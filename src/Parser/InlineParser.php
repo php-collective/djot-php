@@ -50,7 +50,7 @@ class InlineParser
      *
      * @param \Djot\Node\Node $parent
      * @param string $text
-     * @param string|int $sourceLine Source line number (0-indexed) for error reporting
+     * @param int $sourceLine Source line number (0-indexed) for error reporting
      */
     public function parse(Node $parent, string $text, int $sourceLine = 0): void
     {
