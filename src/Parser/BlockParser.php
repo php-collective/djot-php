@@ -74,11 +74,101 @@ class BlockParser
      */
     protected int $lineOffset = 0;
 
+    /**
+     * Custom block patterns: array of [pattern => callback]
+     * Callback receives (array $lines, int $startIndex, Node $parent, BlockParser $parser)
+     * and should return number of lines consumed, or null if not matched
+     *
+     * @var array<string, callable(array<string>, int, \Djot\Node\Node, self): ?int>
+     */
+    protected array $customBlockPatterns = [];
+
     public function __construct(bool $collectWarnings = false, bool $strictMode = false)
     {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
         $this->inlineParser = new InlineParser($this);
+    }
+
+    /**
+     * Register a custom block pattern
+     *
+     * The pattern should match the first line of the block.
+     * The callback receives the full lines array, start index, parent node, and parser,
+     * and should return the number of lines consumed (or null if not a match).
+     *
+     * Example - :::spoiler blocks:
+     * ```php
+     * $parser->addBlockPattern('/^:::spoiler\s*$/', function($lines, $start, $parent, $parser) {
+     *     $endPattern = '/^:::\s*$/';
+     *     $content = [];
+     *     $i = $start + 1;
+     *     while ($i < count($lines) && !preg_match($endPattern, $lines[$i])) {
+     *         $content[] = $lines[$i];
+     *         $i++;
+     *     }
+     *     $div = new Div();
+     *     $div->setAttribute('class', 'spoiler');
+     *     // Parse content inside
+     *     $parser->parseBlockContent($div, $content);
+     *     $parent->appendChild($div);
+     *     return $i - $start + 1; // +1 for closing :::
+     * });
+     * ```
+     *
+     * Example - custom admonitions:
+     * ```php
+     * $parser->addBlockPattern('/^!!!\s*(note|warning|danger)\s*$/', function($lines, $start, $parent, $parser) {
+     *     $type = trim(substr($lines[$start], 3));
+     *     $content = [];
+     *     $i = $start + 1;
+     *     while ($i < count($lines) && preg_match('/^\s+/', $lines[$i])) {
+     *         $content[] = ltrim($lines[$i]);
+     *         $i++;
+     *     }
+     *     $div = new Div();
+     *     $div->setAttribute('class', 'admonition ' . $type);
+     *     $parser->parseBlockContent($div, $content);
+     *     $parent->appendChild($div);
+     *     return $i - $start;
+     * });
+     * ```
+     *
+     * @param string $pattern Regex pattern to match the first line
+     * @param callable(array<string>, int, \Djot\Node\Node, self): ?int $callback
+     */
+    public function addBlockPattern(string $pattern, callable $callback): void
+    {
+        $this->customBlockPatterns[$pattern] = $callback;
+    }
+
+    /**
+     * Remove a custom block pattern
+     */
+    public function removeBlockPattern(string $pattern): void
+    {
+        unset($this->customBlockPatterns[$pattern]);
+    }
+
+    /**
+     * Get all registered custom block patterns
+     *
+     * @return array<string, callable>
+     */
+    public function getBlockPatterns(): array
+    {
+        return $this->customBlockPatterns;
+    }
+
+    /**
+     * Parse block content (for use in custom block callbacks)
+     *
+     * @param \Djot\Node\Node $parent
+     * @param array<string> $lines
+     */
+    public function parseBlockContent(Node $parent, array $lines): void
+    {
+        $this->parseBlocks($parent, $lines, 0);
     }
 
     /**
@@ -328,6 +418,14 @@ class BlockParser
                 continue;
             }
 
+            // Try custom block patterns first (before built-in syntax)
+            $customConsumed = $this->tryCustomBlockPatterns($parent, $lines, $i);
+            if ($customConsumed !== null) {
+                $i += $customConsumed;
+
+                continue;
+            }
+
             // Try to match block elements in order of precedence
             // Comment and raw block must come before code block since ``` =format is a special case
             $consumed = $this->tryParseComment($parent, $lines, $i)
@@ -347,6 +445,33 @@ class BlockParser
 
             $i += $consumed;
         }
+    }
+
+    /**
+     * Try to match custom block patterns at the current position
+     *
+     * @param \Djot\Node\Node $parent
+     * @param array<string> $lines
+     * @param int $start
+     */
+    protected function tryCustomBlockPatterns(Node $parent, array $lines, int $start): ?int
+    {
+        if (empty($this->customBlockPatterns)) {
+            return null;
+        }
+
+        $line = $lines[$start];
+
+        foreach ($this->customBlockPatterns as $pattern => $callback) {
+            if (preg_match($pattern, $line)) {
+                $consumed = $callback($lines, $start, $parent, $this);
+                if ($consumed !== null) {
+                    return $consumed;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1347,5 +1472,13 @@ class BlockParser
     public function addUndefinedFootnoteWarning(string $label, int $line, int $column): void
     {
         $this->addWarning("Undefined footnote '{$label}'", $line, $column, false);
+    }
+
+    /**
+     * Get the inline parser for registering custom patterns
+     */
+    public function getInlineParser(): InlineParser
+    {
+        return $this->inlineParser;
     }
 }

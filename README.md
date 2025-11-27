@@ -1,5 +1,11 @@
 # Djot PHP
 
+[![CI](https://img.shields.io/github/actions/workflow/status/php-collective/djot-php/ci.yml?branch=master&style=flat-square)](https://github.com/php-collective/djot-php/actions)
+[![codecov](https://img.shields.io/codecov/c/github/php-collective/djot-php?style=flat-square)](https://codecov.io/gh/php-collective/djot-php)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level%208-brightgreen.svg?style=flat)](https://phpstan.org/)
+[![PHP Version](https://img.shields.io/badge/php-%3E%3D8.2-8892BF.svg?style=flat-square)](https://php.net)
+[![Software License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
+
 A PHP parser for [Djot](https://djot.net/), a modern light markup language created by John MacFarlane (author of CommonMark/Pandoc).
 
 ## Installation
@@ -24,7 +30,9 @@ $html = $converter->convert('Hello *world*!');
 - **Inline elements**: Emphasis, strong, links, images, code, superscript, subscript, highlight, insert, delete
 - **Advanced**: Footnotes, math expressions, symbols, block attributes, raw HTML blocks, comments
 - **Smart typography**: Curly quotes, en/em dashes, ellipsis
-- **Event system**: Customize rendering without subclassing
+- **Multiple renderers**: HTML, plain text, Markdown output
+- **Extensible**: Custom inline/block patterns, render events
+- **File support**: Parse and convert files directly
 
 ## Examples
 
@@ -317,6 +325,64 @@ echo $converter->convert("Line one\\\nLine two");
 // Line two</p>
 ```
 
+## Alternative Renderers
+
+### Plain Text
+
+Extract plain text for search indexing or SEO:
+
+```php
+use Djot\Renderer\PlainTextRenderer;
+
+$document = $converter->parse('Hello *world*!');
+$renderer = new PlainTextRenderer();
+echo $renderer->render($document);
+// Output: Hello world!
+```
+
+### Markdown
+
+Convert Djot to CommonMark Markdown:
+
+```php
+use Djot\Renderer\MarkdownRenderer;
+
+$document = $converter->parse('Hello *world*!');
+$renderer = new MarkdownRenderer();
+echo $renderer->render($document);
+// Output: Hello **world**!
+```
+
+## File Operations
+
+```php
+// Convert file directly
+$html = $converter->convertFile('/path/to/document.djot');
+
+// Or parse to AST first
+$document = $converter->parseFile('/path/to/document.djot');
+$html = $converter->render($document);
+```
+
+## Custom Syntax Patterns
+
+Extend Djot with custom inline and block patterns:
+
+```php
+// Add @mention support
+$parser = $converter->getParser()->getInlineParser();
+$parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function ($match, $groups, $p) {
+    $link = new Link('/users/' . $groups[1]);
+    $link->appendChild(new Text('@' . $groups[1]));
+    return $link;
+});
+
+echo $converter->convert('Hello @john!');
+// Output: <p>Hello <a href="/users/john">@john</a>!</p>
+```
+
+See the [Cookbook](docs/cookbook.md) for more examples including wiki links, hashtags, admonitions, and custom block patterns.
+
 ## Documentation
 
 See [docs/](docs/) for detailed documentation:
@@ -329,6 +395,11 @@ See [docs/](docs/) for detailed documentation:
 ## Requirements
 
 - PHP 8.2+
+
+## See Also
+
+- [Djot](https://djot.net/) - Official Djot website with syntax reference and playground
+- [jgm/djot](https://github.com/jgm/djot) - Reference implementation in JavaScript by John MacFarlane
 
 ## License
 

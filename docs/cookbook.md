@@ -17,6 +17,9 @@ Common recipes and customizations for djot-php.
 - [Custom Footnotes](#custom-footnotes)
 - [Math Rendering](#math-rendering)
 - [Working with the AST](#working-with-the-ast)
+- [Custom Inline Patterns](#custom-inline-patterns)
+- [Custom Block Patterns](#custom-block-patterns)
+- [Alternative Output Formats](#alternative-output-formats)
 
 ## External Links
 
@@ -606,4 +609,363 @@ $converter->on('render.heading', function (RenderEvent $event): void {
 
 // Now convert
 $html = $converter->convert($djotContent);
+```
+
+## Custom Inline Patterns
+
+Extend Djot with custom inline syntax by registering patterns on the InlineParser.
+
+### @Mentions
+
+Convert `@username` to profile links:
+
+```php
+use Djot\DjotConverter;
+use Djot\Node\Inline\Link;
+use Djot\Node\Inline\Text;
+
+$converter = new DjotConverter();
+$parser = $converter->getParser()->getInlineParser();
+
+$parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function ($match, $groups, $p) {
+    $username = $groups[1];
+    $link = new Link('https://example.com/users/' . $username);
+    $link->appendChild(new Text('@' . $username));
+    return $link;
+});
+
+echo $converter->convert('Hello @john_doe, meet @jane_smith!');
+```
+
+Output:
+```html
+<p>Hello <a href="https://example.com/users/john_doe">@john_doe</a>, meet <a href="https://example.com/users/jane_smith">@jane_smith</a>!</p>
+```
+
+### Wiki Links
+
+Support `[[Page Name]]` wiki-style links:
+
+```php
+$parser->addInlinePattern('/\[\[([^\]]+)\]\]/', function ($match, $groups, $p) {
+    $page = $groups[1];
+    $link = new Link('/wiki/' . rawurlencode($page));
+    $link->appendChild(new Text($page));
+    return $link;
+});
+
+echo $converter->convert('See [[Home Page]] and [[Getting Started]].');
+```
+
+Output:
+```html
+<p>See <a href="/wiki/Home%20Page">Home Page</a> and <a href="/wiki/Getting%20Started">Getting Started</a>.</p>
+```
+
+### Hashtags
+
+Convert `#hashtag` to tag links:
+
+```php
+$parser->addInlinePattern('/#([a-zA-Z][a-zA-Z0-9_]*)/', function ($match, $groups, $p) {
+    $tag = $groups[1];
+    $link = new Link('/tags/' . strtolower($tag));
+    $link->appendChild(new Text('#' . $tag));
+    $link->setAttribute('class', 'hashtag');
+    return $link;
+});
+
+echo $converter->convert('Check out #PHP and #WebDev!');
+```
+
+### Conditional Patterns
+
+Return `null` to fall back to default parsing:
+
+```php
+$parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function ($match, $groups, $p) {
+    // Only handle @admin specially
+    if ($groups[1] === 'admin') {
+        $link = new Link('/admin');
+        $link->appendChild(new Text('Administrator'));
+        return $link;
+    }
+    return null;  // Let default parsing handle other @mentions
+});
+```
+
+### Override Built-in Syntax
+
+Custom patterns are checked before built-in syntax, allowing overrides:
+
+```php
+// Replace **bold** with custom brackets
+$parser->addInlinePattern('/\*\*([^*]+)\*\*/', function ($match, $groups, $p) {
+    return new Text('【' . $groups[1] . '】');
+});
+
+echo $converter->convert('This is **important** text.');
+// Output: <p>This is 【important】 text.</p>
+```
+
+## Custom Block Patterns
+
+Extend Djot with custom block-level syntax by registering patterns on the BlockParser.
+
+### Admonition Blocks
+
+Support `!!! type` admonition syntax:
+
+```php
+use Djot\DjotConverter;
+use Djot\Node\Block\Div;
+
+$converter = new DjotConverter();
+$parser = $converter->getParser();
+
+$parser->addBlockPattern('/^!!!\s*(note|warning|danger)\s*$/', function ($lines, $start, $parent, $p) {
+    preg_match('/^!!!\s*(note|warning|danger)\s*$/', $lines[$start], $m);
+    $type = $m[1];
+
+    // Collect indented content
+    $content = [];
+    $i = $start + 1;
+    while ($i < count($lines) && preg_match('/^\s+(.*)$/', $lines[$i], $contentMatch)) {
+        $content[] = $contentMatch[1];
+        $i++;
+    }
+
+    $div = new Div();
+    $div->setAttribute('class', 'admonition ' . $type);
+    $p->parseBlockContent($div, $content);  // Parse nested content
+    $parent->appendChild($div);
+
+    return $i - $start;  // Return lines consumed
+});
+
+$djot = <<<'DJOT'
+!!! warning
+    Be careful with this feature.
+    It may cause issues.
+
+Regular paragraph.
+DJOT;
+
+echo $converter->convert($djot);
+```
+
+Output:
+```html
+<div class="admonition warning">
+<p>Be careful with this feature.
+It may cause issues.</p>
+</div>
+<p>Regular paragraph.</p>
+```
+
+### Spoiler/Collapsible Blocks
+
+Support `:::spoiler ... :::` syntax:
+
+```php
+$parser->addBlockPattern('/^:::spoiler\s*$/', function ($lines, $start, $parent, $p) {
+    $content = [];
+    $i = $start + 1;
+
+    // Collect until closing :::
+    while ($i < count($lines) && !preg_match('/^:::\s*$/', $lines[$i])) {
+        $content[] = $lines[$i];
+        $i++;
+    }
+
+    $div = new Div();
+    $div->setAttribute('class', 'spoiler');
+    $p->parseBlockContent($div, $content);
+    $parent->appendChild($div);
+
+    // +1 for closing :::
+    return ($i < count($lines)) ? $i - $start + 1 : $i - $start;
+});
+
+$djot = <<<'DJOT'
+:::spoiler
+This content is hidden by default.
+
+It can contain **formatted** text.
+:::
+DJOT;
+```
+
+### Tab Containers
+
+Support `=== Tab Title` syntax:
+
+```php
+$parser->addBlockPattern('/^===\s+(.+)$/', function ($lines, $start, $parent, $p) {
+    preg_match('/^===\s+(.+)$/', $lines[$start], $m);
+    $title = trim($m[1]);
+
+    // Collect content until next === or end
+    $content = [];
+    $i = $start + 1;
+    while ($i < count($lines) && !preg_match('/^===\s+/', $lines[$i])) {
+        $content[] = $lines[$i];
+        $i++;
+    }
+
+    $div = new Div();
+    $div->setAttribute('class', 'tab');
+    $div->setAttribute('data-title', $title);
+    $p->parseBlockContent($div, $content);
+    $parent->appendChild($div);
+
+    return $i - $start;
+});
+
+$djot = <<<'DJOT'
+=== First Tab
+Content of first tab.
+
+=== Second Tab
+Content of second tab.
+DJOT;
+```
+
+### Combining Inline and Block Patterns
+
+Use both pattern types together:
+
+```php
+$converter = new DjotConverter();
+$parser = $converter->getParser();
+$inlineParser = $parser->getInlineParser();
+
+// Inline: @mentions
+$inlineParser->addInlinePattern('/@(\w+)/', function ($m, $g, $p) {
+    $link = new Link('/u/' . $g[1]);
+    $link->appendChild(new Text('@' . $g[1]));
+    return $link;
+});
+
+// Block: NOTE: admonitions
+$parser->addBlockPattern('/^NOTE:\s*$/', function ($lines, $start, $parent, $p) {
+    $content = [];
+    $i = $start + 1;
+    while ($i < count($lines) && $lines[$i] !== '' && !preg_match('/^[A-Z]+:\s*$/', $lines[$i])) {
+        $content[] = $lines[$i];
+        $i++;
+    }
+
+    $div = new Div();
+    $div->setAttribute('class', 'note');
+    $p->parseBlockContent($div, $content);  // @mentions work inside!
+    $parent->appendChild($div);
+
+    return $i - $start;
+});
+
+$djot = <<<'DJOT'
+NOTE:
+Remember to contact @support for help.
+
+Regular paragraph with @mention.
+DJOT;
+
+echo $converter->convert($djot);
+```
+
+## Alternative Output Formats
+
+### Plain Text Extraction
+
+Extract plain text for search indexing or SEO:
+
+```php
+use Djot\DjotConverter;
+use Djot\Renderer\PlainTextRenderer;
+
+$converter = new DjotConverter();
+$renderer = new PlainTextRenderer();
+
+$djot = <<<'DJOT'
+# Welcome
+
+This is *formatted* text with a [link](https://example.com).
+
+- Item one
+- Item two
+DJOT;
+
+$document = $converter->parse($djot);
+$text = $renderer->render($document);
+
+echo $text;
+```
+
+Output:
+```
+Welcome
+
+This is formatted text with a link.
+
+- Item one
+- Item two
+```
+
+### Markdown Conversion
+
+Convert Djot to CommonMark Markdown:
+
+```php
+use Djot\DjotConverter;
+use Djot\Renderer\MarkdownRenderer;
+
+$converter = new DjotConverter();
+$renderer = new MarkdownRenderer();
+
+$djot = <<<'DJOT'
+# Heading
+
+This has _emphasis_ and *strong* text.
+
+| Name | Age |
+|:-----|----:|
+| Alice | 30 |
+| Bob | 25 |
+DJOT;
+
+$document = $converter->parse($djot);
+$markdown = $renderer->render($document);
+
+echo $markdown;
+```
+
+Output:
+```markdown
+# Heading
+
+This has *emphasis* and **strong** text.
+
+| Name | Age |
+|:-----|----:|
+| Alice | 30 |
+| Bob | 25 |
+```
+
+### Converting Files
+
+Work directly with files:
+
+```php
+use Djot\DjotConverter;
+
+$converter = new DjotConverter();
+
+// Convert file to HTML
+$html = $converter->convertFile('/path/to/document.djot');
+
+// Or parse file to AST for manipulation
+$document = $converter->parseFile('/path/to/document.djot');
+// ... modify AST ...
+$html = $converter->render($document);
 ```

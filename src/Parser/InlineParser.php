@@ -41,8 +41,67 @@ class InlineParser
      */
     protected int $currentLine = 0;
 
+    /**
+     * Custom inline patterns: array of [pattern => callback]
+     * Callback receives (string $match, array $groups, InlineParser $parser)
+     * and should return a Node or null
+     *
+     * @var array<string, callable(string, array<string>, self): ?\Djot\Node\Node>
+     */
+    protected array $customPatterns = [];
+
     public function __construct(protected BlockParser $blockParser)
     {
+    }
+
+    /**
+     * Register a custom inline pattern
+     *
+     * The pattern should be a regex that matches from the current position.
+     * It will be anchored to the start automatically.
+     *
+     * Example - @mentions:
+     * ```php
+     * $parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function($match, $groups, $parser) {
+     *     $link = new Link('https://example.com/users/' . $groups[1]);
+     *     $link->appendChild(new Text('@' . $groups[1]));
+     *     return $link;
+     * });
+     * ```
+     *
+     * Example - [[wiki-links]]:
+     * ```php
+     * $parser->addInlinePattern('/\[\[([^\]]+)\]\]/', function($match, $groups, $parser) {
+     *     $link = new Link('/wiki/' . rawurlencode($groups[1]));
+     *     $link->appendChild(new Text($groups[1]));
+     *     return $link;
+     * });
+     * ```
+     *
+     * @param string $pattern Regex pattern (without anchors)
+     * @param callable(string, array<string>, self): ?\Djot\Node\Node $callback
+     */
+    public function addInlinePattern(string $pattern, callable $callback): void
+    {
+        $this->customPatterns[$pattern] = $callback;
+    }
+
+    /**
+     * Remove a custom inline pattern
+     */
+    public function removeInlinePattern(string $pattern): void
+    {
+        unset($this->customPatterns[$pattern]);
+    }
+
+    /**
+     * Get all registered custom patterns
+     *
+     * @return array<string, callable>
+     */
+    public function getInlinePatterns(): array
+    {
+        return $this->customPatterns;
     }
 
     /**
@@ -94,6 +153,17 @@ class InlineParser
 
                     continue;
                 }
+            }
+
+            // Check custom patterns first (before built-in syntax)
+            $customResult = $this->tryCustomPatterns($text, $pos);
+            if ($customResult !== null) {
+                $this->flushText($parent, $textBuffer);
+                $textBuffer = '';
+                $parent->appendChild($customResult['node']);
+                $pos = $customResult['pos'];
+
+                continue;
             }
 
             // Soft break (newline)
@@ -308,6 +378,37 @@ class InlineParser
         if ($text !== '') {
             $parent->appendChild(new Text($text));
         }
+    }
+
+    /**
+     * Try to match custom inline patterns at the current position
+     *
+     * @return array{node: \Djot\Node\Node, pos: int}|null
+     */
+    protected function tryCustomPatterns(string $text, int $pos): ?array
+    {
+        if (empty($this->customPatterns)) {
+            return null;
+        }
+
+        $remaining = substr($text, $pos);
+
+        foreach ($this->customPatterns as $pattern => $callback) {
+            // Anchor pattern to start
+            $anchoredPattern = '/\A' . substr($pattern, 1, -1) . '/';
+
+            if (preg_match($anchoredPattern, $remaining, $matches)) {
+                $node = $callback($matches[0], $matches, $this);
+                if ($node !== null) {
+                    return [
+                        'node' => $node,
+                        'pos' => $pos + strlen($matches[0]),
+                    ];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
