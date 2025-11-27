@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot;
 
+use Closure;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
 use Djot\Renderer\HtmlRenderer;
@@ -65,9 +66,9 @@ class DjotConverter
      * ```
      *
      * @param string $event
-     * @param callable(\Djot\Event\RenderEvent): void $listener
+     * @param \Closure(\Djot\Event\RenderEvent): void $listener
      */
-    public function on(string $event, callable $listener): self
+    public function on(string $event, Closure $listener): self
     {
         $this->renderer->on($event, $listener);
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
+use Closure;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
@@ -52,9 +53,16 @@ class HtmlRenderer
     protected bool $softBreakAsNewline = false;
 
     /**
-     * @var array<string, array<callable(\Djot\Event\RenderEvent): void>>
+     * @var array<string, array<\Closure(\Djot\Event\RenderEvent): void>>
      */
     protected array $listeners = [];
+
+    /**
+     * Tracks footnote reference counts for generating unique IDs
+     *
+     * @var array<string, int>
+     */
+    protected array $footnoteRefCounts = [];
 
     public function __construct(protected bool $xhtml = false)
     {
@@ -73,9 +81,9 @@ class HtmlRenderer
      * - render.* for all nodes
      *
      * @param string $event
-     * @param callable(\Djot\Event\RenderEvent): void $listener
+     * @param \Closure(\Djot\Event\RenderEvent): void $listener
      */
-    public function on(string $event, callable $listener): void
+    public function on(string $event, Closure $listener): void
     {
         $this->listeners[$event][] = $listener;
     }
@@ -94,6 +102,9 @@ class HtmlRenderer
 
     public function render(Document $document): string
     {
+        // Reset footnote reference counts for each render
+        $this->footnoteRefCounts = [];
+
         return $this->renderChildren($document);
     }
 
@@ -497,17 +508,44 @@ class HtmlRenderer
         $label = $this->escape($node->getLabel());
         $attrs = $this->renderAttributes($node);
 
+        $content = trim($this->renderChildren($node));
+
+        // Strip wrapping <p>...</p> to avoid nested paragraphs
+        if (preg_match('/^<p>(.+)<\/p>$/s', $content, $matches)) {
+            $content = $matches[1];
+        }
+
+        // Build backref links for all references to this footnote
+        $refCount = $this->footnoteRefCounts[$node->getLabel()] ?? 1;
+        $backrefs = '';
+        if ($refCount === 1) {
+            $backrefs = '<a href="#fnref-' . $label . '-1">↩</a>';
+        } else {
+            $links = [];
+            for ($i = 1; $i <= $refCount; $i++) {
+                $links[] = '<a href="#fnref-' . $label . '-' . $i . '">↩<sup>' . $i . '</sup></a>';
+            }
+            $backrefs = implode(' ', $links);
+        }
+
         return '<div' . $attrs . ' class="footnote" id="fn-' . $label . '">' . "\n"
-            . '<p><sup>' . $label . '</sup> ' . trim($this->renderChildren($node))
-            . ' <a href="#fnref-' . $label . '">↩</a></p>' . "\n"
+            . '<p><sup>' . $label . '</sup> ' . $content . ' ' . $backrefs . '</p>' . "\n"
             . "</div>\n";
     }
 
     protected function renderFootnoteRef(FootnoteRef $node): string
     {
-        $label = $this->escape($node->getLabel());
+        $label = $node->getLabel();
+        $escapedLabel = $this->escape($label);
 
-        return '<sup id="fnref-' . $label . '"><a href="#fn-' . $label . '">' . $label . '</a></sup>';
+        // Track reference count and generate unique ID
+        if (!isset($this->footnoteRefCounts[$label])) {
+            $this->footnoteRefCounts[$label] = 0;
+        }
+        $this->footnoteRefCounts[$label]++;
+        $refNum = $this->footnoteRefCounts[$label];
+
+        return '<sup id="fnref-' . $escapedLabel . '-' . $refNum . '"><a href="#fn-' . $escapedLabel . '">' . $escapedLabel . '</a></sup>';
     }
 
     protected function renderMath(Math $node): string

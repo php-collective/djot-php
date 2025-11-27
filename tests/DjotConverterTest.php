@@ -720,6 +720,26 @@ DJOT;
         $this->assertStringContainsString('Note B', $result);
     }
 
+    public function testMultipleReferencesToSameFootnote(): void
+    {
+        $djot = "First[^x] and second[^x] and third[^x].\n\n[^x]: Shared note";
+
+        $result = $this->converter->convert($djot);
+
+        // Each reference should have a unique ID
+        $this->assertStringContainsString('id="fnref-x-1"', $result);
+        $this->assertStringContainsString('id="fnref-x-2"', $result);
+        $this->assertStringContainsString('id="fnref-x-3"', $result);
+
+        // Footnote should have backrefs to all references
+        $this->assertStringContainsString('href="#fnref-x-1"', $result);
+        $this->assertStringContainsString('href="#fnref-x-2"', $result);
+        $this->assertStringContainsString('href="#fnref-x-3"', $result);
+
+        // Content should not have nested <p> tags
+        $this->assertStringNotContainsString('<p><sup>x</sup> <p>', $result);
+    }
+
     public function testRawInline(): void
     {
         // Raw inline HTML syntax: `content`{=html}
