@@ -500,7 +500,7 @@ class HtmlRenderer
             return '';
         }
 
-        // Sort attributes: id first, then others (preserving insertion order), then class last
+        // Sort attributes: id first, class second, then others in source order
         uksort($attrs, function (string $a, string $b): int {
             if ($a === 'id') {
                 return -1;
@@ -509,10 +509,10 @@ class HtmlRenderer
                 return 1;
             }
             if ($a === 'class') {
-                return 1; // class goes last
+                return -1; // class after id
             }
             if ($b === 'class') {
-                return -1; // class goes last
+                return 1;
             }
 
             return 0; // preserve order for other attributes

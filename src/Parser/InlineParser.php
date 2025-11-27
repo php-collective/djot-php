@@ -277,17 +277,22 @@ class InlineParser
                 $textBuffer = '';
                 $result = $this->parseLink($text, $pos);
                 if ($result !== null) {
-                    // Check if this returned literal text (for unclosed link)
-                    if (isset($result['literal'])) {
-                        $textBuffer .= $result['literal'];
+                    // Check if this is an unclosed link (special handling)
+                    if (isset($result['unclosed_link'])) {
+                        // Output [ then parse linkText in isolation then output ](
+                        $parent->appendChild(new Text('['));
+                        $this->parseInlines($parent, $result['link_text']);
+                        $parent->appendChild(new Text(']('));
+                        $pos = $result['continue_pos'];
+
+                        continue;
+                    }
+                    if (isset($result['node'])) {
+                        $parent->appendChild($result['node']);
                         $pos = $result['pos'];
 
                         continue;
                     }
-                    $parent->appendChild($result['node']);
-                    $pos = $result['pos'];
-
-                    continue;
                 }
             }
 
@@ -544,7 +549,7 @@ class InlineParser
     }
 
     /**
-     * @return array{node: \Djot\Node\Inline\Link|\Djot\Node\Inline\Span, pos: int}|null
+     * @return array{node: \Djot\Node\Inline\Link|\Djot\Node\Inline\Span, pos: int}|array{unclosed_link: true, link_text: string, continue_pos: int}|null
      */
     protected function parseLink(string $text, int $pos): ?array
     {
@@ -620,12 +625,13 @@ class InlineParser
                 ];
             }
 
-            // Unclosed parenthesis - the entire [text](... is literal text
-            // In djot, emphasis openers in [..] can't match closers in (..)
-            // so we return the whole thing as literal text to prevent cross-boundary emphasis
+            // Unclosed parenthesis - not a valid link
+            // Parse [text] as isolated inline content, then continue from after (
+            // This prevents emphasis from crossing the [text]( boundary
             return [
-                'literal' => substr($text, $pos, $length - $pos),
-                'pos' => $length,
+                'unclosed_link' => true,
+                'link_text' => $linkText,
+                'continue_pos' => $urlStart, // Position after (
             ];
         }
 
@@ -641,7 +647,7 @@ class InlineParser
                     $ref = $this->normalizeReferenceLabel($linkText);
                 } else {
                     // Explicit reference [text][ref] - only normalize whitespace, keep formatting chars
-                    $ref = preg_replace('/\s+/', ' ', trim($ref));
+                    $ref = preg_replace('/\s+/', ' ', trim($ref)) ?? $ref;
                 }
 
                 $refDef = $this->blockParser->getReference($ref);
@@ -728,6 +734,11 @@ class InlineParser
         // Skip the !
         $result = $this->parseLink($text, $pos + 1);
         if ($result === null) {
+            return null;
+        }
+
+        // Unclosed links can't be images, and we need node/pos to exist
+        if (isset($result['unclosed_link']) || !isset($result['node'])) {
             return null;
         }
 
@@ -1618,10 +1629,10 @@ class InlineParser
     {
         // Strip inline formatting markers: _ * ~ ^ + = { }
         // But keep the content between them
-        $label = preg_replace('/[_*~^+={}]/', '', $label);
+        $label = preg_replace('/[_*~^+={}]/', '', $label) ?? $label;
 
         // Normalize whitespace: collapse multiple spaces/newlines to single space
-        $label = preg_replace('/\s+/', ' ', $label);
+        $label = preg_replace('/\s+/', ' ', $label) ?? $label;
 
         // Trim
         return trim($label);

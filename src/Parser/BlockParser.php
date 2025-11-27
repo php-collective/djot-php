@@ -341,13 +341,13 @@ class BlockParser
             } elseif (!empty($match[2])) {
                 // ID attribute
                 $attrs['id'] = $match[2];
-            } elseif (!empty($match[3])) {
+            } elseif (($match[3] ?? '') !== '') {
                 // key="double quoted value"
                 $attrs[$match[3]] = $match[4] ?? '';
-            } elseif (isset($match[5])) {
+            } elseif (($match[5] ?? '') !== '') {
                 // key='single quoted value'
                 $attrs[$match[5]] = $match[6] ?? '';
-            } elseif (isset($match[7])) {
+            } elseif (($match[7] ?? '') !== '') {
                 // key=unquoted
                 $attrs[$match[7]] = $match[8] ?? '';
             }
@@ -512,6 +512,19 @@ class BlockParser
             if (!preg_match('/^[.#a-zA-Z%]/', $attrStr)) {
                 return null;
             }
+
+            // Check if attributes precede a reference definition - if so, skip storing them
+            // (they were already applied during extractReferences)
+            $count = count($lines);
+            $nextIdx = $start + 1;
+            while ($nextIdx < $count && $this->isBlankLine($lines[$nextIdx])) {
+                $nextIdx++;
+            }
+            if ($nextIdx < $count && preg_match('/^\[([^\]]+)\]:/', $lines[$nextIdx])) {
+                // Attributes precede a reference definition, don't store them as block attrs
+                return 1;
+            }
+
             $this->parseAttributeString($attrStr);
 
             return 1;
@@ -1494,9 +1507,10 @@ class BlockParser
         $hasNonRomanLetter = false;
         $allSameLetter = true;
         $romanChars = 'ivxlcdm';
+        $lineCount = count($lines);
 
         // Look ahead at subsequent items
-        for ($i = $start + 1; $i < count($lines); $i++) {
+        for ($i = $start + 1; $i < $lineCount; $i++) {
             $line = $lines[$i];
 
             // Stop at blank lines or non-list content
@@ -1567,7 +1581,7 @@ class BlockParser
     }
 
     /**
-     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, style?: string, marker_indent?: int}|null
+     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string}|null
      */
     protected function parseListItemMarker(string $line): ?array
     {
