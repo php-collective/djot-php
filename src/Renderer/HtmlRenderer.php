@@ -73,7 +73,7 @@ class HtmlRenderer
      * - render.* for all nodes
      *
      * @param string $event
-     * @param callable(\Djot\Event\RenderEvent): void|string $listener
+     * @param callable(\Djot\Event\RenderEvent): void $listener
      */
     public function on(string $event, callable $listener): void
     {

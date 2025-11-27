@@ -65,7 +65,7 @@ class DjotConverter
      * ```
      *
      * @param string $event
-     * @param callable(\Djot\Event\RenderEvent) $listener
+     * @param callable(\Djot\Event\RenderEvent): void $listener
      */
     public function on(string $event, callable $listener): self
     {
