@@ -104,7 +104,7 @@ class HtmlRendererTest extends TestCase
 
         $result = $this->renderer->render($doc);
 
-        $this->assertSame("<p><img src=\"photo.jpg\" alt=\"A photo\"></p>\n", $result);
+        $this->assertSame("<p><img alt=\"A photo\" src=\"photo.jpg\"></p>\n", $result);
     }
 
     public function testRenderCode(): void

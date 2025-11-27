@@ -96,7 +96,7 @@ class DjotConverterTest extends TestCase
     public function testImage(): void
     {
         $djot = '![Alt text](image.png)';
-        $expected = "<p><img src=\"image.png\" alt=\"Alt text\"></p>\n";
+        $expected = "<p><img alt=\"Alt text\" src=\"image.png\"></p>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }

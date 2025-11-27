@@ -378,10 +378,14 @@ class HtmlRenderer
     protected function renderLink(Link $node): string
     {
         $attrs = $this->renderAttributes($node);
-        $href = $this->escape($node->getDestination());
+        $href = $node->getDestination();
         $title = $node->getTitle();
 
-        $html = '<a href="' . $href . '"';
+        $html = '<a';
+        // Only output href if not empty (unresolved references have no href)
+        if ($href !== '') {
+            $html .= ' href="' . $this->escape($href) . '"';
+        }
         if ($title !== null) {
             $html .= ' title="' . $this->escape($title) . '"';
         }
@@ -393,11 +397,11 @@ class HtmlRenderer
     protected function renderImage(Image $node): string
     {
         $attrs = $this->renderAttributes($node);
-        $src = $this->escape($node->getSource());
         $alt = $this->escape($node->getAlt());
+        $src = $this->escape($node->getSource());
         $title = $node->getTitle();
 
-        $html = '<img src="' . $src . '" alt="' . $alt . '"';
+        $html = '<img alt="' . $alt . '" src="' . $src . '"';
         if ($title !== null) {
             $html .= ' title="' . $this->escape($title) . '"';
         }
@@ -471,6 +475,24 @@ class HtmlRenderer
         if (!$attrs) {
             return '';
         }
+
+        // Sort attributes: id first, then class, then others alphabetically
+        uksort($attrs, function (string $a, string $b): int {
+            if ($a === 'id') {
+                return -1;
+            }
+            if ($b === 'id') {
+                return 1;
+            }
+            if ($a === 'class') {
+                return -1;
+            }
+            if ($b === 'class') {
+                return 1;
+            }
+
+            return strcmp($a, $b);
+        });
 
         $html = '';
         foreach ($attrs as $key => $value) {

@@ -600,8 +600,28 @@ class InlineParser
                     ];
                 }
 
-                // Reference not found - warn
+                // Reference not found - create link without href and warn
                 $this->blockParser->addUndefinedReferenceWarning($ref, $this->currentLine, $pos + 1);
+
+                $link = new Link('');
+                $this->parseInlines($link, $linkText);
+
+                $endPos = $refEnd + 1;
+
+                // Check for attributes after reference link
+                if ($endPos < $length && $text[$endPos] === '{') {
+                    $attrEnd = strpos($text, '}', $endPos);
+                    if ($attrEnd !== false) {
+                        $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
+                        $this->applyAttributesToNode($link, $attrStr);
+                        $endPos = $attrEnd + 1;
+                    }
+                }
+
+                return [
+                    'node' => $link,
+                    'pos' => $endPos,
+                ];
             }
         }
 
