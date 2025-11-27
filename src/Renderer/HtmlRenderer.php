@@ -216,6 +216,17 @@ class HtmlRenderer
     protected function renderList(ListBlock $node): string
     {
         $attrs = $this->renderAttributes($node);
+        $tight = $node->isTight();
+
+        // Render children with tight parameter
+        $html = '';
+        foreach ($node->getChildren() as $child) {
+            if ($child instanceof ListItem) {
+                $html .= $this->renderListItem($child, $tight);
+            } else {
+                $html .= $this->renderNode($child);
+            }
+        }
 
         if ($node->getListType() === ListBlock::TYPE_ORDERED) {
             $start = $node->getStart();
@@ -223,33 +234,43 @@ class HtmlRenderer
                 $attrs .= ' start="' . $start . '"';
             }
 
-            return '<ol' . $attrs . ">\n" . $this->renderChildren($node) . "</ol>\n";
+            return '<ol' . $attrs . ">\n" . $html . "</ol>\n";
         }
 
         if ($node->getListType() === ListBlock::TYPE_TASK) {
             $attrs .= ' class="task-list"';
         }
 
-        return '<ul' . $attrs . ">\n" . $this->renderChildren($node) . "</ul>\n";
+        return '<ul' . $attrs . ">\n" . $html . "</ul>\n";
     }
 
-    protected function renderListItem(ListItem $node): string
+    protected function renderListItem(ListItem $node, bool $tight = true): string
     {
         $attrs = $this->renderAttributes($node);
         $content = $this->renderChildren($node);
 
+        if ($tight) {
+            // For tight lists, strip paragraph wrapper
+            $content = preg_replace('/^<p>(.+)<\/p>\n?$/s', '$1', $content) ?? $content;
+        } else {
+            // For loose lists, check if content is just one paragraph followed by lists
+            // In djot, this case should also strip the leading <p> wrapper
+            // Pattern: single paragraph followed by list(s)
+            $content = preg_replace('/^<p>(.+?)<\/p>\n(<[uo]l>)/s', "$1\n$2", $content) ?? $content;
+        }
+
         // Handle task list items
         if ($node->isTask()) {
             $checked = $node->getChecked() ? ' checked=""' : '';
-            $disabled = $this->xhtml ? ' disabled="disabled"' : ' disabled';
-            $checkbox = '<input type="checkbox"' . $checked . $disabled . ($this->xhtml ? ' />' : '>') . ' ';
-            $content = $checkbox . ltrim($content);
+            // Always use xhtml-style format for task list checkboxes
+            $checkbox = '<input disabled="" type="checkbox"' . $checked . "/>\n";
+            $content = $checkbox . rtrim($content);
+        } else {
+            $content = rtrim($content);
         }
 
-        // For tight lists, don't wrap single paragraphs
-        $content = preg_replace('/^<p>(.+)<\/p>\n?$/s', '$1', $content) ?? $content;
-
-        return '<li' . $attrs . '>' . $content . "</li>\n";
+        // In djot, list item content is always on its own line
+        return '<li' . $attrs . ">\n" . $content . "\n</li>\n";
     }
 
     protected function renderThematicBreak(): string
@@ -503,10 +524,13 @@ class HtmlRenderer
         $attrs = $this->renderAttributes($node);
         $content = $this->renderChildren($node);
 
-        // For simple descriptions, don't wrap in paragraph
-        $content = preg_replace('/^<p>(.+)<\/p>\n?$/s', '$1', $content) ?? $content;
+        // Content goes on separate lines
+        $content = rtrim($content);
+        if ($content === '') {
+            return '<dd' . $attrs . ">\n</dd>\n";
+        }
 
-        return '<dd' . $attrs . '>' . $content . "</dd>\n";
+        return '<dd' . $attrs . ">\n" . $content . "\n</dd>\n";
     }
 
     protected function renderFootnote(Footnote $node): string

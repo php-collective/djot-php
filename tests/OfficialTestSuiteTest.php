@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Djot\Test;
 
 use Djot\DjotConverter;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use function count;
 
@@ -22,7 +24,7 @@ use function count;
  * To generate a detailed compatibility report:
  *   php tests/compatibility-report.php
  */
-#[\PHPUnit\Framework\Attributes\Group('official')]
+#[Group('official')]
 class OfficialTestSuiteTest extends TestCase
 {
     protected DjotConverter $converter;
@@ -128,7 +130,7 @@ class OfficialTestSuiteTest extends TestCase
      * Note: Some tests may fail due to implementation differences.
      * This is expected and documented.
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('officialTestProvider')]
+    #[DataProvider('officialTestProvider')]
     public function testOfficialSuite(string $input, string $expected, string $file, int $index): void
     {
         $result = $this->converter->convert($input);

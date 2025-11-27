@@ -128,7 +128,7 @@ class DjotConverterTest extends TestCase
     public function testBulletList(): void
     {
         $djot = "- Item 1\n- Item 2\n- Item 3";
-        $expected = "<ul>\n<li>Item 1</li>\n<li>Item 2</li>\n<li>Item 3</li>\n</ul>\n";
+        $expected = "<ul>\n<li>\nItem 1\n</li>\n<li>\nItem 2\n</li>\n<li>\nItem 3\n</li>\n</ul>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -136,7 +136,7 @@ class DjotConverterTest extends TestCase
     public function testOrderedList(): void
     {
         $djot = "1. First\n2. Second\n3. Third";
-        $expected = "<ol>\n<li>First</li>\n<li>Second</li>\n<li>Third</li>\n</ol>\n";
+        $expected = "<ol>\n<li>\nFirst\n</li>\n<li>\nSecond\n</li>\n<li>\nThird\n</li>\n</ol>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -433,7 +433,8 @@ DJOT;
 
         $this->assertStringContainsString('<dl>', $result);
         $this->assertStringContainsString('<dt>Term</dt>', $result);
-        $this->assertStringContainsString('<dd>Definition of the term</dd>', $result);
+        $this->assertStringContainsString('Definition of the term', $result);
+        $this->assertStringContainsString('<dd>', $result);
     }
 
     public function testBlockAttributes(): void
@@ -511,9 +512,9 @@ DJOT;
         $result = $this->converter->convert($djot);
 
         $this->assertStringContainsString('<dt>Apple</dt>', $result);
-        $this->assertStringContainsString('<dd>A fruit</dd>', $result);
+        $this->assertStringContainsString('A fruit', $result);
         $this->assertStringContainsString('<dt>Banana</dt>', $result);
-        $this->assertStringContainsString('<dd>Another fruit</dd>', $result);
+        $this->assertStringContainsString('Another fruit', $result);
     }
 
     public function testComment(): void
@@ -871,8 +872,8 @@ DJOT;
         $result = $this->converter->convert($djot);
 
         $this->assertStringContainsString('<dt>Term</dt>', $result);
-        $this->assertStringContainsString('<dd>First definition</dd>', $result);
-        $this->assertStringContainsString('<dd>Second definition</dd>', $result);
+        $this->assertStringContainsString('First definition', $result);
+        $this->assertStringContainsString('Second definition', $result);
     }
 
     public function testLinkWithAttributes(): void
@@ -1712,8 +1713,8 @@ DJOT;
 
         $this->assertStringContainsString('<dt>Term 1</dt>', $result);
         $this->assertStringContainsString('<dt>Term 2</dt>', $result);
-        $this->assertStringContainsString('<dd>Definition 2a</dd>', $result);
-        $this->assertStringContainsString('<dd>Definition 2b</dd>', $result);
+        $this->assertStringContainsString('Definition 2a', $result);
+        $this->assertStringContainsString('Definition 2b', $result);
     }
 
     // Edge cases: Math

@@ -1007,56 +1007,103 @@ class BlockParser
             return null;
         }
 
+        // Definition lists are handled separately in djot
+        if ($listInfo['type'] === ListBlock::TYPE_DEFINITION) {
+            return $this->tryParseDjotDefinitionList($parent, $lines, $start);
+        }
+
         $list = new ListBlock(
             $listInfo['type'],
             $listInfo['start'] ?? 1,
-            true,
+            true, // Start as tight
             $listInfo['marker'],
         );
 
+        // Add list style type if present
+        if (isset($listInfo['style'])) {
+            $list->setAttribute('type', $listInfo['style']);
+        }
+
         $i = $start;
         $count = count($lines);
-        $hasBlankLine = false;
+        $lastItemHadBlankAfter = false;
+        $markerIndent = $listInfo['marker_indent'] ?? 0;
 
         while ($i < $count) {
             $currentLine = $lines[$i];
 
+            // Skip blank lines, track them for tight/loose determination
             if ($this->isBlankLine($currentLine)) {
-                $hasBlankLine = true;
+                $lastItemHadBlankAfter = true;
                 $i++;
 
                 continue;
             }
 
-            $itemInfo = $this->parseListItemMarker($currentLine);
+            // Check for indented continuation (after blank line = nested content)
+            $hasIndent = preg_match('/^\s+/', $currentLine);
 
-            // Check if this is a list item of the same type
-            if ($itemInfo === null || $itemInfo['type'] !== $listInfo['type'] || $itemInfo['marker'] !== $listInfo['marker']) {
-                // Check for indented continuation
-                if (preg_match('/^(\s{2,})(.*)$/', $currentLine, $indentMatch) && !$this->isBlankLine($lines[$i - 1] ?? '')) {
-                    // This is a continuation of the previous list item
-                    $lastItem = $list->getChildren()[count($list->getChildren()) - 1] ?? null;
-                    if ($lastItem instanceof ListItem) {
-                        $this->appendToLastParagraph($lastItem, trim($indentMatch[2]), $i);
+            if ($lastItemHadBlankAfter && $hasIndent) {
+                // Content after blank line with indentation belongs to previous item
+                $lastItem = $this->getLastListItem($list);
+                if ($lastItem !== null) {
+                    $list->setTight(false);
+                    // Collect all indented content
+                    $subLines = [];
+                    while ($i < $count) {
+                        $subLine = $lines[$i];
+                        if ($this->isBlankLine($subLine)) {
+                            $subLines[] = '';
+                            $i++;
+
+                            continue;
+                        }
+                        // Check if line has any indentation
+                        if (preg_match('/^\s+/', $subLine)) {
+                            // Remove up to two spaces of indentation (aligns with content after marker)
+                            $subLines[] = preg_replace('/^ {1,2}/', '', $subLine) ?? $subLine;
+                            $i++;
+                        } else {
+                            // Check if it's a same-level list item
+                            $itemInfo = $this->parseListItemMarker($subLine);
+                            if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker']) {
+                                break;
+                            }
+
+                            // End of list
+                            break;
+                        }
                     }
-                    $i++;
+                    // Parse nested content
+                    if ($subLines !== []) {
+                        $this->parseBlocks($lastItem, $subLines, 0);
+                    }
+                    $lastItemHadBlankAfter = false;
 
                     continue;
                 }
+            }
 
+            $itemInfo = $this->parseListItemMarker($currentLine);
+
+            // Check if this is a list item of the same type and marker
+            if ($itemInfo === null || $itemInfo['type'] !== $listInfo['type'] || $itemInfo['marker'] !== $listInfo['marker']) {
                 break;
             }
 
-            if ($hasBlankLine) {
+            // If there was a blank line before this item, list is loose
+            if ($lastItemHadBlankAfter) {
                 $list->setTight(false);
             }
 
             $listItem = new ListItem($itemInfo['checked'] ?? null);
             $itemContent = $itemInfo['content'];
 
-            // Collect item content lines
+            // Collect item content lines (without blank line = tight continuation)
             $itemLines = [$itemContent];
             $i++;
+            $lastItemHadBlankAfter = false;
+            $hasNonMarkerContinuation = false;
 
             while ($i < $count) {
                 $nextLine = $lines[$i];
@@ -1065,21 +1112,35 @@ class BlockParser
                     break;
                 }
 
-                // Check if next line starts a new list item or block
-                if ($this->parseListItemMarker($nextLine) !== null || $this->startsNewBlock($nextLine)) {
+                // Check if next line starts a new list item at same level
+                $nextInfo = $this->parseListItemMarker($nextLine);
+                if ($nextInfo !== null) {
                     break;
                 }
 
-                // Indented continuation
-                if (preg_match('/^\s+(.*)$/', $nextLine, $contMatch)) {
-                    $itemLines[] = $contMatch[1];
-                    $i++;
-                } else {
+                // Check if it starts another block
+                if ($this->startsNewBlock($nextLine)) {
                     break;
                 }
+
+                // Non-indented continuation is literal text (djot behavior)
+                // Strip up to two leading spaces for alignment with content after marker
+                // (2 = typical marker width like "- " or "* ")
+                $nextLine = preg_replace('/^ {1,2}/', '', $nextLine) ?? $nextLine;
+                $itemLines[] = $nextLine;
+                $hasNonMarkerContinuation = true;
+                $i++;
             }
 
-            $this->parseBlocks($listItem, $itemLines, 0);
+            // For tight lists with continuation lines, parse as plain text
+            // This prevents "-like" lines from being parsed as nested lists
+            if ($hasNonMarkerContinuation) {
+                $paragraph = new Paragraph();
+                $this->inlineParser->parse($paragraph, implode("\n", $itemLines), $start);
+                $listItem->appendChild($paragraph);
+            } else {
+                $this->parseBlocks($listItem, $itemLines, 0);
+            }
             $list->appendChild($listItem);
         }
 
@@ -1089,7 +1150,151 @@ class BlockParser
     }
 
     /**
-     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool}|null
+     * Get the last list item from a list
+     */
+    protected function getLastListItem(ListBlock $list): ?ListItem
+    {
+        $children = $list->getChildren();
+        $count = count($children);
+        if ($count === 0) {
+            return null;
+        }
+        $last = $children[$count - 1];
+
+        return $last instanceof ListItem ? $last : null;
+    }
+
+    /**
+     * Get indentation level (number of leading spaces / 2, rounded down)
+     */
+    protected function getIndentLevel(string $line): int
+    {
+        if (preg_match('/^(\s+)/', $line, $matches)) {
+            return (int)(strlen($matches[1]) / 2);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Remove N levels of indentation from a line
+     */
+    protected function removeIndent(string $line, int $levels): string
+    {
+        $spaces = $levels * 2;
+
+        return preg_replace('/^\s{0,' . $spaces . '}/', '', $line) ?? $line;
+    }
+
+    /**
+     * Parse djot-style definition list (: term with indented definition)
+     *
+     * @param \Djot\Node\Node $parent
+     * @param array<string> $lines
+     * @param int $start
+     */
+    protected function tryParseDjotDefinitionList(Node $parent, array $lines, int $start): ?int
+    {
+        $defList = new DefinitionList();
+        $i = $start;
+        $count = count($lines);
+
+        while ($i < $count) {
+            $line = $lines[$i];
+
+            // Skip blank lines
+            if ($this->isBlankLine($line)) {
+                $i++;
+
+                continue;
+            }
+
+            // Must start with ": "
+            if (!preg_match('/^:\s+(.*)$/', $line, $matches)) {
+                break;
+            }
+
+            // The term is the content after ": "
+            $termContent = $matches[1];
+            $termLines = [$termContent];
+            $i++;
+
+            // Collect continuation lines for term (before blank line, single-space indent)
+            while ($i < $count) {
+                $nextLine = $lines[$i];
+                if ($this->isBlankLine($nextLine)) {
+                    break;
+                }
+                // Single space continuation is part of term
+                if (preg_match('/^ ([^ ].*)$/', $nextLine, $contMatch)) {
+                    $termLines[] = $contMatch[1];
+                    $i++;
+                } else {
+                    break;
+                }
+            }
+
+            // Create term node
+            $term = new DefinitionTerm();
+            $this->inlineParser->parse($term, implode("\n", $termLines), $start);
+            $defList->appendChild($term);
+
+            // Now collect definition content (after blank line, 2-space indent)
+            $defLines = [];
+            while ($i < $count) {
+                $defLine = $lines[$i];
+
+                if ($this->isBlankLine($defLine)) {
+                    $defLines[] = '';
+                    $i++;
+
+                    continue;
+                }
+
+                // Check for next term
+                if (preg_match('/^:\s+/', $defLine)) {
+                    break;
+                }
+
+                // Definition content must be indented by 2 spaces
+                if (preg_match('/^  (.*)$/', $defLine, $defMatch)) {
+                    $defLines[] = $defMatch[1];
+                    $i++;
+                } else {
+                    break;
+                }
+            }
+
+            // Create definition node
+            $def = new DefinitionDescription();
+            if ($defLines !== []) {
+                // Remove leading blank lines
+                while ($defLines !== [] && $defLines[0] === '') {
+                    array_shift($defLines);
+                }
+                // Remove trailing blank lines
+                $defLineCount = count($defLines);
+                while ($defLineCount > 0 && $defLines[$defLineCount - 1] === '') {
+                    array_pop($defLines);
+                    $defLineCount--;
+                }
+                $this->parseBlocks($def, $defLines, 0);
+            }
+            $defList->appendChild($def);
+        }
+
+        if (count($defList->getChildren()) === 0) {
+            return null;
+        }
+
+        $this->applyPendingAttributes($defList);
+        $parent->appendChild($defList);
+
+        return $i - $start;
+    }
+
+    /**
+     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, style?: string, marker_indent?: int}|null
      */
     protected function parseListItemMarker(string $line): ?array
     {
@@ -1128,6 +1333,68 @@ class BlockParser
                 'marker' => '()',
                 'content' => $matches[2],
                 'start' => (int)$matches[1],
+            ];
+        }
+
+        // Roman numeral ordered list: i. or I. or i) or I) or (i) or (I)
+        // Check roman numerals BEFORE alpha since they take precedence when ambiguous
+        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)])\s+(.*)$/', $line, $matches)) {
+            $roman = $matches[1];
+            $isLower = ctype_lower($roman[0]);
+            $start = $this->romanToInt(strtoupper($roman));
+            if ($start > 0) {
+                return [
+                    'type' => ListBlock::TYPE_ORDERED,
+                    'marker' => $matches[2],
+                    'content' => $matches[3],
+                    'start' => $start,
+                    'style' => $isLower ? 'i' : 'I',
+                ];
+            }
+        }
+
+        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\)\s+(.*)$/', $line, $matches)) {
+            $roman = $matches[1];
+            $isLower = ctype_lower($roman[0]);
+            $start = $this->romanToInt(strtoupper($roman));
+            if ($start > 0) {
+                return [
+                    'type' => ListBlock::TYPE_ORDERED,
+                    'marker' => '()',
+                    'content' => $matches[2],
+                    'start' => $start,
+                    'style' => $isLower ? 'i' : 'I',
+                ];
+            }
+        }
+
+        // Alpha ordered list: a. or A. or a) or A) or (a) or (A)
+        // Only single letters - multi-letter checked above as roman
+        if (preg_match('/^([a-zA-Z])([.)])\s+(.*)$/', $line, $matches)) {
+            $letter = $matches[1];
+            $isLower = ctype_lower($letter);
+            $start = ord(strtolower($letter)) - ord('a') + 1;
+
+            return [
+                'type' => ListBlock::TYPE_ORDERED,
+                'marker' => $matches[2],
+                'content' => $matches[3],
+                'start' => $start,
+                'style' => $isLower ? 'a' : 'A',
+            ];
+        }
+
+        if (preg_match('/^\(([a-zA-Z])\)\s+(.*)$/', $line, $matches)) {
+            $letter = $matches[1];
+            $isLower = ctype_lower($letter);
+            $start = ord(strtolower($letter)) - ord('a') + 1;
+
+            return [
+                'type' => ListBlock::TYPE_ORDERED,
+                'marker' => '()',
+                'content' => $matches[2],
+                'start' => $start,
+                'style' => $isLower ? 'a' : 'A',
             ];
         }
 
@@ -1475,6 +1742,42 @@ class BlockParser
     protected function splitLines(string $input): array
     {
         return explode("\n", str_replace(["\r\n", "\r"], "\n", $input));
+    }
+
+    /**
+     * Convert roman numeral to integer
+     */
+    protected function romanToInt(string $roman): int
+    {
+        $values = [
+            'I' => 1,
+            'V' => 5,
+            'X' => 10,
+            'L' => 50,
+            'C' => 100,
+            'D' => 500,
+            'M' => 1000,
+        ];
+
+        $result = 0;
+        $prev = 0;
+        $length = strlen($roman);
+
+        for ($i = $length - 1; $i >= 0; $i--) {
+            $char = $roman[$i];
+            if (!isset($values[$char])) {
+                return 0; // Invalid roman numeral
+            }
+            $value = $values[$char];
+            if ($value < $prev) {
+                $result -= $value;
+            } else {
+                $result += $value;
+            }
+            $prev = $value;
+        }
+
+        return $result;
     }
 
     public function getReference(string $label): ?ReferenceDefinition

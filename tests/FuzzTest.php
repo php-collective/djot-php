@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test;
 
 use Djot\DjotConverter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -45,7 +46,7 @@ class FuzzTest extends TestCase
         return $tests;
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('randomAsciiProvider')]
+    #[DataProvider('randomAsciiProvider')]
     public function testRandomAsciiDoesNotCrash(string $input): void
     {
         // Should not throw any exceptions
