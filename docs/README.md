@@ -364,3 +364,59 @@ echo $converter->convert('Hello @john!');
 ```
 
 See the [Cookbook](cookbook.md) for more examples including wiki links, hashtags, admonitions, and custom block patterns.
+
+## Security Considerations
+
+**Warning:** When processing untrusted user input, the default output may contain XSS vulnerabilities. The following vectors are not sanitized by default:
+
+- `javascript:` URLs in links and images
+- Event handler attributes (e.g., `onclick`)
+- Raw HTML blocks and inline HTML
+
+### Recommended: Use HTMLPurifier
+
+For user-generated content, sanitize the HTML output using [HTMLPurifier](http://htmlpurifier.org/):
+
+```bash
+composer require ezyang/htmlpurifier
+```
+
+```php
+use Djot\DjotConverter;
+
+function convertUserContent(string $djot): string
+{
+    $converter = new DjotConverter();
+    $html = $converter->convert($djot);
+
+    $config = HTMLPurifier_Config::createDefault();
+    $config->set('Cache.DefinitionImpl', null);
+    $config->set('HTML.DefinitionID', 'djot-purifier');
+    $config->set('HTML.DefinitionRev', 1);
+    $config->set('HTML.Allowed', 'p,br,strong,em,u,s,del,ins,mark,sub[id],sup[id],a[href|title|class|id],img[src|alt|title],ul,ol,li,dl,dt,dd,blockquote,pre,code[class],h1[id],h2[id],h3[id],h4[id],h5[id],h6[id],table[class|id],thead,tbody,tr,th[align],td[align],hr,div[class|id],span[class|id],section[id]');
+    $config->set('Attr.EnableID', true);
+    $config->set('HTML.TargetBlank', true);
+    $config->set('URI.AllowedSchemes', ['http' => true, 'https' => true, 'mailto' => true]);
+
+    // Add HTML5 elements not in HTMLPurifier's default set
+    $def = $config->maybeGetRawHTMLDefinition();
+    if ($def !== null) {
+        $def->addElement('mark', 'Inline', 'Inline', 'Common');
+        $def->addElement('section', 'Block', 'Flow', 'Common');
+    }
+
+    $purifier = new HTMLPurifier($config);
+
+    return $purifier->purify($html);
+}
+
+// Safe to use with untrusted input
+echo convertUserContent($untrustedUserInput);
+```
+
+This ensures:
+- Only safe HTML tags and attributes are allowed
+- `javascript:` and other dangerous URL schemes are blocked
+- Event handlers like `onclick` are stripped
+- IDs are preserved for footnotes and heading anchors
+- HTML5 elements (`mark`, `section`) are supported
