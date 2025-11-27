@@ -160,7 +160,40 @@ Automatically converts:
 
 ## Extension Points
 
-To add new syntax:
+### Event System (Recommended)
+
+The preferred way to customize rendering is through the event system. This allows you to modify how nodes are rendered without subclassing:
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+
+$converter = new DjotConverter();
+
+// Customize link rendering
+$converter->on('render.link', function (RenderEvent $event): void {
+    $link = $event->getNode();
+    $href = $link->getDestination();
+
+    // Add attributes
+    if (str_starts_with($href, 'http')) {
+        $link->setAttribute('target', '_blank');
+    }
+
+    // Or completely override the HTML output
+    // $event->setHtml('<custom-link>...</custom-link>');
+});
+```
+
+Events are fired for each node type using the pattern `render.{node_type}`:
+- `render.paragraph`, `render.heading`, `render.code_block`, etc.
+- `render.link`, `render.image`, `render.emphasis`, `render.symbol`, etc.
+
+See the [Cookbook](cookbook.md) for common customization recipes.
+
+### Adding New Syntax
+
+For entirely new syntax elements, extend the parser:
 
 1. Create a new Node class extending `BlockNode` or `InlineNode`
 2. Add parsing logic in `BlockParser` or `InlineParser`

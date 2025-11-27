@@ -282,12 +282,71 @@ class DjotConverterTest extends TestCase
         $this->assertStringContainsString('text-align: right', $result);
     }
 
+    public function testTableCaption(): void
+    {
+        $djot = "| A | B |\n|---|---|\n| 1 | 2 |\n^ This is a caption";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<caption>This is a caption</caption>', $result);
+        $this->assertStringContainsString('<table>', $result);
+    }
+
+    public function testTableCaptionWithBlankLine(): void
+    {
+        $djot = "| A | B |\n|---|---|\n| 1 | 2 |\n\n^ Caption after blank line";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<caption>Caption after blank line</caption>', $result);
+    }
+
+    public function testTableCaptionMultiline(): void
+    {
+        $djot = "| A | B |\n|---|---|\n| 1 | 2 |\n^ This is a long caption\n  that continues on the next line";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<caption>This is a long caption that continues on the next line</caption>', $result);
+    }
+
     public function testReferenceLink(): void
     {
         $djot = "[Example][ex]\n\n[ex]: https://example.com";
         $expected = "<p><a href=\"https://example.com\">Example</a></p>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    public function testReferenceLinkWithTitle(): void
+    {
+        $djot = "[Example][ex]\n\n{title=\"My Title\"}\n[ex]: https://example.com";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('href="https://example.com"', $result);
+        $this->assertStringContainsString('title="My Title"', $result);
+    }
+
+    public function testReferenceLinkWithClass(): void
+    {
+        $djot = "[Example][ex]\n\n{.external}\n[ex]: https://example.com";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="external"', $result);
+    }
+
+    public function testReferenceLinkAttributesOverride(): void
+    {
+        // Link-level attributes should override definition-level
+        $djot = "[Example][ex]{.local}\n\n{.external}\n[ex]: https://example.com";
+
+        $result = $this->converter->convert($djot);
+
+        // Should have both classes (definition first, then link)
+        $this->assertStringContainsString('external', $result);
+        $this->assertStringContainsString('local', $result);
     }
 
     public function testNestedEmphasis(): void

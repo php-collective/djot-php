@@ -34,7 +34,7 @@ class BlockParser
     protected InlineParser $inlineParser;
 
     /**
-     * @var array<string, string>
+     * @var array<string, \Djot\Parser\ReferenceDefinition>
      */
     protected array $references = [];
 
@@ -87,9 +87,18 @@ class BlockParser
     {
         $i = 0;
         $count = count($lines);
+        $pendingAttrs = [];
 
         while ($i < $count) {
             $line = $lines[$i];
+
+            // Check for attributes that may precede a reference definition
+            if (preg_match('/^\{([^}]+)\}\s*$/', $line, $attrMatches)) {
+                $pendingAttrs = $this->parseInlineAttributes($attrMatches[1]);
+                $i++;
+
+                continue;
+            }
 
             // Match reference definition: [label]: url
             if (preg_match('/^\[([^\]]+)\]:\s*(.+)$/', $line, $matches)) {
@@ -111,11 +120,52 @@ class BlockParser
                     }
                 }
 
-                $this->references[$label] = $url;
+                $this->references[$label] = new ReferenceDefinition($url, $pendingAttrs);
+                $pendingAttrs = [];
+            } else {
+                // Non-reference line, clear any pending attributes
+                if (!$this->isBlankLine($line)) {
+                    $pendingAttrs = [];
+                }
             }
 
             $i++;
         }
+    }
+
+    /**
+     * Parse inline attributes from a string like ".class #id title=foo"
+     *
+     * @return array<string, mixed>
+     */
+    protected function parseInlineAttributes(string $attrStr): array
+    {
+        $attrs = [];
+
+        // Match: .class, #id, key="quoted value", key='quoted value', key=unquoted
+        preg_match_all('/\.([^\s.#=]+)|#([^\s.#=]+)|([^\s.#=]+)="([^"]*)"|([^\s.#=]+)=\'([^\']*)\'|([^\s.#=]+)=([^\s}"\']+)/', $attrStr, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            if (!empty($match[1])) {
+                // Class attribute
+                $existing = $attrs['class'] ?? '';
+                $attrs['class'] = trim($existing . ' ' . $match[1]);
+            } elseif (!empty($match[2])) {
+                // ID attribute
+                $attrs['id'] = $match[2];
+            } elseif (!empty($match[3])) {
+                // key="double quoted value"
+                $attrs[$match[3]] = $match[4] ?? '';
+            } elseif (isset($match[5])) {
+                // key='single quoted value'
+                $attrs[$match[5]] = $match[6] ?? '';
+            } elseif (isset($match[7])) {
+                // key=unquoted
+                $attrs[$match[7]] = $match[8] ?? '';
+            }
+        }
+
+        return $attrs;
     }
 
     /**
@@ -965,6 +1015,26 @@ class BlockParser
         $this->applyPendingAttributes($table);
         $parent->appendChild($table);
 
+        // Check for caption: ^ Caption text (can have blank line before it)
+        $captionStart = $i;
+        if ($captionStart < $count && $this->isBlankLine($lines[$captionStart])) {
+            $captionStart++;
+        }
+
+        if ($captionStart < $count && preg_match('/^\^\s+(.+)$/', $lines[$captionStart], $captionMatch)) {
+            $captionContent = $captionMatch[1];
+            $captionStart++;
+
+            // Caption can continue on indented lines
+            while ($captionStart < $count && preg_match('/^\s+(\S.*)$/', $lines[$captionStart], $contMatch)) {
+                $captionContent .= ' ' . $contMatch[1];
+                $captionStart++;
+            }
+
+            $table->setCaption(trim($captionContent));
+            $i = $captionStart;
+        }
+
         return $i - $start;
     }
 
@@ -1043,6 +1113,8 @@ class BlockParser
     }
 
     /**
+     * Skip reference definitions (already extracted in first pass)
+     *
      * @param array<string> $lines
      * @param int $start
      */
@@ -1055,9 +1127,6 @@ class BlockParser
             return null;
         }
 
-        $label = $matches[1];
-        $url = trim($matches[2]);
-
         // Collect continuation lines
         $i = $start + 1;
         $count = count($lines);
@@ -1068,14 +1137,11 @@ class BlockParser
                 break;
             }
             if (preg_match('/^\s+(\S.*)$/', $nextLine, $contMatch)) {
-                $url .= $contMatch[1];
                 $i++;
             } else {
                 break;
             }
         }
-
-        $this->references[$label] = $url;
 
         return $i - $start;
     }
@@ -1141,7 +1207,7 @@ class BlockParser
         return explode("\n", str_replace(["\r\n", "\r"], "\n", $input));
     }
 
-    public function getReference(string $label): ?string
+    public function getReference(string $label): ?ReferenceDefinition
     {
         return $this->references[$label] ?? null;
     }

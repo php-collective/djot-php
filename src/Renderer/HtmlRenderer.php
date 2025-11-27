@@ -276,6 +276,12 @@ class HtmlRenderer
         $attrs = $this->renderAttributes($node);
         $html = '<table' . $attrs . ">\n";
 
+        // Render caption if present
+        $caption = $node->getCaption();
+        if ($caption !== null) {
+            $html .= '<caption>' . $this->escape($caption) . "</caption>\n";
+        }
+
         $children = $node->getChildren();
         $inHead = false;
         $inBody = false;

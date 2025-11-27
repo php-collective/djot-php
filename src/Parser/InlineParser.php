@@ -441,14 +441,23 @@ class InlineParser
                     $ref = $linkText;
                 }
 
-                $url = $this->blockParser->getReference($ref);
-                if ($url !== null) {
-                    $link = new Link($url);
+                $refDef = $this->blockParser->getReference($ref);
+                if ($refDef !== null) {
+                    $link = new Link($refDef->url);
                     $this->parseInlines($link, $linkText);
+
+                    // Apply attributes from reference definition first
+                    foreach ($refDef->attributes as $key => $value) {
+                        if ($key === 'class') {
+                            $link->addClass((string)$value);
+                        } else {
+                            $link->setAttribute($key, $value);
+                        }
+                    }
 
                     $endPos = $refEnd + 1;
 
-                    // Check for attributes after reference link
+                    // Check for attributes after reference link (override definition attrs)
                     if ($endPos < $length && $text[$endPos] === '{') {
                         $attrEnd = strpos($text, '}', $endPos);
                         if ($attrEnd !== false) {
