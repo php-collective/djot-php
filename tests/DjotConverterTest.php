@@ -9,6 +9,7 @@ use Djot\Event\RenderEvent;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Symbol;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class DjotConverterTest extends TestCase
 {
@@ -1030,5 +1031,53 @@ DJOT;
 
         $this->assertStringContainsString('class="link"', $result);
         $this->assertStringContainsString('class="bold"', $result);
+    }
+
+    public function testParseFile(): void
+    {
+        $tempFile = sys_get_temp_dir() . '/djot_test_' . uniqid() . '.djot';
+        file_put_contents($tempFile, "# Hello\n\nWorld");
+
+        try {
+            $document = $this->converter->parseFile($tempFile);
+            $this->assertCount(2, $document->getChildren());
+
+            $result = $this->converter->render($document);
+            $this->assertStringContainsString('<h1>Hello</h1>', $result);
+            $this->assertStringContainsString('<p>World</p>', $result);
+        } finally {
+            unlink($tempFile);
+        }
+    }
+
+    public function testConvertFile(): void
+    {
+        $tempFile = sys_get_temp_dir() . '/djot_test_' . uniqid() . '.djot';
+        file_put_contents($tempFile, "# Hello\n\nWorld");
+
+        try {
+            $result = $this->converter->convertFile($tempFile);
+
+            $this->assertStringContainsString('<h1>Hello</h1>', $result);
+            $this->assertStringContainsString('<p>World</p>', $result);
+        } finally {
+            unlink($tempFile);
+        }
+    }
+
+    public function testParseFileNotFound(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('File not found');
+
+        $this->converter->parseFile('/nonexistent/file.djot');
+    }
+
+    public function testConvertFileNotFound(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('File not found');
+
+        $this->converter->convertFile('/nonexistent/file.djot');
     }
 }

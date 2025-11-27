@@ -8,6 +8,7 @@ use Closure;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
 use Djot\Renderer\HtmlRenderer;
+use RuntimeException;
 
 /**
  * Main Djot to HTML converter
@@ -35,11 +36,40 @@ class DjotConverter
     }
 
     /**
+     * Convert a Djot file to HTML
+     */
+    public function convertFile(string $path): string
+    {
+        $document = $this->parseFile($path);
+
+        return $this->render($document);
+    }
+
+    /**
      * Parse Djot markup into an AST
      */
     public function parse(string $djot): Document
     {
         return $this->parser->parse($djot);
+    }
+
+    /**
+     * Parse a Djot file into an AST
+     *
+     * @throws \RuntimeException If the file cannot be read
+     */
+    public function parseFile(string $path): Document
+    {
+        if (!is_file($path)) {
+            throw new RuntimeException("File not found: {$path}");
+        }
+
+        $content = file_get_contents($path);
+        if ($content === false) {
+            throw new RuntimeException("Failed to read file: {$path}");
+        }
+
+        return $this->parse($content);
     }
 
     /**
