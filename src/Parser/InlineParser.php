@@ -36,13 +36,26 @@ class InlineParser
      */
     protected array $delimiterStack = [];
 
+    /**
+     * Current source line number for error reporting (0-indexed)
+     */
+    protected int $currentLine = 0;
+
     public function __construct(protected BlockParser $blockParser)
     {
     }
 
-    public function parse(Node $parent, string $text): void
+    /**
+     * Parse inline content
+     *
+     * @param \Djot\Node\Node $parent
+     * @param string $text
+     * @param string|int $sourceLine Source line number (0-indexed) for error reporting
+     */
+    public function parse(Node $parent, string $text, int $sourceLine = 0): void
     {
         $this->delimiterStack = [];
+        $this->currentLine = $sourceLine;
         $this->parseInlines($parent, $text);
     }
 
@@ -472,6 +485,9 @@ class InlineParser
                         'pos' => $endPos,
                     ];
                 }
+
+                // Reference not found - warn
+                $this->blockParser->addUndefinedReferenceWarning($ref, $this->currentLine, $pos + 1);
             }
         }
 
@@ -755,6 +771,11 @@ class InlineParser
         }
 
         $label = $matches[1];
+
+        // Warn if footnote is not defined
+        if (!$this->blockParser->hasFootnote($label)) {
+            $this->blockParser->addUndefinedFootnoteWarning($label, $this->currentLine, $pos + 1);
+        }
 
         return [
             'node' => new FootnoteRef($label),

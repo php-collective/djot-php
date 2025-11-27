@@ -19,9 +19,20 @@ class DjotConverter
 
     protected HtmlRenderer $renderer;
 
-    public function __construct(bool $xhtml = false)
+    protected bool $collectWarnings;
+
+    protected bool $strictMode;
+
+    /**
+     * @param bool $xhtml Whether to use XHTML-compatible output
+     * @param bool $warnings Whether to collect warnings during parsing
+     * @param bool $strict Whether to throw exceptions on parse errors
+     */
+    public function __construct(bool $xhtml = false, bool $warnings = false, bool $strict = false)
     {
-        $this->parser = new BlockParser();
+        $this->collectWarnings = $warnings;
+        $this->strictMode = $strict;
+        $this->parser = new BlockParser($warnings, $strict);
         $this->renderer = new HtmlRenderer($xhtml);
     }
 
@@ -129,5 +140,35 @@ class DjotConverter
     public function getParser(): BlockParser
     {
         return $this->parser;
+    }
+
+    /**
+     * Get warnings collected during the last parse operation
+     *
+     * Only populated when warnings collection is enabled.
+     *
+     * @return array<\Djot\Exception\ParseWarning>
+     */
+    public function getWarnings(): array
+    {
+        return $this->parser->getWarnings();
+    }
+
+    /**
+     * Check if there were any warnings during the last parse operation
+     */
+    public function hasWarnings(): bool
+    {
+        return count($this->parser->getWarnings()) > 0;
+    }
+
+    /**
+     * Clear any collected warnings
+     */
+    public function clearWarnings(): self
+    {
+        $this->parser->clearWarnings();
+
+        return $this;
     }
 }

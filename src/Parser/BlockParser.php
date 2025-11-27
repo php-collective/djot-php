@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Djot\Parser;
 
+use Djot\Exception\ParseException;
+use Djot\Exception\ParseWarning;
 use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Comment;
@@ -50,9 +52,92 @@ class BlockParser
      */
     protected array $pendingAttributes = [];
 
-    public function __construct()
+    /**
+     * Whether to collect warnings during parsing
+     */
+    protected bool $collectWarnings = false;
+
+    /**
+     * Whether to throw on parse errors
+     */
+    protected bool $strictMode = false;
+
+    /**
+     * Collected warnings during parsing
+     *
+     * @var array<\Djot\Exception\ParseWarning>
+     */
+    protected array $warnings = [];
+
+    /**
+     * Current line offset for nested parsing (0-indexed internally, 1-indexed for errors)
+     */
+    protected int $lineOffset = 0;
+
+    public function __construct(bool $collectWarnings = false, bool $strictMode = false)
     {
+        $this->collectWarnings = $collectWarnings;
+        $this->strictMode = $strictMode;
         $this->inlineParser = new InlineParser($this);
+    }
+
+    /**
+     * Enable or disable warning collection
+     */
+    public function setCollectWarnings(bool $collect): self
+    {
+        $this->collectWarnings = $collect;
+
+        return $this;
+    }
+
+    /**
+     * Enable or disable strict mode
+     */
+    public function setStrictMode(bool $strict): self
+    {
+        $this->strictMode = $strict;
+
+        return $this;
+    }
+
+    /**
+     * Get collected warnings
+     *
+     * @return array<\Djot\Exception\ParseWarning>
+     */
+    public function getWarnings(): array
+    {
+        return $this->warnings;
+    }
+
+    /**
+     * Clear collected warnings
+     */
+    public function clearWarnings(): self
+    {
+        $this->warnings = [];
+
+        return $this;
+    }
+
+    /**
+     * Add a warning or throw exception in strict mode
+     *
+     * @throws \Djot\Exception\ParseException In strict mode for errors
+     */
+    protected function addWarning(string $message, int $line, int $column = 1, bool $isError = false): void
+    {
+        // Convert from 0-indexed to 1-indexed for user-facing messages
+        $line = $line + $this->lineOffset + 1;
+
+        if ($isError && $this->strictMode) {
+            throw new ParseException($message, $line, $column);
+        }
+
+        if ($this->collectWarnings) {
+            $this->warnings[] = new ParseWarning($message, $line, $column);
+        }
     }
 
     public function parse(string $input): Document
@@ -60,6 +145,8 @@ class BlockParser
         $this->references = [];
         $this->footnotes = [];
         $this->pendingAttributes = [];
+        $this->warnings = [];
+        $this->lineOffset = 0;
         $document = new Document();
         $lines = $this->splitLines($input);
 
@@ -342,6 +429,7 @@ class BlockParser
         $content = '';
         $i = $start + 1;
         $count = count($lines);
+        $closed = false;
 
         while ($i < $count) {
             $currentLine = $lines[$i];
@@ -349,12 +437,17 @@ class BlockParser
             // Check for closing fence (same char, equal or longer length)
             if (preg_match('/^' . preg_quote($fenceChar, '/') . '{' . $fenceLength . ',}\s*$/', $currentLine)) {
                 $i++;
+                $closed = true;
 
                 break;
             }
 
             $content .= $currentLine . "\n";
             $i++;
+        }
+
+        if (!$closed) {
+            $this->addWarning('Unclosed code fence', $start, 1, true);
         }
 
         $codeBlock = new CodeBlock(rtrim($content, "\n"), $language);
@@ -384,6 +477,7 @@ class BlockParser
         $i = $start;
         $count = count($lines);
         $inComment = false;
+        $closed = false;
 
         while ($i < $count) {
             $currentLine = $lines[$i];
@@ -399,6 +493,7 @@ class BlockParser
                     if ($closePos !== false) {
                         $content .= substr($afterOpen, 0, $closePos);
                         $i++;
+                        $closed = true;
 
                         break;
                     }
@@ -410,6 +505,7 @@ class BlockParser
                 if ($closePos !== false) {
                     $content .= substr($currentLine, 0, $closePos);
                     $i++;
+                    $closed = true;
 
                     break;
                 }
@@ -417,6 +513,10 @@ class BlockParser
             }
 
             $i++;
+        }
+
+        if (!$closed) {
+            $this->addWarning('Unclosed comment', $start, 1, true);
         }
 
         // Comments are stored but not rendered
@@ -449,6 +549,7 @@ class BlockParser
         $content = '';
         $i = $start + 1;
         $count = count($lines);
+        $closed = false;
 
         while ($i < $count) {
             $currentLine = $lines[$i];
@@ -456,12 +557,17 @@ class BlockParser
             // Check for closing fence (equal or longer)
             if (preg_match('/^`{' . $fenceLength . ',}\s*$/', $currentLine)) {
                 $i++;
+                $closed = true;
 
                 break;
             }
 
             $content .= $currentLine . "\n";
             $i++;
+        }
+
+        if (!$closed) {
+            $this->addWarning('Unclosed raw block', $start, 1, true);
         }
 
         $rawBlock = new RawBlock(rtrim($content, "\n"), $format);
@@ -497,6 +603,7 @@ class BlockParser
         $innerLines = [];
         $i = $start + 1;
         $count = count($lines);
+        $closed = false;
 
         while ($i < $count) {
             $currentLine = $lines[$i];
@@ -504,6 +611,7 @@ class BlockParser
             // Check for closing fence (equal or longer)
             if (preg_match('/^:{' . $fenceLength . ',}\s*$/', $currentLine)) {
                 $i++;
+                $closed = true;
 
                 break;
             }
@@ -512,8 +620,16 @@ class BlockParser
             $i++;
         }
 
-        // Parse inner content as blocks
+        if (!$closed) {
+            $this->addWarning('Unclosed div', $start, 1, true);
+        }
+
+        // Parse inner content as blocks (track line offset for nested content)
+        $previousOffset = $this->lineOffset;
+        $this->lineOffset = $previousOffset + $start + 1;
         $this->parseBlocks($div, $innerLines, 0);
+        $this->lineOffset = $previousOffset;
+
         $this->applyPendingAttributes($div);
         $parent->appendChild($div);
 
@@ -552,7 +668,7 @@ class BlockParser
         }
 
         $heading = new Heading($level);
-        $this->inlineParser->parse($heading, trim($content));
+        $this->inlineParser->parse($heading, trim($content), $start);
         $this->applyPendingAttributes($heading);
         $parent->appendChild($heading);
 
@@ -670,7 +786,7 @@ class BlockParser
                 if (preg_match('/^:\s+(.*)$/', $nextLine)) {
                     // Parse term
                     $term = new DefinitionTerm();
-                    $this->inlineParser->parse($term, trim($currentLine));
+                    $this->inlineParser->parse($term, trim($currentLine), $i);
                     $defList->appendChild($term);
                     $i++;
 
@@ -769,7 +885,7 @@ class BlockParser
                     // This is a continuation of the previous list item
                     $lastItem = $list->getChildren()[count($list->getChildren()) - 1] ?? null;
                     if ($lastItem instanceof ListItem) {
-                        $this->appendToLastParagraph($lastItem, trim($indentMatch[2]));
+                        $this->appendToLastParagraph($lastItem, trim($indentMatch[2]), $i);
                     }
                     $i++;
 
@@ -923,7 +1039,7 @@ class BlockParser
         // Parse each line as a paragraph with hard breaks between them
         $paragraph = new Paragraph();
         foreach ($contentLines as $index => $contentLine) {
-            $this->inlineParser->parse($paragraph, $contentLine);
+            $this->inlineParser->parse($paragraph, $contentLine, $start + $index);
             if ($index < count($contentLines) - 1) {
                 $paragraph->appendChild(new HardBreak());
             }
@@ -1000,7 +1116,7 @@ class BlockParser
             foreach ($cells as $index => $cellContent) {
                 $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
                 $cell = new TableCell(false, $alignment);
-                $this->inlineParser->parse($cell, trim($cellContent));
+                $this->inlineParser->parse($cell, trim($cellContent), $i);
                 $row->appendChild($cell);
             }
 
@@ -1171,20 +1287,20 @@ class BlockParser
         }
 
         $paragraph = new Paragraph();
-        $this->inlineParser->parse($paragraph, $content);
+        $this->inlineParser->parse($paragraph, $content, $start);
         $this->applyPendingAttributes($paragraph);
         $parent->appendChild($paragraph);
 
         return $i - $start;
     }
 
-    protected function appendToLastParagraph(Node $parent, string $content): void
+    protected function appendToLastParagraph(Node $parent, string $content, int $line): void
     {
         $children = $parent->getChildren();
         $lastChild = $children[count($children) - 1] ?? null;
 
         if ($lastChild instanceof Paragraph) {
-            $this->inlineParser->parse($lastChild, ' ' . $content);
+            $this->inlineParser->parse($lastChild, ' ' . $content, $line);
         }
     }
 
@@ -1215,5 +1331,21 @@ class BlockParser
     public function hasFootnote(string $label): bool
     {
         return isset($this->footnotes[$label]);
+    }
+
+    /**
+     * Add warning for undefined reference (called from InlineParser)
+     */
+    public function addUndefinedReferenceWarning(string $ref, int $line, int $column): void
+    {
+        $this->addWarning("Undefined reference '{$ref}'", $line, $column, false);
+    }
+
+    /**
+     * Add warning for undefined footnote (called from InlineParser)
+     */
+    public function addUndefinedFootnoteWarning(string $label, int $line, int $column): void
+    {
+        $this->addWarning("Undefined footnote '{$label}'", $line, $column, false);
     }
 }

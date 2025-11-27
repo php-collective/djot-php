@@ -6,6 +6,7 @@ namespace Djot\Test;
 
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Exception\ParseException;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Symbol;
 use PHPUnit\Framework\TestCase;
@@ -1079,5 +1080,233 @@ DJOT;
         $this->expectExceptionMessage('File not found');
 
         $this->converter->convertFile('/nonexistent/file.djot');
+    }
+
+    // Warning and strict mode tests
+
+    public function testWarningsDisabledByDefault(): void
+    {
+        $converter = new DjotConverter();
+        $converter->convert("```php\ncode without closing fence");
+
+        $this->assertEmpty($converter->getWarnings());
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testWarningsCollectionEnabled(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("```php\ncode without closing fence");
+
+        $this->assertTrue($converter->hasWarnings());
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString('Unclosed code fence', $warnings[0]->getMessage());
+        $this->assertSame(1, $warnings[0]->getLine());
+    }
+
+    public function testStrictModeThrowsOnUnclosedCodeFence(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed code fence');
+
+        $converter->convert("```php\ncode without closing fence");
+    }
+
+    public function testStrictModeThrowsOnUnclosedDiv(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed div');
+
+        $converter->convert("::: warning\nSome content without closing");
+    }
+
+    public function testStrictModeThrowsOnUnclosedComment(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed comment');
+
+        $converter->convert('{% This comment never closes');
+    }
+
+    public function testStrictModeThrowsOnUnclosedRawBlock(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed raw block');
+
+        $converter->convert("``` =html\n<div>no closing fence");
+    }
+
+    public function testWarningForUndefinedReference(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Link text][missing]');
+
+        $this->assertTrue($converter->hasWarnings());
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString("Undefined reference 'missing'", $warnings[0]->getMessage());
+    }
+
+    public function testWarningForUndefinedFootnote(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('Text with footnote[^missing]');
+
+        $this->assertTrue($converter->hasWarnings());
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString("Undefined footnote 'missing'", $warnings[0]->getMessage());
+    }
+
+    public function testNoWarningForDefinedReference(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[Link text][ref]\n\n[ref]: https://example.com");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testNoWarningForDefinedFootnote(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("Text[^note]\n\n[^note]: Footnote content");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testWarningLineNumber(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("Line 1\n\nLine 3\n\n```php\ncode");
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertSame(5, $warnings[0]->getLine());
+    }
+
+    public function testParseExceptionLineNumber(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        try {
+            $converter->convert("Line 1\n\nLine 3\n\n```php\ncode");
+            $this->fail('Expected ParseException was not thrown');
+        } catch (ParseException $e) {
+            $this->assertSame(5, $e->getSourceLine());
+            $this->assertSame(1, $e->getSourceColumn());
+        }
+    }
+
+    public function testMultipleWarnings(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[Missing ref][ref1]\n\n[Another][ref2]\n\nFootnote[^missing]");
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(3, $warnings);
+    }
+
+    public function testClearWarnings(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][ref]');
+
+        $this->assertTrue($converter->hasWarnings());
+
+        $converter->clearWarnings();
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testWarningsAndStrictModeTogether(): void
+    {
+        $converter = new DjotConverter(warnings: true, strict: true);
+
+        // Should throw on error but still have warnings enabled
+        $this->expectException(ParseException::class);
+        $converter->convert("```\nunclosed");
+    }
+
+    public function testWarningToArray(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][ref]');
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+
+        $array = $warnings[0]->toArray();
+        $this->assertArrayHasKey('message', $array);
+        $this->assertArrayHasKey('line', $array);
+        $this->assertArrayHasKey('column', $array);
+    }
+
+    public function testWarningToString(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][ref]');
+
+        $warnings = $converter->getWarnings();
+        $string = (string)$warnings[0];
+
+        $this->assertStringContainsString('Undefined reference', $string);
+        $this->assertStringContainsString('line', $string);
+        $this->assertStringContainsString('column', $string);
+    }
+
+    public function testNestedDivWarningLineNumber(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $djot = <<<'DJOT'
+::: outer
+Line 2
+
+::: inner
+Line 5
+unclosed inner
+:::
+
+Line 9
+DJOT;
+        // The outer div is unclosed
+        $djot = <<<'DJOT'
+::: outer
+Line 2
+
+```php
+unclosed code
+DJOT;
+        $converter->convert($djot);
+
+        $warnings = $converter->getWarnings();
+        // Should have warnings for unclosed code fence and unclosed div
+        $this->assertGreaterThanOrEqual(1, count($warnings));
+    }
+
+    public function testClosedBlocksNoWarnings(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $djot = <<<'DJOT'
+```php
+function test() {}
+```
+
+::: note
+This is a note.
+:::
+
+{% This is a comment %}
+DJOT;
+        $converter->convert($djot);
+
+        $this->assertFalse($converter->hasWarnings());
     }
 }
