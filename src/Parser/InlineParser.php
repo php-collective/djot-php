@@ -324,8 +324,18 @@ class InlineParser
                 }
             }
 
-            // Special braced syntax: {=highlight=}, {+insert+}, {-delete-}
+            // Special braced syntax: {=highlight=}, {+insert+}, {-delete-}, or inline attributes {.class}
             if ($char === '{') {
+                // First check for inline attributes that apply to preceding word
+                $attrResult = $this->parseInlineAttributes($text, $pos, $textBuffer, $parent);
+                if ($attrResult !== null) {
+                    $textBuffer = $attrResult['textBuffer'];
+                    $pos = $attrResult['pos'];
+
+                    continue;
+                }
+
+                // Then try special braced syntax
                 $this->flushText($parent, $textBuffer);
                 $textBuffer = '';
                 $result = $this->parseBracedInline($text, $pos);
@@ -534,7 +544,7 @@ class InlineParser
                     $attrEnd = strpos($text, '}', $endPos);
                     if ($attrEnd !== false) {
                         $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
-                        $this->parseAttributes($link, $attrStr);
+                        $this->applyAttributesToNode($link, $attrStr);
                         $endPos = $attrEnd + 1;
                     }
                 }
@@ -576,7 +586,7 @@ class InlineParser
                         $attrEnd = strpos($text, '}', $endPos);
                         if ($attrEnd !== false) {
                             $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
-                            $this->parseAttributes($link, $attrStr);
+                            $this->applyAttributesToNode($link, $attrStr);
                             $endPos = $attrEnd + 1;
                         }
                     }
@@ -598,7 +608,7 @@ class InlineParser
             if ($attrEnd !== false) {
                 $attrStr = substr($text, $afterBracket + 1, $attrEnd - $afterBracket - 1);
                 $span = new Span();
-                $this->parseAttributes($span, $attrStr);
+                $this->applyAttributesToNode($span, $attrStr);
                 $this->parseInlines($span, $linkText);
 
                 return [
@@ -839,18 +849,179 @@ class InlineParser
         ];
     }
 
-    protected function parseAttributes(Node $node, string $attrStr): void
+    /**
+     * Parse inline attributes that apply to preceding word: word{.class}
+     *
+     * @return array{textBuffer: string, pos: int}|null
+     */
+    protected function parseInlineAttributes(string $text, int $pos, string $textBuffer, Node $parent): ?array
     {
-        // Parse .class, #id, key=value
-        preg_match_all('/\.([^\s.#=]+)|#([^\s.#=]+)|([^\s.#=]+)=(["\']?)([^"\'}\s]*)\4/', $attrStr, $matches, PREG_SET_ORDER);
+        $length = strlen($text);
+
+        // Find the closing brace, handling quoted strings
+        $attrEnd = $this->findAttributeEnd($text, $pos);
+        if ($attrEnd === null) {
+            return null;
+        }
+
+        $attrStr = substr($text, $pos + 1, $attrEnd - $pos - 1);
+
+        // Check if this looks like valid attributes (starts with ., #, or key=)
+        if ($attrStr !== '' && !preg_match('/^[.#a-zA-Z_%]/', $attrStr)) {
+            return null;
+        }
+
+        // Remove comments from attributes: % ... % or % to end
+        $attrStr = $this->removeAttributeComments($attrStr);
+
+        // Empty attributes: hi{} - just skip them
+        if (trim($attrStr) === '') {
+            return [
+                'textBuffer' => $textBuffer,
+                'pos' => $attrEnd + 1,
+            ];
+        }
+
+        // Find the preceding word to attach attributes to
+        // A word is a sequence of non-whitespace characters
+        $precedingWord = '';
+        $wordStart = strlen($textBuffer);
+
+        // Scan backwards to find word boundary (whitespace or start of string)
+        while ($wordStart > 0) {
+            $char = $textBuffer[$wordStart - 1];
+            // Stop at whitespace (but not non-breaking space)
+            if ($char === ' ' || $char === "\t" || $char === "\n" || $char === "\r") {
+                break;
+            }
+            $wordStart--;
+        }
+
+        if ($wordStart < strlen($textBuffer)) {
+            $precedingWord = substr($textBuffer, $wordStart);
+            $textBuffer = substr($textBuffer, 0, $wordStart);
+        }
+
+        // If no preceding word, attributes don't attach to anything
+        // But they still consume the braces (according to the spec)
+        if ($precedingWord === '') {
+            // Flush text and skip attributes - they produce nothing
+            $this->flushText($parent, $textBuffer);
+
+            return [
+                'textBuffer' => '',
+                'pos' => $attrEnd + 1,
+            ];
+        }
+
+        // Flush any text before the word
+        $this->flushText($parent, $textBuffer);
+
+        // Create a span with the word and apply attributes
+        $span = new Span();
+        $span->appendChild(new Text($precedingWord));
+        $this->applyAttributesToNode($span, $attrStr);
+        $parent->appendChild($span);
+
+        return [
+            'textBuffer' => '',
+            'pos' => $attrEnd + 1,
+        ];
+    }
+
+    /**
+     * Find the end of an attribute block, handling quoted strings
+     */
+    protected function findAttributeEnd(string $text, int $pos): ?int
+    {
+        $length = strlen($text);
+        $i = $pos + 1;
+        $inQuote = null;
+        $depth = 1;
+
+        while ($i < $length) {
+            $char = $text[$i];
+
+            // Handle escape sequences
+            if ($char === '\\' && $i + 1 < $length) {
+                $i += 2;
+
+                continue;
+            }
+
+            // Handle quotes
+            if ($inQuote !== null) {
+                if ($char === $inQuote) {
+                    $inQuote = null;
+                }
+                $i++;
+
+                continue;
+            }
+
+            if ($char === '"' || $char === "'") {
+                $inQuote = $char;
+                $i++;
+
+                continue;
+            }
+
+            if ($char === '{') {
+                $depth++;
+            } elseif ($char === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    return $i;
+                }
+            }
+
+            $i++;
+        }
+
+        return null;
+    }
+
+    /**
+     * Remove comments from attribute string: % ... % or % to end
+     */
+    protected function removeAttributeComments(string $attrStr): string
+    {
+        // Remove % ... % comments
+        $result = preg_replace('/%[^%]*%/', '', $attrStr);
+
+        // Remove % to end of string comments
+        $percentPos = strpos($result ?? $attrStr, '%');
+        if ($percentPos !== false) {
+            $result = substr($result ?? $attrStr, 0, $percentPos);
+        }
+
+        return $result ?? $attrStr;
+    }
+
+    /**
+     * Apply attributes from a string to a node
+     */
+    protected function applyAttributesToNode(Node $node, string $attrStr): void
+    {
+        // Match: .class, #id, key="quoted value", key='quoted value', key=unquoted
+        preg_match_all('/\.([^\s.#=}]+)|#([^\s.#=}]+)|([^\s.#=}]+)="([^"]*)"|([^\s.#=}]+)=\'([^\']*)\'|([^\s.#=}]+)=([^\s}"\']+)/', $attrStr, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $match) {
             if (!empty($match[1])) {
+                // Class attribute
                 $node->addClass($match[1]);
             } elseif (!empty($match[2])) {
+                // ID attribute
                 $node->setAttribute('id', $match[2]);
-            } elseif (!empty($match[3])) {
-                $node->setAttribute($match[3], $match[5] ?? '');
+            } elseif (($match[3] ?? '') !== '') {
+                // key="double quoted value"
+                $node->setAttribute($match[3], $match[4] ?? '');
+            } elseif (($match[5] ?? '') !== '') {
+                // key='single quoted value'
+                $node->setAttribute($match[5], $match[6] ?? '');
+            } elseif (($match[7] ?? '') !== '') {
+                // key=unquoted
+                $node->setAttribute($match[7], $match[8] ?? '');
             }
         }
     }

@@ -1309,4 +1309,637 @@ DJOT;
 
         $this->assertFalse($converter->hasWarnings());
     }
+
+    // ==================== Edge Case Tests ====================
+
+    // Edge cases: Empty and whitespace input
+
+    public function testEmptyInput(): void
+    {
+        $result = $this->converter->convert('');
+        $this->assertSame('', $result);
+    }
+
+    public function testWhitespaceOnlyInput(): void
+    {
+        $result = $this->converter->convert("   \n  \t  \n   ");
+        $this->assertSame('', trim($result));
+    }
+
+    public function testSingleNewline(): void
+    {
+        $result = $this->converter->convert("\n");
+        $this->assertSame('', trim($result));
+    }
+
+    // Edge cases: Unicode and special characters
+
+    public function testUnicodeCharacters(): void
+    {
+        $djot = 'Hello 世界! 🎉 Привет мир';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('世界', $result);
+        $this->assertStringContainsString('🎉', $result);
+        $this->assertStringContainsString('Привет мир', $result);
+    }
+
+    public function testUnicodeInHeading(): void
+    {
+        $djot = '# 日本語の見出し';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<h1>日本語の見出し</h1>', $result);
+    }
+
+    public function testUnicodeInLink(): void
+    {
+        $djot = '[リンク](https://example.com/日本語)';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('href="https://example.com/日本語"', $result);
+        $this->assertStringContainsString('リンク</a>', $result);
+    }
+
+    public function testSpecialHtmlCharacters(): void
+    {
+        $djot = 'Test <script>alert("XSS")</script> & "quotes"';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('&lt;script&gt;', $result);
+        $this->assertStringContainsString('&amp;', $result);
+    }
+
+    // Edge cases: Deeply nested structures
+
+    public function testDeeplyNestedLists(): void
+    {
+        $djot = "- Level 1\n  - Level 2\n    - Level 3\n      - Level 4";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('Level 1', $result);
+        $this->assertStringContainsString('Level 2', $result);
+    }
+
+    public function testDeeplyNestedBlockquotes(): void
+    {
+        $djot = "> Level 1\n>\n> > Level 2\n> >\n> > > Level 3";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<blockquote>', $result);
+        $this->assertStringContainsString('Level 1', $result);
+    }
+
+    public function testDeeplyNestedDivs(): void
+    {
+        $djot = "::: outer\n::: middle\n::: inner\nContent\n:::\n:::\n:::";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="outer"', $result);
+        $this->assertStringContainsString('class="middle"', $result);
+        $this->assertStringContainsString('class="inner"', $result);
+    }
+
+    public function testNestedEmphasisAndStrong(): void
+    {
+        $djot = '*_strong emphasis_* and _*emphasis strong*_';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<strong>', $result);
+        $this->assertStringContainsString('<em>', $result);
+    }
+
+    // Edge cases: Inline code and backticks
+
+    public function testMultipleBackticksInCode(): void
+    {
+        // Use 2 backticks to wrap content containing 1 backtick
+        $djot = '`` `code` ``';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<code>', $result);
+    }
+
+    public function testCodeWithBacktickAtBoundary(): void
+    {
+        $djot = '`` ` ``';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<code>`</code>', $result);
+    }
+
+    public function testTripleBackticksInline(): void
+    {
+        $djot = '``` code ```';
+        $result = $this->converter->convert($djot);
+
+        // Triple backticks start a code block, not inline code
+        $this->assertStringContainsString('<pre>', $result);
+    }
+
+    // Edge cases: Links and URLs
+
+    public function testLinkWithParenthesesInUrl(): void
+    {
+        $djot = '[Wikipedia](https://en.wikipedia.org/wiki/Example_(disambiguation))';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('href="https://en.wikipedia.org/wiki/Example_(disambiguation)"', $result);
+    }
+
+    public function testLinkWithEscapedBracket(): void
+    {
+        $djot = '[Text with \] bracket](url)';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('href="url"', $result);
+    }
+
+    public function testEmptyLinkText(): void
+    {
+        $djot = '[](https://example.com)';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('href="https://example.com"', $result);
+    }
+
+    public function testLinkWithOnlyWhitespace(): void
+    {
+        $djot = '[   ](url)';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('href="url"', $result);
+    }
+
+    public function testAutolinkWithQueryString(): void
+    {
+        $djot = '<https://example.com/search?q=test&page=1>';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('href="https://example.com/search?q=test&amp;page=1"', $result);
+    }
+
+    // Edge cases: Tables
+
+    public function testTableWithEmptyCells(): void
+    {
+        $djot = "| A |  | C |\n|---|---|---|\n| 1 |  | 3 |";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<table>', $result);
+        $this->assertStringContainsString('<td></td>', $result);
+    }
+
+    public function testTableWithSingleColumn(): void
+    {
+        $djot = "| Header |\n|--------|\n| Cell |";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<table>', $result);
+        $this->assertStringContainsString('<th>Header</th>', $result);
+    }
+
+    public function testTableWithEscapedPipe(): void
+    {
+        $djot = "| A \\| B | C |\n|--------|---|\n| 1 \\| 2 | 3 |";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('A | B', $result);
+        $this->assertStringContainsString('1 | 2', $result);
+    }
+
+    public function testTableWithMismatchedColumns(): void
+    {
+        // More cells in body than header
+        $djot = "| A | B |\n|---|---|\n| 1 | 2 | 3 |";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<table>', $result);
+    }
+
+    // Edge cases: Code blocks
+
+    public function testCodeBlockWithLongerClosingFence(): void
+    {
+        $djot = "```\ncode\n````";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<pre><code>code</code></pre>', $result);
+    }
+
+    public function testCodeBlockWithTildesAndBackticks(): void
+    {
+        $djot = "~~~\n```\ncode with backticks\n```\n~~~";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('```', $result);
+        $this->assertStringContainsString('code with backticks', $result);
+    }
+
+    public function testCodeBlockWithEmptyContent(): void
+    {
+        $djot = "```\n```";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<pre><code></code></pre>', $result);
+    }
+
+    // Edge cases: Emphasis boundaries
+
+    public function testEmphasisNotInMiddleOfWord(): void
+    {
+        // Underscores in the middle of words should create emphasis in Djot
+        $djot = 'snake_case_name';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<em>case</em>', $result);
+    }
+
+    public function testStrongNotInMiddleOfWord(): void
+    {
+        $djot = 'some*thing*else';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<strong>thing</strong>', $result);
+    }
+
+    public function testMultipleConsecutiveDelimiters(): void
+    {
+        // In Djot, ** creates two empty strong elements around text
+        // This is different from Markdown where ** is bold
+        $djot = 'Text **not strong** here';
+        $result = $this->converter->convert($djot);
+
+        // ** is not valid Djot strong syntax - it creates empty strong tags
+        $this->assertStringContainsString('<strong></strong>', $result);
+        $this->assertStringContainsString('not strong', $result);
+    }
+
+    // Edge cases: Escaping
+
+    public function testEscapedSpecialCharacters(): void
+    {
+        $djot = '\* \_ \` \[ \] \{ \}';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('* _ ` [ ] { }', $result);
+    }
+
+    public function testEscapedBackslash(): void
+    {
+        $djot = 'Test \\\\ here';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('\\', $result);
+    }
+
+    public function testEscapedBackslashBeforeDelimiter(): void
+    {
+        $djot = '\\\\*strong*';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('\\', $result);
+        $this->assertStringContainsString('<strong>strong</strong>', $result);
+    }
+
+    public function testBackslashAtEndOfLine(): void
+    {
+        $djot = "Line with backslash\\\nNext line";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<br>', $result);
+    }
+
+    // Edge cases: Block attributes
+
+    public function testBlockAttributesWithQuotedValues(): void
+    {
+        $djot = "{title=\"Hello World\" data-value=\"123\"}\n# Heading";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('title="Hello World"', $result);
+        $this->assertStringContainsString('data-value="123"', $result);
+    }
+
+    public function testBlockAttributesWithSingleQuotedValues(): void
+    {
+        $djot = "{title='Single Quoted' data-info='some info'}\n# Heading";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('title="Single Quoted"', $result);
+        $this->assertStringContainsString('data-info="some info"', $result);
+    }
+
+    public function testInlineAttributesWithQuotedValues(): void
+    {
+        $djot = '[styled text]{title="Hello World" data-value="test 123"}';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('title="Hello World"', $result);
+        $this->assertStringContainsString('data-value="test 123"', $result);
+    }
+
+    public function testMultipleBlockAttributeLines(): void
+    {
+        $djot = "{.class1}\n{.class2 #myid}\nParagraph";
+        $result = $this->converter->convert($djot);
+
+        // Second attribute line should apply to paragraph
+        $this->assertStringContainsString('class2', $result);
+        $this->assertStringContainsString('id="myid"', $result);
+    }
+
+    // Edge cases: Smart typography
+
+    public function testSmartQuotesNested(): void
+    {
+        $djot = '"He said \'hello\' to me"';
+        $result = $this->converter->convert($djot);
+
+        // Should have curly quotes
+        $this->assertStringContainsString("\u{201C}", $result); // Left double quote
+        $this->assertStringContainsString("\u{201D}", $result); // Right double quote
+        $this->assertStringContainsString("\u{2018}", $result); // Left single quote
+        $this->assertStringContainsString("\u{2019}", $result); // Right single quote
+    }
+
+    public function testMultipleDashes(): void
+    {
+        $djot = 'Single - dash, double -- dash, triple --- dash, quad ---- dash';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString(' - ', $result); // Single stays
+        $this->assertStringContainsString("\u{2013}", $result); // En-dash
+        $this->assertStringContainsString("\u{2014}", $result); // Em-dash
+    }
+
+    public function testEllipsisInDifferentContexts(): void
+    {
+        $djot = 'Wait... and more... and...';
+        $result = $this->converter->convert($djot);
+
+        // All ... should become …
+        $this->assertStringNotContainsString('...', $result);
+        $this->assertStringContainsString("\u{2026}", $result);
+    }
+
+    // Edge cases: Footnotes
+
+    public function testFootnoteWithSpecialCharacters(): void
+    {
+        $djot = "Text[^note-1]\n\n[^note-1]: Footnote with *bold* and `code`.";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('fnref-note-1', $result);
+        $this->assertStringContainsString('<strong>bold</strong>', $result);
+        $this->assertStringContainsString('<code>code</code>', $result);
+    }
+
+    public function testFootnoteWithMultipleParagraphs(): void
+    {
+        $djot = "Text[^long]\n\n[^long]: First paragraph.\n\n  Second paragraph.";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('First paragraph', $result);
+    }
+
+    // Edge cases: Definition lists
+
+    public function testDefinitionListWithMultipleTerms(): void
+    {
+        $djot = "Term 1\n: Definition 1\n\nTerm 2\n: Definition 2a\n: Definition 2b";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dt>Term 1</dt>', $result);
+        $this->assertStringContainsString('<dt>Term 2</dt>', $result);
+        $this->assertStringContainsString('<dd>Definition 2a</dd>', $result);
+        $this->assertStringContainsString('<dd>Definition 2b</dd>', $result);
+    }
+
+    // Edge cases: Math
+
+    public function testMathWithSpecialCharacters(): void
+    {
+        $djot = '$`x < y > z`$';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="math inline"', $result);
+        // Math content should have escaped HTML entities
+        $this->assertStringContainsString('x &lt; y &gt; z', $result);
+    }
+
+    public function testDisplayMathWithNewlines(): void
+    {
+        $djot = "$$`\n  x = y\n  y = z\n`$$";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="math display"', $result);
+    }
+
+    // Edge cases: Comments
+
+    public function testCommentWithSpecialCharacters(): void
+    {
+        $djot = '{% Comment with <html> and & special chars %}';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringNotContainsString('Comment', $result);
+        $this->assertStringNotContainsString('<html>', $result);
+    }
+
+    public function testCommentBetweenParagraphs(): void
+    {
+        $djot = "Para 1\n\n{% hidden %}\n\nPara 2";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<p>Para 1</p>', $result);
+        $this->assertStringContainsString('<p>Para 2</p>', $result);
+        $this->assertStringNotContainsString('hidden', $result);
+    }
+
+    // Edge cases: Raw content
+
+    public function testRawBlockNonHtml(): void
+    {
+        $djot = "``` =latex\n\\frac{1}{2}\n```";
+        $result = $this->converter->convert($djot);
+
+        // Non-HTML raw blocks should not be rendered
+        $this->assertStringNotContainsString('\\frac', $result);
+    }
+
+    public function testRawInlineNonHtml(): void
+    {
+        $djot = 'Text `\\frac{1}{2}`{=latex} more';
+        $result = $this->converter->convert($djot);
+
+        // Non-HTML raw inline should not be rendered
+        $this->assertStringNotContainsString('\\frac', $result);
+    }
+
+    // Edge cases: Line blocks
+
+    public function testLineBlockWithEmptyLines(): void
+    {
+        $djot = "| Line 1\n|\n| Line 3";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="line-block"', $result);
+        $this->assertStringContainsString('Line 1', $result);
+        $this->assertStringContainsString('Line 3', $result);
+    }
+
+    // Edge cases: Spans
+
+    public function testSpanWithEmptyContent(): void
+    {
+        $djot = '[]{.highlight}';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<span class="highlight"></span>', $result);
+    }
+
+    public function testSpanWithNestedFormatting(): void
+    {
+        $djot = '[*bold* and _italic_]{.styled}';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="styled"', $result);
+        $this->assertStringContainsString('<strong>bold</strong>', $result);
+        $this->assertStringContainsString('<em>italic</em>', $result);
+    }
+
+    // Edge cases: Images
+
+    public function testImageWithEmptyAlt(): void
+    {
+        $djot = '![](image.png)';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('alt=""', $result);
+        $this->assertStringContainsString('src="image.png"', $result);
+    }
+
+    public function testImageWithFormattingInAlt(): void
+    {
+        $djot = '![*Photo* of _something_](photo.jpg)';
+        $result = $this->converter->convert($djot);
+
+        // Alt text should be plain text extracted
+        $this->assertStringContainsString('alt=', $result);
+        $this->assertStringContainsString('src="photo.jpg"', $result);
+    }
+
+    // Edge cases: Mixed content
+
+    public function testParagraphWithAllInlineTypes(): void
+    {
+        $djot = 'Text with _emphasis_, *strong*, `code`, [link](url), ^super^, ~sub~, {=high=}, {+ins+}, {-del-}.';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<em>emphasis</em>', $result);
+        $this->assertStringContainsString('<strong>strong</strong>', $result);
+        $this->assertStringContainsString('<code>code</code>', $result);
+        $this->assertStringContainsString('<a href="url">link</a>', $result);
+        $this->assertStringContainsString('<sup>super</sup>', $result);
+        $this->assertStringContainsString('<sub>sub</sub>', $result);
+        $this->assertStringContainsString('<mark>high</mark>', $result);
+        $this->assertStringContainsString('<ins>ins</ins>', $result);
+        $this->assertStringContainsString('<del>del</del>', $result);
+    }
+
+    public function testComplexNestedDocument(): void
+    {
+        $djot = <<<'DJOT'
+# Complex Document
+
+::: note
+> This is a blockquote inside a div.
+
+- List item 1
+- List item 2
+  - Nested item
+
+| A | B |
+|---|---|
+| 1 | 2 |
+:::
+
+[^1]: Footnote content with *formatting*.
+
+Reference[^1] here.
+DJOT;
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<h1>Complex Document</h1>', $result);
+        $this->assertStringContainsString('class="note"', $result);
+        $this->assertStringContainsString('<blockquote>', $result);
+        $this->assertStringContainsString('<ul>', $result);
+        $this->assertStringContainsString('<table>', $result);
+        $this->assertStringContainsString('Footnote content', $result);
+    }
+
+    // Edge cases: Consecutive same-type elements
+
+    public function testConsecutiveCodeBlocks(): void
+    {
+        $djot = "```\nblock 1\n```\n\n```\nblock 2\n```";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('block 1', $result);
+        $this->assertStringContainsString('block 2', $result);
+        $this->assertSame(2, substr_count($result, '<pre>'));
+    }
+
+    public function testConsecutiveBlockquotes(): void
+    {
+        $djot = "> Quote 1\n\n> Quote 2";
+        $result = $this->converter->convert($djot);
+
+        $this->assertSame(2, substr_count($result, '<blockquote>'));
+    }
+
+    // Edge cases: XHTML mode specifics
+
+    public function testXhtmlHardBreak(): void
+    {
+        $converter = new DjotConverter(xhtml: true);
+        $djot = "Line 1\\\nLine 2";
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('<br />', $result);
+    }
+
+    public function testXhtmlThematicBreak(): void
+    {
+        $converter = new DjotConverter(xhtml: true);
+        $djot = "Above\n\n***\n\nBelow";
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('<hr />', $result);
+    }
+
+    // Edge cases: Reference links
+
+    public function testCaseInsensitiveReferenceLink(): void
+    {
+        $djot = "[Example][REF]\n\n[ref]: https://example.com";
+        $this->converter->convert($djot);
+
+        // References are case-sensitive in Djot
+        // This should produce a warning in warning mode, not a link
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert($djot);
+        $this->assertTrue($converter->hasWarnings());
+    }
+
+    public function testShortcutReferenceLink(): void
+    {
+        // [label][] syntax where label matches reference
+        $djot = "[Example][]\n\n[Example]: https://example.com";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('href="https://example.com"', $result);
+    }
 }

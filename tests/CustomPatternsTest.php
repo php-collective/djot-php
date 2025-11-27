@@ -6,9 +6,14 @@ namespace Djot\Test;
 
 use Djot\DjotConverter;
 use Djot\Node\Block\Div;
+use Djot\Node\Block\Heading;
 use Djot\Node\Block\Paragraph;
 use Djot\Node\Inline\Link;
+use Djot\Node\Inline\Span;
+use Djot\Node\Inline\Strong;
 use Djot\Node\Inline\Text;
+use Djot\Node\Node;
+use Djot\Parser\BlockParser;
 use PHPUnit\Framework\TestCase;
 
 class CustomPatternsTest extends TestCase
@@ -358,5 +363,436 @@ class CustomPatternsTest extends TestCase
         $this->assertStringContainsString('class="note"', $result);
         $this->assertStringContainsString('href="/u/support"', $result);
         $this->assertStringContainsString('href="/u/mention"', $result);
+    }
+
+    // ==================== Edge Cases for Custom Patterns ====================
+
+    public function testInlinePatternWithNestedFormatting(): void
+    {
+        $parser = $this->converter->getParser()->getInlineParser();
+
+        // Register a pattern that captures content with formatting
+        $parser->addInlinePattern('/\{\{([^}]+)\}\}/', function ($match, $groups, $p) {
+            $span = new Span();
+            $span->setAttribute('class', 'template');
+            $span->appendChild(new Text($groups[1]));
+
+            return $span;
+        });
+
+        $result = $this->converter->convert('Check out {{template_variable}} here.');
+
+        $this->assertStringContainsString('class="template"', $result);
+        $this->assertStringContainsString('template_variable', $result);
+    }
+
+    public function testInlinePatternWithUnicode(): void
+    {
+        $parser = $this->converter->getParser()->getInlineParser();
+
+        // Pattern that matches Unicode hashtags - note that the pattern needs proper handling
+        // The custom pattern system anchors patterns, so we need to test this differently
+        $parser->addInlinePattern('/#([a-zA-Z0-9_]+)/', function ($match, $groups, $p) {
+            $link = new Link('/tags/' . rawurlencode($groups[1]));
+            $link->appendChild(new Text('#' . $groups[1]));
+
+            return $link;
+        });
+
+        $result = $this->converter->convert('Check out #TestTag and #hello123!');
+
+        $this->assertStringContainsString('href="/tags/TestTag"', $result);
+        $this->assertStringContainsString('href="/tags/hello123"', $result);
+        $this->assertStringContainsString('#TestTag', $result);
+    }
+
+    public function testInlinePatternAtStartOfLine(): void
+    {
+        $parser = $this->converter->getParser()->getInlineParser();
+
+        $parser->addInlinePattern('/^>>\s*(.+)$/', function ($match, $groups, $p) {
+            $span = new Span();
+            $span->setAttribute('class', 'greentext');
+            $span->appendChild(new Text($groups[1]));
+
+            return $span;
+        });
+
+        // Note: This tests that patterns work at the start of content
+        $result = $this->converter->convert('>> implying this is greentext');
+
+        $this->assertStringContainsString('greentext', $result);
+    }
+
+    public function testInlinePatternWithMultipleCaptures(): void
+    {
+        $parser = $this->converter->getParser()->getInlineParser();
+
+        // Pattern that captures two groups: label|url
+        $parser->addInlinePattern('/\[\[([^|]+)\|([^\]]+)\]\]/', function ($match, $groups, $p) {
+            $link = new Link($groups[2]);
+            $link->appendChild(new Text($groups[1]));
+
+            return $link;
+        });
+
+        $result = $this->converter->convert('See [[Documentation|/docs]] for more info.');
+
+        $this->assertStringContainsString('href="/docs"', $result);
+        $this->assertStringContainsString('Documentation</a>', $result);
+    }
+
+    public function testInlinePatternWithAttributes(): void
+    {
+        $parser = $this->converter->getParser()->getInlineParser();
+
+        // Pattern that creates element with multiple attributes
+        $parser->addInlinePattern('/\[!([^\]]+)\]/', function ($match, $groups, $p) {
+            $span = new Span();
+            $span->setAttribute('class', 'alert');
+            $span->setAttribute('role', 'alert');
+            $span->setAttribute('aria-live', 'polite');
+            $span->appendChild(new Text($groups[1]));
+
+            return $span;
+        });
+
+        $result = $this->converter->convert('Important: [!This is an alert message]');
+
+        $this->assertStringContainsString('class="alert"', $result);
+        $this->assertStringContainsString('role="alert"', $result);
+        $this->assertStringContainsString('aria-live="polite"', $result);
+    }
+
+    public function testBlockPatternWithNestedBlocks(): void
+    {
+        $parser = $this->converter->getParser();
+
+        // Register collapsible details pattern
+        $parser->addBlockPattern('/^<details>\s*$/', function ($lines, $start, $parent, $p) {
+            $content = [];
+            $i = $start + 1;
+            $count = count($lines);
+
+            while ($i < $count && !preg_match('/^<\/details>\s*$/', $lines[$i])) {
+                $content[] = $lines[$i];
+                $i++;
+            }
+
+            $div = new Div();
+            $div->setAttribute('class', 'details');
+            $p->parseBlockContent($div, $content);
+            $parent->appendChild($div);
+
+            // +1 for closing tag
+            return ($i < $count) ? $i - $start + 1 : $i - $start;
+        });
+
+        $djot = "<details>\n# Summary\n\nThis is the content.\n\n- Item 1\n- Item 2\n</details>\n\nAfter details.";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="details"', $result);
+        $this->assertStringContainsString('<h1>Summary</h1>', $result);
+        $this->assertStringContainsString('<ul>', $result);
+        $this->assertStringContainsString('<p>After details.</p>', $result);
+    }
+
+    public function testBlockPatternWithIndentedContent(): void
+    {
+        $parser = $this->converter->getParser();
+
+        // Register callout pattern with indented content
+        $parser->addBlockPattern('/^CALLOUT:\s*(\w+)\s*$/', function ($lines, $start, $parent, $p) {
+            preg_match('/^CALLOUT:\s*(\w+)\s*$/', $lines[$start], $m);
+            $type = $m[1];
+
+            $content = [];
+            $i = $start + 1;
+            $count = count($lines);
+
+            // Collect indented lines
+            while ($i < $count && preg_match('/^    (.*)$/', $lines[$i], $contentMatch)) {
+                $content[] = $contentMatch[1];
+                $i++;
+            }
+
+            $div = new Div();
+            $div->setAttribute('class', 'callout callout-' . strtolower($type));
+            $p->parseBlockContent($div, $content);
+            $parent->appendChild($div);
+
+            return $i - $start;
+        });
+
+        $djot = "CALLOUT: INFO\n    This is important information.\n    With multiple lines.\n\nRegular paragraph.";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="callout callout-info"', $result);
+        $this->assertStringContainsString('important information', $result);
+        $this->assertStringContainsString('<p>Regular paragraph.</p>', $result);
+    }
+
+    public function testBlockPatternConsumingMultipleBlocks(): void
+    {
+        $parser = $this->converter->getParser();
+
+        // Register a two-column layout pattern
+        $parser->addBlockPattern('/^:::\s*columns\s*$/', function ($lines, $start, $parent, $p) {
+            $leftContent = [];
+            $rightContent = [];
+            $currentSide = 'left';
+            $i = $start + 1;
+            $count = count($lines);
+
+            while ($i < $count && !preg_match('/^:::\s*$/', $lines[$i])) {
+                if (preg_match('/^---\s*$/', $lines[$i])) {
+                    $currentSide = 'right';
+                    $i++;
+
+                    continue;
+                }
+
+                if ($currentSide === 'left') {
+                    $leftContent[] = $lines[$i];
+                } else {
+                    $rightContent[] = $lines[$i];
+                }
+                $i++;
+            }
+
+            $container = new Div();
+            $container->setAttribute('class', 'columns');
+
+            $leftDiv = new Div();
+            $leftDiv->setAttribute('class', 'column-left');
+            $p->parseBlockContent($leftDiv, $leftContent);
+            $container->appendChild($leftDiv);
+
+            $rightDiv = new Div();
+            $rightDiv->setAttribute('class', 'column-right');
+            $p->parseBlockContent($rightDiv, $rightContent);
+            $container->appendChild($rightDiv);
+
+            $parent->appendChild($container);
+
+            return ($i < $count) ? $i - $start + 1 : $i - $start;
+        });
+
+        $djot = "::: columns\nLeft content here.\n---\nRight content here.\n:::\n\nAfter columns.";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="columns"', $result);
+        $this->assertStringContainsString('class="column-left"', $result);
+        $this->assertStringContainsString('class="column-right"', $result);
+        $this->assertStringContainsString('Left content here', $result);
+        $this->assertStringContainsString('Right content here', $result);
+    }
+
+    public function testMultipleCustomBlockPatterns(): void
+    {
+        $parser = $this->converter->getParser();
+
+        // Register multiple block patterns
+        $parser->addBlockPattern('/^!!!note\s*$/', function ($lines, $start, $parent, $p) {
+            return $this->createAdmonition($lines, $start, $parent, $p, 'note');
+        });
+
+        $parser->addBlockPattern('/^!!!warning\s*$/', function ($lines, $start, $parent, $p) {
+            return $this->createAdmonition($lines, $start, $parent, $p, 'warning');
+        });
+
+        $djot = "!!!note\n    This is a note.\n\n!!!warning\n    This is a warning.\n\nRegular text.";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('class="admonition note"', $result);
+        $this->assertStringContainsString('class="admonition warning"', $result);
+        $this->assertStringContainsString('This is a note', $result);
+        $this->assertStringContainsString('This is a warning', $result);
+    }
+
+    /**
+     * Helper method for admonition patterns
+     */
+    private function createAdmonition(array $lines, int $start, Node $parent, BlockParser $p, string $type): int
+    {
+        $content = [];
+        $i = $start + 1;
+        $count = count($lines);
+
+        while ($i < $count && preg_match('/^    (.*)$/', $lines[$i], $m)) {
+            $content[] = $m[1];
+            $i++;
+        }
+
+        $div = new Div();
+        $div->setAttribute('class', 'admonition ' . $type);
+        $p->parseBlockContent($div, $content);
+        $parent->appendChild($div);
+
+        return $i - $start;
+    }
+
+    public function testInlinePatternNotMatchingPartialWord(): void
+    {
+        $parser = $this->converter->getParser()->getInlineParser();
+
+        // Pattern with word boundary
+        $parser->addInlinePattern('/\bTODO\b/', function ($match, $groups, $p) {
+            $span = new Span();
+            $span->setAttribute('class', 'todo');
+            $span->appendChild(new Text('TODO'));
+
+            return $span;
+        });
+
+        $result = $this->converter->convert('This is a TODO item, not TODOLIST.');
+
+        $this->assertStringContainsString('class="todo"', $result);
+        // TODOLIST should not match
+        $this->assertStringContainsString('TODOLIST', $result);
+    }
+
+    public function testInlinePatternPreservesEscapes(): void
+    {
+        $parser = $this->converter->getParser()->getInlineParser();
+
+        $parser->addInlinePattern('/@(\w+)/', function ($match, $groups, $p) {
+            $link = new Link('/user/' . $groups[1]);
+            $link->appendChild(new Text('@' . $groups[1]));
+
+            return $link;
+        });
+
+        // Test that escaped @ is not matched
+        $result = $this->converter->convert('Contact \\@admin for help, or @support.');
+
+        // Escaped @ should be literal
+        $this->assertStringContainsString('@admin', $result);
+        $this->assertStringNotContainsString('href="/user/admin"', $result);
+
+        // Non-escaped @ should create link
+        $this->assertStringContainsString('href="/user/support"', $result);
+    }
+
+    public function testBlockPatternPrecedenceOverBuiltin(): void
+    {
+        $parser = $this->converter->getParser();
+
+        // Override heading behavior for special prefix
+        $parser->addBlockPattern('/^##\s+DRAFT:\s+(.+)$/', function ($lines, $start, $parent, $p) {
+            preg_match('/^##\s+DRAFT:\s+(.+)$/', $lines[$start], $m);
+
+            $div = new Div();
+            $div->setAttribute('class', 'draft-heading');
+
+            $heading = new Heading(2);
+            $heading->appendChild(new Text($m[1]));
+            $div->appendChild($heading);
+
+            $parent->appendChild($div);
+
+            return 1;
+        });
+
+        $result = $this->converter->convert("## DRAFT: Work in Progress\n\n## Regular Heading");
+
+        $this->assertStringContainsString('class="draft-heading"', $result);
+        $this->assertStringContainsString('Work in Progress', $result);
+        // Regular heading should still work
+        $this->assertStringContainsString('<h2>Regular Heading</h2>', $result);
+    }
+
+    public function testBlockPatternWithEmptyContent(): void
+    {
+        $parser = $this->converter->getParser();
+
+        $parser->addBlockPattern('/^---separator---$/', function ($lines, $start, $parent, $p) {
+            $div = new Div();
+            $div->setAttribute('class', 'separator');
+            $parent->appendChild($div);
+
+            return 1;
+        });
+
+        $result = $this->converter->convert("Before\n\n---separator---\n\nAfter");
+
+        $this->assertStringContainsString('class="separator"', $result);
+        $this->assertStringContainsString('<p>Before</p>', $result);
+        $this->assertStringContainsString('<p>After</p>', $result);
+    }
+
+    public function testInlinePatternChaining(): void
+    {
+        $parser = $this->converter->getParser()->getInlineParser();
+
+        // Multiple inline patterns in sequence
+        $parser->addInlinePattern('/@(\w+)/', function ($match, $groups, $p) {
+            $link = new Link('/users/' . $groups[1]);
+            $link->appendChild(new Text('@' . $groups[1]));
+
+            return $link;
+        });
+
+        $parser->addInlinePattern('/#(\w+)/', function ($match, $groups, $p) {
+            $link = new Link('/tags/' . $groups[1]);
+            $link->appendChild(new Text('#' . $groups[1]));
+
+            return $link;
+        });
+
+        $result = $this->converter->convert('Hello @alice and @bob! Check #news and #updates.');
+
+        $this->assertStringContainsString('href="/users/alice"', $result);
+        $this->assertStringContainsString('href="/users/bob"', $result);
+        $this->assertStringContainsString('href="/tags/news"', $result);
+        $this->assertStringContainsString('href="/tags/updates"', $result);
+    }
+
+    public function testInlinePatternReturnsComplexNode(): void
+    {
+        $parser = $this->converter->getParser()->getInlineParser();
+
+        // Pattern that returns a node with children
+        $parser->addInlinePattern('/\[\[(\w+):(\w+)\]\]/', function ($match, $groups, $p) {
+            $span = new Span();
+            $span->setAttribute('class', 'ref');
+            $span->setAttribute('data-type', $groups[1]);
+            $span->setAttribute('data-id', $groups[2]);
+
+            $strong = new Strong();
+            $strong->appendChild(new Text($groups[1] . ':'));
+            $span->appendChild($strong);
+
+            $span->appendChild(new Text(' ' . $groups[2]));
+
+            return $span;
+        });
+
+        $result = $this->converter->convert('Reference [[issue:123]] in the tracker.');
+
+        $this->assertStringContainsString('class="ref"', $result);
+        $this->assertStringContainsString('data-type="issue"', $result);
+        $this->assertStringContainsString('data-id="123"', $result);
+        $this->assertStringContainsString('<strong>issue:</strong>', $result);
+    }
+
+    public function testGetRegisteredPatterns(): void
+    {
+        $parser = $this->converter->getParser();
+        $inlineParser = $parser->getInlineParser();
+
+        // Add some patterns
+        $inlineParser->addInlinePattern('/pattern1/', fn ($m, $g, $p) => null);
+        $inlineParser->addInlinePattern('/pattern2/', fn ($m, $g, $p) => null);
+        $parser->addBlockPattern('/^block1$/', fn ($l, $s, $p, $bp) => 1);
+
+        $inlinePatterns = $inlineParser->getInlinePatterns();
+        $blockPatterns = $parser->getBlockPatterns();
+
+        $this->assertCount(2, $inlinePatterns);
+        $this->assertArrayHasKey('/pattern1/', $inlinePatterns);
+        $this->assertArrayHasKey('/pattern2/', $inlinePatterns);
+        $this->assertCount(1, $blockPatterns);
+        $this->assertArrayHasKey('/^block1$/', $blockPatterns);
     }
 }

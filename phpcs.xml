@@ -10,4 +10,10 @@
     <rule ref="SlevomatCodingStandard.Functions.RequireTrailingCommaInDeclaration"/>
     <rule ref="SlevomatCodingStandard.Functions.RequireTrailingCommaInClosureUse"/>
 
+    <!-- Allow short attribute names since PhpCollective.Commenting.Attributes.ExpectedFQCN conflicts -->
+    <rule ref="SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly.ReferenceViaFullyQualifiedName">
+        <exclude-pattern>tests/OfficialTestSuiteTest.php</exclude-pattern>
+        <exclude-pattern>tests/FuzzTest.php</exclude-pattern>
+    </rule>
+
 </ruleset>

@@ -485,11 +485,17 @@ class BlockParser
         $line = $lines[$start];
 
         // Match block attribute: {.class} or {#id} or {key=value} or combinations
-        if (!preg_match('/^\{([^}]+)\}\s*$/', $line, $matches)) {
+        // Allow } inside quoted strings
+        if (!preg_match('/^\{(.+)\}\s*$/', $line, $matches)) {
             return null;
         }
 
+        // Verify it looks like attributes (starts with ., #, or key=)
         $attrStr = $matches[1];
+        if (!preg_match('/^[.#a-zA-Z_]/', $attrStr)) {
+            return null;
+        }
+
         $this->parseAttributeString($attrStr);
 
         return 1;
@@ -512,10 +518,19 @@ class BlockParser
             $this->pendingAttributes['id'] = $idMatch[1];
         }
 
-        // Parse key=value or key="value"
-        if (preg_match_all('/([a-zA-Z_][a-zA-Z0-9_-]*)=(["\']?)([^"\'\s}]*)\2/', $attrStr, $kvMatches, PREG_SET_ORDER)) {
+        // Parse key="double quoted value", key='single quoted value', or key=unquoted
+        if (preg_match_all('/([a-zA-Z_][a-zA-Z0-9_-]*)="([^"]*)"|([a-zA-Z_][a-zA-Z0-9_-]*)=\'([^\']*)\'|([a-zA-Z_][a-zA-Z0-9_-]*)=([^\s}"\']+)/', $attrStr, $kvMatches, PREG_SET_ORDER)) {
             foreach ($kvMatches as $match) {
-                $this->pendingAttributes[$match[1]] = $match[3];
+                if (($match[1] ?? '') !== '') {
+                    // key="double quoted value"
+                    $this->pendingAttributes[$match[1]] = $match[2] ?? '';
+                } elseif (($match[3] ?? '') !== '') {
+                    // key='single quoted value'
+                    $this->pendingAttributes[$match[3]] = $match[4] ?? '';
+                } elseif (($match[5] ?? '') !== '') {
+                    // key=unquoted
+                    $this->pendingAttributes[$match[5]] = $match[6] ?? '';
+                }
             }
         }
     }
@@ -823,13 +838,20 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Match block quote: > followed by space or end of line
-        if (!preg_match('/^>\s?(.*)$/', $line, $matches)) {
+        // Match block quote: > followed by space or end of line (NOT >text or >>)
+        // The > must be followed by a space or be at end of line
+        if (!preg_match('/^> (.*)$/', $line, $matches) && !preg_match('/^>$/', $line)) {
             return null;
         }
 
         $blockQuote = new BlockQuote();
-        $innerLines = [$matches[1]];
+        $innerLines = [];
+
+        if (preg_match('/^> (.*)$/', $line, $matches)) {
+            $innerLines[] = $matches[1];
+        } elseif (preg_match('/^>$/', $line)) {
+            $innerLines[] = '';
+        }
 
         $i = $start + 1;
         $count = count($lines);
@@ -841,12 +863,17 @@ class BlockParser
                 break;
             }
 
-            // Continue with > prefix
-            if (preg_match('/^>\s?(.*)$/', $currentLine, $matches)) {
+            // Continue with "> " prefix (space required)
+            if (preg_match('/^> (.*)$/', $currentLine, $matches)) {
                 $innerLines[] = $matches[1];
                 $i++;
+            } elseif (preg_match('/^>$/', $currentLine)) {
+                // Empty block quote line (just >)
+                $innerLines[] = '';
+                $i++;
             } elseif (!$this->startsNewBlock($currentLine)) {
-                // Lazy continuation (blank lines already handled above)
+                // Lazy continuation - includes lines starting with ">" but no space
+                // These become literal ">text" in the paragraph
                 $innerLines[] = $currentLine;
                 $i++;
             } else {
@@ -1437,7 +1464,9 @@ class BlockParser
     protected function startsNewBlock(string $line): bool
     {
         // Check if line starts a new block element
-        return (bool)preg_match('/^(#{1,6}\s|[>]|[-*+]\s|\d+[.)]\s|`{3,}|:{3,}|\|)/', $line);
+        // Note: Block quotes (>) are NOT included here - they don't interrupt paragraphs
+        // Block quotes can only start after a blank line or at document start
+        return (bool)preg_match('/^(#{1,6}\s|[-*+]\s|\d+[.)]\s|`{3,}|:{3,}|\|)/', $line);
     }
 
     /**
