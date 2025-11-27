@@ -1,0 +1,46 @@
+{
+    "name": "php-collective/djot",
+    "description": "A PHP parser for Djot, a modern light markup language",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["djot", "markup", "parser", "markdown"],
+    "authors": [
+        {
+            "name": "PHP Collective",
+            "homepage": "https://github.com/php-collective"
+        }
+    ],
+    "require": {
+        "php": "^8.2"
+    },
+    "require-dev": {
+        "php-collective/code-sniffer": "dev-master",
+        "phpstan/phpstan": "^2.1.32",
+        "phpunit/phpunit": "^11.0 || ^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Djot\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Djot\\Test\\": "tests/"
+        }
+    },
+    "scripts": {
+        "check": [
+            "@cs-check",
+            "@test"
+        ],
+        "cs-check": "phpcs --colors --parallel=16",
+        "cs-fix": "phpcbf --colors --parallel=16",
+        "stan": "phpstan analyze",
+        "test": "phpunit"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}
