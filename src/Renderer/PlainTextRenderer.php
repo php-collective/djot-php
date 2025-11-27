@@ -172,9 +172,11 @@ class PlainTextRenderer
             }
         }
 
-        $caption = $node->getCaption();
-        if ($caption !== null) {
-            $text .= $caption . "\n";
+        if ($node->hasCaptionChildren()) {
+            foreach ($node->getCaptionChildren() as $child) {
+                $text .= $this->renderNode($child);
+            }
+            $text = rtrim($text) . "\n";
         }
 
         return $text . "\n";

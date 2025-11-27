@@ -50,7 +50,7 @@ use Djot\Node\Node;
  */
 class HtmlRenderer
 {
-    protected bool $softBreakAsNewline = false;
+    protected bool $softBreakAsNewline = true;
 
     /**
      * @var array<string, array<\Closure(\Djot\Event\RenderEvent): void>>
@@ -138,7 +138,7 @@ class HtmlRenderer
             $node instanceof DefinitionDescription => $this->renderDefinitionDescription($node),
             $node instanceof ListBlock => $this->renderList($node),
             $node instanceof ListItem => $this->renderListItem($node),
-            $node instanceof ThematicBreak => $this->renderThematicBreak(),
+            $node instanceof ThematicBreak => $this->renderThematicBreak($node),
             $node instanceof Div => $this->renderDiv($node),
             $node instanceof Table => $this->renderTable($node),
             $node instanceof TableRow => $this->renderTableRow($node),
@@ -180,16 +180,43 @@ class HtmlRenderer
     protected function renderParagraph(Paragraph $node): string
     {
         $attrs = $this->renderAttributes($node);
+        $content = rtrim($this->renderChildren($node));
 
-        return '<p' . $attrs . '>' . $this->renderChildren($node) . "</p>\n";
+        return '<p' . $attrs . '>' . $content . "</p>\n";
     }
 
     protected function renderHeading(Heading $node): string
     {
         $level = $node->getLevel();
+
+        // Auto-generate id from heading text if not already set
+        if (!$node->hasAttribute('id')) {
+            $headingText = $this->getPlainText($node);
+            if ($headingText !== '') {
+                $node->setAttribute('id', $headingText);
+            }
+        }
+
         $attrs = $this->renderAttributes($node);
 
         return '<h' . $level . $attrs . '>' . $this->renderChildren($node) . '</h' . $level . ">\n";
+    }
+
+    /**
+     * Get plain text content of a node (for generating heading IDs)
+     */
+    protected function getPlainText(Node $node): string
+    {
+        $text = '';
+        foreach ($node->getChildren() as $child) {
+            if ($child instanceof Text) {
+                $text .= $child->getContent();
+            } elseif ($child instanceof Node) {
+                $text .= $this->getPlainText($child);
+            }
+        }
+
+        return $text;
     }
 
     protected function renderCodeBlock(CodeBlock $node): string
@@ -198,9 +225,15 @@ class HtmlRenderer
         $attrs = $this->renderAttributes($node);
 
         $code = $this->escape($node->getContent());
+        // Add trailing newline inside code block (official djot behavior)
+        if ($code !== '' && !str_ends_with($code, "\n")) {
+            $code .= "\n";
+        }
 
         if ($language !== null) {
-            return '<pre' . $attrs . '><code class="language-' . $this->escape($language) . '">' . $code . "</code></pre>\n";
+            $langClass = 'class="language-' . $this->escape($language) . '"';
+
+            return '<pre' . $attrs . '><code ' . $langClass . '>' . $code . "</code></pre>\n";
         }
 
         return '<pre' . $attrs . '><code>' . $code . "</code></pre>\n";
@@ -229,12 +262,19 @@ class HtmlRenderer
         }
 
         if ($node->getListType() === ListBlock::TYPE_ORDERED) {
+            $olAttrs = '';
             $start = $node->getStart();
+            $style = $node->getStyle();
+
+            // Order: start, then type, then other attrs
             if ($start !== 1) {
-                $attrs .= ' start="' . $start . '"';
+                $olAttrs .= ' start="' . $start . '"';
+            }
+            if ($style !== null) {
+                $olAttrs .= ' type="' . $style . '"';
             }
 
-            return '<ol' . $attrs . ">\n" . $html . "</ol>\n";
+            return '<ol' . $olAttrs . $attrs . ">\n" . $html . "</ol>\n";
         }
 
         if ($node->getListType() === ListBlock::TYPE_TASK) {
@@ -273,9 +313,11 @@ class HtmlRenderer
         return '<li' . $attrs . ">\n" . $content . "\n</li>\n";
     }
 
-    protected function renderThematicBreak(): string
+    protected function renderThematicBreak(ThematicBreak $node): string
     {
-        return $this->xhtml ? "<hr />\n" : "<hr>\n";
+        $attrs = $this->renderAttributes($node);
+
+        return $this->xhtml ? '<hr' . $attrs . " />\n" : '<hr' . $attrs . ">\n";
     }
 
     protected function renderDiv(Div $node): string
@@ -297,40 +339,22 @@ class HtmlRenderer
         $attrs = $this->renderAttributes($node);
         $html = '<table' . $attrs . ">\n";
 
-        // Render caption if present
-        $caption = $node->getCaption();
-        if ($caption !== null) {
-            $html .= '<caption>' . $this->escape($caption) . "</caption>\n";
+        // Render caption if present (with parsed inline content)
+        if ($node->hasCaptionChildren()) {
+            $captionHtml = '';
+            foreach ($node->getCaptionChildren() as $child) {
+                $captionHtml .= $this->renderNode($child);
+            }
+            // Remove trailing newline from last text node
+            $captionHtml = rtrim($captionHtml);
+            $html .= '<caption>' . $captionHtml . "</caption>\n";
         }
 
-        $children = $node->getChildren();
-        $inHead = false;
-        $inBody = false;
-
-        foreach ($children as $row) {
+        // djot tables don't use thead/tbody - just rows with th or td cells
+        foreach ($node->getChildren() as $row) {
             if ($row instanceof TableRow) {
-                if ($row->isHeader() && !$inHead) {
-                    $html .= "<thead>\n";
-                    $inHead = true;
-                } elseif (!$row->isHeader() && $inHead) {
-                    $html .= "</thead>\n";
-                    $inHead = false;
-                }
-
-                if (!$row->isHeader() && !$inBody) {
-                    $html .= "<tbody>\n";
-                    $inBody = true;
-                }
-
                 $html .= $this->renderTableRow($row);
             }
-        }
-
-        if ($inHead) {
-            $html .= "</thead>\n";
-        }
-        if ($inBody) {
-            $html .= "</tbody>\n";
         }
 
         return $html . "</table>\n";
@@ -382,8 +406,8 @@ class HtmlRenderer
         $title = $node->getTitle();
 
         $html = '<a';
-        // Only output href if not empty (unresolved references have no href)
-        if ($href !== '') {
+        // Only output href if destination is set (even if empty)
+        if ($href !== null) {
             $html .= ' href="' . $this->escape($href) . '"';
         }
         if ($title !== null) {
@@ -476,7 +500,7 @@ class HtmlRenderer
             return '';
         }
 
-        // Sort attributes: id first, then class, then others alphabetically
+        // Sort attributes: id first, then others (preserving insertion order), then class last
         uksort($attrs, function (string $a, string $b): int {
             if ($a === 'id') {
                 return -1;
@@ -485,13 +509,13 @@ class HtmlRenderer
                 return 1;
             }
             if ($a === 'class') {
-                return -1;
+                return 1; // class goes last
             }
             if ($b === 'class') {
-                return 1;
+                return -1; // class goes last
             }
 
-            return strcmp($a, $b);
+            return 0; // preserve order for other attributes
         });
 
         $html = '';
@@ -508,8 +532,9 @@ class HtmlRenderer
         // Only escape <, >, and & for HTML safety
         $escaped = htmlspecialchars($text, ENT_NOQUOTES | ENT_HTML5, 'UTF-8');
 
-        // Convert non-breaking space to entity for consistency with official djot
-        return str_replace("\u{00A0}", '&nbsp;', $escaped);
+        // Convert escaped space placeholder (U+E000) to &nbsp; entity
+        // Literal NBSP characters in source are preserved as-is
+        return str_replace("\u{E000}", '&nbsp;', $escaped);
     }
 
     /**
@@ -522,8 +547,8 @@ class HtmlRenderer
         // ENT_QUOTES: Escape both single and double quotes for attribute values
         $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        // Convert non-breaking space to entity for consistency with official djot
-        return str_replace("\u{00A0}", '&nbsp;', $escaped);
+        // Convert escaped space placeholder (U+E000) to &nbsp; entity
+        return str_replace("\u{E000}", '&nbsp;', $escaped);
     }
 
     protected function renderRawBlock(RawBlock $node): string
@@ -616,7 +641,10 @@ class HtmlRenderer
         $this->footnoteRefCounts[$label]++;
         $refNum = $this->footnoteRefCounts[$label];
 
-        return '<sup id="fnref-' . $escapedLabel . '-' . $refNum . '"><a href="#fn-' . $escapedLabel . '">' . $escapedLabel . '</a></sup>';
+        $id = 'fnref-' . $escapedLabel . '-' . $refNum;
+        $href = '#fn-' . $escapedLabel;
+
+        return '<sup id="' . $id . '"><a href="' . $href . '">' . $escapedLabel . '</a></sup>';
     }
 
     protected function renderMath(Math $node): string

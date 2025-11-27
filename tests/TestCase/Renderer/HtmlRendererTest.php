@@ -49,7 +49,7 @@ class HtmlRendererTest extends TestCase
 
         $result = $this->renderer->render($doc);
 
-        $this->assertSame("<h2>Title</h2>\n", $result);
+        $this->assertSame("<h2 id=\"Title\">Title</h2>\n", $result);
     }
 
     public function testRenderEmphasis(): void
@@ -128,7 +128,7 @@ class HtmlRendererTest extends TestCase
 
         $result = $this->renderer->render($doc);
 
-        $this->assertSame("<pre><code class=\"language-php\">echo 'hello';</code></pre>\n", $result);
+        $this->assertSame("<pre><code class=\"language-php\">echo 'hello';\n</code></pre>\n", $result);
     }
 
     public function testRenderCodeBlockWithoutLanguage(): void
@@ -139,7 +139,7 @@ class HtmlRendererTest extends TestCase
 
         $result = $this->renderer->render($doc);
 
-        $this->assertSame("<pre><code>plain code</code></pre>\n", $result);
+        $this->assertSame("<pre><code>plain code\n</code></pre>\n", $result);
     }
 
     public function testRenderHardBreak(): void
@@ -167,13 +167,13 @@ class HtmlRendererTest extends TestCase
 
         $result = $this->renderer->render($doc);
 
-        // Default: soft break as space
-        $this->assertSame("<p>Line 1 Line 2</p>\n", $result);
+        // Default: soft break as newline (djot preserves newlines)
+        $this->assertSame("<p>Line 1\nLine 2</p>\n", $result);
     }
 
-    public function testRenderSoftBreakAsNewline(): void
+    public function testRenderSoftBreakAsSpace(): void
     {
-        $this->renderer->setSoftBreakAsNewline(true);
+        $this->renderer->setSoftBreakAsNewline(false);
 
         $doc = new Document();
         $para = new Paragraph();
@@ -184,7 +184,7 @@ class HtmlRendererTest extends TestCase
 
         $result = $this->renderer->render($doc);
 
-        $this->assertSame("<p>Line 1\nLine 2</p>\n", $result);
+        $this->assertSame("<p>Line 1 Line 2</p>\n", $result);
     }
 
     public function testRenderWithAttributes(): void

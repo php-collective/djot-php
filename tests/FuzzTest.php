@@ -349,7 +349,7 @@ class FuzzTest extends TestCase
 
         $result = $this->converter->convert($input);
         $this->assertIsString($result);
-        $this->assertStringContainsString('<h1>', $result);
+        $this->assertStringContainsString('<h1 ', $result);
     }
 
     public function testManySmallDocuments(): void

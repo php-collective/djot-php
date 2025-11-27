@@ -322,7 +322,7 @@ class CustomPatternsTest extends TestCase
 
         // Regular heading falls through to default
         $normalResult = $this->converter->convert('# Regular Heading');
-        $this->assertStringContainsString('<h1>Regular Heading</h1>', $normalResult);
+        $this->assertStringContainsString('<h1 id="Regular Heading">Regular Heading</h1>', $normalResult);
     }
 
     // ==================== Combined Patterns ====================
@@ -492,7 +492,7 @@ class CustomPatternsTest extends TestCase
         $result = $this->converter->convert($djot);
 
         $this->assertStringContainsString('class="details"', $result);
-        $this->assertStringContainsString('<h1>Summary</h1>', $result);
+        $this->assertStringContainsString('<h1 id="Summary">Summary</h1>', $result);
         $this->assertStringContainsString('<ul>', $result);
         $this->assertStringContainsString('<p>After details.</p>', $result);
     }
@@ -699,7 +699,7 @@ class CustomPatternsTest extends TestCase
         $this->assertStringContainsString('class="draft-heading"', $result);
         $this->assertStringContainsString('Work in Progress', $result);
         // Regular heading should still work
-        $this->assertStringContainsString('<h2>Regular Heading</h2>', $result);
+        $this->assertStringContainsString('<h2 id="Regular Heading">Regular Heading</h2>', $result);
     }
 
     public function testBlockPatternWithEmptyContent(): void

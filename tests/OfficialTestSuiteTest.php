@@ -16,10 +16,10 @@ use function count;
  * These tests are downloaded from https://github.com/jgm/djot.js/tree/main/test
  * and provide compatibility verification with the reference implementation.
  *
- * Current compatibility: ~28% (67/237 tests passing)
+ * Current compatibility: ~80% (189/237 tests passing)
  *
  * To run these tests:
- *   vendor/bin/phpunit --group official
+ *   vendor/bin/phpunit tests/OfficialTestSuiteTest.php
  *
  * To generate a detailed compatibility report:
  *   php tests/compatibility-report.php
@@ -59,10 +59,11 @@ class OfficialTestSuiteTest extends TestCase
         $tests = [];
 
         // Match code blocks containing test cases
-        preg_match_all('/```\n(.*?)\n```/s', $content, $matches);
+        // Support both triple and quad backtick fences (quad backticks allow triple backticks in content)
+        preg_match_all('/(`{3,})\n(.*?)\n\1/s', $content, $matches);
 
         $index = 0;
-        foreach ($matches[1] as $block) {
+        foreach ($matches[2] as $block) {
             // Split on the separator line (a single `.`)
             $parts = preg_split('/\n\.\n/', $block, 2);
             if (count($parts) === 2) {

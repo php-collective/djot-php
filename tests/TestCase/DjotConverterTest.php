@@ -40,7 +40,7 @@ class DjotConverterTest extends TestCase
     public function testHeadings(): void
     {
         $djot = "# Heading 1\n\n## Heading 2\n\n### Heading 3";
-        $expected = "<h1>Heading 1</h1>\n<h2>Heading 2</h2>\n<h3>Heading 3</h3>\n";
+        $expected = "<h1 id=\"Heading 1\">Heading 1</h1>\n<h2 id=\"Heading 2\">Heading 2</h2>\n<h3 id=\"Heading 3\">Heading 3</h3>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -72,7 +72,7 @@ class DjotConverterTest extends TestCase
     public function testCodeBlock(): void
     {
         $djot = "```php\necho 'hello';\n```";
-        $expected = "<pre><code class=\"language-php\">echo 'hello';</code></pre>\n";
+        $expected = "<pre><code class=\"language-php\">echo 'hello';\n</code></pre>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -80,7 +80,7 @@ class DjotConverterTest extends TestCase
     public function testCodeBlockWithoutLanguage(): void
     {
         $djot = "```\nplain code\n```";
-        $expected = "<pre><code>plain code</code></pre>\n";
+        $expected = "<pre><code>plain code\n</code></pre>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -120,7 +120,8 @@ class DjotConverterTest extends TestCase
     public function testBlockQuote(): void
     {
         $djot = "> This is a quote\n> with multiple lines";
-        $expected = "<blockquote>\n<p>This is a quote with multiple lines</p>\n</blockquote>\n";
+        // Djot preserves newlines
+        $expected = "<blockquote>\n<p>This is a quote\nwith multiple lines</p>\n</blockquote>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -264,11 +265,10 @@ class DjotConverterTest extends TestCase
 
         $result = $this->converter->convert($djot);
 
+        // djot doesn't use thead/tbody - just th and td cells
         $this->assertStringContainsString('<table>', $result);
-        $this->assertStringContainsString('<thead>', $result);
         $this->assertStringContainsString('<th>A</th>', $result);
         $this->assertStringContainsString('<th>B</th>', $result);
-        $this->assertStringContainsString('<tbody>', $result);
         $this->assertStringContainsString('<td>1</td>', $result);
         $this->assertStringContainsString('<td>2</td>', $result);
     }
@@ -305,11 +305,12 @@ class DjotConverterTest extends TestCase
 
     public function testTableCaptionMultiline(): void
     {
-        $djot = "| A | B |\n|---|---|\n| 1 | 2 |\n^ This is a long caption\n  that continues on the next line";
+        $djot = "| A | B |\n|---|---|\n| 1 | 2 |\n^ This is a long caption\nthat continues on the next line";
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<caption>This is a long caption that continues on the next line</caption>', $result);
+        // Djot preserves newlines in captions
+        $this->assertStringContainsString("<caption>This is a long caption\nthat continues on the next line</caption>", $result);
     }
 
     public function testReferenceLink(): void
@@ -403,10 +404,10 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1>Welcome</h1>', $result);
+        $this->assertStringContainsString('<h1 id="Welcome">Welcome</h1>', $result);
         $this->assertStringContainsString('<strong>comprehensive</strong>', $result);
         $this->assertStringContainsString('<em>Djot</em>', $result);
-        $this->assertStringContainsString('<h2>Features</h2>', $result);
+        $this->assertStringContainsString('<h2 id="Features">Features</h2>', $result);
         $this->assertStringContainsString('<ul>', $result);
         $this->assertStringContainsString('<li>', $result);
         $this->assertStringContainsString('language-php', $result);
@@ -620,7 +621,7 @@ DJOT;
     public function testCodeBlockWithTildes(): void
     {
         $djot = "~~~\ncode\n~~~";
-        $expected = "<pre><code>code</code></pre>\n";
+        $expected = "<pre><code>code\n</code></pre>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -719,7 +720,7 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1>', $result);
+        $this->assertStringContainsString('<h1 id="Hello world and everyone">', $result);
         $this->assertStringContainsString('<strong>world</strong>', $result);
         $this->assertStringContainsString('<em>everyone</em>', $result);
     }
@@ -789,9 +790,9 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1>One</h1>', $result);
-        $this->assertStringContainsString('<h2>Two</h2>', $result);
-        $this->assertStringContainsString('<h3>Three</h3>', $result);
+        $this->assertStringContainsString('<h1 id="One">One</h1>', $result);
+        $this->assertStringContainsString('<h2 id="Two">Two</h2>', $result);
+        $this->assertStringContainsString('<h3 id="Three">Three</h3>', $result);
     }
 
     public function testTableWithInlineFormatting(): void
@@ -1078,7 +1079,7 @@ DJOT;
             $this->assertCount(2, $document->getChildren());
 
             $result = $this->converter->render($document);
-            $this->assertStringContainsString('<h1>Hello</h1>', $result);
+            $this->assertStringContainsString('<h1 id="Hello">Hello</h1>', $result);
             $this->assertStringContainsString('<p>World</p>', $result);
         } finally {
             unlink($tempFile);
@@ -1093,7 +1094,7 @@ DJOT;
         try {
             $result = $this->converter->convertFile($tempFile);
 
-            $this->assertStringContainsString('<h1>Hello</h1>', $result);
+            $this->assertStringContainsString('<h1 id="Hello">Hello</h1>', $result);
             $this->assertStringContainsString('<p>World</p>', $result);
         } finally {
             unlink($tempFile);
@@ -1383,7 +1384,7 @@ DJOT;
         $djot = '# 日本語の見出し';
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1>日本語の見出し</h1>', $result);
+        $this->assertStringContainsString('<h1 id="日本語の見出し">日本語の見出し</h1>', $result);
     }
 
     public function testUnicodeInLink(): void
@@ -1467,8 +1468,9 @@ DJOT;
         $djot = '``` code ```';
         $result = $this->converter->convert($djot);
 
-        // Triple backticks start a code block, not inline code
-        $this->assertStringContainsString('<pre>', $result);
+        // Triple backticks with closing on same line is inline code (official djot behavior)
+        $this->assertStringContainsString('<code> code </code>', $result);
+        $this->assertStringNotContainsString('<pre>', $result);
     }
 
     // Edge cases: Links and URLs
@@ -1558,7 +1560,7 @@ DJOT;
         $djot = "```\ncode\n````";
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<pre><code>code</code></pre>', $result);
+        $this->assertStringContainsString("<pre><code>code\n</code></pre>", $result);
     }
 
     public function testCodeBlockWithTildesAndBackticks(): void
@@ -1599,14 +1601,13 @@ DJOT;
 
     public function testMultipleConsecutiveDelimiters(): void
     {
-        // In Djot, ** doesn't create bold like Markdown
-        // The first * can't create empty emphasis, so it's literal
-        // Then *not strong* creates strong, then the final * is literal
+        // In Djot, each * is a strong delimiter (unlike Markdown where ** = bold)
+        // So ** opens two strong scopes, text, and ** closes them both
         $djot = 'Text **not strong** here';
         $result = $this->converter->convert($djot);
 
-        // Result should be: Text *<strong>not strong</strong>* here
-        $this->assertStringContainsString('*<strong>not strong</strong>*', $result);
+        // Result should be: Text <strong><strong>not strong</strong></strong> here
+        $this->assertStringContainsString('<strong><strong>not strong</strong></strong>', $result);
     }
 
     /**
@@ -1962,7 +1963,7 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1>Complex Document</h1>', $result);
+        $this->assertStringContainsString('<h1 id="Complex Document">Complex Document</h1>', $result);
         $this->assertStringContainsString('class="note"', $result);
         $this->assertStringContainsString('<blockquote>', $result);
         $this->assertStringContainsString('<ul>', $result);

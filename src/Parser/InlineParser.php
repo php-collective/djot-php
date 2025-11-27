@@ -140,9 +140,34 @@ class InlineParser
 
                     continue;
                 }
-                if ($escaped === ' ') {
-                    // Non-breaking space
-                    $textBuffer .= "\u{00A0}";
+                // Check for hard break: \TAB or \ followed by optional whitespace then newline
+                if ($escaped === "\t" || $escaped === ' ') {
+                    // Look ahead for end of line (optional trailing whitespace then newline)
+                    $lookAhead = $pos + 2;
+                    while ($lookAhead < $length && ($text[$lookAhead] === ' ' || $text[$lookAhead] === "\t")) {
+                        $lookAhead++;
+                    }
+                    if ($lookAhead < $length && $text[$lookAhead] === "\n") {
+                        // This is a hard break - strip trailing whitespace from text buffer
+                        $textBuffer = rtrim($textBuffer, " \t");
+                        $this->flushText($parent, $textBuffer);
+                        $textBuffer = '';
+                        $parent->appendChild(new HardBreak());
+                        $pos = $lookAhead + 1;
+
+                        continue;
+                    }
+                    // Not at end of line - treat as escaped space/tab
+                    if ($escaped === ' ') {
+                        // Non-breaking space - use placeholder that renderer converts to &nbsp;
+                        // We use U+E000 (private use area) to distinguish from literal NBSP
+                        $textBuffer .= "\u{E000}";
+                        $pos += 2;
+
+                        continue;
+                    }
+                    // Escaped tab becomes literal tab
+                    $textBuffer .= $escaped;
                     $pos += 2;
 
                     continue;
@@ -252,6 +277,13 @@ class InlineParser
                 $textBuffer = '';
                 $result = $this->parseLink($text, $pos);
                 if ($result !== null) {
+                    // Check if this returned literal text (for unclosed link)
+                    if (isset($result['literal'])) {
+                        $textBuffer .= $result['literal'];
+                        $pos = $result['pos'];
+
+                        continue;
+                    }
                     $parent->appendChild($result['node']);
                     $pos = $result['pos'];
 
@@ -397,7 +429,7 @@ class InlineParser
      */
     protected function tryCustomPatterns(string $text, int $pos): ?array
     {
-        if (empty($this->customPatterns)) {
+        if (!$this->customPatterns) {
             return null;
         }
 
@@ -441,27 +473,56 @@ class InlineParser
         while ($searchPos < $length) {
             $closePos = strpos($text, str_repeat('`', $openBackticks), $searchPos);
             if ($closePos === false) {
-                return null;
+                // No closing backticks found - in djot, unclosed code spans
+                // extend to end of paragraph content
+                $remaining = substr($text, $contentStart);
+
+                return [
+                    'node' => new Code($remaining),
+                    'pos' => $length,
+                ];
             }
 
-            // Make sure we have exactly the right number of backticks
+            // Make sure we have exactly the right number of backticks (not more)
+            // Check both before and after the match
             $afterClose = $closePos + $openBackticks;
-            if ($afterClose >= $length || $text[$afterClose] !== '`') {
-                $content = substr($text, $contentStart, $closePos - $contentStart);
+            $beforeClose = $closePos > 0 ? $text[$closePos - 1] : '';
+            $afterChar = $afterClose < $length ? $text[$afterClose] : '';
 
-                // Strip single leading and trailing space if content starts/ends with backtick
-                if (strlen($content) >= 2 && $content[0] === ' ' && $content[strlen($content) - 1] === ' ') {
-                    if (str_contains($content, '`')) {
-                        $content = substr($content, 1, -1);
-                    }
+            // Skip if this is inside a longer run of backticks
+            if ($beforeClose === '`' || $afterChar === '`') {
+                // Move past this backtick run to find the next potential match
+                while ($searchPos < $length && $text[$searchPos] === '`') {
+                    $searchPos++;
+                }
+                if ($searchPos < $length) {
+                    $searchPos++;
                 }
 
-                // Check for raw inline format: `...`{=format}
-                $endPos = $afterClose;
-                if ($afterClose < $length && $text[$afterClose] === '{' && $afterClose + 1 < $length && $text[$afterClose + 1] === '=') {
-                    $formatEnd = strpos($text, '}', $afterClose);
-                    if ($formatEnd !== false) {
-                        $format = substr($text, $afterClose + 2, $formatEnd - $afterClose - 2);
+                continue;
+            }
+
+            // Found exact match
+            $content = substr($text, $contentStart, $closePos - $contentStart);
+
+            // Strip single leading and trailing space if content starts/ends with backtick
+            if (strlen($content) >= 2 && $content[0] === ' ' && $content[strlen($content) - 1] === ' ') {
+                if (str_contains($content, '`')) {
+                    $content = substr($content, 1, -1);
+                }
+            }
+
+            // Check for raw inline format: `...`{=format}
+            // Format must be ONLY {=format} with no other attributes
+            $endPos = $afterClose;
+            $isRawInline = $afterClose < $length && $text[$afterClose] === '{'
+                && $afterClose + 1 < $length && $text[$afterClose + 1] === '=';
+            if ($isRawInline) {
+                $formatEnd = strpos($text, '}', $afterClose);
+                if ($formatEnd !== false) {
+                    $format = substr($text, $afterClose + 2, $formatEnd - $afterClose - 2);
+                    // Only accept pure format (alphanumeric/hyphen), reject if mixed with other attributes
+                    if (preg_match('/^[a-zA-Z0-9-]+$/', $format)) {
                         $endPos = $formatEnd + 1;
 
                         return [
@@ -469,15 +530,14 @@ class InlineParser
                             'pos' => $endPos,
                         ];
                     }
+                    // Mixed attributes like {=html #id} - treat attribute block as literal
                 }
-
-                return [
-                    'node' => new Code($content),
-                    'pos' => $endPos,
-                ];
             }
 
-            $searchPos = $closePos + 1;
+            return [
+                'node' => new Code($content),
+                'pos' => $endPos,
+            ];
         }
 
         return null;
@@ -537,6 +597,8 @@ class InlineParser
                 // Remove newlines from URL (soft breaks are ignored in URLs)
                 $url = str_replace(["\r\n", "\r", "\n"], '', $url);
                 $url = trim($url);
+                // Process escape sequences in URL (e.g., \* -> *)
+                $url = preg_replace('/\\\\(.)/', '$1', $url) ?? $url;
                 $link = new Link($url);
                 $this->parseInlines($link, $linkText);
 
@@ -557,6 +619,14 @@ class InlineParser
                     'pos' => $endPos,
                 ];
             }
+
+            // Unclosed parenthesis - the entire [text](... is literal text
+            // In djot, emphasis openers in [..] can't match closers in (..)
+            // so we return the whole thing as literal text to prevent cross-boundary emphasis
+            return [
+                'literal' => substr($text, $pos, $length - $pos),
+                'pos' => $length,
+            ];
         }
 
         // Reference link: [text][ref] or [text][]{.class}
@@ -564,8 +634,14 @@ class InlineParser
             $refEnd = strpos($text, ']', $afterBracket + 1);
             if ($refEnd !== false) {
                 $ref = substr($text, $afterBracket + 1, $refEnd - $afterBracket - 1);
+
+                // For empty reference [text][], use link text as reference
+                // In this case, normalize to strip formatting markers
                 if ($ref === '') {
-                    $ref = $linkText;
+                    $ref = $this->normalizeReferenceLabel($linkText);
+                } else {
+                    // Explicit reference [text][ref] - only normalize whitespace, keep formatting chars
+                    $ref = preg_replace('/\s+/', ' ', trim($ref));
                 }
 
                 $refDef = $this->blockParser->getReference($ref);
@@ -600,10 +676,10 @@ class InlineParser
                     ];
                 }
 
-                // Reference not found - create link without href and warn
+                // Reference not found - create link without href (null) and warn
                 $this->blockParser->addUndefinedReferenceWarning($ref, $this->currentLine, $pos + 1);
 
-                $link = new Link('');
+                $link = new Link(null);
                 $this->parseInlines($link, $linkText);
 
                 $endPos = $refEnd + 1;
@@ -663,7 +739,7 @@ class InlineParser
         // Extract alt text from link children
         $alt = $this->extractText($link);
 
-        $image = new Image($link->getDestination(), $alt, $link->getTitle());
+        $image = new Image($link->getDestination() ?? '', $alt, $link->getTitle());
 
         // Transfer attributes from link to image
         foreach ($link->getAttributes() as $key => $value) {
@@ -756,7 +832,18 @@ class InlineParser
         }
 
         // Find closing delimiter, skipping over attribute blocks and code spans
+        // First, check if there are consecutive delimiters (opening run)
         $searchPos = $pos + 1;
+        $openingRunEnd = $pos + 1;
+        while ($openingRunEnd < $length && $text[$openingRunEnd] === $delimiter) {
+            $openingRunEnd++;
+        }
+        // If the opening run extends to end of string (all delimiters), no valid emphasis
+        if ($openingRunEnd >= $length) {
+            return null;
+        }
+        // Skip the opening run to look for content and closing run
+        $searchPos = $openingRunEnd;
         while ($searchPos < $length) {
             $char = $text[$searchPos];
 
@@ -802,17 +889,38 @@ class InlineParser
                 // Check if this can be a closer (not preceded by whitespace)
                 $beforeClose = $searchPos > 0 ? $text[$searchPos - 1] : ' ';
                 if (!ctype_space($beforeClose)) {
-                    // Don't allow empty emphasis (e.g., __ or ***)
-                    if ($searchPos === $pos + 1) {
-                        return null;
+                    // A braced closer (like _} or *}) can only close a braced opener
+                    // Since we're looking for a non-braced closer, skip if followed by }
+                    $afterClose = $text[$searchPos + 1] ?? '';
+                    if ($afterClose === '}') {
+                        $searchPos++;
+
+                        continue;
                     }
-                    $content = substr($text, $pos + 1, $searchPos - $pos - 1);
+                    // For runs of delimiters like *****, we want to find the LAST one
+                    // to match our opener (outer-to-outer matching)
+                    // Find the end of this run of closers
+                    $runEnd = $searchPos;
+                    while ($runEnd + 1 < $length && $text[$runEnd + 1] === $delimiter) {
+                        $runEnd++;
+                    }
+                    // Use the last delimiter in this closing run
+                    $actualClose = $runEnd;
+
+                    // Check content isn't empty
+                    $content = substr($text, $pos + 1, $actualClose - $pos - 1);
+                    if ($content === '') {
+                        $searchPos = $runEnd + 1;
+
+                        continue;
+                    }
+
                     $node = new $nodeClass();
                     $this->parseInlines($node, $content);
 
                     return [
                         'node' => $node,
-                        'pos' => $searchPos + 1,
+                        'pos' => $actualClose + 1,
                     ];
                 }
             }
@@ -824,7 +932,7 @@ class InlineParser
     }
 
     /**
-     * Parse braced inline syntax: {=highlight=}, {+insert+}, {-delete-}
+     * Parse braced inline syntax: {=highlight=}, {+insert+}, {-delete-}, {'} and {"}
      *
      * @return array{node: \Djot\Node\Node, pos: int}|null
      */
@@ -836,10 +944,54 @@ class InlineParser
         }
 
         $marker = $text[$pos + 1];
+
+        // Handle braced quotes: {'} or {"} followed by optional quotes then }
+        // {''} = left single quote + right single quote
+        // {""} = left double quote + right double quote
+        // {'} = right single quote only, {"} = right double quote only
+        if ($marker === "'" || $marker === '"') {
+            // Count consecutive quotes
+            $quoteCount = 1;
+            $quotePos = $pos + 2;
+            while ($quotePos < $length && $text[$quotePos] === $marker) {
+                $quoteCount++;
+                $quotePos++;
+            }
+            // Must be followed by closing }
+            if ($quotePos < $length && $text[$quotePos] === '}') {
+                // Generate curly quotes based on count
+                $openQuote = $marker === "'" ? "\u{2018}" : "\u{201C}";
+                $closeQuote = $marker === "'" ? "\u{2019}" : "\u{201D}";
+
+                // For pairs like {''}, output left + right
+                // For single {'}, output just right (used for apostrophe)
+                if ($quoteCount === 1) {
+                    $result = $closeQuote;
+                } elseif ($quoteCount === 2) {
+                    $result = $openQuote . $closeQuote;
+                } else {
+                    // For more, alternate open/close
+                    $result = '';
+                    for ($i = 0; $i < $quoteCount; $i++) {
+                        $result .= ($i % 2 === 0) ? $openQuote : $closeQuote;
+                    }
+                }
+
+                return [
+                    'node' => new Text($result),
+                    'pos' => $quotePos + 1,
+                ];
+            }
+        }
+
         $nodeClass = match ($marker) {
             '=' => Highlight::class,
             '+' => Insert::class,
             '-' => Delete::class,
+            '~' => Subscript::class,
+            '^' => Superscript::class,
+            '_' => Emphasis::class,
+            '*' => Strong::class,
             default => null,
         };
 
@@ -848,6 +1000,7 @@ class InlineParser
         }
 
         // Find closing: marker}
+        // For braced syntax, we allow spaces inside (unlike bare delimiters)
         $searchPos = $pos + 2;
         while ($searchPos < $length - 1) {
             if ($text[$searchPos] === $marker && $text[$searchPos + 1] === '}') {
@@ -871,7 +1024,8 @@ class InlineParser
         $prevChar = $pos > 0 ? $text[$pos - 1] : ' ';
         $nextChar = $text[$pos + 1] ?? ' ';
 
-        $prevIsSpace = ctype_space($prevChar) || $pos === 0;
+        // = acts as word boundary for quotes (e.g., key="value" in attributes)
+        $prevIsSpace = ctype_space($prevChar) || $pos === 0 || $prevChar === '=';
         $nextIsSpace = ctype_space($nextChar);
 
         // A quote following another quote should also be considered as having "space" before
@@ -890,13 +1044,104 @@ class InlineParser
             }
         }
 
+        // Single quote before digit is always apostrophe (e.g., '70s)
+        if ($quote === "'" && ctype_digit($nextChar)) {
+            return "\u{2019}"; // closing/apostrophe
+        }
+
+        // A quote after ] or ) cannot be an opener
+        if ($prevChar === ']' || $prevChar === ')') {
+            return $quote === '"' ? "\u{201D}" : "\u{2019}";
+        }
+
         if ($quote === '"') {
             // Opening if preceded by space or start, closing otherwise
             return $prevIsSpace && !$nextIsSpace ? "\u{201C}" : "\u{201D}";
         }
 
-        // Single quote
-        return $prevIsSpace && !$nextIsSpace ? "\u{2018}" : "\u{2019}";
+        // For single quotes, use matching algorithm to determine if this could be an opener
+        // A potential opener at position can only be an opener if there's a matching closer later
+        if ($prevIsSpace && !$nextIsSpace) {
+            // This could be an opener - check if there's a matching closer
+            $matchingCloser = $this->findMatchingSingleQuoteCloser($text, $pos);
+            if ($matchingCloser !== null) {
+                return "\u{2018}"; // opening quote
+            }
+
+            // No matching closer found, treat as apostrophe
+            return "\u{2019}";
+        }
+
+        // Closing/apostrophe
+        return "\u{2019}";
+    }
+
+    /**
+     * Find a matching single quote closer for a potential opener at $pos
+     *
+     * Returns the position of the closer if found, null otherwise.
+     * Uses a matching algorithm similar to emphasis - potential openers and closers
+     * are matched from innermost pairs outward.
+     */
+    protected function findMatchingSingleQuoteCloser(string $text, int $openerPos): ?int
+    {
+        $length = strlen($text);
+
+        // Collect all potential openers and closers after this position
+        $openers = [$openerPos];
+        $closers = [];
+
+        for ($i = $openerPos + 1; $i < $length; $i++) {
+            if ($text[$i] !== "'") {
+                continue;
+            }
+
+            $prevChar = $text[$i - 1] ?? ' ';
+            $nextChar = $text[$i + 1] ?? ' ';
+            $prevIsSpace = ctype_space($prevChar);
+            // Closer can be followed by space, punctuation, or end of string
+            $nextIsSpaceOrPunct = ctype_space($nextChar) || $i === $length - 1
+                || preg_match('/^[\p{P}\p{S}]/u', $nextChar);
+
+            // Skip quotes before digits (always apostrophe)
+            if (ctype_digit($nextChar)) {
+                continue;
+            }
+
+            // Skip quotes after ] or )
+            if ($prevChar === ']' || $prevChar === ')') {
+                continue;
+            }
+
+            $nextIsSpace = ctype_space($nextChar);
+            if ($prevIsSpace && !$nextIsSpace) {
+                // Could be opener (after space, before non-space)
+                $openers[] = $i;
+            } elseif (!$prevIsSpace && $nextIsSpaceOrPunct) {
+                // Could be closer (after non-space, before space/punct)
+                $closers[] = $i;
+            } elseif (!$prevIsSpace) {
+                // Mid-word quote (like Jane's) - typically apostrophe
+                continue;
+            }
+        }
+
+        // Now match openers with closers, innermost first
+        // For each closer, find the nearest preceding unmatched opener
+        $matched = [];
+        foreach ($closers as $closer) {
+            for ($j = count($openers) - 1; $j >= 0; $j--) {
+                $opener = $openers[$j];
+                if ($opener < $closer && !isset($matched[$opener])) {
+                    $matched[$opener] = $closer;
+
+                    break;
+                }
+            }
+        }
+
+        // Return the closer for our position, if any
+        return $matched[$openerPos] ?? null;
     }
 
     /**
@@ -911,25 +1156,54 @@ class InlineParser
             $dashCount++;
         }
 
-        // Convert dashes: --- = em-dash, -- = en-dash
-        $result = '';
-        $remaining = $dashCount;
+        // Convert dashes according to djot algorithm:
+        // 1. If divisible by 3, all em-dashes
+        // 2. If divisible by 2, all en-dashes
+        // 3. Otherwise, em-dashes first, then en-dashes, with minimal en-dashes
+        $emDash = "\u{2014}"; // —
+        $enDash = "\u{2013}"; // –
 
-        while ($remaining > 0) {
-            if ($remaining >= 3) {
-                $result .= "\u{2014}"; // em-dash
-                $remaining -= 3;
-            } elseif ($remaining >= 2) {
-                $result .= "\u{2013}"; // en-dash
-                $remaining -= 2;
-            } else {
-                $result .= '-';
-                $remaining--;
-            }
+        if ($dashCount === 1) {
+            return [
+                'text' => '-',
+                'pos' => $pos + $dashCount,
+            ];
+        }
+
+        if ($dashCount % 3 === 0) {
+            // All em-dashes
+            return [
+                'text' => str_repeat($emDash, (int)($dashCount / 3)),
+                'pos' => $pos + $dashCount,
+            ];
+        }
+
+        if ($dashCount % 2 === 0) {
+            // All en-dashes
+            return [
+                'text' => str_repeat($enDash, (int)($dashCount / 2)),
+                'pos' => $pos + $dashCount,
+            ];
+        }
+
+        // Mixed: find combination emCount*3 + enCount*2 = dashCount with minimal enCount
+        // Start with max em-dashes and find the remainder for en-dashes
+        $emCount = (int)($dashCount / 3);
+        $remainder = $dashCount % 3;
+
+        // remainder can be 1 or 2 (not 0, we handled that above)
+        if ($remainder === 1) {
+            // Can't make 1 with en-dashes, so trade one em-dash for two en-dashes
+            // 3 + 1 = 4 → 2*2 = 4 ✓
+            $emCount--;
+            $enCount = 2;
+        } else {
+            // remainder is 2, which is one en-dash
+            $enCount = 1;
         }
 
         return [
-            'text' => $result,
+            'text' => str_repeat($emDash, $emCount) . str_repeat($enDash, $enCount),
             'pos' => $pos + $dashCount,
         ];
     }
@@ -951,8 +1225,9 @@ class InlineParser
 
         $attrStr = substr($text, $pos + 1, $attrEnd - $pos - 1);
 
-        // Check if this looks like valid attributes (starts with ., #, or key=)
-        if ($attrStr !== '' && !preg_match('/^[.#a-zA-Z_%]/', $attrStr)) {
+        // Check if this looks like valid attributes (starts with ., #, % comment, or key=)
+        // Exclude _ * = + - ~ ^ which are braced inline markers
+        if ($attrStr !== '' && !preg_match('/^[.#a-zA-Z%]/', $attrStr)) {
             return null;
         }
 
@@ -968,21 +1243,48 @@ class InlineParser
         }
 
         // Find the preceding word to attach attributes to
-        // A word is a sequence of non-whitespace characters
+        // A word is a sequence of alphanumeric characters (plus some allowed chars)
         $precedingWord = '';
         $wordStart = strlen($textBuffer);
 
-        // Scan backwards to find word boundary (whitespace or start of string)
+        // Scan backwards to find word boundary
+        // Stop at whitespace, quotes, or punctuation that isn't part of a word
+        // Need to handle multi-byte UTF-8 characters like curly quotes
         while ($wordStart > 0) {
             $char = $textBuffer[$wordStart - 1];
-            // Stop at whitespace (but not non-breaking space)
+
+            // Check for multi-byte UTF-8 curly quotes (3 bytes each)
+            // The last byte of UTF-8 curly quotes is 0x9C, 0x9D, 0x98, or 0x99
+            if (ord($char) >= 0x98 && ord($char) <= 0x9D && $wordStart >= 3) {
+                $threeBytes = substr($textBuffer, $wordStart - 3, 3);
+                // Check for curly quotes: " " ' ' (U+201C, U+201D, U+2018, U+2019)
+                if (
+                    $threeBytes === "\u{201C}" || $threeBytes === "\u{201D}" ||
+                    $threeBytes === "\u{2018}" || $threeBytes === "\u{2019}"
+                ) {
+                    // Word starts at current wordStart (after the curly quote)
+                    break;
+                }
+            }
+
+            // Stop at whitespace
             if ($char === ' ' || $char === "\t" || $char === "\n" || $char === "\r") {
+                break;
+            }
+            // Stop at quotes and other word-breaking punctuation
+            if (
+                $char === '"' || $char === "'" || $char === '(' || $char === ')' ||
+                $char === '[' || $char === ']' || $char === '{' || $char === '}' ||
+                $char === '<' || $char === '>' || $char === '=' || $char === ':' ||
+                $char === ';' || $char === ',' || $char === '!' || $char === '?'
+            ) {
                 break;
             }
             $wordStart--;
         }
 
-        if ($wordStart < strlen($textBuffer)) {
+        $textBufferLen = strlen($textBuffer);
+        if ($wordStart < $textBufferLen) {
             $precedingWord = substr($textBuffer, $wordStart);
             $textBuffer = substr($textBuffer, 0, $wordStart);
         }
@@ -1166,7 +1468,10 @@ class InlineParser
     {
         // Match: .class, #id, key="quoted value" (with escapes), key='quoted value', key=unquoted
         // The regex uses ([^"\\]|\\.)* to match content with escaped characters
-        preg_match_all('/\.([^\s.#=}]+)|#([^\s.#=}]+)|([^\s.#=}]+)="((?:[^"\\\\]|\\\\.)*)"|([^\s.#=}]+)=\'((?:[^\'\\\\]|\\\\.)*)\'|([^\s.#=}]+)=([^\s}"\']+)/', $attrStr, $matches, PREG_SET_ORDER);
+        $pattern = '/\.([^\s.#=}]+)|#([^\s.#=}]+)'
+            . '|([^\s.#=}]+)="((?:[^"\\\\]|\\\\.)*)"|([^\s.#=}]+)=\'((?:[^\'\\\\]|\\\\.)*)\''
+            . '|([^\s.#=}]+)=([^\s}"\']+)/';
+        preg_match_all($pattern, $attrStr, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $match) {
             if (!empty($match[1])) {
@@ -1300,5 +1605,25 @@ class InlineParser
             'node' => new Symbol($matches[1]),
             'pos' => $pos + strlen($matches[0]),
         ];
+    }
+
+    /**
+     * Normalize a reference label for lookup.
+     *
+     * - Strip inline formatting markers (_, *, etc.)
+     * - Collapse whitespace (including newlines) to single spaces
+     * - Trim leading/trailing whitespace
+     */
+    protected function normalizeReferenceLabel(string $label): string
+    {
+        // Strip inline formatting markers: _ * ~ ^ + = { }
+        // But keep the content between them
+        $label = preg_replace('/[_*~^+={}]/', '', $label);
+
+        // Normalize whitespace: collapse multiple spaces/newlines to single space
+        $label = preg_replace('/\s+/', ' ', $label);
+
+        // Trim
+        return trim($label);
     }
 }

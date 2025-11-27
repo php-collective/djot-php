@@ -10,14 +10,19 @@ namespace Djot\Node\Inline;
 class Link extends InlineNode
 {
     public function __construct(
-        protected string $destination = '',
+        protected ?string $destination = null,
         protected ?string $title = null,
     ) {
     }
 
-    public function getDestination(): string
+    public function getDestination(): ?string
     {
         return $this->destination;
+    }
+
+    public function setDestination(string $destination): void
+    {
+        $this->destination = $destination;
     }
 
     public function getTitle(): ?string

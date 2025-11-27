@@ -34,6 +34,7 @@ class ListBlock extends BlockNode
         protected int $start = 1,
         protected bool $tight = true,
         protected ?string $marker = null,
+        protected ?string $style = null,
     ) {
     }
 
@@ -60,6 +61,11 @@ class ListBlock extends BlockNode
     public function getMarker(): ?string
     {
         return $this->marker;
+    }
+
+    public function getStyle(): ?string
+    {
+        return $this->style;
     }
 
     public function getType(): string
