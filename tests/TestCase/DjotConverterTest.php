@@ -2033,4 +2033,78 @@ DJOT;
 
         $this->assertStringContainsString('href="https://example.com"', $result);
     }
+
+    public function testUnclosedLinkEmphasisBoundary(): void
+    {
+        // Emphasis should NOT cross [text]( boundary when link is unclosed
+        $djot = '[x_y](x_';
+        $result = $this->converter->convert($djot);
+
+        // Should be literal text, not emphasis
+        $this->assertSame("<p>[x_y](x_</p>\n", $result);
+    }
+
+    public function testUnclosedLinkWithValidEmphasis(): void
+    {
+        // Emphasis entirely within (url) part should still work
+        $djot = "[unclosed](hello *a\nb*";
+        $result = $this->converter->convert($djot);
+
+        // The *a\nb* is entirely in the url part, so emphasis applies
+        $this->assertStringContainsString('<strong>a', $result);
+        $this->assertStringContainsString('b</strong>', $result);
+    }
+
+    public function testReferenceDefinitionAttributes(): void
+    {
+        // Attributes before reference definition apply to the link
+        $djot = "{title=foo}\n[ref]: /url\n\n[ref][]";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('title="foo"', $result);
+        $this->assertStringContainsString('href="/url"', $result);
+        // Attributes should be on the link, not the paragraph
+        $this->assertStringNotContainsString('<p title=', $result);
+    }
+
+    public function testReferenceDefinitionAttributeOverride(): void
+    {
+        // Inline attributes override definition attributes
+        $djot = "{title=foo}\n[ref]: /url\n\n[ref][]{title=bar}";
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('title="bar"', $result);
+        $this->assertStringNotContainsString('title="foo"', $result);
+    }
+
+    public function testAttributeOrderIdClassFirst(): void
+    {
+        // Attributes should be ordered: id first, class second, then others
+        $djot = 'hi{#myid .myclass key="value"}';
+        $result = $this->converter->convert($djot);
+
+        // Check that id comes before class, and class comes before key
+        $this->assertMatchesRegularExpression('/id="myid".*class="myclass".*key="value"/', $result);
+    }
+
+    public function testUnclosedBraceParagraphContinuation(): void
+    {
+        // Unclosed { means next line is continuation, not new block
+        $djot = "text{a=x\n# not-a-heading";
+        $result = $this->converter->convert($djot);
+
+        // Should be single paragraph, not paragraph + heading
+        $this->assertSame("<p>text{a=x\n# not-a-heading</p>\n", $result);
+        $this->assertStringNotContainsString('<h1', $result);
+    }
+
+    public function testUnclosedBraceAtStartOfLine(): void
+    {
+        // Unclosed { at start of line also continues
+        $djot = "{a=x\n# not-a-heading";
+        $result = $this->converter->convert($djot);
+
+        $this->assertSame("<p>{a=x\n# not-a-heading</p>\n", $result);
+        $this->assertStringNotContainsString('<h1', $result);
+    }
 }

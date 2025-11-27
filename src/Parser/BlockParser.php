@@ -2215,7 +2215,15 @@ class BlockParser
         while ($i < $count) {
             $nextLine = $lines[$i];
 
-            if ($this->isBlankLine($nextLine) || $this->startsNewBlock($nextLine)) {
+            // Check for unclosed brace in content - if present, don't break on new block
+            // This handles cases like: text{a=x\n# not-a-heading
+            $hasUnclosedBrace = $this->hasUnclosedBrace($content);
+
+            if ($this->isBlankLine($nextLine)) {
+                break;
+            }
+
+            if (!$hasUnclosedBrace && $this->startsNewBlock($nextLine)) {
                 break;
             }
 
@@ -2257,6 +2265,53 @@ class BlockParser
         // Note: Fenced divs (:::) are NOT included - they don't interrupt paragraphs in djot
         // Only unordered lists (-*+) can interrupt paragraphs
         return (bool)preg_match('/^(#{1,6}\s|[-*+]\s|`{3,}|\|)/', $line);
+    }
+
+    /**
+     * Check if text has an unclosed brace (for attribute blocks)
+     */
+    protected function hasUnclosedBrace(string $text): bool
+    {
+        $depth = 0;
+        $inQuote = false;
+        $quoteChar = '';
+        $len = strlen($text);
+
+        for ($i = 0; $i < $len; $i++) {
+            $char = $text[$i];
+
+            // Handle escape sequences
+            if ($char === '\\' && $i + 1 < $len) {
+                $i++;
+
+                continue;
+            }
+
+            // Handle quotes
+            if (!$inQuote && ($char === '"' || $char === "'")) {
+                $inQuote = true;
+                $quoteChar = $char;
+
+                continue;
+            }
+
+            if ($inQuote && $char === $quoteChar) {
+                $inQuote = false;
+
+                continue;
+            }
+
+            // Count braces only outside quotes
+            if (!$inQuote) {
+                if ($char === '{') {
+                    $depth++;
+                } elseif ($char === '}') {
+                    $depth--;
+                }
+            }
+        }
+
+        return $depth > 0;
     }
 
     /**
