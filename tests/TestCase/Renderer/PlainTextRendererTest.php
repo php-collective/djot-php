@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Djot\Test;
+namespace Djot\Test\TestCase\Renderer;
 
 use Djot\DjotConverter;
 use Djot\Renderer\PlainTextRenderer;

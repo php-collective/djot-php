@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Djot\Test;
+namespace Djot\Test\TestCase;
 
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
@@ -573,6 +573,39 @@ DJOT;
 
         $result = $this->converter->convert($djot);
         $this->assertStringNotContainsString('<strong>', $result);
+    }
+
+    /**
+     * Test that attributes inside emphasis don't break delimiter matching
+     *
+     * Regression test: Special characters like * inside quoted attribute values
+     * should not be treated as emphasis delimiters.
+     */
+    public function testAttributesInsideEmphasis(): void
+    {
+        // The * inside key="*" should not close the strong
+        $djot = 'a *b{#id key="*"}*';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<strong>', $result);
+        $this->assertStringContainsString('</strong>', $result);
+        $this->assertStringContainsString('id="id"', $result);
+        $this->assertStringContainsString('key="*"', $result);
+    }
+
+    /**
+     * Test that unclosed emphasis with attributes creates span instead
+     *
+     * When emphasis cannot close because the only potential closer is inside
+     * an attribute, the attribute attaches to the preceding word.
+     */
+    public function testAttributesWithDelimiterInValueNoClose(): void
+    {
+        $djot = 'a *b{#id key="*"}o';
+        $result = $this->converter->convert($djot);
+
+        // No closing * so *b stays literal, attribute attaches to *b
+        $this->assertStringContainsString('<span id="id" key="*">*b</span>', $result);
     }
 
     public function testEscapedUnderscore(): void
@@ -1566,14 +1599,52 @@ DJOT;
 
     public function testMultipleConsecutiveDelimiters(): void
     {
-        // In Djot, ** creates two empty strong elements around text
-        // This is different from Markdown where ** is bold
+        // In Djot, ** doesn't create bold like Markdown
+        // The first * can't create empty emphasis, so it's literal
+        // Then *not strong* creates strong, then the final * is literal
         $djot = 'Text **not strong** here';
         $result = $this->converter->convert($djot);
 
-        // ** is not valid Djot strong syntax - it creates empty strong tags
-        $this->assertStringContainsString('<strong></strong>', $result);
-        $this->assertStringContainsString('not strong', $result);
+        // Result should be: Text *<strong>not strong</strong>* here
+        $this->assertStringContainsString('*<strong>not strong</strong>*', $result);
+    }
+
+    /**
+     * Test that empty emphasis delimiters are treated as literal text
+     *
+     * Regression test: __ and ___ should produce literal underscores, not empty <em> tags
+     */
+    public function testEmptyEmphasisIsLiteral(): void
+    {
+        $this->assertSame("<p>__</p>\n", $this->converter->convert('__'));
+        $this->assertSame("<p>___</p>\n", $this->converter->convert('___'));
+        $this->assertSame("<p>**</p>\n", $this->converter->convert('**'));
+        // Note: *** at block level is a thematic break, so test inline
+        $this->assertStringContainsString('***', $this->converter->convert('a***b'));
+    }
+
+    /**
+     * Test that code spans inside emphasis don't break delimiter matching
+     *
+     * Regression test: The * inside `*` should be treated as code, not as emphasis closer
+     */
+    public function testCodeSpanInsideStrong(): void
+    {
+        $result = $this->converter->convert('*foo `*`*');
+
+        $this->assertStringContainsString('<strong>foo <code>*</code></strong>', $result);
+    }
+
+    /**
+     * Test that inline link URLs have newlines stripped
+     *
+     * Regression test: [link](url\nandurl) should produce urlandurl as the href
+     */
+    public function testInlineLinkUrlNewlineStripping(): void
+    {
+        $result = $this->converter->convert("[link](url\nandurl)");
+
+        $this->assertStringContainsString('href="urlandurl"', $result);
     }
 
     // Edge cases: Escaping
@@ -1662,6 +1733,24 @@ DJOT;
         $this->assertStringContainsString("\u{201D}", $result); // Right double quote
         $this->assertStringContainsString("\u{2018}", $result); // Left single quote
         $this->assertStringContainsString("\u{2019}", $result); // Right single quote
+    }
+
+    /**
+     * Test that consecutive opening quotes at line start are both openers
+     *
+     * Regression test: "'Shelob'" at line start should produce "'Shelob'"
+     * not "'Shelob'" (where the single quote after double is a closer)
+     */
+    public function testSmartQuotesConsecutiveOpenersAtLineStart(): void
+    {
+        $this->converter->getRenderer()->setSoftBreakAsNewline(true);
+
+        $djot = "\"Hello,\" said the spider.\n\"'Shelob' is my name.\"";
+        $result = $this->converter->convert($djot);
+
+        // Both " and ' at start of second line should be opening quotes
+        // Expected: "'Shelob' (open double, open single, close single, close double)
+        $this->assertStringContainsString("\u{201C}\u{2018}Shelob\u{2019}", $result);
     }
 
     public function testMultipleDashes(): void

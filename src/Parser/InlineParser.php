@@ -533,7 +533,10 @@ class InlineParser
             }
 
             if ($parenDepth === 0) {
-                $url = trim(substr($text, $urlStart, $urlEnd - $urlStart));
+                $url = substr($text, $urlStart, $urlEnd - $urlStart);
+                // Remove newlines from URL (soft breaks are ignored in URLs)
+                $url = str_replace(["\r\n", "\r", "\n"], '', $url);
+                $url = trim($url);
                 $link = new Link($url);
                 $this->parseInlines($link, $linkText);
 
@@ -727,28 +730,59 @@ class InlineParser
             return null;
         }
 
-        // Find closing delimiter
+        // Find closing delimiter, skipping over attribute blocks and code spans
         $searchPos = $pos + 1;
         while ($searchPos < $length) {
-            $closePos = strpos($text, $delimiter, $searchPos);
-            if ($closePos === false) {
-                return null;
+            $char = $text[$searchPos];
+
+            // Skip over attribute blocks {....} respecting quotes
+            if ($char === '{') {
+                $attrEnd = $this->findAttributeEnd($text, $searchPos);
+                if ($attrEnd !== null) {
+                    $searchPos = $attrEnd + 1;
+
+                    continue;
+                }
             }
 
-            // Check if this can be a closer (not preceded by whitespace)
-            $beforeClose = $closePos > 0 ? $text[$closePos - 1] : ' ';
-            if (!ctype_space($beforeClose)) {
-                $content = substr($text, $pos + 1, $closePos - $pos - 1);
-                $node = new $nodeClass();
-                $this->parseInlines($node, $content);
+            // Skip over code spans `...`
+            if ($char === '`') {
+                $codeEnd = $this->findCodeSpanEnd($text, $searchPos);
+                if ($codeEnd !== null) {
+                    $searchPos = $codeEnd;
 
-                return [
-                    'node' => $node,
-                    'pos' => $closePos + 1,
-                ];
+                    continue;
+                }
             }
 
-            $searchPos = $closePos + 1;
+            // Skip escape sequences
+            if ($char === '\\' && $searchPos + 1 < $length) {
+                $searchPos += 2;
+
+                continue;
+            }
+
+            // Check for closing delimiter
+            if ($char === $delimiter) {
+                // Check if this can be a closer (not preceded by whitespace)
+                $beforeClose = $searchPos > 0 ? $text[$searchPos - 1] : ' ';
+                if (!ctype_space($beforeClose)) {
+                    // Don't allow empty emphasis (e.g., __ or ***)
+                    if ($searchPos === $pos + 1) {
+                        return null;
+                    }
+                    $content = substr($text, $pos + 1, $searchPos - $pos - 1);
+                    $node = new $nodeClass();
+                    $this->parseInlines($node, $content);
+
+                    return [
+                        'node' => $node,
+                        'pos' => $searchPos + 1,
+                    ];
+                }
+            }
+
+            $searchPos++;
         }
 
         return null;
@@ -804,6 +838,22 @@ class InlineParser
 
         $prevIsSpace = ctype_space($prevChar) || $pos === 0;
         $nextIsSpace = ctype_space($nextChar);
+
+        // A quote following another quote should also be considered as having "space" before
+        // For example, "'Hello" at line start should produce "'Hello
+        $prevIsQuoteOpener = ($prevChar === '"' || $prevChar === "'") && $prevIsSpace === false;
+        if ($prevIsQuoteOpener) {
+            if ($pos === 1) {
+                // Previous quote was at position 0 (start of string)
+                $prevIsSpace = true;
+            } elseif ($pos >= 2) {
+                // Check if the preceding quote was in an opener position
+                $prevPrevChar = $text[$pos - 2];
+                if (ctype_space($prevPrevChar)) {
+                    $prevIsSpace = true;
+                }
+            }
+        }
 
         if ($quote === '"') {
             // Opening if preceded by space or start, closing otherwise
@@ -976,6 +1026,49 @@ class InlineParser
             }
 
             $i++;
+        }
+
+        return null;
+    }
+
+    /**
+     * Find the end of a code span starting at $pos
+     *
+     * @return int|null Position after the closing backticks, or null if not found
+     */
+    protected function findCodeSpanEnd(string $text, int $pos): ?int
+    {
+        $length = strlen($text);
+
+        // Count opening backticks
+        $openBackticks = 0;
+        while ($pos + $openBackticks < $length && $text[$pos + $openBackticks] === '`') {
+            $openBackticks++;
+        }
+
+        if ($openBackticks === 0) {
+            return null;
+        }
+
+        $contentStart = $pos + $openBackticks;
+
+        // Find matching closing backticks
+        $closingPattern = str_repeat('`', $openBackticks);
+        $searchPos = $contentStart;
+
+        while ($searchPos < $length) {
+            $closePos = strpos($text, $closingPattern, $searchPos);
+            if ($closePos === false) {
+                return null;
+            }
+
+            // Make sure we have exactly the right number of backticks (not more)
+            $afterClose = $closePos + $openBackticks;
+            if ($afterClose >= $length || $text[$afterClose] !== '`') {
+                return $afterClose;
+            }
+
+            $searchPos = $closePos + 1;
         }
 
         return null;

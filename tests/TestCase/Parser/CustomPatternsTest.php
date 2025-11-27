@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Djot\Test;
+namespace Djot\Test\TestCase\Parser;
 
 use Djot\DjotConverter;
 use Djot\Node\Block\Div;
