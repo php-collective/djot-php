@@ -7,17 +7,23 @@ The main entry point for converting Djot to HTML.
 ```php
 use Djot\DjotConverter;
 
-$converter = new DjotConverter(xhtml: false);
+$converter = new DjotConverter();
 $html = $converter->convert($djotString);
 ```
 
 ### Constructor
 
 ```php
-public function __construct(bool $xhtml = false)
+public function __construct(
+    bool $xhtml = false,
+    bool $warnings = false,
+    bool $strict = false
+)
 ```
 
 - `$xhtml`: When `true`, produces XHTML-compatible output (self-closing tags like `<br />`).
+- `$warnings`: When `true`, collects warnings during parsing (see [Error Handling](#error-handling)).
+- `$strict`: When `true`, throws `ParseException` on parse errors (see [Error Handling](#error-handling)).
 
 ### Methods
 
@@ -32,7 +38,7 @@ Converts Djot markup to HTML.
 #### on
 
 ```php
-public function on(string $event, callable $listener): self
+public function on(string $event, Closure $listener): self
 ```
 
 Register a listener for render events. See [Event System](#event-system) below.
@@ -44,6 +50,116 @@ public function off(?string $event = null): self
 ```
 
 Remove listeners. Pass event name to remove specific listeners, or `null` to remove all.
+
+#### getWarnings
+
+```php
+public function getWarnings(): array
+```
+
+Returns an array of `ParseWarning` objects from the last parse operation. Only populated when `warnings: true` is set.
+
+#### hasWarnings
+
+```php
+public function hasWarnings(): bool
+```
+
+Returns `true` if there were any warnings during the last parse operation.
+
+#### clearWarnings
+
+```php
+public function clearWarnings(): self
+```
+
+Clears any collected warnings.
+
+## Error Handling
+
+The parser can optionally report warnings and errors with line/column information.
+
+### Warning Mode
+
+Enable warning collection to detect issues without stopping parsing:
+
+```php
+$converter = new DjotConverter(warnings: true);
+$html = $converter->convert($djot);
+
+if ($converter->hasWarnings()) {
+    foreach ($converter->getWarnings() as $warning) {
+        echo $warning->getMessage();  // "Undefined reference 'foo'"
+        echo $warning->getLine();     // 5
+        echo $warning->getColumn();   // 3
+
+        // Or as string
+        echo $warning;  // "Undefined reference 'foo' at line 5, column 3"
+
+        // Or as array
+        $data = $warning->toArray();
+        // ['message' => '...', 'line' => 5, 'column' => 3]
+    }
+}
+```
+
+**Warnings are reported for:**
+- Undefined reference links (`[text][missing]`)
+- Undefined footnotes (`[^missing]`)
+
+### Strict Mode
+
+Enable strict mode to throw exceptions on parse errors:
+
+```php
+use Djot\Exception\ParseException;
+
+$converter = new DjotConverter(strict: true);
+
+try {
+    $html = $converter->convert($djot);
+} catch (ParseException $e) {
+    echo $e->getMessage();      // "Unclosed code fence at line 3, column 1"
+    echo $e->getSourceLine();   // 3
+    echo $e->getSourceColumn(); // 1
+}
+```
+
+**Errors that throw in strict mode:**
+- Unclosed code fences
+- Unclosed divs (`:::`)
+- Unclosed comments (`{% ... %}`)
+- Unclosed raw blocks
+
+### Both Modes
+
+You can enable both modes together - warnings will be collected for non-fatal issues, while fatal errors will throw:
+
+```php
+$converter = new DjotConverter(warnings: true, strict: true);
+```
+
+### ParseWarning
+
+```php
+use Djot\Exception\ParseWarning;
+
+$warning->getMessage(): string   // Warning message
+$warning->getLine(): int         // 1-indexed line number
+$warning->getColumn(): int       // 1-indexed column number
+$warning->toArray(): array       // ['message' => ..., 'line' => ..., 'column' => ...]
+(string)$warning                 // "Message at line X, column Y"
+```
+
+### ParseException
+
+```php
+use Djot\Exception\ParseException;
+
+$e->getMessage(): string         // Full message with location
+$e->getSourceLine(): int         // 1-indexed line number
+$e->getSourceColumn(): int       // 1-indexed column number
+```
 
 ## Event System
 
@@ -120,8 +236,15 @@ Parses Djot input into an AST (Abstract Syntax Tree).
 ```php
 use Djot\Parser\BlockParser;
 
-$parser = new BlockParser();
+$parser = new BlockParser(
+    collectWarnings: false,
+    strictMode: false
+);
 $document = $parser->parse($djotString);
+
+// Get warnings (if collectWarnings: true)
+// Get exception on errors (if strictMode: true)
+$warnings = $parser->getWarnings();
 ```
 
 ### HtmlRenderer
