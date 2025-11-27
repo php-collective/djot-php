@@ -730,6 +730,11 @@ class InlineParser
             return null;
         }
 
+        // Can't open if followed by } (closer marker in djot)
+        if ($nextChar === '}') {
+            return null;
+        }
+
         // Find closing delimiter, skipping over attribute blocks and code spans
         $searchPos = $pos + 1;
         while ($searchPos < $length) {
@@ -750,6 +755,16 @@ class InlineParser
                 $codeEnd = $this->findCodeSpanEnd($text, $searchPos);
                 if ($codeEnd !== null) {
                     $searchPos = $codeEnd;
+
+                    continue;
+                }
+            }
+
+            // Skip over autolinks <...>
+            if ($char === '<') {
+                $autolinkEnd = $this->findAutolinkEnd($text, $searchPos);
+                if ($autolinkEnd !== null) {
+                    $searchPos = $autolinkEnd;
 
                     continue;
                 }
@@ -1075,6 +1090,39 @@ class InlineParser
     }
 
     /**
+     * Find the end of an autolink starting at $pos
+     *
+     * @return int|null Position after the closing >, or null if not a valid autolink
+     */
+    protected function findAutolinkEnd(string $text, int $pos): ?int
+    {
+        $length = strlen($text);
+
+        if ($pos >= $length || $text[$pos] !== '<') {
+            return null;
+        }
+
+        $end = strpos($text, '>', $pos);
+        if ($end === false) {
+            return null;
+        }
+
+        $content = substr($text, $pos + 1, $end - $pos - 1);
+
+        // Check if it's a valid URL autolink
+        if (preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:[^\s<>]*$/', $content)) {
+            return $end + 1;
+        }
+
+        // Check if it's a valid email autolink
+        if (filter_var($content, FILTER_VALIDATE_EMAIL)) {
+            return $end + 1;
+        }
+
+        return null;
+    }
+
+    /**
      * Remove comments from attribute string: % ... % or % to end
      */
     protected function removeAttributeComments(string $attrStr): string
@@ -1096,8 +1144,9 @@ class InlineParser
      */
     protected function applyAttributesToNode(Node $node, string $attrStr): void
     {
-        // Match: .class, #id, key="quoted value", key='quoted value', key=unquoted
-        preg_match_all('/\.([^\s.#=}]+)|#([^\s.#=}]+)|([^\s.#=}]+)="([^"]*)"|([^\s.#=}]+)=\'([^\']*)\'|([^\s.#=}]+)=([^\s}"\']+)/', $attrStr, $matches, PREG_SET_ORDER);
+        // Match: .class, #id, key="quoted value" (with escapes), key='quoted value', key=unquoted
+        // The regex uses ([^"\\]|\\.)* to match content with escaped characters
+        preg_match_all('/\.([^\s.#=}]+)|#([^\s.#=}]+)|([^\s.#=}]+)="((?:[^"\\\\]|\\\\.)*)"|([^\s.#=}]+)=\'((?:[^\'\\\\]|\\\\.)*)\'|([^\s.#=}]+)=([^\s}"\']+)/', $attrStr, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $match) {
             if (!empty($match[1])) {
@@ -1108,15 +1157,26 @@ class InlineParser
                 $node->setAttribute('id', $match[2]);
             } elseif (($match[3] ?? '') !== '') {
                 // key="double quoted value"
-                $node->setAttribute($match[3], $match[4] ?? '');
+                $node->setAttribute($match[3], $this->processAttributeEscapes($match[4] ?? ''));
             } elseif (($match[5] ?? '') !== '') {
                 // key='single quoted value'
-                $node->setAttribute($match[5], $match[6] ?? '');
+                $node->setAttribute($match[5], $this->processAttributeEscapes($match[6] ?? ''));
             } elseif (($match[7] ?? '') !== '') {
                 // key=unquoted
                 $node->setAttribute($match[7], $match[8] ?? '');
             }
         }
+    }
+
+    /**
+     * Process escape sequences in attribute values
+     *
+     * Handles \\ -> \ and \" -> " (and other escaped characters)
+     */
+    protected function processAttributeEscapes(string $value): string
+    {
+        // Replace escape sequences: \X -> X for any character X
+        return preg_replace('/\\\\(.)/', '$1', $value) ?? $value;
     }
 
     /**

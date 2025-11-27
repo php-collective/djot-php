@@ -474,7 +474,7 @@ class HtmlRenderer
 
         $html = '';
         foreach ($attrs as $key => $value) {
-            $html .= ' ' . $this->escape($key) . '="' . $this->escape((string)$value) . '"';
+            $html .= ' ' . $this->escape($key) . '="' . $this->escapeAttribute((string)$value) . '"';
         }
 
         return $html;
@@ -482,7 +482,26 @@ class HtmlRenderer
 
     protected function escape(string $text): string
     {
-        return htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // ENT_NOQUOTES: Don't convert quotes - official djot keeps them literal
+        // Only escape <, >, and & for HTML safety
+        $escaped = htmlspecialchars($text, ENT_NOQUOTES | ENT_HTML5, 'UTF-8');
+
+        // Convert non-breaking space to entity for consistency with official djot
+        return str_replace("\u{00A0}", '&nbsp;', $escaped);
+    }
+
+    /**
+     * Escape text for use in HTML attribute values
+     *
+     * Unlike escape(), this DOES escape quotes since they're in attribute context
+     */
+    protected function escapeAttribute(string $text): string
+    {
+        // ENT_QUOTES: Escape both single and double quotes for attribute values
+        $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Convert non-breaking space to entity for consistency with official djot
+        return str_replace("\u{00A0}", '&nbsp;', $escaped);
     }
 
     protected function renderRawBlock(RawBlock $node): string

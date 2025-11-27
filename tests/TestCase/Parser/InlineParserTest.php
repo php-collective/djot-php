@@ -355,4 +355,37 @@ class InlineParserTest extends TestCase
         $em = $strong->getChildren()[0] ?? null;
         $this->assertInstanceOf(Emphasis::class, $em);
     }
+
+    public function testAutolinkPrecedenceOverEmphasis(): void
+    {
+        // Autolinks should be protected from emphasis delimiter matching
+        // The _ in the URL should not be treated as an emphasis closer
+        $para = $this->parseInline('_<http://example.com/a_b>');
+
+        $children = $para->getChildren();
+        $this->assertCount(2, $children);
+
+        // First should be literal underscore
+        $this->assertInstanceOf(Text::class, $children[0]);
+        $this->assertSame('_', $children[0]->getContent());
+
+        // Second should be the autolink
+        $this->assertInstanceOf(Link::class, $children[1]);
+        $this->assertSame('http://example.com/a_b', $children[1]->getDestination());
+    }
+
+    public function testEmphasisFollowedByCloseBrace(): void
+    {
+        // Emphasis opener cannot be followed by } (closer marker)
+        $para = $this->parseInline('_}b_');
+
+        // Should all be literal text
+        $content = '';
+        foreach ($para->getChildren() as $child) {
+            if ($child instanceof Text) {
+                $content .= $child->getContent();
+            }
+        }
+        $this->assertSame('_}b_', $content);
+    }
 }

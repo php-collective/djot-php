@@ -72,7 +72,7 @@ class DjotConverterTest extends TestCase
     public function testCodeBlock(): void
     {
         $djot = "```php\necho 'hello';\n```";
-        $expected = "<pre><code class=\"language-php\">echo &apos;hello&apos;;</code></pre>\n";
+        $expected = "<pre><code class=\"language-php\">echo 'hello';</code></pre>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }

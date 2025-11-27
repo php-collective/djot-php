@@ -128,7 +128,7 @@ class HtmlRendererTest extends TestCase
 
         $result = $this->renderer->render($doc);
 
-        $this->assertSame("<pre><code class=\"language-php\">echo &apos;hello&apos;;</code></pre>\n", $result);
+        $this->assertSame("<pre><code class=\"language-php\">echo 'hello';</code></pre>\n", $result);
     }
 
     public function testRenderCodeBlockWithoutLanguage(): void

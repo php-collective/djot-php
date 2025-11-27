@@ -277,16 +277,23 @@ class BlockParser
                 continue;
             }
 
-            // Match reference definition: [label]: url
-            if (preg_match('/^\[([^\]]+)\]:\s*(.+)$/', $line, $matches)) {
+            // Match reference definition: [label]: url (url can be empty, on next line)
+            if (preg_match('/^\[([^\]]+)\]:\s*(.*)$/', $line, $matches)) {
                 $label = $matches[1];
                 $url = trim($matches[2]);
 
-                // Collect continuation lines
+                // Collect continuation lines (URL can start on continuation line)
                 $j = $i + 1;
                 while ($j < $count) {
                     $nextLine = $lines[$j];
-                    if ($this->isBlankLine($nextLine) || $this->startsNewBlock($nextLine)) {
+                    if ($this->isBlankLine($nextLine)) {
+                        break;
+                    }
+                    // Check if next line starts a new reference definition
+                    if (preg_match('/^\[([^\]]+)\]:/', $nextLine)) {
+                        break;
+                    }
+                    if ($this->startsNewBlock($nextLine)) {
                         break;
                     }
                     if (preg_match('/^\s+(\S.*)$/', $nextLine, $contMatch)) {
@@ -299,11 +306,14 @@ class BlockParser
 
                 $this->references[$label] = new ReferenceDefinition($url, $pendingAttrs);
                 $pendingAttrs = [];
-            } else {
-                // Non-reference line, clear any pending attributes
-                if (!$this->isBlankLine($line)) {
-                    $pendingAttrs = [];
-                }
+                $i = $j;
+
+                continue;
+            }
+
+            // Non-reference line, clear any pending attributes
+            if (!$this->isBlankLine($line)) {
+                $pendingAttrs = [];
             }
 
             $i++;
@@ -518,21 +528,33 @@ class BlockParser
             $this->pendingAttributes['id'] = $idMatch[1];
         }
 
-        // Parse key="double quoted value", key='single quoted value', or key=unquoted
-        if (preg_match_all('/([a-zA-Z_][a-zA-Z0-9_-]*)="([^"]*)"|([a-zA-Z_][a-zA-Z0-9_-]*)=\'([^\']*)\'|([a-zA-Z_][a-zA-Z0-9_-]*)=([^\s}"\']+)/', $attrStr, $kvMatches, PREG_SET_ORDER)) {
+        // Parse key="double quoted value" (with escape support), key='single quoted value', or key=unquoted
+        // The regex uses ([^"\\]|\\.)* to match content with escaped characters
+        if (preg_match_all('/([a-zA-Z_][a-zA-Z0-9_-]*)="((?:[^"\\\\]|\\\\.)*)"|([a-zA-Z_][a-zA-Z0-9_-]*)=\'((?:[^\'\\\\]|\\\\.)*)\'|([a-zA-Z_][a-zA-Z0-9_-]*)=([^\s}"\']+)/', $attrStr, $kvMatches, PREG_SET_ORDER)) {
             foreach ($kvMatches as $match) {
                 if (($match[1] ?? '') !== '') {
                     // key="double quoted value"
-                    $this->pendingAttributes[$match[1]] = $match[2] ?? '';
+                    $this->pendingAttributes[$match[1]] = $this->processAttributeEscapes($match[2] ?? '');
                 } elseif (($match[3] ?? '') !== '') {
                     // key='single quoted value'
-                    $this->pendingAttributes[$match[3]] = $match[4] ?? '';
+                    $this->pendingAttributes[$match[3]] = $this->processAttributeEscapes($match[4] ?? '');
                 } elseif (($match[5] ?? '') !== '') {
                     // key=unquoted
                     $this->pendingAttributes[$match[5]] = $match[6] ?? '';
                 }
             }
         }
+    }
+
+    /**
+     * Process escape sequences in attribute values
+     *
+     * Handles \\ -> \ and \" -> " (and other escaped characters)
+     */
+    protected function processAttributeEscapes(string $value): string
+    {
+        // Replace escape sequences: \X -> X for any character X
+        return preg_replace('/\\\\(.)/', '$1', $value) ?? $value;
     }
 
     /**
@@ -1657,8 +1679,8 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Match reference definition: [label]: url
-        if (!preg_match('/^\[([^\]]+)\]:\s*(.+)$/', $line, $matches)) {
+        // Match reference definition: [label]: url (url can be empty, on next line)
+        if (!preg_match('/^\[([^\]]+)\]:\s*(.*)$/', $line, $matches)) {
             return null;
         }
 
@@ -1668,7 +1690,14 @@ class BlockParser
 
         while ($i < $count) {
             $nextLine = $lines[$i];
-            if ($this->isBlankLine($nextLine) || $this->startsNewBlock($nextLine)) {
+            if ($this->isBlankLine($nextLine)) {
+                break;
+            }
+            // Check if next line starts a new reference definition
+            if (preg_match('/^\[([^\]]+)\]:/', $nextLine)) {
+                break;
+            }
+            if ($this->startsNewBlock($nextLine)) {
                 break;
             }
             if (preg_match('/^\s+(\S.*)$/', $nextLine, $contMatch)) {
@@ -1733,7 +1762,9 @@ class BlockParser
         // Check if line starts a new block element
         // Note: Block quotes (>) are NOT included here - they don't interrupt paragraphs
         // Block quotes can only start after a blank line or at document start
-        return (bool)preg_match('/^(#{1,6}\s|[-*+]\s|\d+[.)]\s|`{3,}|:{3,}|\|)/', $line);
+        // Note: Ordered lists (\d+[.)]) are NOT included - they don't interrupt paragraphs in djot
+        // Only unordered lists (-*+) can interrupt paragraphs
+        return (bool)preg_match('/^(#{1,6}\s|[-*+]\s|`{3,}|:{3,}|\|)/', $line);
     }
 
     /**
