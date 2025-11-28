@@ -942,17 +942,24 @@ class HtmlRenderer
         foreach ($renderedContents as $number => $content) {
             $html .= '<li id="fn' . $number . '">' . "\n";
 
+            // Find the label for this footnote number to get ref count
+            $label = array_search($number, $this->footnoteNumbers, true);
+            $refCount = $label !== false ? ($this->footnoteRefCounts[$label] ?? 1) : 1;
+
+            // Generate backlinks - multiple if footnote referenced multiple times
+            $backlinks = $this->generateBacklinks($number, $refCount);
+
             // Add backlink - if content ends with </p>, insert before it
             // Otherwise add as separate paragraph
             if ($content !== '' && preg_match('/^(.*)(<\/p>\n?)$/s', $content, $matches)) {
-                $content = $matches[1] . '<a href="#fnref' . $number . '" role="doc-backlink">↩︎</a></p>';
+                $content = $matches[1] . $backlinks . '</p>';
                 $html .= $content . "\n";
             } else {
                 // Content doesn't end with paragraph (e.g., code block or empty)
                 if ($content !== '') {
                     $html .= $content . "\n";
                 }
-                $html .= '<p><a href="#fnref' . $number . '" role="doc-backlink">↩︎</a></p>' . "\n";
+                $html .= '<p>' . $backlinks . '</p>' . "\n";
             }
 
             $html .= '</li>' . "\n";
@@ -962,6 +969,32 @@ class HtmlRenderer
         $html .= '</section>' . "\n";
 
         return $html;
+    }
+
+    /**
+     * Generate backlink(s) for a footnote
+     *
+     * @param int $number Footnote number
+     * @param int $refCount Number of times footnote was referenced
+     */
+    protected function generateBacklinks(int $number, int $refCount): string
+    {
+        if ($refCount <= 1) {
+            // Single reference - simple backlink
+            return '<a href="#fnref' . $number . '" role="doc-backlink">↩︎</a>';
+        }
+
+        // Multiple references - generate numbered backlinks
+        $links = [];
+        for ($i = 1; $i <= $refCount; $i++) {
+            $refId = 'fnref' . $number;
+            if ($i > 1) {
+                $refId .= '-' . $i;
+            }
+            $links[] = '<a href="#' . $refId . '" role="doc-backlink">↩︎<sup>' . $i . '</sup></a>';
+        }
+
+        return implode(' ', $links);
     }
 
     protected function renderFootnoteRef(FootnoteRef $node): string
@@ -975,8 +1008,21 @@ class HtmlRenderer
         }
         $number = $this->footnoteNumbers[$label];
 
+        // Track reference count for this footnote to generate unique IDs
+        if (!isset($this->footnoteRefCounts[$label])) {
+            $this->footnoteRefCounts[$label] = 0;
+        }
+        $this->footnoteRefCounts[$label]++;
+        $refCount = $this->footnoteRefCounts[$label];
+
+        // Generate unique ID: fnref1 for first, fnref1-2 for second, etc.
+        $refId = 'fnref' . $number;
+        if ($refCount > 1) {
+            $refId .= '-' . $refCount;
+        }
+
         // Format: <a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a>
-        return '<a id="fnref' . $number . '" href="#fn' . $number . '" role="doc-noteref"><sup>' . $number . '</sup></a>';
+        return '<a id="' . $refId . '" href="#fn' . $number . '" role="doc-noteref"><sup>' . $number . '</sup></a>';
     }
 
     protected function renderMath(Math $node): string

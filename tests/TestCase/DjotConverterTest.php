@@ -2380,4 +2380,60 @@ DJOT;
         $this->assertStringContainsString('<pre><code class="language-python">', $result);
         $this->assertStringContainsString('x = y + 3', $result);
     }
+
+    /**
+     * Test that multiple references to the same footnote get unique IDs
+     *
+     * Fix for GitHub issue jgm/djot#348: Multiple calls to the same note
+     * should generate unique HTML-compliant IDs with suffixes.
+     */
+    public function testMultipleFootnoteReferencesGetUniqueIds(): void
+    {
+        $djot = <<<'DJOT'
+First ref[^note].
+
+Second ref[^note].
+
+Third ref[^note].
+
+[^note]: The footnote.
+DJOT;
+
+        $result = $this->converter->convert($djot);
+
+        // Each reference should have a unique ID
+        $this->assertStringContainsString('id="fnref1"', $result);
+        $this->assertStringContainsString('id="fnref1-2"', $result);
+        $this->assertStringContainsString('id="fnref1-3"', $result);
+
+        // All should link to the same footnote
+        $this->assertSame(3, substr_count($result, 'href="#fn1"'));
+
+        // Footnote should have multiple backlinks
+        $this->assertStringContainsString('href="#fnref1"', $result);
+        $this->assertStringContainsString('href="#fnref1-2"', $result);
+        $this->assertStringContainsString('href="#fnref1-3"', $result);
+
+        // Single footnote (no duplicates)
+        $this->assertSame(1, substr_count($result, 'id="fn1"'));
+    }
+
+    public function testSingleFootnoteReferenceNoSuffix(): void
+    {
+        $djot = <<<'DJOT'
+Single ref[^note].
+
+[^note]: The footnote.
+DJOT;
+
+        $result = $this->converter->convert($djot);
+
+        // Single reference - no suffix needed
+        $this->assertStringContainsString('id="fnref1"', $result);
+        $this->assertStringNotContainsString('fnref1-', $result);
+
+        // Simple backlink without numbering
+        $this->assertStringContainsString('href="#fnref1"', $result);
+        $this->assertStringNotContainsString('<sup>1</sup></a> <a', $result);
+    }
 }
