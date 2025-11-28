@@ -758,6 +758,54 @@ DJOT;
         $this->assertStringContainsString('First', $result);
     }
 
+    public function testListItemAttributes(): void
+    {
+        $djot = "- item 1\n  {.highlight}\n- item 2";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li class="highlight">', $result);
+        $this->assertStringContainsString('item 1', $result);
+        $this->assertStringContainsString('item 2', $result);
+    }
+
+    public function testListItemAttributesWithId(): void
+    {
+        $djot = "- first item\n  {#first .important}\n- second item";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li id="first" class="important">', $result);
+    }
+
+    public function testListItemAttributesWithCustomAttribute(): void
+    {
+        $djot = "- item\n  {data-value=\"test\"}";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('data-value="test"', $result);
+    }
+
+    public function testOrderedListItemAttributes(): void
+    {
+        $djot = "1. first\n   {.step-one}\n2. second";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li class="step-one">', $result);
+    }
+
+    public function testTaskListItemAttributes(): void
+    {
+        $djot = "- [x] done\n  {.completed}\n- [ ] pending";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li class="completed">', $result);
+        $this->assertStringContainsString('checked=""', $result);
+    }
+
     public function testRomanNumeralList(): void
     {
         // x. is parsed as Roman numeral 10

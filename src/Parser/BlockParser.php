@@ -713,6 +713,41 @@ class BlockParser
     }
 
     /**
+     * Parse attribute string and return as array (without affecting pendingAttributes)
+     *
+     * @return array<string, string>
+     */
+    protected function parseAttributeStringToArray(string $attrStr): array
+    {
+        $attributes = [];
+
+        // Parse .class
+        if (preg_match_all('/\.([^\s.#=}]+)/', $attrStr, $classMatches)) {
+            $attributes['class'] = implode(' ', $classMatches[1]);
+        }
+
+        // Parse #id
+        if (preg_match('/#([^\s.#=}]+)/', $attrStr, $idMatch)) {
+            $attributes['id'] = $idMatch[1];
+        }
+
+        // Parse key="double quoted value", key='single quoted value', or key=unquoted
+        if (preg_match_all('/([a-zA-Z_][a-zA-Z0-9_-]*)="((?:[^"\\\\]|\\\\.)*)"|([a-zA-Z_][a-zA-Z0-9_-]*)=\'((?:[^\'\\\\]|\\\\.)*)\'|([a-zA-Z_][a-zA-Z0-9_-]*)=([^\s}"\']+)/', $attrStr, $kvMatches, PREG_SET_ORDER)) {
+            foreach ($kvMatches as $match) {
+                if (($match[1] ?? '') !== '') {
+                    $attributes[$match[1]] = $this->processAttributeEscapes($match[2] ?? '');
+                } elseif (($match[3] ?? '') !== '') {
+                    $attributes[$match[3]] = $this->processAttributeEscapes($match[4] ?? '');
+                } elseif (($match[5] ?? '') !== '') {
+                    $attributes[$match[5]] = $match[6] ?? '';
+                }
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
      * Apply pending attributes to a node and clear them
      */
     protected function applyPendingAttributes(Node $node): void
@@ -1508,6 +1543,15 @@ class BlockParser
                     }
                 }
 
+                // Check for list item attributes (must be at content indent, be a standalone attribute block)
+                if (
+                    $nextIndent >= $contentIndent &&
+                    preg_match('/^\{([^{}]+)\}\s*$/', $nextTrimmed, $attrMatch)
+                ) {
+                    // This is a list item attribute line - don't add to content
+                    break;
+                }
+
                 // Content at content indent or more is continuation (even if it looks like a list marker)
                 // In djot, "  - b" after "- a" (no blank line) is literal text, not a nested list
                 if ($nextIndent >= $contentIndent) {
@@ -1521,6 +1565,21 @@ class BlockParser
                 $i++;
             }
 
+            // Check for list item attributes on the next line
+            $itemAttributes = [];
+            if ($i < $count) {
+                $potentialAttrLine = $lines[$i];
+                $trimmedAttrLine = ltrim($potentialAttrLine);
+                // Check if it's an attribute block at content indent level
+                if (
+                    preg_match('/^\{([^{}]+)\}\s*$/', $trimmedAttrLine, $attrMatch) &&
+                    $this->getLeadingSpaces($potentialAttrLine) >= $contentIndent
+                ) {
+                    $itemAttributes = $this->parseAttributeStringToArray($attrMatch[1]);
+                    $i++;
+                }
+            }
+
             // For tight lists with continuation lines, parse as plain text
             // This prevents "-like" lines from being parsed as nested lists
             if ($hasNonMarkerContinuation) {
@@ -1529,6 +1588,13 @@ class BlockParser
                 $listItem->appendChild($paragraph);
             } else {
                 $this->parseBlocks($listItem, $itemLines, 0);
+            }
+
+            // Apply attributes to list item
+            if ($itemAttributes !== []) {
+                foreach ($itemAttributes as $key => $value) {
+                    $listItem->setAttribute($key, $value);
+                }
             }
             $list->appendChild($listItem);
         }
