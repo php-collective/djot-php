@@ -475,6 +475,14 @@ class InlineParser
         $searchPos = $contentStart;
 
         // Find matching closing backticks
+        // Handle edge case: backticks at end of text with no content after
+        if ($searchPos >= $length) {
+            return [
+                'node' => new Code(''),
+                'pos' => $length,
+            ];
+        }
+
         while ($searchPos < $length) {
             $closePos = strpos($text, str_repeat('`', $openBackticks), $searchPos);
             if ($closePos === false) {
@@ -1035,8 +1043,13 @@ class InlineParser
         $prevChar = $pos > 0 ? $text[$pos - 1] : ' ';
         $nextChar = $text[$pos + 1] ?? ' ';
 
+        // Quote immediately after = is always an opener (attribute value start)
+        if ($prevChar === '=') {
+            return $quote === '"' ? "\u{201C}" : "\u{2018}";
+        }
+
         // = acts as word boundary for quotes (e.g., key="value" in attributes)
-        $prevIsSpace = ctype_space($prevChar) || $pos === 0 || $prevChar === '=';
+        $prevIsSpace = ctype_space($prevChar) || $pos === 0;
         $nextIsSpace = ctype_space($nextChar);
 
         // A quote following another quote should also be considered as having "space" before
@@ -1259,13 +1272,18 @@ class InlineParser
         $wordStart = strlen($textBuffer);
 
         // Scan backwards to find word boundary
-        // Stop at whitespace, quotes, or punctuation that isn't part of a word
-        // Need to handle multi-byte UTF-8 characters like curly quotes
+        // Per djot spec: a word is a sequence of non-ASCII-whitespace characters
+        // However, smart/curly quotes act as word boundaries for attribute attachment
         while ($wordStart > 0) {
             $char = $textBuffer[$wordStart - 1];
 
+            // Stop at ASCII whitespace
+            if ($char === ' ' || $char === "\t" || $char === "\n" || $char === "\r") {
+                break;
+            }
+
             // Check for multi-byte UTF-8 curly quotes (3 bytes each)
-            // The last byte of UTF-8 curly quotes is 0x9C, 0x9D, 0x98, or 0x99
+            // These act as word boundaries for attribute attachment
             if (ord($char) >= 0x98 && ord($char) <= 0x9D && $wordStart >= 3) {
                 $threeBytes = substr($textBuffer, $wordStart - 3, 3);
                 // Check for curly quotes: " " ' ' (U+201C, U+201D, U+2018, U+2019)
@@ -1273,24 +1291,10 @@ class InlineParser
                     $threeBytes === "\u{201C}" || $threeBytes === "\u{201D}" ||
                     $threeBytes === "\u{2018}" || $threeBytes === "\u{2019}"
                 ) {
-                    // Word starts at current wordStart (after the curly quote)
                     break;
                 }
             }
 
-            // Stop at whitespace
-            if ($char === ' ' || $char === "\t" || $char === "\n" || $char === "\r") {
-                break;
-            }
-            // Stop at quotes and other word-breaking punctuation
-            if (
-                $char === '"' || $char === "'" || $char === '(' || $char === ')' ||
-                $char === '[' || $char === ']' || $char === '{' || $char === '}' ||
-                $char === '<' || $char === '>' || $char === '=' || $char === ':' ||
-                $char === ';' || $char === ',' || $char === '!' || $char === '?'
-            ) {
-                break;
-            }
             $wordStart--;
         }
 

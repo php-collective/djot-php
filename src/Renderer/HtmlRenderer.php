@@ -312,18 +312,12 @@ class HtmlRenderer
             return '';
         }
 
-        // Sort attributes: id first, class second, then others in source order
+        // Sort attributes: id first, then others in source order
         uksort($attrs, function (string $a, string $b): int {
             if ($a === 'id') {
                 return -1;
             }
             if ($b === 'id') {
-                return 1;
-            }
-            if ($a === 'class') {
-                return -1;
-            }
-            if ($b === 'class') {
                 return 1;
             }
 
@@ -410,22 +404,22 @@ class HtmlRenderer
     protected function renderParagraph(Paragraph $node): string
     {
         $attrs = $this->renderAttributes($node);
-        $content = rtrim($this->renderChildren($node));
+        $content = rtrim($this->renderChildren($node), " \t");
 
         return '<p' . $attrs . '>' . $content . "</p>\n";
     }
 
     protected function renderHeading(Heading $node): string
     {
-        // This is called when a heading is rendered outside document context (via events)
-        // In normal document rendering, section wrapping is handled by renderDocumentWithSections
+        // This is called when a heading is rendered inside other blocks (blockquote, div, etc.)
+        // Section wrapping is ONLY applied at document level by renderDocumentWithSections
+        // Inside nested blocks, headings just get id attribute directly
         $level = $node->getLevel();
         $sectionId = $this->getSectionId($node);
         $attrs = $this->renderAttributesExcluding($node, ['id']);
 
-        return '<section id="' . $this->escapeAttribute($sectionId) . '">' . "\n"
-            . '<h' . $level . $attrs . '>' . $this->renderChildren($node) . '</h' . $level . ">\n"
-            . "</section>\n";
+        return '<h' . $level . ' id="' . $this->escapeAttribute($sectionId) . '"' . $attrs . '>'
+            . $this->renderChildren($node) . '</h' . $level . ">\n";
     }
 
     /**
@@ -518,13 +512,11 @@ class HtmlRenderer
         $content = $this->renderChildren($node);
 
         if ($tight) {
-            // For tight lists, strip paragraph wrapper
-            $content = preg_replace('/^<p>(.+)<\/p>\n?$/s', '$1', $content) ?? $content;
-        } else {
-            // For loose lists, check if content is just one paragraph followed by lists
-            // In djot, this case should also strip the leading <p> wrapper
-            // Pattern: single paragraph followed by list(s)
-            $content = preg_replace('/^<p>(.+?)<\/p>\n(<[uo]l>)/s', "$1\n$2", $content) ?? $content;
+            // For tight lists, strip paragraph wrapper from content
+            // This handles both:
+            // 1. Single paragraph: <p>text</p> -> text
+            // 2. Paragraph followed by nested list: <p>text</p>\n<ul>... -> text\n<ul>...
+            $content = preg_replace('/^<p>(.+?)<\/p>(\n)?/s', '$1$2', $content) ?? $content;
         }
 
         // Handle task list items
@@ -728,18 +720,12 @@ class HtmlRenderer
             return '';
         }
 
-        // Sort attributes: id first, class second, then others in source order
+        // Sort attributes: id first, then others in source order
         uksort($attrs, function (string $a, string $b): int {
             if ($a === 'id') {
                 return -1;
             }
             if ($b === 'id') {
-                return 1;
-            }
-            if ($a === 'class') {
-                return -1; // class after id
-            }
-            if ($b === 'class') {
                 return 1;
             }
 
@@ -920,7 +906,7 @@ class HtmlRenderer
         $content = $this->escape($node->getContent());
 
         if ($node->isDisplay()) {
-            return '<span class="math display">\\[' . $content . "\\]</span>\n";
+            return '<span class="math display">\\[' . $content . '\\]</span>';
         }
 
         return '<span class="math inline">\\(' . $content . '\\)</span>';

@@ -2097,14 +2097,34 @@ DJOT;
         $this->assertStringNotContainsString('title="foo"', $result);
     }
 
-    public function testAttributeOrderIdClassFirst(): void
+    public function testAttributeOrderIdFirst(): void
     {
-        // Attributes should be ordered: id first, class second, then others
+        // Attributes should be ordered: id first, then others in source order
         $djot = 'hi{#myid .myclass key="value"}';
         $result = $this->converter->convert($djot);
 
-        // Check that id comes before class, and class comes before key
+        // Check that id comes first, class and key follow in source order
         $this->assertMatchesRegularExpression('/id="myid".*class="myclass".*key="value"/', $result);
+    }
+
+    public function testAttributeOrderWithConsecutiveBlocks(): void
+    {
+        // From official attributes_16: consecutive attribute blocks, id first then source order
+        $djot = "{#id}\n{key=val}\n{.foo .bar}\n{key=val2}\n{.baz}\n{#id2}\nOkay";
+        $result = $this->converter->convert($djot);
+
+        // Expected: id first, then key, then class (source order after id)
+        $this->assertSame('<p id="id2" key="val2" class="foo bar baz">Okay</p>' . "\n", $result);
+    }
+
+    public function testAttributeOrderClassInMiddle(): void
+    {
+        // Class should stay in source order position, not be forced to second
+        $djot = "{#id .class\n  style=\"color:red\"}\nA paragraph";
+        $result = $this->converter->convert($djot);
+
+        // Class comes before style because that's the source order
+        $this->assertSame('<p id="id" class="class" style="color:red">A paragraph</p>' . "\n", $result);
     }
 
     public function testUnclosedBraceParagraphContinuation(): void
@@ -2126,5 +2146,164 @@ DJOT;
 
         $this->assertSame("<p>{a=x\n# not-a-heading</p>\n", $result);
         $this->assertStringNotContainsString('<h1', $result);
+    }
+
+    // ==================== Nested List Edge Cases ====================
+
+    public function testNestedListsWithIncrementingIndentation(): void
+    {
+        // Test 2 from official: blank lines introduce nested lists based on indentation
+        $djot = "- one\n\n - two\n\n  - three";
+        $result = $this->converter->convert($djot);
+
+        // Should produce three nesting levels (tight)
+        $expected = "<ul>\n<li>\none\n<ul>\n<li>\ntwo\n<ul>\n<li>\nthree\n</li>\n</ul>\n</li>\n</ul>\n</li>\n</ul>\n";
+        $this->assertSame($expected, $result);
+    }
+
+    public function testListLooseWithMultipleParagraphs(): void
+    {
+        // Test 3 from official: blank line before indented text makes list loose
+        $djot = "- one\n  and\n\n  another paragraph\n\n  - a list\n\n- two";
+        $result = $this->converter->convert($djot);
+
+        // Should have <p> tags around content (loose list)
+        $this->assertStringContainsString('<p>one', $result);
+        $this->assertStringContainsString('<p>another paragraph</p>', $result);
+        $this->assertStringContainsString('<p>two</p>', $result);
+    }
+
+    public function testListTightWithIndentedListLikeContinuation(): void
+    {
+        // Test 7 from official: "- b" is literal text when no blank line precedes
+        $djot = "- a\n  - b\n\n  - c\n- d";
+        $result = $this->converter->convert($djot);
+
+        // "- b" should be literal text, "- c" after blank should be nested list
+        $expected = "<ul>\n<li>\na\n- b\n<ul>\n<li>\nc\n</li>\n</ul>\n</li>\n<li>\nd\n</li>\n</ul>\n";
+        $this->assertSame($expected, $result);
+    }
+
+    public function testListTightWithNestedContentAndBlankBeforeSibling(): void
+    {
+        // Test 8 from official: blank before sibling within nested content doesn't make outer loose
+        $djot = "- a\n  - b\n\n  - c\n\n- d";
+        $result = $this->converter->convert($djot);
+
+        // Should be tight (no <p> tags around a and d)
+        $expected = "<ul>\n<li>\na\n- b\n<ul>\n<li>\nc\n</li>\n</ul>\n</li>\n<li>\nd\n</li>\n</ul>\n";
+        $this->assertSame($expected, $result);
+    }
+
+    public function testLazyListContinuationAfterNestedContent(): void
+    {
+        // Test 12 from official: lazy continuation at base indent continues nested list item
+        $djot = "- a\n\n  * b\ncd";
+        $result = $this->converter->convert($djot);
+
+        // "cd" should be part of nested list item "b"
+        $expected = "<ul>\n<li>\na\n<ul>\n<li>\nb\ncd\n</li>\n</ul>\n</li>\n</ul>\n";
+        $this->assertSame($expected, $result);
+    }
+
+    public function testNestedListTightWithMultipleItems(): void
+    {
+        // Tests 10 and 11 from official: multiple nested items, tight
+        $djot = "- a\n\n  - b\n  - c\n- d";
+        $result = $this->converter->convert($djot);
+
+        // Should be tight
+        $expected = "<ul>\n<li>\na\n<ul>\n<li>\nb\n</li>\n<li>\nc\n</li>\n</ul>\n</li>\n<li>\nd\n</li>\n</ul>\n";
+        $this->assertSame($expected, $result);
+    }
+
+    // ==================== Paragraph Newline Handling ====================
+
+    public function testParagraphPreservesTrailingSoftBreak(): void
+    {
+        // From official attributes_12: trailing softbreak should be preserved
+        $djot = "After {#id} space\n{.class}";
+        $result = $this->converter->convert($djot);
+
+        // The {.class} becomes a block attribute, leaving "After  space\n" in paragraph
+        // The newline before </p> should be preserved
+        $this->assertSame("<p>After  space\n</p>\n", $result);
+    }
+
+    public function testParagraphTrimsTrailingSpacesNotNewlines(): void
+    {
+        // Trailing spaces should be trimmed, but newlines preserved
+        $djot = 'hello world   ';
+        $result = $this->converter->convert($djot);
+
+        // Trailing spaces trimmed
+        $this->assertSame("<p>hello world</p>\n", $result);
+    }
+
+    // ==================== Raw Inline with Mixed Attributes ====================
+
+    public function testRawInlineWithMixedAttributesIsLiteral(): void
+    {
+        // From official raw_2: {=html #id} is NOT valid raw syntax, should be literal text
+        $djot = "`<b>foo</b>`{=html #id}\n```";
+        $result = $this->converter->convert($djot);
+
+        // The code span is normal code (not raw), {=html #id} is literal text
+        // The ``` on second line is inline code (empty)
+        $expected = "<p><code>&lt;b&gt;foo&lt;/b&gt;</code>{=html #id}\n<code></code></p>\n";
+        $this->assertSame($expected, $result);
+    }
+
+    public function testRawInlineOnlyWithPureFormat(): void
+    {
+        // Valid raw inline: only {=format} with no other attributes
+        $djot = '`<a>`{=html}';
+        $result = $this->converter->convert($djot);
+
+        // Should output raw HTML
+        $this->assertSame("<p><a></p>\n", $result);
+    }
+
+    // ==================== Bare Backticks as Inline Code ====================
+
+    public function testBareBackticksAtEndOfParagraphIsInlineCode(): void
+    {
+        // Triple backticks at end of paragraph with no closing = inline code
+        $djot = "Some text\n```";
+        $result = $this->converter->convert($djot);
+
+        // Should be one paragraph with empty inline code at end
+        $this->assertSame("<p>Some text\n<code></code></p>\n", $result);
+    }
+
+    public function testBareBackticksAloneIsInlineCode(): void
+    {
+        // Just triple backticks with nothing else = inline code
+        $djot = 'text ```';
+        $result = $this->converter->convert($djot);
+
+        // Should be inline code
+        $this->assertSame("<p>text <code></code></p>\n", $result);
+    }
+
+    public function testUnclosedBackticksWithInfoStringIsInlineCode(): void
+    {
+        // From official code_blocks: unclosed ``` with info string = inline code
+        $djot = '``` not a code block';
+        $result = $this->converter->convert($djot);
+
+        // Should be inline code in a paragraph
+        $this->assertSame("<p><code> not a code block</code></p>\n", $result);
+    }
+
+    public function testBackticksWithClosingFenceIsCodeBlock(): void
+    {
+        // Triple backticks with proper closing = code block
+        $djot = "``` python\nx = y + 3\n```";
+        $result = $this->converter->convert($djot);
+
+        // Should be code block with language
+        $this->assertStringContainsString('<pre><code class="language-python">', $result);
+        $this->assertStringContainsString('x = y + 3', $result);
     }
 }

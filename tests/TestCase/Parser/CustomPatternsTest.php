@@ -493,9 +493,8 @@ class CustomPatternsTest extends TestCase
         $result = $this->converter->convert($djot);
 
         $this->assertStringContainsString('class="details"', $result);
-        // Headings are now wrapped in section per djot spec
-        $this->assertStringContainsString('<section id="Summary">', $result);
-        $this->assertStringContainsString('<h1>Summary</h1>', $result);
+        // Headings inside nested blocks get id attribute directly (no section wrapper)
+        $this->assertStringContainsString('<h1 id="Summary">', $result);
         $this->assertStringContainsString('<ul>', $result);
         $this->assertStringContainsString('<p>After details.</p>', $result);
     }

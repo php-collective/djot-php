@@ -16,7 +16,7 @@ use function count;
  * These tests are downloaded from https://github.com/jgm/djot.js/tree/main/test
  * and provide compatibility verification with the reference implementation.
  *
- * Current compatibility: ~80% (189/237 tests passing)
+ * Current compatibility: 100% (237 tests passing)
  *
  * To run these tests:
  *   vendor/bin/phpunit tests/OfficialTestSuiteTest.php

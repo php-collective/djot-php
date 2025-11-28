@@ -8,6 +8,9 @@
     <testsuites>
         <testsuite name="default">
             <directory>tests/</directory>
+        </testsuite>
+        <testsuite name="own">
+            <directory>tests/</directory>
             <exclude>tests/OfficialTestSuiteTest.php</exclude>
         </testsuite>
         <testsuite name="official">

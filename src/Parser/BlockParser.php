@@ -240,9 +240,10 @@ class BlockParser
         $document = new Document();
         $lines = $this->splitLines($input);
 
-        // First pass: extract reference definitions and footnotes
+        // First pass: extract reference definitions, footnotes, and heading references
         $this->extractReferences($lines);
         $this->extractFootnotes($lines);
+        $this->extractHeadingReferences($lines);
 
         // Second pass: parse blocks
         $this->parseBlocks($document, $lines, 0);
@@ -423,6 +424,80 @@ class BlockParser
             }
 
             $i++;
+        }
+    }
+
+    /**
+     * Extract heading IDs as implicit reference definitions
+     * This allows [Heading][] style links to headings
+     *
+     * @param array<string> $lines
+     */
+    protected function extractHeadingReferences(array $lines): void
+    {
+        $usedIds = [];
+        $pendingId = null;
+        $count = count($lines);
+
+        for ($i = 0; $i < $count; $i++) {
+            $line = $lines[$i];
+
+            // Check for explicit ID attribute before heading: {#custom-id}
+            if (preg_match('/^\{#([^\s}]+)\}\s*$/', $line, $attrMatch)) {
+                $pendingId = $attrMatch[1];
+
+                continue;
+            }
+
+            // Match heading: optional leading spaces, 1-6 # characters, followed by content
+            if (preg_match('/^[ ]{0,3}(#{1,6})(?:\s+(.*))?$/', $line, $matches)) {
+                $headingText = isset($matches[2]) ? trim($matches[2]) : '';
+
+                // Collect continuation lines
+                $j = $i + 1;
+                while ($j < $count) {
+                    $nextLine = $lines[$j];
+                    if (trim($nextLine) === '' || preg_match('/^[ ]{0,3}#{1,6}/', $nextLine)) {
+                        break;
+                    }
+                    if (!$this->startsNewBlock($nextLine)) {
+                        $headingText .= ' ' . trim($nextLine);
+                        $j++;
+                    } else {
+                        break;
+                    }
+                }
+
+                // Generate ID from heading text (same algorithm as renderer)
+                if ($pendingId !== null) {
+                    $id = $pendingId;
+                    $pendingId = null;
+                } else {
+                    // Strip inline markup to get plain text for ID
+                    $plainText = preg_replace('/[*_`\[\]{}]/', '', $headingText) ?? $headingText;
+                    $id = str_replace(' ', '-', trim($plainText));
+                    // Handle duplicate IDs
+                    $baseId = $id;
+                    $counter = 1;
+                    while (isset($usedIds[$id])) {
+                        $id = $baseId . '-' . $counter;
+                        $counter++;
+                    }
+                }
+                $usedIds[$id] = true;
+
+                // Register as reference if not already defined
+                // Use normalized heading text as the label (for [Heading][] style links)
+                $label = preg_replace('/\s+/', ' ', trim($headingText)) ?? $headingText;
+                if (!isset($this->references[$label])) {
+                    $this->references[$label] = new ReferenceDefinition('#' . $id, []);
+                }
+            } else {
+                // Non-heading, non-attribute line - clear pending ID
+                if (!$this->isBlankLine($line)) {
+                    $pendingId = null;
+                }
+            }
         }
     }
 
@@ -710,11 +785,16 @@ class BlockParser
             $i++;
         }
 
-        // If not closed and this is a single line with backticks and content, treat as inline code
-        // But if no content (just ``` by itself), treat as empty code block
-        if (!$closed && $fenceChar === '`' && $i === $start + 1 && $info !== '') {
-            // Single line unclosed fence with content - treat as inline code in a paragraph
-            return null;
+        // If not closed and using backticks, check if this should be inline code
+        if (!$closed && $fenceChar === '`') {
+            if ($i === $start + 1 && $info !== '') {
+                // Single line unclosed fence with content - treat as inline code in a paragraph
+                return null;
+            }
+            if ($content === '' && $info === '') {
+                // Empty unclosed fence (just ``` with nothing) - treat as inline code
+                return null;
+            }
         }
 
         if (!$closed) {
@@ -1250,6 +1330,9 @@ class BlockParser
             $listInfo = $this->disambiguateListStyle($listInfo, $lines, $start);
         }
 
+        // Get the base indentation of this list
+        $baseIndent = $this->getLeadingSpaces($line);
+
         $list = new ListBlock(
             $listInfo['type'],
             $listInfo['start'] ?? 1,
@@ -1265,7 +1348,6 @@ class BlockParser
         $i = $start;
         $count = count($lines);
         $lastItemHadBlankAfter = false;
-        $markerIndent = $listInfo['marker_indent'] ?? 0;
         $firstItem = true; // Track first item to use listInfo directly
 
         while ($i < $count) {
@@ -1279,45 +1361,84 @@ class BlockParser
                 continue;
             }
 
-            // Check for indented continuation (after blank line = nested content)
-            $hasIndent = preg_match('/^\s+/', $currentLine);
+            // Get indentation of current line
+            $currentIndent = $this->getLeadingSpaces($currentLine);
 
-            if ($lastItemHadBlankAfter && $hasIndent) {
+            // If line is less indented than base, we're done with this list
+            if ($currentIndent < $baseIndent) {
+                break;
+            }
+
+            // Check for indented continuation (after blank line = nested content)
+            if ($lastItemHadBlankAfter && $currentIndent > $baseIndent) {
                 // Content after blank line with indentation belongs to previous item
                 $lastItem = $this->getLastListItem($list);
                 if ($lastItem !== null) {
-                    $list->setTight(false);
-                    // Collect all indented content
+                    // Check if the first indented content is a list marker or regular text
+                    // Blank line followed by indented TEXT = loose list (multiple paragraphs)
+                    // Blank line followed by indented LIST MARKER = tight nesting
+                    $trimmedCurrent = ltrim($currentLine);
+                    $firstContentIsListMarker = $this->parseListItemMarker($trimmedCurrent) !== null;
+                    if (!$firstContentIsListMarker) {
+                        // Indented text after blank = loose list
+                        $list->setTight(false);
+                    }
+
+                    // Collect all indented content at this new level
                     $subLines = [];
+                    $subIndent = $currentIndent;
+                    $sawBlankLine = false;
                     while ($i < $count) {
                         $subLine = $lines[$i];
                         if ($this->isBlankLine($subLine)) {
                             $subLines[] = '';
+                            $sawBlankLine = true;
                             $i++;
 
                             continue;
                         }
-                        // Check if line has any indentation
-                        if (preg_match('/^\s+/', $subLine)) {
-                            // Remove up to two spaces of indentation (aligns with content after marker)
-                            $subLines[] = preg_replace('/^ {1,2}/', '', $subLine) ?? $subLine;
+                        $lineIndent = $this->getLeadingSpaces($subLine);
+                        // Check if line has at least the subIndent level
+                        if ($lineIndent >= $subIndent) {
+                            // Remove subIndent spaces of indentation
+                            $subLines[] = substr($subLine, $subIndent);
+                            $sawBlankLine = false;
                             $i++;
-                        } else {
-                            // Check if it's a same-level list item
-                            $itemInfo = $this->parseListItemMarker($subLine);
+                        } elseif ($lineIndent >= $baseIndent) {
+                            // Check if it's a same-level list item (at base indent)
+                            $trimmedLine = ltrim($subLine);
+                            $itemInfo = $this->parseListItemMarker($trimmedLine);
                             $sameStyle = !isset($listInfo['style']) || !isset($itemInfo['style']) || $itemInfo['style'] === $listInfo['style'];
-                            if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle) {
+                            if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle && $lineIndent === $baseIndent) {
                                 break;
                             }
-
+                            // Content at base indent that's not a matching list marker
+                            // Check if it's a block starter - if so, end list
+                            if ($this->startsNewBlock($trimmedLine)) {
+                                break;
+                            }
+                            // Otherwise it's lazy continuation - include in nested content
+                            $subLines[] = $trimmedLine;
+                            $sawBlankLine = false;
+                            $i++;
+                        } else {
                             // End of list
                             break;
                         }
+                    }
+                    // Remove trailing blank lines from subLines
+                    $subLineCount = count($subLines);
+                    while ($subLineCount > 0 && $subLines[$subLineCount - 1] === '') {
+                        array_pop($subLines);
+                        $subLineCount--;
                     }
                     // Parse nested content
                     if ($subLines !== []) {
                         $this->parseBlocks($lastItem, $subLines, 0);
                     }
+                    // In djot, blank lines within nested content don't make the parent list loose
+                    // The list is only loose if there's a blank line directly after item content
+                    // (before nested content starts), which is already handled elsewhere
                     $lastItemHadBlankAfter = false;
 
                     continue;
@@ -1326,11 +1447,16 @@ class BlockParser
 
             // For first item, use the already-parsed listInfo (may have been disambiguated)
             // For subsequent items, parse fresh
+            $trimmedLine = ltrim($currentLine);
             if ($firstItem) {
                 $itemInfo = $listInfo;
                 $firstItem = false;
             } else {
-                $itemInfo = $this->parseListItemMarker($currentLine);
+                // Only match items at the same indentation level
+                if ($currentIndent !== $baseIndent) {
+                    break;
+                }
+                $itemInfo = $this->parseListItemMarker($trimmedLine);
 
                 // Check if this is a list item of the same type, marker, and style
                 if ($itemInfo === null || $itemInfo['type'] !== $listInfo['type'] || $itemInfo['marker'] !== $listInfo['marker']) {
@@ -1357,6 +1483,9 @@ class BlockParser
             $lastItemHadBlankAfter = false;
             $hasNonMarkerContinuation = false;
 
+            // Calculate content indent (base + marker width, typically 2 for "- ")
+            $contentIndent = $baseIndent + 2;
+
             while ($i < $count) {
                 $nextLine = $lines[$i];
 
@@ -1364,22 +1493,30 @@ class BlockParser
                     break;
                 }
 
-                // Check if next line starts a new list item at same level
-                $nextInfo = $this->parseListItemMarker($nextLine);
-                if ($nextInfo !== null) {
-                    break;
+                $nextIndent = $this->getLeadingSpaces($nextLine);
+                $nextTrimmed = ltrim($nextLine);
+
+                // Check if next line starts a new list item at same level (base indent)
+                if ($nextIndent === $baseIndent) {
+                    $nextInfo = $this->parseListItemMarker($nextTrimmed);
+                    if ($nextInfo !== null) {
+                        break;
+                    }
+                    // Non-list content at base indent - check if it starts another block
+                    if ($this->startsNewBlock($nextTrimmed)) {
+                        break;
+                    }
                 }
 
-                // Check if it starts another block
-                if ($this->startsNewBlock($nextLine)) {
-                    break;
+                // Content at content indent or more is continuation (even if it looks like a list marker)
+                // In djot, "  - b" after "- a" (no blank line) is literal text, not a nested list
+                if ($nextIndent >= $contentIndent) {
+                    // Properly indented continuation - include with original indentation relative to content
+                    $itemLines[] = substr($nextLine, $contentIndent);
+                } else {
+                    // Lazy continuation (not properly indented but not at base level either)
+                    $itemLines[] = $nextTrimmed;
                 }
-
-                // Non-indented continuation is literal text (djot behavior)
-                // Strip up to two leading spaces for alignment with content after marker
-                // (2 = typical marker width like "- " or "* ")
-                $nextLine = preg_replace('/^ {1,2}/', '', $nextLine) ?? $nextLine;
-                $itemLines[] = $nextLine;
                 $hasNonMarkerContinuation = true;
                 $i++;
             }
@@ -1403,6 +1540,19 @@ class BlockParser
         $parent->appendChild($list);
 
         return $i - $start;
+    }
+
+    /**
+     * Get number of leading spaces in a line
+     */
+    protected function getLeadingSpaces(string $line): int
+    {
+        $match = [];
+        if (preg_match('/^( *)/', $line, $match)) {
+            return strlen($match[1]);
+        }
+
+        return 0;
     }
 
     /**
@@ -1472,31 +1622,48 @@ class BlockParser
 
             // The term is the content after ": "
             $termContent = $matches[1];
-            $termLines = [$termContent];
+
+            // Special case: if term starts with code fence, term is empty and fence is part of definition
+            $termStartsWithCodeFence = preg_match('/^(`{3,}|~{3,})/', $termContent, $fenceMatch);
+            $codeFenceChar = $termStartsWithCodeFence ? $fenceMatch[1][0] : null;
+            $codeFenceLen = $termStartsWithCodeFence ? strlen($fenceMatch[1]) : 0;
+
+            $termLines = $termStartsWithCodeFence ? [] : [$termContent];
             $i++;
 
             // Collect continuation lines for term (before blank line, single-space indent)
-            while ($i < $count) {
-                $nextLine = $lines[$i];
-                if ($this->isBlankLine($nextLine)) {
-                    break;
-                }
-                // Single space continuation is part of term
-                if (preg_match('/^ ([^ ].*)$/', $nextLine, $contMatch)) {
-                    $termLines[] = $contMatch[1];
-                    $i++;
-                } else {
-                    break;
+            // But NOT if term starts with code fence
+            if (!$termStartsWithCodeFence) {
+                while ($i < $count) {
+                    $nextLine = $lines[$i];
+                    if ($this->isBlankLine($nextLine)) {
+                        break;
+                    }
+                    // Single space continuation is part of term
+                    if (preg_match('/^ ([^ ].*)$/', $nextLine, $contMatch)) {
+                        $termLines[] = $contMatch[1];
+                        $i++;
+                    } else {
+                        break;
+                    }
                 }
             }
 
             // Create term node
             $term = new DefinitionTerm();
-            $this->inlineParser->parse($term, implode("\n", $termLines), $start);
+            if ($termLines !== []) {
+                $this->inlineParser->parse($term, implode("\n", $termLines), $start);
+            }
             $defList->appendChild($term);
 
             // Now collect definition content (after blank line, 2-space indent)
             $defLines = [];
+
+            // If term started with code fence, add it to definition content
+            if ($termStartsWithCodeFence) {
+                $defLines[] = $termContent;
+            }
+
             while ($i < $count) {
                 $defLine = $lines[$i];
 
@@ -2343,7 +2510,20 @@ class BlockParser
         // Note: Ordered lists (\d+[.)]) are NOT included - they don't interrupt paragraphs in djot
         // Note: Fenced divs (:::) are NOT included - they don't interrupt paragraphs in djot
         // Only unordered lists (-*+) can interrupt paragraphs
-        return (bool)preg_match('/^(#{1,6}\s|[-*+]\s|`{3,}|\|)/', $line);
+        if (preg_match('/^(#{1,6}\s|[-*+]\s|\|)/', $line)) {
+            return true;
+        }
+        // Code fences: backticks start a new block only if they have content or info string
+        // A bare ``` by itself should be treated as inline code
+        if (preg_match('/^(`{3,})(.*)$/', $line, $matches)) {
+            $info = trim($matches[2]);
+
+            // If there's an info string or the fence is closing style (backticks followed by content),
+            // then it's a code block. But bare backticks alone should be inline code.
+            return $info !== '';
+        }
+
+        return false;
     }
 
     /**
