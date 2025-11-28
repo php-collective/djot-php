@@ -127,3 +127,97 @@ Check out [our site](https://example.com).
 - Migrating forum content to modern platforms
 - Converting archived discussions
 - Importing user-generated content from legacy systems
+
+## HtmlToDjot
+
+Converts HTML to Djot markup. Useful for importing content from CMS systems, WYSIWYG editors, or web scraping.
+
+```php
+use Djot\Converter\HtmlToDjot;
+
+$converter = new HtmlToDjot();
+$djot = $converter->convert($html);
+```
+
+**Conversion Table:**
+
+| HTML | Djot Output |
+|------|-------------|
+| `<strong>`, `<b>` | `*bold*` |
+| `<em>`, `<i>` | `_italic_` |
+| `<u>`, `<ins>` | `{+underline+}` |
+| `<s>`, `<del>`, `<strike>` | `{-deleted-}` |
+| `<mark>` | `{=highlighted=}` |
+| `<sup>` | `^superscript^` |
+| `<sub>` | `~subscript~` |
+| `<code>` | `` `code` `` |
+| `<pre><code>` | ` ```code block``` ` |
+| `<a href="...">` | `[text](url)` |
+| `<img src="..." alt="...">` | `![alt](src)` |
+| `<h1>` - `<h6>` | `#` - `######` |
+| `<p>` | Paragraph |
+| `<blockquote>` | `> quote` |
+| `<ul>`, `<ol>` | `- item` / `1. item` |
+| `<hr>` | `---` |
+| `<br>` | `\` (hard break) |
+| `<table>` | Djot table syntax |
+| `<dl>`, `<dt>`, `<dd>` | Definition list |
+| `<span class="x">` | `[text]{.x}` |
+| `<figure>` + `<figcaption>` | Image with caption |
+
+**File Operations:**
+
+```php
+// Convert file and get result
+$djot = $converter->convertFile('/path/to/file.html');
+```
+
+**Example:**
+
+```php
+$html = <<<'HTML'
+<article>
+  <h1>Welcome</h1>
+  <p>This is <strong>important</strong> and <em>emphasized</em>.</p>
+  <ul>
+    <li>First item</li>
+    <li>Second item</li>
+  </ul>
+  <blockquote>A famous quote</blockquote>
+  <pre><code class="language-php">echo "Hello";</code></pre>
+</article>
+HTML;
+
+$djot = $converter->convert($html);
+```
+
+Output:
+```djot
+# Welcome
+
+This is *important* and _emphasized_.
+
+- First item
+- Second item
+
+> A famous quote
+
+```php
+echo "Hello";
+```
+```
+
+**Behavior:**
+- Strips `<script>`, `<style>`, and `<noscript>` tags
+- Normalizes whitespace (multiple spaces/newlines become single space)
+- Preserves whitespace inside `<pre>` blocks
+- Detects code language from `class="language-xxx"` attribute
+- Converts `<span>` with class/id to Djot span syntax
+- Handles nested lists
+- Handles tables with headers
+
+**Use Cases:**
+- Importing content from WordPress or other CMS
+- Converting WYSIWYG editor output
+- Web scraping and content extraction
+- Migrating HTML documentation to Djot
