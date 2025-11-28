@@ -98,31 +98,22 @@ https://sandbox.dereuromark.de/sandbox/djot
 - [Examples](docs/README.md) - Comprehensive usage examples
 - [Syntax Reference](docs/syntax.md) - Complete Djot syntax guide
 - [API Reference](docs/api.md) - Classes and methods
+- [Converters](docs/converters.md) - Markdown/BBCode to Djot conversion
 - [Cookbook](docs/cookbook.md) - Common customizations and recipes
 - [Architecture](docs/architecture.md) - Internal design
 
 ## Security
 
-**Warning:** When processing untrusted user input, sanitize the output to prevent XSS attacks. We recommend using [HTMLPurifier](http://htmlpurifier.org/):
+When processing untrusted user input, enable safe mode for XSS protection:
 
 ```php
-$converter = new DjotConverter();
+$converter = new DjotConverter(safeMode: true);
 $html = $converter->convert($untrustedInput);
-
-$config = HTMLPurifier_Config::createDefault();
-$config->set('Cache.DefinitionImpl', null);
-$config->set('HTML.DefinitionID', 'djot-purifier');
-$config->set('HTML.DefinitionRev', 1);
-$config->set('HTML.Allowed', 'p,br,strong,em,u,s,del,ins,mark,sub[id],sup[id],a[href|title|class|id],img[src|alt|title],ul,ol,li,dl,dt,dd,blockquote,pre,code[class],h1[id],h2[id],h3[id],h4[id],h5[id],h6[id],table[class|id],thead,tbody,tr,th[align],td[align],hr,div[class|id],span[class|id],section[id]');
-$config->set('Attr.EnableID', true);
-$config->set('HTML.TargetBlank', true);
-$config->set('URI.AllowedSchemes', ['http' => true, 'https' => true, 'mailto' => true]);
-
-$purifier = new HTMLPurifier($config);
-$safeHtml = $purifier->purify($html);
 ```
 
-See [Security Considerations](docs/README.md#security-considerations) for details.
+Safe mode automatically blocks dangerous URL schemes (`javascript:`, etc.), strips event handler attributes (`onclick`, etc.), and escapes raw HTML.
+
+See [Security Considerations](docs/README.md#security-considerations) for details and advanced configuration.
 
 ## See Also
 

@@ -17,13 +17,15 @@ $html = $converter->convert($djotString);
 public function __construct(
     bool $xhtml = false,
     bool $warnings = false,
-    bool $strict = false
+    bool $strict = false,
+    bool|SafeMode|null $safeMode = null
 )
 ```
 
 - `$xhtml`: When `true`, produces XHTML-compatible output (self-closing tags like `<br />`).
 - `$warnings`: When `true`, collects warnings during parsing (see [Error Handling](#error-handling)).
 - `$strict`: When `true`, throws `ParseException` on parse errors (see [Error Handling](#error-handling)).
+- `$safeMode`: When `true` or a `SafeMode` instance, enables XSS protection (see [Safe Mode](#safe-mode)).
 
 ### Methods
 
@@ -132,6 +134,124 @@ public function clearWarnings(): self
 ```
 
 Clears any collected warnings.
+
+#### setSafeMode
+
+```php
+public function setSafeMode(bool|SafeMode|null $safeMode): self
+```
+
+Enable, disable, or configure safe mode after construction. Pass `true` for defaults, a `SafeMode` instance for custom configuration, or `null`/`false` to disable.
+
+## Safe Mode
+
+Safe mode provides built-in XSS protection for user-generated content.
+
+### Basic Usage
+
+```php
+use Djot\DjotConverter;
+
+// Enable with sensible defaults
+$converter = new DjotConverter(safeMode: true);
+$html = $converter->convert($userInput);
+```
+
+### What Safe Mode Does
+
+1. **URL Sanitization**: Blocks dangerous URL schemes in links and images
+   - Blocked by default: `javascript:`, `vbscript:`, `data:`, `file:`
+   - Safe URLs like `https:`, `mailto:`, and relative paths are allowed
+
+2. **Attribute Filtering**: Strips event handler attributes
+   - Blocks attributes starting with `on` (e.g., `onclick`, `onload`, `onerror`)
+   - Blocks specific dangerous attributes (`srcdoc`, `formaction`)
+   - Allows safe attributes like `class`, `id`, `data-*`
+
+3. **Raw HTML Handling**: Controls how raw HTML is processed
+   - `escape` (default): HTML-encodes raw HTML so it displays as text
+   - `strip`: Removes raw HTML entirely
+   - `allow`: Passes raw HTML through (not recommended)
+
+### SafeMode Class
+
+```php
+use Djot\SafeMode;
+
+// Factory methods
+$safeMode = SafeMode::defaults();  // Standard protection
+$safeMode = SafeMode::strict();    // Strips raw HTML completely
+```
+
+#### Configuration Methods
+
+```php
+// URL scheme control
+$safeMode->setDangerousSchemes(['javascript', 'vbscript', 'data']);
+$safeMode->addDangerousScheme('ftp');
+$safeMode->getDangerousSchemes();
+
+// Whitelist approach (only these schemes allowed)
+$safeMode->setAllowedSchemes(['https', 'mailto']);
+$safeMode->getAllowedSchemes();
+
+// Attribute filtering
+$safeMode->setBlockedAttributePrefixes(['on']);  // Blocks onclick, onload, etc.
+$safeMode->setBlockedAttributes(['srcdoc', 'formaction']);
+$safeMode->getBlockedAttributePrefixes();
+$safeMode->getBlockedAttributes();
+
+// Raw HTML handling
+$safeMode->setRawHtmlMode(SafeMode::RAW_HTML_ESCAPE);  // Default
+$safeMode->setRawHtmlMode(SafeMode::RAW_HTML_STRIP);   // Remove completely
+$safeMode->setRawHtmlMode(SafeMode::RAW_HTML_ALLOW);   // Pass through
+$safeMode->getRawHtmlMode();
+```
+
+#### Validation Methods
+
+```php
+$safeMode->isUrlSafe('https://example.com');     // true
+$safeMode->isUrlSafe('javascript:alert(1)');    // false
+
+$safeMode->isAttributeSafe('class');            // true
+$safeMode->isAttributeSafe('onclick');          // false
+
+$safeMode->sanitizeUrl('javascript:alert(1)');  // ''
+$safeMode->filterAttributes([
+    'class' => 'highlight',
+    'onclick' => 'hack()',
+]);  // ['class' => 'highlight']
+```
+
+### Custom Configuration Example
+
+```php
+use Djot\DjotConverter;
+use Djot\SafeMode;
+
+// Only allow HTTPS links, strip raw HTML
+$safeMode = SafeMode::defaults()
+    ->setAllowedSchemes(['https'])
+    ->setRawHtmlMode(SafeMode::RAW_HTML_STRIP);
+
+$converter = new DjotConverter(safeMode: $safeMode);
+```
+
+### Enabling After Construction
+
+```php
+$converter = new DjotConverter();
+
+// Enable later
+$converter->setSafeMode(true);
+
+// Or with custom config
+$converter->setSafeMode(SafeMode::strict());
+
+// Disable
+$converter->setSafeMode(false);
+```
 
 ## Error Handling
 
@@ -429,25 +549,95 @@ $renderer->setTableCellSeparator(' | ');
 
 ### MarkdownRenderer
 
-Renders an AST Document to CommonMark-compatible Markdown.
+Renders an AST Document to CommonMark-compatible Markdown. Useful for:
+- Converting Djot content to Markdown for systems that only support Markdown
+- Migrating content between formats
+- Generating Markdown documentation from Djot source
 
 ```php
+use Djot\DjotConverter;
 use Djot\Renderer\MarkdownRenderer;
+
+$converter = new DjotConverter();
+$document = $converter->parse($djotText);
 
 $renderer = new MarkdownRenderer();
 $markdown = $renderer->render($document);
 ```
 
+**Conversion Table:**
+
+| Djot | Markdown Output |
+|------|-----------------|
+| `*strong*` | `**strong**` |
+| `_emphasis_` | `*emphasis*` |
+| `{-deleted-}` | `~~deleted~~` (GFM) |
+| `{+inserted+}` | `<ins>inserted</ins>` |
+| `{=highlighted=}` | `<mark>highlighted</mark>` |
+| `^superscript^` | `<sup>superscript</sup>` |
+| `~subscript~` | `<sub>subscript</sub>` |
+| `` `code` `` | `` `code` `` |
+| `[text](url)` | `[text](url)` |
+| `![alt](src)` | `![alt](src)` |
+| `# Heading` | `# Heading` |
+| `> quote` | `> quote` |
+| `- list` | `- list` |
+| `1. ordered` | `1. ordered` |
+| `- [ ] task` | `- [ ] task` |
+| `:symbol:` | `:symbol:` |
+| `[^note]` | `[^note]` |
+| `$math$` | `$math$` |
+| `$$display$$` | `$$display$$` |
+| Tables | GFM tables with alignment |
+| Divs | Content only (no wrapper) |
+| Spans | Content only (no wrapper) |
+| Definition lists | Bold term + `: description` |
+| Line blocks | Hard breaks (`  \n`) |
+| Raw HTML | Passed through |
+| Comments | Stripped |
+
 **Behavior:**
-- Converts Djot to CommonMark Markdown
-- Uses GFM extensions where available (strikethrough with `~~`)
-- Falls back to HTML for features without Markdown equivalents:
-  - Superscript: `<sup>text</sup>`
-  - Subscript: `<sub>text</sub>`
-  - Highlight: `<mark>text</mark>`
-  - Insert: `<ins>text</ins>`
-- Preserves table alignment
-- Preserves footnotes
+- Produces CommonMark-compatible output
+- Uses GFM extensions where available (strikethrough, tables, task lists, footnotes)
+- Falls back to inline HTML for features without Markdown equivalents
+- Escapes special Markdown characters in text content
+- Handles nested backticks in code spans and fenced blocks
+- Preserves table column alignment
+- Normalizes multiple blank lines
+
+**Example:**
+
+```php
+$djot = <<<'DJOT'
+# Hello *World*
+
+This has {=highlighted=} and {-deleted-} text.
+
+| Name  | Score |
+|-------|------:|
+| Alice |    95 |
+DJOT;
+
+$document = $converter->parse($djot);
+$markdown = (new MarkdownRenderer())->render($document);
+```
+
+Output:
+```markdown
+# Hello **World**
+
+This has <mark>highlighted</mark> and ~~deleted~~ text.
+
+| Name | Score |
+| --- | ---: |
+| Alice | 95 |
+```
+
+**Limitations:**
+- Djot divs (`::: class`) lose their class/attributes (content is preserved)
+- Djot spans (`[text]{.class}`) lose their attributes (content is preserved)
+- Definition lists are approximated (not native Markdown)
+- Some whitespace/formatting may differ from original
 
 ## AST Node Types
 

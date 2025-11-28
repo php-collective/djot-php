@@ -8,6 +8,7 @@ This directory contains detailed documentation for djot-php.
 - [API Reference](api.md) - Classes and methods
 - [Cookbook](cookbook.md) - Common customizations and recipes
 - [Architecture](architecture.md) - Internal design
+- [Converters](converters.md) - Markdown/BBCode to Djot conversion
 
 ## Examples
 
@@ -373,9 +374,37 @@ See the [Cookbook](cookbook.md) for more examples including wiki links, hashtags
 - Event handler attributes (e.g., `onclick`)
 - Raw HTML blocks and inline HTML
 
-### Recommended: Use HTMLPurifier
+### Recommended: Use Safe Mode
 
-For user-generated content, sanitize the HTML output using [HTMLPurifier](http://htmlpurifier.org/):
+Enable the built-in safe mode for XSS protection:
+
+```php
+use Djot\DjotConverter;
+
+// Enable with sensible defaults
+$converter = new DjotConverter(safeMode: true);
+$html = $converter->convert($userInput);
+```
+
+Safe mode automatically:
+- Blocks dangerous URL schemes (`javascript:`, `vbscript:`, `data:`, `file:`)
+- Strips event handler attributes (`onclick`, `onload`, etc.)
+- Escapes raw HTML (or strips it in strict mode)
+
+For stricter protection, use `SafeMode::strict()`:
+
+```php
+use Djot\DjotConverter;
+use Djot\SafeMode;
+
+$converter = new DjotConverter(safeMode: SafeMode::strict());
+```
+
+See the [API Reference](api.md#safe-mode) for full SafeMode configuration options.
+
+### Alternative: Use HTMLPurifier
+
+For maximum control over allowed HTML, you can also use [HTMLPurifier](http://htmlpurifier.org/):
 
 ```bash
 composer require ezyang/htmlpurifier
