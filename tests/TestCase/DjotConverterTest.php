@@ -758,6 +758,32 @@ DJOT;
         $this->assertStringContainsString('First', $result);
     }
 
+    public function testRomanNumeralList(): void
+    {
+        // x. is parsed as Roman numeral 10
+        $djot = "x. first\nx. second\nx. third";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<ol start="10" type="i">', $result);
+        $this->assertStringContainsString('first', $result);
+        $this->assertStringContainsString('second', $result);
+        $this->assertStringContainsString('third', $result);
+    }
+
+    public function testRomanNumeralListUppercase(): void
+    {
+        // X. is parsed as uppercase Roman numeral 10
+        $djot = "X. first\nX. second\nX. third";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<ol start="10" type="I">', $result);
+        $this->assertStringContainsString('first', $result);
+        $this->assertStringContainsString('second', $result);
+        $this->assertStringContainsString('third', $result);
+    }
+
     public function testThematicBreakDashes(): void
     {
         $djot = "Before\n\n---\n\nAfter";
