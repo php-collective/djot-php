@@ -44,6 +44,7 @@ use Djot\Node\Inline\Superscript;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\SafeMode;
 
 /**
  * Renders AST to HTML
@@ -51,6 +52,11 @@ use Djot\Node\Node;
 class HtmlRenderer
 {
     protected bool $softBreakAsNewline = true;
+
+    /**
+     * Safe mode configuration (null = disabled)
+     */
+    protected ?SafeMode $safeMode = null;
 
     /**
      * @var array<string, array<\Closure(\Djot\Event\RenderEvent): void>>
@@ -97,6 +103,32 @@ class HtmlRenderer
 
     public function __construct(protected bool $xhtml = false)
     {
+    }
+
+    /**
+     * Enable safe mode with the given configuration
+     */
+    public function setSafeMode(?SafeMode $safeMode): self
+    {
+        $this->safeMode = $safeMode;
+
+        return $this;
+    }
+
+    /**
+     * Get the current safe mode configuration
+     */
+    public function getSafeMode(): ?SafeMode
+    {
+        return $this->safeMode;
+    }
+
+    /**
+     * Check if safe mode is enabled
+     */
+    public function isSafeModeEnabled(): bool
+    {
+        return $this->safeMode !== null;
     }
 
     public function setSoftBreakAsNewline(bool $value): void
@@ -310,6 +342,11 @@ class HtmlRenderer
         $attrs = array_diff_key($attrs, array_flip($exclude));
         if (!$attrs) {
             return '';
+        }
+
+        // Filter dangerous attributes in safe mode
+        if ($this->safeMode !== null) {
+            $attrs = $this->safeMode->filterAttributes($attrs);
         }
 
         // Sort attributes: id first, then others in source order
@@ -625,6 +662,11 @@ class HtmlRenderer
         $href = $node->getDestination();
         $title = $node->getTitle();
 
+        // Sanitize URL in safe mode
+        if ($this->safeMode !== null && $href !== null) {
+            $href = $this->safeMode->sanitizeUrl($href);
+        }
+
         $html = '<a';
         // Only output href if destination is set (even if empty)
         if ($href !== null) {
@@ -642,10 +684,15 @@ class HtmlRenderer
     {
         $attrs = $this->renderAttributes($node);
         $alt = $this->escape($node->getAlt());
-        $src = $this->escape($node->getSource());
+        $src = $node->getSource();
         $title = $node->getTitle();
 
-        $html = '<img alt="' . $alt . '" src="' . $src . '"';
+        // Sanitize URL in safe mode
+        if ($this->safeMode !== null) {
+            $src = $this->safeMode->sanitizeUrl($src);
+        }
+
+        $html = '<img alt="' . $alt . '" src="' . $this->escape($src) . '"';
         if ($title !== null) {
             $html .= ' title="' . $this->escape($title) . '"';
         }
@@ -720,6 +767,11 @@ class HtmlRenderer
             return '';
         }
 
+        // Filter dangerous attributes in safe mode
+        if ($this->safeMode !== null) {
+            $attrs = $this->safeMode->filterAttributes($attrs);
+        }
+
         // Sort attributes: id first, then others in source order
         uksort($attrs, function (string $a, string $b): int {
             if ($a === 'id') {
@@ -768,21 +820,47 @@ class HtmlRenderer
     protected function renderRawBlock(RawBlock $node): string
     {
         // Only output if format is HTML
-        if ($node->getFormat() === 'html') {
-            return $node->getContent() . "\n";
+        if ($node->getFormat() !== 'html') {
+            return '';
         }
 
-        return '';
+        $content = $node->getContent();
+
+        // Handle raw HTML according to safe mode
+        if ($this->safeMode !== null) {
+            $mode = $this->safeMode->getRawHtmlMode();
+            if ($mode === SafeMode::RAW_HTML_STRIP) {
+                return '';
+            }
+            if ($mode === SafeMode::RAW_HTML_ESCAPE) {
+                return $this->escape($content) . "\n";
+            }
+        }
+
+        return $content . "\n";
     }
 
     protected function renderRawInline(RawInline $node): string
     {
         // Only output if format is HTML
-        if ($node->getFormat() === 'html') {
-            return $node->getContent();
+        if ($node->getFormat() !== 'html') {
+            return '';
         }
 
-        return '';
+        $content = $node->getContent();
+
+        // Handle raw HTML according to safe mode
+        if ($this->safeMode !== null) {
+            $mode = $this->safeMode->getRawHtmlMode();
+            if ($mode === SafeMode::RAW_HTML_STRIP) {
+                return '';
+            }
+            if ($mode === SafeMode::RAW_HTML_ESCAPE) {
+                return $this->escape($content);
+            }
+        }
+
+        return $content;
     }
 
     protected function renderDefinitionList(DefinitionList $node): string

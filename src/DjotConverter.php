@@ -27,13 +27,43 @@ class DjotConverter
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
      * @param bool $strict Whether to throw exceptions on parse errors
+     * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode (true for defaults, SafeMode instance for custom config)
      */
-    public function __construct(bool $xhtml = false, bool $warnings = false, bool $strict = false)
-    {
+    public function __construct(
+        bool $xhtml = false,
+        bool $warnings = false,
+        bool $strict = false,
+        bool|SafeMode|null $safeMode = null,
+    ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
         $this->parser = new BlockParser($warnings, $strict);
         $this->renderer = new HtmlRenderer($xhtml);
+
+        // Configure safe mode
+        if ($safeMode === true) {
+            $this->renderer->setSafeMode(SafeMode::defaults());
+        } elseif ($safeMode instanceof SafeMode) {
+            $this->renderer->setSafeMode($safeMode);
+        }
+    }
+
+    /**
+     * Enable or disable safe mode
+     *
+     * @param \Djot\SafeMode|bool|null $safeMode True for defaults, SafeMode for custom, null/false to disable
+     */
+    public function setSafeMode(bool|SafeMode|null $safeMode): self
+    {
+        if ($safeMode === true) {
+            $this->renderer->setSafeMode(SafeMode::defaults());
+        } elseif ($safeMode instanceof SafeMode) {
+            $this->renderer->setSafeMode($safeMode);
+        } else {
+            $this->renderer->setSafeMode(null);
+        }
+
+        return $this;
     }
 
     /**
