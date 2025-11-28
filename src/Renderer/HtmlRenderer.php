@@ -64,6 +64,37 @@ class HtmlRenderer
      */
     protected array $footnoteRefCounts = [];
 
+    /**
+     * Tracks used IDs for deduplication
+     *
+     * @var array<string, int>
+     */
+    protected array $usedIds = [];
+
+    /**
+     * Counter for auto-generated section IDs (when heading has no text)
+     */
+    protected int $sectionCounter = 0;
+
+    /**
+     * Maps footnote labels to their assigned numbers (order of first reference)
+     *
+     * @var array<string, int>
+     */
+    protected array $footnoteNumbers = [];
+
+    /**
+     * Counter for footnote numbering
+     */
+    protected int $footnoteCounter = 0;
+
+    /**
+     * Collected footnote nodes for rendering at end
+     *
+     * @var array<string, \Djot\Node\Block\Footnote>
+     */
+    protected array $collectedFootnotes = [];
+
     public function __construct(protected bool $xhtml = false)
     {
     }
@@ -102,10 +133,209 @@ class HtmlRenderer
 
     public function render(Document $document): string
     {
-        // Reset footnote reference counts for each render
+        // Reset state for each render
         $this->footnoteRefCounts = [];
+        $this->usedIds = [];
+        $this->sectionCounter = 0;
+        $this->footnoteNumbers = [];
+        $this->footnoteCounter = 0;
+        $this->collectedFootnotes = [];
 
-        return $this->renderChildren($document);
+        $html = $this->renderDocumentWithSections($document);
+
+        // Render collected footnotes at end (populated by renderFootnote/renderFootnoteRef during rendering)
+        // @phpstan-ignore-next-line
+        if ($this->collectedFootnotes || $this->footnoteNumbers) {
+            $html .= $this->renderFootnotesSection();
+        }
+
+        return $html;
+    }
+
+    /**
+     * Render document with section wrapping around headings
+     */
+    protected function renderDocumentWithSections(Document $document): string
+    {
+        $children = $document->getChildren();
+        $html = '';
+        /** @var array<int, int> $openSections Level => count of open sections at that level */
+        $openSections = [];
+
+        $childCount = count($children);
+        for ($i = 0; $i < $childCount; $i++) {
+            $child = $children[$i];
+
+            if ($child instanceof Heading) {
+                $level = $child->getLevel();
+
+                // Dispatch render event for heading - allows custom rendering
+                $eventName = 'render.' . $child->getType();
+                $event = new RenderEvent($child);
+                $this->dispatchEvent($eventName, $event);
+                $this->dispatchEvent('render.*', $event);
+
+                // Close any sections at same or deeper level
+                for ($l = 6; $l >= $level; $l--) {
+                    while (!empty($openSections[$l]) && $openSections[$l] > 0) {
+                        $html .= "</section>\n";
+                        $openSections[$l]--;
+                    }
+                }
+
+                // If event provided custom HTML, use it (without section wrapper)
+                if ($event->isDefaultPrevented()) {
+                    $html .= $event->getHtml() ?? '';
+
+                    continue;
+                }
+
+                // Get the section ID
+                $sectionId = $this->getSectionId($child);
+
+                // Open new section
+                $html .= '<section id="' . $this->escapeAttribute($sectionId) . '">' . "\n";
+                if (!isset($openSections[$level])) {
+                    $openSections[$level] = 0;
+                }
+                $openSections[$level]++;
+
+                // Render heading without section wrapper
+                $html .= $this->renderHeadingContent($child);
+            } else {
+                // Track IDs from non-heading elements for deduplication
+                $this->trackIdFromNode($child);
+                $html .= $this->renderNode($child);
+            }
+        }
+
+        // Close all open sections (deepest first)
+        for ($l = 6; $l >= 1; $l--) {
+            while (!empty($openSections[$l]) && $openSections[$l] > 0) {
+                $html .= "</section>\n";
+                $openSections[$l]--;
+            }
+        }
+
+        return $html;
+    }
+
+    /**
+     * Generate section ID from heading
+     */
+    protected function getSectionId(Heading $node): string
+    {
+        // If heading has explicit id attribute, use it
+        if ($node->hasAttribute('id')) {
+            $id = (string)$node->getAttribute('id');
+            // Track explicit IDs so auto-generated IDs don't conflict
+            if (!isset($this->usedIds[$id])) {
+                $this->usedIds[$id] = 0;
+            }
+
+            return $id;
+        }
+
+        // Generate from heading text
+        $headingText = $this->getPlainText($node);
+
+        if ($headingText === '') {
+            // Generate fallback ID
+            $this->sectionCounter++;
+
+            return 's-' . $this->sectionCounter;
+        }
+
+        // Convert to valid ID:
+        // 1. Strip # characters entirely
+        // 2. Trim whitespace
+        // 3. Replace whitespace sequences with single dashes
+        $baseId = str_replace('#', '', $headingText);
+        $baseId = trim($baseId);
+        $baseId = preg_replace('/[\s]+/', '-', $baseId) ?? $baseId;
+
+        // Track and deduplicate
+        if (!isset($this->usedIds[$baseId])) {
+            $this->usedIds[$baseId] = 0;
+
+            return $baseId;
+        }
+
+        // Already used, add suffix (first conflict is -1, second is -2, etc.)
+        $this->usedIds[$baseId]++;
+
+        return $baseId . '-' . $this->usedIds[$baseId];
+    }
+
+    /**
+     * Track ID usage from non-heading elements (like paragraphs with explicit IDs)
+     */
+    protected function trackIdFromNode(Node $node): void
+    {
+        if ($node->hasAttribute('id')) {
+            $id = (string)$node->getAttribute('id');
+            if (!isset($this->usedIds[$id])) {
+                $this->usedIds[$id] = 0;
+            }
+        }
+    }
+
+    /**
+     * Render just the heading tag content (without section wrapper)
+     */
+    protected function renderHeadingContent(Heading $node): string
+    {
+        $level = $node->getLevel();
+
+        // Don't render id on heading since it's on section
+        $attrs = $this->renderAttributesExcluding($node, ['id']);
+
+        return '<h' . $level . $attrs . '>' . $this->renderChildren($node) . '</h' . $level . ">\n";
+    }
+
+    /**
+     * Render attributes excluding specified ones
+     *
+     * @param \Djot\Node\Node $node
+     * @param array<string> $exclude
+     */
+    protected function renderAttributesExcluding(Node $node, array $exclude): string
+    {
+        $attrs = $node->getAttributes();
+        if (!$attrs) {
+            return '';
+        }
+
+        // Filter out excluded attributes
+        $attrs = array_diff_key($attrs, array_flip($exclude));
+        if (!$attrs) {
+            return '';
+        }
+
+        // Sort attributes: id first, class second, then others in source order
+        uksort($attrs, function (string $a, string $b): int {
+            if ($a === 'id') {
+                return -1;
+            }
+            if ($b === 'id') {
+                return 1;
+            }
+            if ($a === 'class') {
+                return -1;
+            }
+            if ($b === 'class') {
+                return 1;
+            }
+
+            return 0;
+        });
+
+        $html = '';
+        foreach ($attrs as $key => $value) {
+            $html .= ' ' . $this->escape($key) . '="' . $this->escapeAttribute((string)$value) . '"';
+        }
+
+        return $html;
     }
 
     protected function renderNode(Node $node): string
@@ -187,19 +417,15 @@ class HtmlRenderer
 
     protected function renderHeading(Heading $node): string
     {
+        // This is called when a heading is rendered outside document context (via events)
+        // In normal document rendering, section wrapping is handled by renderDocumentWithSections
         $level = $node->getLevel();
+        $sectionId = $this->getSectionId($node);
+        $attrs = $this->renderAttributesExcluding($node, ['id']);
 
-        // Auto-generate id from heading text if not already set
-        if (!$node->hasAttribute('id')) {
-            $headingText = $this->getPlainText($node);
-            if ($headingText !== '') {
-                $node->setAttribute('id', $headingText);
-            }
-        }
-
-        $attrs = $this->renderAttributes($node);
-
-        return '<h' . $level . $attrs . '>' . $this->renderChildren($node) . '</h' . $level . ">\n";
+        return '<section id="' . $this->escapeAttribute($sectionId) . '">' . "\n"
+            . '<h' . $level . $attrs . '>' . $this->renderChildren($node) . '</h' . $level . ">\n"
+            . "</section>\n";
     }
 
     /**
@@ -211,6 +437,8 @@ class HtmlRenderer
         foreach ($node->getChildren() as $child) {
             if ($child instanceof Text) {
                 $text .= $child->getContent();
+            } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
+                $text .= ' ';
             } elseif ($child instanceof Node) {
                 $text .= $this->getPlainText($child);
             }
@@ -601,50 +829,90 @@ class HtmlRenderer
 
     protected function renderFootnote(Footnote $node): string
     {
-        $label = $this->escape($node->getLabel());
-        $attrs = $this->renderAttributes($node);
+        // Collect footnote for rendering at document end, don't output here
+        $label = $node->getLabel();
+        $this->collectedFootnotes[$label] = $node;
 
-        $content = trim($this->renderChildren($node));
+        return '';
+    }
 
-        // Strip wrapping <p>...</p> to avoid nested paragraphs
-        if (preg_match('/^<p>(.+)<\/p>$/s', $content, $matches)) {
-            $content = $matches[1];
-        }
+    /**
+     * Render all collected footnotes as end section
+     */
+    protected function renderFootnotesSection(): string
+    {
+        // Pre-render all footnote contents to discover any nested footnote references
+        // Keep iterating until no new footnotes are discovered
+        $renderedContents = [];
+        $processedNumbers = [];
 
-        // Build backref links for all references to this footnote
-        $refCount = $this->footnoteRefCounts[$node->getLabel()] ?? 1;
-        $backrefs = '';
-        if ($refCount === 1) {
-            $backrefs = '<a href="#fnref-' . $label . '-1">↩</a>';
-        } else {
-            $links = [];
-            for ($i = 1; $i <= $refCount; $i++) {
-                $links[] = '<a href="#fnref-' . $label . '-' . $i . '">↩<sup>' . $i . '</sup></a>';
+        do {
+            $newFootnotes = false;
+            foreach ($this->footnoteNumbers as $label => $number) {
+                if (isset($processedNumbers[$number])) {
+                    continue;
+                }
+                $processedNumbers[$number] = true;
+
+                if (isset($this->collectedFootnotes[$label])) {
+                    // Rendering may discover new footnote references
+                    $renderedContents[$number] = trim($this->renderChildren($this->collectedFootnotes[$label]));
+                } else {
+                    $renderedContents[$number] = '';
+                }
+
+                // Check if new footnotes were discovered during rendering
+                if (count($this->footnoteNumbers) > count($processedNumbers)) {
+                    $newFootnotes = true;
+                }
             }
-            $backrefs = implode(' ', $links);
+        } while ($newFootnotes);
+
+        // Sort footnotes by their reference number order
+        ksort($renderedContents);
+
+        $html = '<section role="doc-endnotes">' . "\n";
+        $html .= '<hr>' . "\n";
+        $html .= '<ol>' . "\n";
+
+        foreach ($renderedContents as $number => $content) {
+            $html .= '<li id="fn' . $number . '">' . "\n";
+
+            // Add backlink - if content ends with </p>, insert before it
+            // Otherwise add as separate paragraph
+            if ($content !== '' && preg_match('/^(.*)(<\/p>\n?)$/s', $content, $matches)) {
+                $content = $matches[1] . '<a href="#fnref' . $number . '" role="doc-backlink">↩︎</a></p>';
+                $html .= $content . "\n";
+            } else {
+                // Content doesn't end with paragraph (e.g., code block or empty)
+                if ($content !== '') {
+                    $html .= $content . "\n";
+                }
+                $html .= '<p><a href="#fnref' . $number . '" role="doc-backlink">↩︎</a></p>' . "\n";
+            }
+
+            $html .= '</li>' . "\n";
         }
 
-        return '<div' . $attrs . ' class="footnote" id="fn-' . $label . '">' . "\n"
-            . '<p><sup>' . $label . '</sup> ' . $content . ' ' . $backrefs . '</p>' . "\n"
-            . "</div>\n";
+        $html .= '</ol>' . "\n";
+        $html .= '</section>' . "\n";
+
+        return $html;
     }
 
     protected function renderFootnoteRef(FootnoteRef $node): string
     {
         $label = $node->getLabel();
-        $escapedLabel = $this->escape($label);
 
-        // Track reference count and generate unique ID
-        if (!isset($this->footnoteRefCounts[$label])) {
-            $this->footnoteRefCounts[$label] = 0;
+        // Assign number to footnote on first reference
+        if (!isset($this->footnoteNumbers[$label])) {
+            $this->footnoteCounter++;
+            $this->footnoteNumbers[$label] = $this->footnoteCounter;
         }
-        $this->footnoteRefCounts[$label]++;
-        $refNum = $this->footnoteRefCounts[$label];
+        $number = $this->footnoteNumbers[$label];
 
-        $id = 'fnref-' . $escapedLabel . '-' . $refNum;
-        $href = '#fn-' . $escapedLabel;
-
-        return '<sup id="' . $id . '"><a href="' . $href . '">' . $escapedLabel . '</a></sup>';
+        // Format: <a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a>
+        return '<a id="fnref' . $number . '" href="#fn' . $number . '" role="doc-noteref"><sup>' . $number . '</sup></a>';
     }
 
     protected function renderMath(Math $node): string

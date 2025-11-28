@@ -39,8 +39,13 @@ class DjotConverterTest extends TestCase
 
     public function testHeadings(): void
     {
+        // Headings are wrapped in <section> per djot spec
+        // Nested headings create nested sections (h2 inside h1 section, etc.)
         $djot = "# Heading 1\n\n## Heading 2\n\n### Heading 3";
-        $expected = "<h1 id=\"Heading 1\">Heading 1</h1>\n<h2 id=\"Heading 2\">Heading 2</h2>\n<h3 id=\"Heading 3\">Heading 3</h3>\n";
+        $expected = "<section id=\"Heading-1\">\n<h1>Heading 1</h1>\n"
+            . "<section id=\"Heading-2\">\n<h2>Heading 2</h2>\n"
+            . "<section id=\"Heading-3\">\n<h3>Heading 3</h3>\n"
+            . "</section>\n</section>\n</section>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -404,10 +409,13 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1 id="Welcome">Welcome</h1>', $result);
+        // Headings are now wrapped in section per djot spec
+        $this->assertStringContainsString('<section id="Welcome">', $result);
+        $this->assertStringContainsString('<h1>Welcome</h1>', $result);
         $this->assertStringContainsString('<strong>comprehensive</strong>', $result);
         $this->assertStringContainsString('<em>Djot</em>', $result);
-        $this->assertStringContainsString('<h2 id="Features">Features</h2>', $result);
+        $this->assertStringContainsString('<section id="Features">', $result);
+        $this->assertStringContainsString('<h2>Features</h2>', $result);
         $this->assertStringContainsString('<ul>', $result);
         $this->assertStringContainsString('<li>', $result);
         $this->assertStringContainsString('language-php', $result);
@@ -421,9 +429,11 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('fnref-1', $result);
-        $this->assertStringContainsString('fn-1', $result);
+        // Footnotes now use numbered IDs per djot spec
+        $this->assertStringContainsString('fnref1', $result);
+        $this->assertStringContainsString('fn1', $result);
         $this->assertStringContainsString('footnote content', $result);
+        $this->assertStringContainsString('role="doc-endnotes"', $result);
     }
 
     public function testDefinitionList(): void
@@ -720,7 +730,9 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1 id="Hello world and everyone">', $result);
+        // Headings wrapped in section per djot spec
+        $this->assertStringContainsString('<section id="Hello-world-and-everyone">', $result);
+        $this->assertStringContainsString('<h1>', $result);
         $this->assertStringContainsString('<strong>world</strong>', $result);
         $this->assertStringContainsString('<em>everyone</em>', $result);
     }
@@ -790,9 +802,13 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1 id="One">One</h1>', $result);
-        $this->assertStringContainsString('<h2 id="Two">Two</h2>', $result);
-        $this->assertStringContainsString('<h3 id="Three">Three</h3>', $result);
+        // Headings are wrapped in section per djot spec
+        $this->assertStringContainsString('<section id="One">', $result);
+        $this->assertStringContainsString('<h1>One</h1>', $result);
+        $this->assertStringContainsString('<section id="Two">', $result);
+        $this->assertStringContainsString('<h2>Two</h2>', $result);
+        $this->assertStringContainsString('<section id="Three">', $result);
+        $this->assertStringContainsString('<h3>Three</h3>', $result);
     }
 
     public function testTableWithInlineFormatting(): void
@@ -822,18 +838,16 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        // Each reference should have a unique ID
-        $this->assertStringContainsString('id="fnref-x-1"', $result);
-        $this->assertStringContainsString('id="fnref-x-2"', $result);
-        $this->assertStringContainsString('id="fnref-x-3"', $result);
+        // All references to same footnote share the same ID (numbered by first reference)
+        // In djot spec, all refs get same id="fnref1" href="#fn1"
+        $this->assertStringContainsString('id="fnref1"', $result);
+        $this->assertStringContainsString('href="#fn1"', $result);
+        $this->assertStringContainsString('role="doc-noteref"', $result);
 
-        // Footnote should have backrefs to all references
-        $this->assertStringContainsString('href="#fnref-x-1"', $result);
-        $this->assertStringContainsString('href="#fnref-x-2"', $result);
-        $this->assertStringContainsString('href="#fnref-x-3"', $result);
-
-        // Content should not have nested <p> tags
-        $this->assertStringNotContainsString('<p><sup>x</sup> <p>', $result);
+        // Footnote at end with backlink
+        $this->assertStringContainsString('<li id="fn1">', $result);
+        $this->assertStringContainsString('href="#fnref1"', $result);
+        $this->assertStringContainsString('role="doc-backlink"', $result);
     }
 
     public function testRawInline(): void
@@ -1079,7 +1093,8 @@ DJOT;
             $this->assertCount(2, $document->getChildren());
 
             $result = $this->converter->render($document);
-            $this->assertStringContainsString('<h1 id="Hello">Hello</h1>', $result);
+            $this->assertStringContainsString('<section id="Hello">', $result);
+            $this->assertStringContainsString('<h1>Hello</h1>', $result);
             $this->assertStringContainsString('<p>World</p>', $result);
         } finally {
             unlink($tempFile);
@@ -1094,7 +1109,8 @@ DJOT;
         try {
             $result = $this->converter->convertFile($tempFile);
 
-            $this->assertStringContainsString('<h1 id="Hello">Hello</h1>', $result);
+            $this->assertStringContainsString('<section id="Hello">', $result);
+            $this->assertStringContainsString('<h1>Hello</h1>', $result);
             $this->assertStringContainsString('<p>World</p>', $result);
         } finally {
             unlink($tempFile);
@@ -1384,7 +1400,8 @@ DJOT;
         $djot = '# 日本語の見出し';
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1 id="日本語の見出し">日本語の見出し</h1>', $result);
+        $this->assertStringContainsString('<section id="日本語の見出し">', $result);
+        $this->assertStringContainsString('<h1>日本語の見出し</h1>', $result);
     }
 
     public function testUnicodeInLink(): void
@@ -1781,7 +1798,8 @@ DJOT;
         $djot = "Text[^note-1]\n\n[^note-1]: Footnote with *bold* and `code`.";
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('fnref-note-1', $result);
+        // Footnotes now use numbered IDs per djot spec
+        $this->assertStringContainsString('fnref1', $result);
         $this->assertStringContainsString('<strong>bold</strong>', $result);
         $this->assertStringContainsString('<code>code</code>', $result);
     }
@@ -1963,7 +1981,9 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<h1 id="Complex Document">Complex Document</h1>', $result);
+        // Headings wrapped in section per djot spec
+        $this->assertStringContainsString('<section id="Complex-Document">', $result);
+        $this->assertStringContainsString('<h1>Complex Document</h1>', $result);
         $this->assertStringContainsString('class="note"', $result);
         $this->assertStringContainsString('<blockquote>', $result);
         $this->assertStringContainsString('<ul>', $result);

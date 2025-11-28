@@ -49,7 +49,8 @@ class HtmlRendererTest extends TestCase
 
         $result = $this->renderer->render($doc);
 
-        $this->assertSame("<h2 id=\"Title\">Title</h2>\n", $result);
+        // Headings are wrapped in <section> tags per djot spec
+        $this->assertSame("<section id=\"Title\">\n<h2>Title</h2>\n</section>\n", $result);
     }
 
     public function testRenderEmphasis(): void

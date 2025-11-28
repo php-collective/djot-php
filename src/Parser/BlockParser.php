@@ -374,26 +374,51 @@ class BlockParser
                 $label = $matches[1];
                 $content = $matches[2];
 
-                // Collect continuation lines (indented)
-                $contentLines = [$content];
+                // Determine base indentation (2 spaces for footnotes)
+                $baseIndent = 2;
+
+                // Collect continuation lines (indented or blank)
+                $contentLines = [];
+                if (trim($content) !== '') {
+                    $contentLines[] = $content;
+                }
                 $j = $i + 1;
+                $hasContent = false;
                 while ($j < $count) {
                     $nextLine = $lines[$j];
                     if ($this->isBlankLine($nextLine)) {
+                        // Add blank line to preserve structure
+                        $contentLines[] = '';
                         $j++;
 
                         continue;
                     }
-                    if (preg_match('/^\s+(.+)$/', $nextLine, $contMatch)) {
+                    // Check if line has at least base indentation
+                    if (preg_match('/^[ ]{' . $baseIndent . '}(.*)$/', $nextLine, $contMatch)) {
                         $contentLines[] = $contMatch[1];
+                        $hasContent = true;
+                        $j++;
+                    } elseif (!$hasContent && preg_match('/^\s+(.+)$/', $nextLine, $contMatch)) {
+                        // Allow flexible indentation for first content line
+                        $contentLines[] = $contMatch[1];
+                        $hasContent = true;
                         $j++;
                     } else {
                         break;
                     }
                 }
 
+                // Remove trailing blank lines
+                $lineCount = count($contentLines);
+                while ($lineCount > 0 && $contentLines[$lineCount - 1] === '') {
+                    array_pop($contentLines);
+                    $lineCount--;
+                }
+
                 $footnote = new Footnote($label);
-                $this->parseBlocks($footnote, $contentLines, 0);
+                if ($contentLines) {
+                    $this->parseBlocks($footnote, $contentLines, 0);
+                }
                 $this->footnotes[$label] = $footnote;
             }
 
@@ -632,6 +657,12 @@ class BlockParser
     {
         $line = $lines[$start];
 
+        // Fast early exit: code blocks start with ` or ~ (possibly after whitespace)
+        $trimmed = ltrim($line);
+        if ($trimmed === '' || ($trimmed[0] !== '`' && $trimmed[0] !== '~')) {
+            return null;
+        }
+
         // Match opening fence: 3+ backticks or tildes, optionally with leading whitespace
         if (!preg_match('/^(\s*)(`{3,}|~{3,})(.*)$/', $line, $matches)) {
             return null;
@@ -710,6 +741,11 @@ class BlockParser
     {
         $line = $lines[$start];
 
+        // Fast early exit: comments must contain {%
+        if (!str_contains($line, '{%')) {
+            return null;
+        }
+
         // Match comment opening: {%
         if (!str_starts_with(trim($line), '{%')) {
             return null;
@@ -779,6 +815,11 @@ class BlockParser
     {
         $line = $lines[$start];
 
+        // Fast early exit: raw blocks start with ` and contain =
+        if (!isset($line[0]) || $line[0] !== '`' || !str_contains($line, '=')) {
+            return null;
+        }
+
         // Match opening fence with =format: ``` =html or ```=html
         if (!preg_match('/^(`{3,})\s+=(\w+)\s*$/', $line, $matches)) {
             return null;
@@ -827,6 +868,11 @@ class BlockParser
     protected function tryParseDiv(Node $parent, array $lines, int $start): ?int
     {
         $line = $lines[$start];
+
+        // Fast early exit: divs start with :
+        if (!isset($line[0]) || $line[0] !== ':') {
+            return null;
+        }
 
         // Match opening fence: 3+ colons with optional class
         if (!preg_match('/^(:{3,})\s*(.*)$/', $line, $matches)) {
@@ -918,22 +964,45 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Match heading: 1-6 # characters followed by space
-        if (!preg_match('/^(#{1,6})\s+(.+)$/', $line, $matches)) {
+        // Fast early exit: headings start with # (possibly after up to 3 spaces)
+        $trimmed = ltrim($line, ' ');
+        if (!isset($trimmed[0]) || $trimmed[0] !== '#') {
+            return null;
+        }
+
+        // Match heading: optional leading spaces, 1-6 # characters, optionally followed by space and content
+        // Can be: "## Heading", "##", "   ## Heading", "##\n", etc.
+        if (!preg_match('/^[ ]{0,3}(#{1,6})(?:\s+(.*))?$/', $line, $matches)) {
             return null;
         }
 
         $level = strlen($matches[1]);
-        $content = $matches[2];
+        $content = isset($matches[2]) ? trim($matches[2]) : '';
 
-        // Collect continuation lines (lines starting with same # or plain text)
+        // Collect continuation lines
         $i = $start + 1;
         $count = count($lines);
         while ($i < $count) {
             $nextLine = $lines[$i];
-            // Check for continuation with # prefix
-            if (preg_match('/^#{1,' . $level . '}\s+(.+)$/', $nextLine, $contMatch)) {
-                $content .= ' ' . $contMatch[1];
+
+            // Empty line ends the heading
+            if ($this->isBlankLine($nextLine)) {
+                break;
+            }
+
+            // Check for continuation with # prefix (same level or less)
+            if (preg_match('/^[ ]{0,3}#{1,' . $level . '}\s+(.+)$/', $nextLine, $contMatch)) {
+                if ($content !== '') {
+                    $content .= "\n";
+                }
+                $content .= $contMatch[1];
+                $i++;
+            } elseif (!$this->startsNewBlock($nextLine)) {
+                // "Lazy" continuation - plain text continues the heading
+                if ($content !== '') {
+                    $content .= "\n";
+                }
+                $content .= $nextLine;
                 $i++;
             } else {
                 break;
@@ -986,6 +1055,11 @@ class BlockParser
     protected function tryParseBlockQuote(Node $parent, array $lines, int $start): ?int
     {
         $line = $lines[$start];
+
+        // Fast early exit: block quotes start with >
+        if (!isset($line[0]) || $line[0] !== '>') {
+            return null;
+        }
 
         // Match block quote: > followed by space or end of line (NOT >text or >>)
         // The > must be followed by a space or be at end of line
@@ -1809,6 +1883,11 @@ class BlockParser
     protected function tryParseTable(Node $parent, array $lines, int $start): ?int
     {
         $line = $lines[$start];
+
+        // Fast early exit: tables start with |
+        if (!isset($line[0]) || $line[0] !== '|') {
+            return null;
+        }
 
         // Table rows start and end with | (but the ending | must be outside code spans)
         if (!preg_match('/^\|.*\|$/', $line)) {
