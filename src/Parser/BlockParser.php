@@ -394,8 +394,8 @@ class BlockParser
 
                         continue;
                     }
-                    // Check if line has at least base indentation
-                    if (preg_match('/^[ ]{' . $baseIndent . '}(.*)$/', $nextLine, $contMatch)) {
+                    // Check if line has at least base indentation (2 spaces or 1 tab)
+                    if (preg_match('/^(?:[ ]{' . $baseIndent . '}|\t)(.*)$/', $nextLine, $contMatch)) {
                         $contentLines[] = $contMatch[1];
                         $hasContent = true;
                         $j++;
@@ -449,8 +449,9 @@ class BlockParser
                 continue;
             }
 
-            // Match heading: optional leading spaces, 1-6 # characters, followed by content
-            if (preg_match('/^[ ]{0,3}(#{1,6})(?:\s+(.*))?$/', $line, $matches)) {
+            // Match heading: optional leading spaces, 1-6 # characters, followed by space(s) and content
+            // Space after # is syntax delimiter, not indentation - must be space(s) per spec, not tab
+            if (preg_match('/^[ ]{0,3}(#{1,6})(?: +(.*))?$/', $line, $matches)) {
                 $headingText = isset($matches[2]) ? trim($matches[2]) : '';
 
                 // Collect continuation lines
@@ -935,8 +936,8 @@ class BlockParser
             return null;
         }
 
-        // Match opening fence with =format: ``` =html or ```=html
-        if (!preg_match('/^(`{3,})\s+=(\w+)\s*$/', $line, $matches)) {
+        // Match opening fence with =format: ``` =html (space before = is syntax delimiter)
+        if (!preg_match('/^(`{3,}) +=(\w+) *$/', $line, $matches)) {
             return null;
         }
 
@@ -1085,9 +1086,10 @@ class BlockParser
             return null;
         }
 
-        // Match heading: optional leading spaces, 1-6 # characters, optionally followed by space and content
+        // Match heading: optional leading spaces, 1-6 # characters, optionally followed by space(s) and content
         // Can be: "## Heading", "##", "   ## Heading", "##\n", etc.
-        if (!preg_match('/^[ ]{0,3}(#{1,6})(?:\s+(.*))?$/', $line, $matches)) {
+        // Space after # is syntax delimiter - must be space(s) per spec, not tab
+        if (!preg_match('/^[ ]{0,3}(#{1,6})(?: +(.*))?$/', $line, $matches)) {
             return null;
         }
 
@@ -1106,7 +1108,7 @@ class BlockParser
             }
 
             // Check for continuation with # prefix (same level or less)
-            if (preg_match('/^[ ]{0,3}#{1,' . $level . '}\s+(.+)$/', $nextLine, $contMatch)) {
+            if (preg_match('/^[ ]{0,3}#{1,' . $level . '} +(.+)$/', $nextLine, $contMatch)) {
                 if ($content !== '') {
                     $content .= "\n";
                 }
@@ -1206,7 +1208,7 @@ class BlockParser
                 break;
             }
 
-            // Continue with "> " prefix (space required)
+            // Continue with "> " prefix (space required per spec)
             if (preg_match('/^> (.*)$/', $currentLine, $matches)) {
                 $innerLines[] = $matches[1];
                 $i++;
@@ -1261,7 +1263,7 @@ class BlockParser
         }
 
         // Next line must start with : (definition marker)
-        if (!preg_match('/^:\s+(.*)$/', $defLine)) {
+        if (!preg_match('/^: +(.*)$/', $defLine)) {
             return null;
         }
 
@@ -1282,7 +1284,7 @@ class BlockParser
             // Check if this line is a term (followed by : definition)
             if ($i + 1 < $count && !preg_match('/^[>#\-*+\d`:|]/', $currentLine)) {
                 $nextLine = $lines[$i + 1];
-                if (preg_match('/^:\s+(.*)$/', $nextLine)) {
+                if (preg_match('/^: +(.*)$/', $nextLine)) {
                     // Parse term
                     $term = new DefinitionTerm();
                     $this->inlineParser->parse($term, trim($currentLine), $i);
@@ -1292,7 +1294,7 @@ class BlockParser
                     // Parse definitions (can have multiple)
                     while ($i < $count) {
                         $defLineContent = $lines[$i];
-                        if (preg_match('/^:\s+(.*)$/', $defLineContent, $defMatch)) {
+                        if (preg_match('/^: +(.*)$/', $defLineContent, $defMatch)) {
                             $defContent = $defMatch[1];
 
                             // Collect continuation lines
@@ -1306,7 +1308,7 @@ class BlockParser
                                 if (preg_match('/^\s+(.+)$/', $contLine, $contMatch)) {
                                     $defLines[] = $contMatch[1];
                                     $i++;
-                                } elseif (preg_match('/^:\s+/', $contLine)) {
+                                } elseif (preg_match('/^: +/', $contLine)) {
                                     // Another definition
                                     break;
                                 } else {
@@ -1435,8 +1437,8 @@ class BlockParser
                         $lineIndent = $this->getLeadingSpaces($subLine);
                         // Check if line has at least the subIndent level
                         if ($lineIndent >= $subIndent) {
-                            // Remove subIndent spaces of indentation
-                            $subLines[] = substr($subLine, $subIndent);
+                            // Remove subIndent worth of indentation (handling tabs)
+                            $subLines[] = $this->stripLeadingIndent($subLine, $subIndent);
                             $sawBlankLine = false;
                             $i++;
                         } elseif ($lineIndent >= $baseIndent) {
@@ -1556,7 +1558,7 @@ class BlockParser
                 // In djot, "  - b" after "- a" (no blank line) is literal text, not a nested list
                 if ($nextIndent >= $contentIndent) {
                     // Properly indented continuation - include with original indentation relative to content
-                    $itemLines[] = substr($nextLine, $contentIndent);
+                    $itemLines[] = $this->stripLeadingIndent($nextLine, $contentIndent);
                 } else {
                     // Lazy continuation (not properly indented but not at base level either)
                     $itemLines[] = $nextTrimmed;
@@ -1609,16 +1611,56 @@ class BlockParser
     }
 
     /**
-     * Get number of leading spaces in a line
+     * Get number of leading whitespace as space-equivalent count.
+     *
+     * Tabs are counted as 2 spaces (one indentation level) to support
+     * tab-based indentation for nested structures.
+     *
+     * @see https://github.com/jgm/djot/issues/255
      */
     protected function getLeadingSpaces(string $line): int
     {
-        $match = [];
-        if (preg_match('/^( *)/', $line, $match)) {
-            return strlen($match[1]);
+        $count = 0;
+        $len = strlen($line);
+
+        for ($i = 0; $i < $len; $i++) {
+            if ($line[$i] === ' ') {
+                $count++;
+            } elseif ($line[$i] === "\t") {
+                // Tab counts as 2 spaces (one indentation level)
+                $count += 2;
+            } else {
+                break;
+            }
         }
 
-        return 0;
+        return $count;
+    }
+
+    /**
+     * Strip leading whitespace from a line, up to the specified space-equivalent count.
+     *
+     * Tabs count as 2 spaces. This correctly handles mixed spaces and tabs.
+     */
+    protected function stripLeadingIndent(string $line, int $amount): string
+    {
+        $stripped = 0;
+        $len = strlen($line);
+        $i = 0;
+
+        while ($i < $len && $stripped < $amount) {
+            if ($line[$i] === ' ') {
+                $stripped++;
+                $i++;
+            } elseif ($line[$i] === "\t") {
+                $stripped += 2;
+                $i++;
+            } else {
+                break;
+            }
+        }
+
+        return substr($line, $i);
     }
 
     /**
@@ -1681,8 +1723,8 @@ class BlockParser
                 continue;
             }
 
-            // Must start with ": "
-            if (!preg_match('/^:\s+(.*)$/', $line, $matches)) {
+            // Must start with ": " (space is syntax delimiter, not tab)
+            if (!preg_match('/^: +(.*)$/', $line, $matches)) {
                 break;
             }
 
@@ -1740,8 +1782,8 @@ class BlockParser
                     continue;
                 }
 
-                // Check for next term
-                if (preg_match('/^:\s+/', $defLine)) {
+                // Check for next term (space is syntax delimiter, not tab)
+                if (preg_match('/^: +/', $defLine)) {
                     break;
                 }
 
@@ -1893,7 +1935,8 @@ class BlockParser
     protected function parseListItemMarker(string $line): ?array
     {
         // Task list: - [ ] or - [x] or - [X]
-        if (preg_match('/^[-*+]\s+\[([ xX])\]\s+(.*)$/', $line, $matches)) {
+        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
+        if (preg_match('/^[-*+] +\[([ xX])\] +(.*)$/', $line, $matches)) {
             return [
                 'type' => ListBlock::TYPE_TASK,
                 'marker' => '-',
@@ -1903,7 +1946,8 @@ class BlockParser
         }
 
         // Bullet list: -, +, or *
-        if (preg_match('/^([-*+])\s+(.*)$/', $line, $matches)) {
+        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
+        if (preg_match('/^([-*+]) +(.*)$/', $line, $matches)) {
             $marker = $matches[1];
             $content = $matches[2];
 
@@ -1928,7 +1972,8 @@ class BlockParser
         }
 
         // Ordered list: 1. or 1) or (1)
-        if (preg_match('/^(\d+)([.)])\s+(.*)$/', $line, $matches)) {
+        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
+        if (preg_match('/^(\d+)([.)]) +(.*)$/', $line, $matches)) {
             return [
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => $matches[2],
@@ -1937,7 +1982,7 @@ class BlockParser
             ];
         }
 
-        if (preg_match('/^\((\d+)\)\s+(.*)$/', $line, $matches)) {
+        if (preg_match('/^\((\d+)\) +(.*)$/', $line, $matches)) {
             return [
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => '()',
@@ -1949,7 +1994,8 @@ class BlockParser
         // Roman numeral ordered list: i. or I. or i) or I) or (i) or (I)
         // Single letters are ambiguous - could be alpha or roman
         // Return both possibilities and let the list parser disambiguate based on subsequent items
-        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)])\s+(.*)$/', $line, $matches)) {
+        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
+        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)]) +(.*)$/', $line, $matches)) {
             $roman = $matches[1];
             $isLower = ctype_lower($roman[0]);
             $start = $this->romanToInt(strtoupper($roman));
@@ -1973,7 +2019,7 @@ class BlockParser
             }
         }
 
-        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\)\s+(.*)$/', $line, $matches)) {
+        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\) +(.*)$/', $line, $matches)) {
             $roman = $matches[1];
             $isLower = ctype_lower($roman[0]);
             $start = $this->romanToInt(strtoupper($roman));
@@ -1999,7 +2045,8 @@ class BlockParser
 
         // Alpha ordered list: a. or A. or a) or A) or (a) or (A)
         // Only single letters - multi-letter checked above as roman
-        if (preg_match('/^([a-zA-Z])([.)])\s+(.*)$/', $line, $matches)) {
+        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
+        if (preg_match('/^([a-zA-Z])([.)]) +(.*)$/', $line, $matches)) {
             $letter = $matches[1];
             $isLower = ctype_lower($letter);
             $start = ord(strtolower($letter)) - ord('a') + 1;
@@ -2013,7 +2060,7 @@ class BlockParser
             ];
         }
 
-        if (preg_match('/^\(([a-zA-Z])\)\s+(.*)$/', $line, $matches)) {
+        if (preg_match('/^\(([a-zA-Z])\) +(.*)$/', $line, $matches)) {
             $letter = $matches[1];
             $isLower = ctype_lower($letter);
             $start = ord(strtolower($letter)) - ord('a') + 1;
@@ -2028,7 +2075,8 @@ class BlockParser
         }
 
         // Definition list: :
-        if (preg_match('/^:\s+(.*)$/', $line, $matches)) {
+        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
+        if (preg_match('/^: +(.*)$/', $line, $matches)) {
             return [
                 'type' => ListBlock::TYPE_DEFINITION,
                 'marker' => ':',
@@ -2210,7 +2258,8 @@ class BlockParser
             $captionStart++;
         }
 
-        if ($captionStart < $count && preg_match('/^\^\s+(.+)$/', $lines[$captionStart], $captionMatch)) {
+        // Table caption: ^ followed by space(s), not tab (syntax delimiter)
+        if ($captionStart < $count && preg_match('/^\^ +(.+)$/', $lines[$captionStart], $captionMatch)) {
             $captionLines = [$captionMatch[1]];
             $captionStart++;
 
