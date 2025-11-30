@@ -6,6 +6,8 @@ namespace Djot\Test\TestCase\Renderer;
 
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Heading;
+use Djot\Node\Block\ListBlock;
+use Djot\Node\Block\ListItem;
 use Djot\Node\Block\Paragraph;
 use Djot\Node\Document;
 use Djot\Node\Inline\Code;
@@ -246,5 +248,46 @@ class HtmlRendererTest extends TestCase
         $result = $this->renderer->render($doc);
 
         $this->assertSame("<p><strong><em>bold and italic</em></strong></p>\n", $result);
+    }
+
+    public function testRenderExtendedTaskStates(): void
+    {
+        $doc = new Document();
+        $list = new ListBlock(ListBlock::TYPE_TASK);
+
+        // Cancelled task [-]
+        $item1 = new ListItem(null, ListItem::STATE_CANCELLED);
+        $para1 = new Paragraph();
+        $para1->appendChild(new Text('Cancelled task'));
+        $item1->appendChild($para1);
+        $list->appendChild($item1);
+
+        // Deferred task [>]
+        $item2 = new ListItem(null, ListItem::STATE_DEFERRED);
+        $para2 = new Paragraph();
+        $para2->appendChild(new Text('Deferred task'));
+        $item2->appendChild($para2);
+        $list->appendChild($item2);
+
+        // Question task [?]
+        $item3 = new ListItem(null, ListItem::STATE_QUESTION);
+        $para3 = new Paragraph();
+        $para3->appendChild(new Text('Question task'));
+        $item3->appendChild($para3);
+        $list->appendChild($item3);
+
+        $doc->appendChild($list);
+
+        $result = $this->renderer->render($doc);
+
+        // Check for data-state attributes
+        $this->assertStringContainsString('data-state="cancelled"', $result);
+        $this->assertStringContainsString('data-state="deferred"', $result);
+        $this->assertStringContainsString('data-state="question"', $result);
+
+        // Check for task-* classes on li elements
+        $this->assertStringContainsString('class="task-cancelled"', $result);
+        $this->assertStringContainsString('class="task-deferred"', $result);
+        $this->assertStringContainsString('class="task-question"', $result);
     }
 }

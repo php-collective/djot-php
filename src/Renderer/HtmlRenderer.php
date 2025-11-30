@@ -558,10 +558,23 @@ class HtmlRenderer
 
         // Handle task list items
         if ($node->isTask()) {
+            $taskState = $node->getTaskState();
             $checked = $node->getChecked() ? ' checked=""' : '';
+
+            // Add data-state for extended task states (cancelled, deferred, question)
+            $dataState = '';
+            if ($taskState !== null && !in_array($taskState, [ListItem::STATE_PENDING, ListItem::STATE_DONE], true)) {
+                $dataState = ' data-state="' . $taskState . '"';
+            }
+
             // Always use xhtml-style format for task list checkboxes
-            $checkbox = '<input disabled="" type="checkbox"' . $checked . "/>\n";
+            $checkbox = '<input disabled="" type="checkbox"' . $checked . $dataState . "/>\n";
             $content = $checkbox . rtrim($content);
+
+            // Add class to li for extended states
+            if ($taskState !== null && $taskState !== ListItem::STATE_PENDING && $taskState !== ListItem::STATE_DONE) {
+                $attrs .= ' class="task-' . $taskState . '"';
+            }
         } else {
             $content = rtrim($content);
         }

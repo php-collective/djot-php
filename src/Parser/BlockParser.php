@@ -1511,7 +1511,10 @@ class BlockParser
                 $list->setTight(false);
             }
 
-            $listItem = new ListItem($itemInfo['checked'] ?? null);
+            $listItem = new ListItem(
+                $itemInfo['checked'] ?? null,
+                $itemInfo['taskState'] ?? null,
+            );
             $itemContent = $itemInfo['content'];
 
             // Collect item content lines (without blank line = tight continuation)
@@ -1934,14 +1937,24 @@ class BlockParser
      */
     protected function parseListItemMarker(string $line): ?array
     {
-        // Task list: - [ ] or - [x] or - [X]
+        // Task list: - [ ] or - [x] or - [X] or extended states: [-] [>] [?]
         // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^[-*+] +\[([ xX])\] +(.*)$/', $line, $matches)) {
+        if (preg_match('/^[-*+] +\[([ xX\->?])\] +(.*)$/', $line, $matches)) {
+            $marker = $matches[1];
+            $taskState = match (strtolower($marker)) {
+                ' ' => ListItem::STATE_PENDING,
+                'x' => ListItem::STATE_DONE,
+                '-' => ListItem::STATE_CANCELLED,
+                '>' => ListItem::STATE_DEFERRED,
+                default => ListItem::STATE_QUESTION, // '?' is the only remaining option from regex
+            };
+
             return [
                 'type' => ListBlock::TYPE_TASK,
                 'marker' => '-',
                 'content' => $matches[2],
-                'checked' => strtolower($matches[1]) === 'x',
+                'checked' => $taskState === ListItem::STATE_DONE,
+                'taskState' => $taskState,
             ];
         }
 

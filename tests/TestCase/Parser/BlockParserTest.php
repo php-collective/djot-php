@@ -10,6 +10,7 @@ use Djot\Node\Block\DefinitionList;
 use Djot\Node\Block\Div;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\ListBlock;
+use Djot\Node\Block\ListItem;
 use Djot\Node\Block\Paragraph;
 use Djot\Node\Block\Table;
 use Djot\Node\Block\ThematicBreak;
@@ -145,6 +146,45 @@ class BlockParserTest extends TestCase
         $list = $doc->getChildren()[0];
         $this->assertInstanceOf(ListBlock::class, $list);
         $this->assertSame('list', $list->getType());
+    }
+
+    public function testParseExtendedTaskStates(): void
+    {
+        $doc = $this->parser->parse(
+            "- [ ] Pending\n- [x] Done\n- [-] Cancelled\n- [>] Deferred\n- [?] Question",
+        );
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+        $this->assertSame(ListBlock::TYPE_TASK, $list->getListType());
+
+        $items = $list->getChildren();
+        $this->assertCount(5, $items);
+
+        // Pending [ ]
+        $this->assertInstanceOf(ListItem::class, $items[0]);
+        $this->assertSame(ListItem::STATE_PENDING, $items[0]->getTaskState());
+        $this->assertFalse($items[0]->getChecked());
+
+        // Done [x]
+        $this->assertInstanceOf(ListItem::class, $items[1]);
+        $this->assertSame(ListItem::STATE_DONE, $items[1]->getTaskState());
+        $this->assertTrue($items[1]->getChecked());
+
+        // Cancelled [-]
+        $this->assertInstanceOf(ListItem::class, $items[2]);
+        $this->assertSame(ListItem::STATE_CANCELLED, $items[2]->getTaskState());
+        $this->assertFalse($items[2]->getChecked());
+
+        // Deferred [>]
+        $this->assertInstanceOf(ListItem::class, $items[3]);
+        $this->assertSame(ListItem::STATE_DEFERRED, $items[3]->getTaskState());
+        $this->assertFalse($items[3]->getChecked());
+
+        // Question [?]
+        $this->assertInstanceOf(ListItem::class, $items[4]);
+        $this->assertSame(ListItem::STATE_QUESTION, $items[4]->getTaskState());
+        $this->assertFalse($items[4]->getChecked());
     }
 
     public function testParseDefinitionList(): void
