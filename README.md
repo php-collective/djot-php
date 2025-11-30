@@ -117,6 +117,11 @@ Safe mode automatically blocks dangerous URL schemes (`javascript:`, etc.), stri
 
 See [Security Considerations](docs/README.md#security-considerations) for details and advanced configuration.
 
+
+## Implementations
+
+- [php-collective/wp-djot](https://github.com/php-collective/wp-djot) - WordPress plugin for Djot support
+
 ## See Also
 
 - [Djot](https://djot.net/) - Official Djot website with syntax reference and playground
