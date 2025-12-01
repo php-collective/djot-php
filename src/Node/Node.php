@@ -57,6 +57,78 @@ abstract class Node
         $this->children[$index] = $child;
     }
 
+    /**
+     * Replace a child node with another node
+     */
+    public function replaceChildNode(Node $oldChild, Node $newChild): bool
+    {
+        $index = array_search($oldChild, $this->children, true);
+        if ($index === false) {
+            return false;
+        }
+
+        $newChild->parent = $this;
+        $this->children[$index] = $newChild;
+        $oldChild->parent = null;
+
+        return true;
+    }
+
+    /**
+     * Replace a child node with multiple nodes
+     *
+     * @param \Djot\Node\Node $oldChild
+     * @param list<\Djot\Node\Node> $newChildren
+     */
+    public function replaceChildWithMany(Node $oldChild, array $newChildren): bool
+    {
+        $index = array_search($oldChild, $this->children, true);
+        if ($index === false) {
+            return false;
+        }
+
+        foreach ($newChildren as $child) {
+            $child->parent = $this;
+        }
+
+        array_splice($this->children, (int)$index, 1, $newChildren);
+        $oldChild->parent = null;
+
+        return true;
+    }
+
+    /**
+     * Remove a child node
+     */
+    public function removeChild(Node $child): bool
+    {
+        $index = array_search($child, $this->children, true);
+        if ($index === false) {
+            return false;
+        }
+
+        array_splice($this->children, (int)$index, 1);
+        $child->parent = null;
+
+        return true;
+    }
+
+    /**
+     * Remove child at index
+     */
+    public function removeChildAt(int $index): ?Node
+    {
+        if (!isset($this->children[$index])) {
+            return null;
+        }
+
+        $child = $this->children[$index];
+        array_splice($this->children, $index, 1);
+        $child->parent = null;
+
+        return $child;
+    }
+
     public function setAttribute(string $key, mixed $value): void
     {
         $this->attributes[$key] = $value;

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Djot;
 
 use Closure;
+use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
 use Djot\Renderer\HtmlRenderer;
+use LengthException;
 use RuntimeException;
 
 /**
@@ -23,17 +25,23 @@ class DjotConverter
 
     protected bool $strictMode;
 
+    protected ?Profile $profile = null;
+
+    protected ?ProfileFilter $profileFilter = null;
+
     /**
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
      * @param bool $strict Whether to throw exceptions on parse errors
      * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode (true for defaults, SafeMode instance for custom config)
+     * @param \Djot\Profile|null $profile Profile for feature restriction (null = all features allowed)
      */
     public function __construct(
         bool $xhtml = false,
         bool $warnings = false,
         bool $strict = false,
         bool|SafeMode|null $safeMode = null,
+        ?Profile $profile = null,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
@@ -45,6 +53,12 @@ class DjotConverter
             $this->renderer->setSafeMode(SafeMode::defaults());
         } elseif ($safeMode instanceof SafeMode) {
             $this->renderer->setSafeMode($safeMode);
+        }
+
+        // Configure profile
+        $this->profile = $profile;
+        if ($profile !== null) {
+            $this->profileFilter = new ProfileFilter();
         }
     }
 
@@ -67,11 +81,54 @@ class DjotConverter
     }
 
     /**
+     * Set the profile for feature restriction
+     *
+     * @param \Djot\Profile|null $profile Null to disable profile filtering
+     */
+    public function setProfile(?Profile $profile): self
+    {
+        $this->profile = $profile;
+        if ($profile !== null && $this->profileFilter === null) {
+            $this->profileFilter = new ProfileFilter();
+        }
+
+        return $this;
+    }
+
+    /**
+     * Get the current profile
+     */
+    public function getProfile(): ?Profile
+    {
+        return $this->profile;
+    }
+
+    /**
      * Convert Djot markup to HTML
+     *
+     * @throws \LengthException If input exceeds profile's max length
      */
     public function convert(string $djot): string
     {
+        // Check max length before parsing
+        if ($this->profile !== null && $this->profile->getMaxLength() > 0) {
+            if (strlen($djot) > $this->profile->getMaxLength()) {
+                throw new LengthException(
+                    sprintf(
+                        'Input length (%d bytes) exceeds maximum allowed (%d bytes)',
+                        strlen($djot),
+                        $this->profile->getMaxLength(),
+                    ),
+                );
+            }
+        }
+
         $document = $this->parse($djot);
+
+        // Apply profile filter after parsing
+        if ($this->profile !== null && $this->profileFilter !== null) {
+            $document = $this->profileFilter->filter($document, $this->profile);
+        }
 
         return $this->render($document);
     }
@@ -200,5 +257,23 @@ class DjotConverter
         $this->parser->clearWarnings();
 
         return $this;
+    }
+
+    /**
+     * Get profile violations from the last convert operation
+     *
+     * @return array<\Djot\ProfileViolation>
+     */
+    public function getProfileViolations(): array
+    {
+        return $this->profileFilter?->getViolations() ?? [];
+    }
+
+    /**
+     * Check if there were any profile violations during the last convert
+     */
+    public function hasProfileViolations(): bool
+    {
+        return count($this->getProfileViolations()) > 0;
     }
 }
