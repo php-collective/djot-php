@@ -528,6 +528,30 @@ DJOT;
         $this->assertStringContainsString('Another fruit', $result);
     }
 
+    public function testDefinitionListMultipleTerms(): void
+    {
+        $djot = ": CLI\n: Command Line Interface\n\n  A text-based interface for interacting with computers.";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dt>CLI</dt>', $result);
+        $this->assertStringContainsString('<dt>Command Line Interface</dt>', $result);
+        $this->assertStringContainsString('A text-based interface', $result);
+        // Both terms should share a single definition
+        $this->assertSame(1, substr_count($result, '<dd>'));
+    }
+
+    public function testDefinitionListMultipleTermsWithBlankLines(): void
+    {
+        $djot = ": color\n\n: colour\n\n  The visual property of objects.";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dt>color</dt>', $result);
+        $this->assertStringContainsString('<dt>colour</dt>', $result);
+        $this->assertSame(1, substr_count($result, '<dd>'));
+    }
+
     public function testComment(): void
     {
         $djot = "Before\n\n{% This is a comment %}\n\nAfter";

@@ -207,6 +207,48 @@ Works with all list types:
 
 ---
 
+### Multiple Definition Terms
+
+**Status:** Implemented in djot-php
+
+Multiple terms can share a single definition in definition lists:
+
+```djot
+: CLI
+: Command Line Interface
+
+  A text-based interface for interacting with computers.
+
+: color
+: colour
+
+  The visual property of objects.
+```
+
+**Output:**
+```html
+<dl>
+<dt>CLI</dt>
+<dt>Command Line Interface</dt>
+<dd>
+<p>A text-based interface for interacting with computers.</p>
+</dd>
+<dt>color</dt>
+<dt>colour</dt>
+<dd>
+<p>The visual property of objects.</p>
+</dd>
+</dl>
+```
+
+**Rules:**
+- Consecutive `: term` lines are grouped as multiple terms
+- Blank lines between terms are allowed
+- Definition follows after blank line with indentation
+- Common in dictionaries for synonyms, abbreviations, and alternate spellings
+
+---
+
 ## Testing
 
 All enhancements have dedicated test coverage:
@@ -235,9 +277,10 @@ vendor/bin/phpunit
 
 ### Language Features
 
-| Feature              | Upstream PR/Issue                              | Status     |
-|----------------------|------------------------------------------------|------------|
-| List item attributes | [#262](https://github.com/jgm/djot/pull/262)   | Open PR    |
+| Feature                   | Upstream PR/Issue                              | Status     |
+|---------------------------|------------------------------------------------|------------|
+| List item attributes      | [#262](https://github.com/jgm/djot/pull/262)   | Open PR    |
+| Multiple definition terms | -                                              | djot-php   |
 
 These enhancements may be adopted into the official spec. We track upstream discussions and adjust our implementation accordingly.
 
