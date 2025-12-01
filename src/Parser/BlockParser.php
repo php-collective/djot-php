@@ -1728,20 +1728,43 @@ class BlockParser
                 break;
             }
 
-            // The term is the content after ": "
-            $termContent = $matches[1];
+            // Collect all consecutive terms (multiple `: term` lines can share one definition)
+            $terms = [];
+            $codeFenceInfo = null;
 
-            // Special case: if term starts with code fence, term is empty and fence is part of definition
-            $termStartsWithCodeFence = preg_match('/^(`{3,}|~{3,})/', $termContent, $fenceMatch);
-            $codeFenceChar = $termStartsWithCodeFence ? $fenceMatch[1][0] : null;
-            $codeFenceLen = $termStartsWithCodeFence ? strlen($fenceMatch[1]) : 0;
+            while ($i < $count) {
+                $termLine = $lines[$i];
 
-            $termLines = $termStartsWithCodeFence ? [] : [$termContent];
-            $i++;
+                // Skip blank lines between terms
+                if ($this->isBlankLine($termLine)) {
+                    $i++;
 
-            // Collect continuation lines for term (before blank line, single-space indent)
-            // But NOT if term starts with code fence
-            if (!$termStartsWithCodeFence) {
+                    continue;
+                }
+
+                // Check if this is a term line
+                if (!preg_match('/^: +(.*)$/', $termLine, $termMatch)) {
+                    break;
+                }
+
+                $termContent = $termMatch[1];
+
+                // Special case: if term starts with code fence, term is empty and fence is part of definition
+                $termStartsWithCodeFence = preg_match('/^(`{3,}|~{3,})/', $termContent, $fenceMatch);
+
+                if ($termStartsWithCodeFence) {
+                    // Code fence starts definition - create empty term and break
+                    $codeFenceInfo = $termContent;
+                    $terms[] = [];
+                    $i++;
+
+                    break;
+                }
+
+                $termLines = [$termContent];
+                $i++;
+
+                // Collect continuation lines for term (before blank line, single-space indent)
                 while ($i < $count) {
                     $nextLine = $lines[$i];
                     if ($this->isBlankLine($nextLine)) {
@@ -1755,21 +1778,36 @@ class BlockParser
                         break;
                     }
                 }
+
+                $terms[] = $termLines;
+
+                // Check if next non-blank line is another term or definition content
+                $peekIdx = $i;
+                while ($peekIdx < $count && $this->isBlankLine($lines[$peekIdx])) {
+                    $peekIdx++;
+                }
+
+                // If next content is indented definition, stop collecting terms
+                if ($peekIdx < $count && preg_match('/^  /', $lines[$peekIdx])) {
+                    break;
+                }
             }
 
-            // Create term node
-            $term = new DefinitionTerm();
-            if ($termLines !== []) {
-                $this->inlineParser->parse($term, implode("\n", $termLines), $start);
+            // Create term nodes
+            foreach ($terms as $termLines) {
+                $term = new DefinitionTerm();
+                if ($termLines !== []) {
+                    $this->inlineParser->parse($term, implode("\n", $termLines), $start);
+                }
+                $defList->appendChild($term);
             }
-            $defList->appendChild($term);
 
             // Now collect definition content (after blank line, 2-space indent)
             $defLines = [];
 
             // If term started with code fence, add it to definition content
-            if ($termStartsWithCodeFence) {
-                $defLines[] = $termContent;
+            if ($codeFenceInfo !== null) {
+                $defLines[] = $codeFenceInfo;
             }
 
             while ($i < $count) {
