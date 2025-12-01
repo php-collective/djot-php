@@ -103,6 +103,7 @@ https://sandbox.dereuromark.de/sandbox/djot
 - [Converters](docs/converters.md) - Markdown/BBCode to Djot conversion
 - [Cookbook](docs/cookbook.md) - Common customizations and recipes
 - [Architecture](docs/architecture.md) - Internal design
+- [Enhancements](docs/enhancements.md) - Fixes beyond the current spec
 
 ## Security
 
