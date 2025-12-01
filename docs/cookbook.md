@@ -6,6 +6,7 @@ Common recipes and customizations for djot-php.
 
 - [External Links](#external-links)
 - [Custom Emoji/Symbols](#custom-emojisymbols)
+- [Abbreviations](#abbreviations)
 - [Syntax Highlighting](#syntax-highlighting)
 - [Table of Contents Generation](#table-of-contents-generation)
 - [Image Processing](#image-processing)
@@ -99,6 +100,53 @@ Output:
 ```html
 <p>I <span class="emoji" title="heart">❤️</span> this <span class="emoji" title="rocket">🚀</span> feature!</p>
 ```
+
+## Abbreviations
+
+Convert spans with `abbr` attribute to semantic `<abbr>` elements:
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Inline\Span;
+
+$converter = new DjotConverter();
+
+$converter->on('render.span', function (RenderEvent $event): void {
+    $span = $event->getNode();
+    if (!$span instanceof Span) {
+        return;
+    }
+
+    $abbrTitle = $span->getAttribute('abbr');
+    if ($abbrTitle !== null) {
+        // Remove abbr from attributes, use as title
+        $span->removeAttribute('abbr');
+
+        // Build abbr element with remaining attributes
+        $attrs = '';
+        foreach ($span->getAttributes() as $key => $value) {
+            $attrs .= ' ' . $key . '="' . htmlspecialchars($value) . '"';
+        }
+
+        $event->setHtml(
+            '<abbr title="' . htmlspecialchars($abbrTitle) . '"' . $attrs . '>'
+            . $event->getChildrenHtml()
+            . '</abbr>'
+        );
+    }
+});
+
+echo $converter->convert('The [HTML]{abbr="HyperText Markup Language"} standard.');
+```
+
+Output:
+```html
+<p>The <abbr title="HyperText Markup Language">HTML</abbr> standard.</p>
+```
+
+This uses standard djot span syntax with attributes, so no custom parsing is needed.
+You can combine with other attributes: `[CSS]{abbr="Cascading Style Sheets" .tech-term}`.
 
 ## Syntax Highlighting
 
