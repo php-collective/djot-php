@@ -644,22 +644,70 @@ Output:
 
 ### Wiki Links
 
-Support `[[Page Name]]` wiki-style links:
+Support `[[Page Name]]` and `[[Page Name|display text]]` wiki-style links:
 
 ```php
-$parser->addInlinePattern('/\[\[([^\]]+)\]\]/', function ($match, $groups, $p) {
-    $page = $groups[1];
-    $link = new Link('/wiki/' . rawurlencode($page));
-    $link->appendChild(new Text($page));
+use Djot\DjotConverter;
+use Djot\Node\Inline\Link;
+use Djot\Node\Inline\Text;
+
+$converter = new DjotConverter();
+$parser = $converter->getParser()->getInlineParser();
+
+// Pattern matches [[target]] or [[target|display text]]
+$parser->addInlinePattern('/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/', function ($match, $groups, $p) {
+    $target = trim($groups[1]);
+    $display = isset($groups[2]) ? trim($groups[2]) : $target;
+
+    // Convert target to URL (customize as needed)
+    $url = '/wiki/' . rawurlencode(str_replace(' ', '-', $target));
+
+    $link = new Link($url);
+    $link->appendChild(new Text($display));
+    $link->setAttribute('class', 'wikilink');
     return $link;
 });
 
-echo $converter->convert('See [[Home Page]] and [[Getting Started]].');
+echo $converter->convert('See [[Home Page]] and [[API Reference|the API docs]].');
 ```
 
 Output:
 ```html
-<p>See <a href="/wiki/Home%20Page">Home Page</a> and <a href="/wiki/Getting%20Started">Getting Started</a>.</p>
+<p>See <a href="/wiki/Home-Page" class="wikilink">Home Page</a> and <a href="/wiki/API-Reference" class="wikilink">the API docs</a>.</p>
+```
+
+#### Configurable Base URL
+
+```php
+// Make the base URL configurable
+$wikiBaseUrl = '/docs/';  // or 'https://wiki.example.com/'
+
+$parser->addInlinePattern('/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/', function ($match, $groups, $p) use ($wikiBaseUrl) {
+    $target = trim($groups[1]);
+    $display = isset($groups[2]) ? trim($groups[2]) : $target;
+    $slug = strtolower(str_replace(' ', '-', $target));
+
+    $link = new Link($wikiBaseUrl . rawurlencode($slug));
+    $link->appendChild(new Text($display));
+    return $link;
+});
+```
+
+#### With File Extension
+
+```php
+// Add .html extension for static sites
+$parser->addInlinePattern('/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/', function ($match, $groups, $p) {
+    $target = trim($groups[1]);
+    $display = isset($groups[2]) ? trim($groups[2]) : $target;
+    $slug = strtolower(str_replace(' ', '-', $target));
+
+    $link = new Link('/pages/' . $slug . '.html');
+    $link->appendChild(new Text($display));
+    return $link;
+});
+
+// [[Installation Guide]] → <a href="/pages/installation-guide.html">Installation Guide</a>
 ```
 
 ### Hashtags
