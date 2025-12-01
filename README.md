@@ -103,6 +103,7 @@ https://sandbox.dereuromark.de/sandbox/djot
 - [Converters](docs/converters.md) - Markdown/BBCode to Djot conversion
 - [Cookbook](docs/cookbook.md) - Common customizations and recipes
 - [Architecture](docs/architecture.md) - Internal design
+- [Enhancements](docs/enhancements.md) - Fixes beyond the current spec
 
 ## Security
 
@@ -116,6 +117,11 @@ $html = $converter->convert($untrustedInput);
 Safe mode automatically blocks dangerous URL schemes (`javascript:`, etc.), strips event handler attributes (`onclick`, etc.), and escapes raw HTML.
 
 See [Security Considerations](docs/README.md#security-considerations) for details and advanced configuration.
+
+
+## Implementations
+
+- [php-collective/wp-djot](https://github.com/php-collective/wp-djot) - WordPress plugin for Djot support
 
 ## See Also
 

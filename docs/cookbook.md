@@ -644,22 +644,110 @@ Output:
 
 ### Wiki Links
 
-Support `[[Page Name]]` wiki-style links:
+Support wiki-style links using a `wiki:` URL scheme. This approach uses standard
+djot link syntax and avoids ambiguity with nested spans (since `[[x]{.a}]{.b}` is valid djot).
 
 ```php
-$parser->addInlinePattern('/\[\[([^\]]+)\]\]/', function ($match, $groups, $p) {
-    $page = $groups[1];
-    $link = new Link('/wiki/' . rawurlencode($page));
-    $link->appendChild(new Text($page));
-    return $link;
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+
+$converter = new DjotConverter();
+
+// Handle wiki: scheme in links
+$converter->on('render.link', function (RenderEvent $event): void {
+    $link = $event->getNode();
+    $url = $link->getDestination() ?? '';
+
+    if (str_starts_with($url, 'wiki:')) {
+        $target = substr($url, 5); // Remove 'wiki:' prefix
+
+        // If empty, use the link text as target
+        if ($target === '') {
+            $text = '';
+            foreach ($link->getChildren() as $child) {
+                if ($child instanceof \Djot\Node\Inline\Text) {
+                    $text .= $child->getContent();
+                }
+            }
+            $target = $text;
+        }
+
+        // Convert to URL slug
+        $slug = strtolower(str_replace(' ', '-', $target));
+        $link->setDestination('/wiki/' . rawurlencode($slug));
+        $link->setAttribute('class', 'wikilink');
+    }
 });
 
-echo $converter->convert('See [[Home Page]] and [[Getting Started]].');
+echo $converter->convert('See [Home Page](wiki:) and [the API docs](wiki:API Reference).');
 ```
 
 Output:
 ```html
-<p>See <a href="/wiki/Home%20Page">Home Page</a> and <a href="/wiki/Getting%20Started">Getting Started</a>.</p>
+<p>See <a href="/wiki/home-page" class="wikilink">Home Page</a> and <a href="/wiki/api-reference" class="wikilink">the API docs</a>.</p>
+```
+
+The syntax:
+- `[Page Name](wiki:)` - link text becomes the target
+- `[display text](wiki:Page Name)` - explicit target with custom display text
+
+#### Configurable Base URL
+
+```php
+$wikiBaseUrl = '/docs/';  // or 'https://wiki.example.com/'
+
+$converter->on('render.link', function (RenderEvent $event) use ($wikiBaseUrl): void {
+    $link = $event->getNode();
+    $url = $link->getDestination() ?? '';
+
+    if (str_starts_with($url, 'wiki:')) {
+        $target = substr($url, 5);
+
+        if ($target === '') {
+            $text = '';
+            foreach ($link->getChildren() as $child) {
+                if ($child instanceof \Djot\Node\Inline\Text) {
+                    $text .= $child->getContent();
+                }
+            }
+            $target = $text;
+        }
+
+        $slug = strtolower(str_replace(' ', '-', $target));
+        $link->setDestination($wikiBaseUrl . rawurlencode($slug));
+    }
+});
+```
+
+#### With File Extension
+
+```php
+use Djot\Event\RenderEvent;
+
+// Add .html extension for static sites
+$converter->on('render.link', function (RenderEvent $event): void {
+    $link = $event->getNode();
+    $url = $link->getDestination() ?? '';
+
+    if (str_starts_with($url, 'wiki:')) {
+        $target = substr($url, 5);
+
+        if ($target === '') {
+            $text = '';
+            foreach ($link->getChildren() as $child) {
+                if ($child instanceof \Djot\Node\Inline\Text) {
+                    $text .= $child->getContent();
+                }
+            }
+            $target = $text;
+        }
+
+        $slug = strtolower(str_replace(' ', '-', $target));
+        $link->setDestination('/pages/' . $slug . '.html');
+    }
+});
+
+// [Installation Guide](wiki:) → <a href="/pages/installation-guide.html">Installation Guide</a>
 ```
 
 ### Hashtags
@@ -676,6 +764,59 @@ $parser->addInlinePattern('/#([a-zA-Z][a-zA-Z0-9_]*)/', function ($match, $group
 });
 
 echo $converter->convert('Check out #PHP and #WebDev!');
+```
+
+### Root-Relative Links
+
+Support `<~/path>` and `<~/path|display text>` for site-root-relative links:
+
+```php
+use Djot\DjotConverter;
+use Djot\Node\Inline\Link;
+use Djot\Node\Inline\Text;
+
+$converter = new DjotConverter();
+$parser = $converter->getParser()->getInlineParser();
+
+// Pattern matches <~/path> or <~/path|display text>
+$parser->addInlinePattern('/<~([^>|]+)(?:\|([^>]+))?>/​', function ($match, $groups, $p) {
+    $path = trim($groups[1]);
+    $display = isset($groups[2]) ? trim($groups[2]) : basename($path);
+
+    // Build root-relative URL
+    $url = '/' . ltrim($path, '/');
+
+    $link = new Link($url);
+    $link->appendChild(new Text($display));
+    $link->setAttribute('class', 'internal-link');
+    return $link;
+});
+
+echo $converter->convert('See <~/docs/installation> and <~/api/users|the API>.');
+```
+
+Output:
+```html
+<p>See <a href="/docs/installation" class="internal-link">installation</a> and <a href="/api/users" class="internal-link">the API</a>.</p>
+```
+
+#### Configurable Base Path
+
+```php
+$basePath = '/docs/v2';  // Prepend to all paths
+
+$parser->addInlinePattern('/<~([^>|]+)(?:\|([^>]+))?>/​', function ($match, $groups, $p) use ($basePath) {
+    $path = trim($groups[1]);
+    $display = isset($groups[2]) ? trim($groups[2]) : basename($path);
+
+    $url = $basePath . '/' . ltrim($path, '/');
+
+    $link = new Link($url);
+    $link->appendChild(new Text($display));
+    return $link;
+});
+
+// <~/guide> → <a href="/docs/v2/guide">guide</a>
 ```
 
 ### Conditional Patterns
