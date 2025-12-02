@@ -141,24 +141,27 @@ class ProfileTest extends TestCase
 
     // ==================== Minimal Profile Tests ====================
 
-    public function testMinimalProfileAllowsOnlyTextAndEmphasis(): void
+    public function testMinimalProfileAllowsNonDestructiveInline(): void
     {
         $converter = new DjotConverter(profile: Profile::minimal());
         $html = $converter->convert('*bold* and _italic_ and `code` and [link](url)');
 
         $this->assertStringContainsString('<strong>bold</strong>', $html);
         $this->assertStringContainsString('<em>italic</em>', $html);
-        $this->assertStringNotContainsString('<code>', $html);
+        $this->assertStringContainsString('<code>code</code>', $html);
+        // Links are still disabled (potentially destructive)
         $this->assertStringNotContainsString('<a ', $html);
     }
 
-    public function testMinimalProfileStripsLists(): void
+    public function testMinimalProfileAllowsLists(): void
     {
         $converter = new DjotConverter(profile: Profile::minimal());
         $html = $converter->convert("- Item 1\n- Item 2");
 
-        $this->assertStringNotContainsString('<ul>', $html);
-        $this->assertStringNotContainsString('<li>', $html);
+        $this->assertStringContainsString('<ul>', $html);
+        $this->assertStringContainsString('<li>', $html);
+        $this->assertStringContainsString('Item 1', $html);
+        $this->assertStringContainsString('Item 2', $html);
     }
 
     // ==================== Article Profile Tests ====================
@@ -681,10 +684,12 @@ DJOT;
     public function testMinimalProfileDefaultReason(): void
     {
         $profile = Profile::minimal();
-        $reason = $profile->getReasonDisallowed(NodeType::CODE);
+        // Links are disallowed in minimal profile
+        $reason = $profile->getReasonDisallowed(NodeType::LINK);
 
-        // Should have a default reason
+        // Should have a specific reason for links
         $this->assertNotNull($reason);
+        $this->assertStringContainsString('Links', $reason);
     }
 
     public function testBlockNodeWithNoTextContent(): void

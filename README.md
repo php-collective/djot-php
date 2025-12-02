@@ -100,6 +100,7 @@ https://sandbox.dereuromark.de/sandbox/djot
 - [Examples](docs/README.md) - Comprehensive usage examples
 - [Syntax Reference](docs/syntax.md) - Complete Djot syntax guide
 - [API Reference](docs/api.md) - Classes and methods
+- [Profiles](docs/profiles.md) - Feature restriction for different contexts
 - [Converters](docs/converters.md) - Markdown/BBCode to Djot conversion
 - [Cookbook](docs/cookbook.md) - Common customizations and recipes
 - [Architecture](docs/architecture.md) - Internal design

@@ -183,34 +183,53 @@ class Profile
     }
 
     /**
-     * Create a minimal profile suitable for chat or single-line input
+     * Create a minimal profile suitable for chat or short-form input
      *
-     * Only text, bold, italic, and line breaks are allowed.
-     * This is the most restrictive preset, suitable for:
+     * Allows all trivial inline formatting:
+     * - Basic: text, bold, italic, strikethrough, code
+     * - Advanced: superscript, subscript, highlight, insert, delete
+     * - Breaks: soft/hard line breaks
+     *
+     * Blocks limited to paragraphs and lists. Suitable for:
      * - Chat messages
      * - Micro-posts
-     * - Subject lines
      * - Short form content
      */
     public static function minimal(): self
     {
         $profile = new self();
         $profile->name = 'minimal';
-        $profile->description = 'Chat/micro-posts. Text, bold, italic only.';
+        $profile->description = 'Chat/micro-posts. Non-destructive inline formatting, paragraphs and lists.';
         $profile
             ->allowInline([
                 NodeType::TEXT,
                 NodeType::EMPHASIS,
                 NodeType::STRONG,
+                NodeType::CODE,
+                NodeType::DELETE,
+                NodeType::INSERT,
+                NodeType::HIGHLIGHT,
+                NodeType::SUPERSCRIPT,
+                NodeType::SUBSCRIPT,
                 NodeType::SOFT_BREAK,
                 NodeType::HARD_BREAK,
             ])
             ->allowBlock([
                 NodeType::PARAGRAPH,
-            ]);
+                NodeType::LIST_BLOCK,
+                NodeType::LIST_ITEM,
+            ])
+            ->setMaxNesting(2);
 
         $profile->featureReasons = [
-            'default' => 'Only basic text formatting (bold, italic) is allowed in this context.',
+            NodeType::LINK => 'Links are disabled in this minimal context.',
+            NodeType::IMAGE => 'Images are disabled in this minimal context.',
+            NodeType::RAW_INLINE => 'Raw HTML is disabled for security reasons.',
+            NodeType::FOOTNOTE_REF => 'Footnotes are disabled in this minimal context.',
+            NodeType::SPAN => 'Custom spans are disabled in this minimal context.',
+            NodeType::SYMBOL => 'Symbols are disabled in this minimal context.',
+            NodeType::MATH => 'Math is disabled in this minimal context.',
+            'default' => 'Only basic text formatting and lists are allowed in this context.',
         ];
 
         return $profile;

@@ -154,7 +154,7 @@ final class NodeType
     /**
      * @var string
      */
-    public const FOOTNOTE_REF = 'footnote_reference';
+    public const FOOTNOTE_REF = 'footnote_ref';
 
     /**
      * @var string
