@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
+use Closure;
+use Djot\Event\RenderEvent;
+use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Comment;
 use Djot\Node\Block\DefinitionDescription;
@@ -47,7 +50,57 @@ class PlainTextRenderer
 
     protected string $orderedListItemPrefix = '. ';
 
-    protected string $tableCellSeparator = "\t";
+    protected string $tableCellSeparator = ' | ';
+
+    protected string $blockQuotePrefix = '"';
+
+    protected string $blockQuoteSuffix = '"';
+
+    /**
+     * @var array<string, array<\Closure(\Djot\Event\RenderEvent): void>>
+     */
+    protected array $listeners = [];
+
+    /**
+     * Register an event listener
+     *
+     * @param string $event Event name (e.g., 'render.paragraph', 'render.*')
+     * @param \Closure(\Djot\Event\RenderEvent): void $listener
+     */
+    public function on(string $event, Closure $listener): void
+    {
+        $this->listeners[$event][] = $listener;
+    }
+
+    /**
+     * Remove event listeners
+     *
+     * @param string|null $event Event name or null to remove all listeners
+     */
+    public function off(?string $event = null): void
+    {
+        if ($event === null) {
+            $this->listeners = [];
+        } else {
+            unset($this->listeners[$event]);
+        }
+    }
+
+    /**
+     * Dispatch an event to all registered listeners
+     */
+    protected function dispatchEvent(string $event, RenderEvent $renderEvent): void
+    {
+        if (!isset($this->listeners[$event])) {
+            return;
+        }
+        foreach ($this->listeners[$event] as $listener) {
+            $listener($renderEvent);
+            if ($renderEvent->isDefaultPrevented()) {
+                break;
+            }
+        }
+    }
 
     public function render(Document $document): string
     {
@@ -61,6 +114,16 @@ class PlainTextRenderer
 
     protected function renderNode(Node $node): string
     {
+        // Dispatch render events
+        $eventName = 'render.' . $node->getType();
+        $event = new RenderEvent($node);
+        $this->dispatchEvent($eventName, $event);
+        $this->dispatchEvent('render.*', $event);
+
+        if ($event->isDefaultPrevented()) {
+            return $event->getHtml() ?? '';
+        }
+
         return match (true) {
             $node instanceof Document => $this->renderChildren($node),
             $node instanceof Paragraph => $this->renderParagraph($node),
@@ -68,6 +131,7 @@ class PlainTextRenderer
             $node instanceof CodeBlock => $this->renderCodeBlock($node),
             $node instanceof Comment => '', // Skip comments
             $node instanceof RawBlock => '', // Skip raw blocks (format-specific)
+            $node instanceof BlockQuote => $this->renderBlockQuote($node),
             $node instanceof ListBlock => $this->renderList($node),
             $node instanceof ListItem => $this->renderListItem($node),
             $node instanceof DefinitionList => $this->renderDefinitionList($node),
@@ -115,6 +179,13 @@ class PlainTextRenderer
     protected function renderCodeBlock(CodeBlock $node): string
     {
         return $node->getContent() . "\n\n";
+    }
+
+    protected function renderBlockQuote(BlockQuote $node): string
+    {
+        $content = trim($this->renderChildren($node));
+
+        return $this->blockQuotePrefix . $content . $this->blockQuoteSuffix . "\n\n";
     }
 
     protected function renderList(ListBlock $node): string
@@ -236,5 +307,21 @@ class PlainTextRenderer
     public function setTableCellSeparator(string $separator): void
     {
         $this->tableCellSeparator = $separator;
+    }
+
+    /**
+     * Set the prefix for block quotes
+     */
+    public function setBlockQuotePrefix(string $prefix): void
+    {
+        $this->blockQuotePrefix = $prefix;
+    }
+
+    /**
+     * Set the suffix for block quotes
+     */
+    public function setBlockQuoteSuffix(string $suffix): void
+    {
+        $this->blockQuoteSuffix = $suffix;
     }
 }
