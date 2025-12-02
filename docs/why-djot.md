@@ -10,6 +10,54 @@ Markdown was designed in 2004 as a simple format for writing blog posts. Twenty 
 2. **Ambiguous syntax** - `_` and `*` behave differently based on context
 3. **Limited features** - no highlighting, attributes, or consistent extensions
 4. **HTML dependency** - raw HTML is the escape hatch for everything
+5. **Complex parsing** - requires backtracking and lookahead
+
+## Parser Design: No Backtracking
+
+One of Djot's most significant technical advantages is its parser design.
+
+### The Markdown Parsing Problem
+
+Markdown requires **backtracking** - the parser must sometimes go back and reinterpret what it already parsed. Consider:
+
+```markdown
+*foo *bar* baz*
+```
+
+A Markdown parser sees `*foo ` and thinks "this might be emphasis." It continues, finds `*bar*` (definitely emphasis), then hits `baz*`. Now it must decide: is the outer `*...*` emphasis too?
+
+The parser has to backtrack and try different interpretations. This leads to:
+
+- **Unpredictable results** - different parsers make different choices
+- **Performance costs** - worst-case exponential time complexity
+- **Edge case bugs** - complex nesting creates surprising output
+
+### Djot's Solution
+
+Djot was designed from the ground up to parse **without backtracking**:
+
+- `*` always means strong, `_` always means emphasis
+- Delimiters must be "matched" - `*foo*` works, `*foo _bar* baz_` doesn't cross
+- The parser never needs to reconsider previous decisions
+
+**Benefits:**
+
+| Aspect | Markdown | Djot |
+|--------|----------|------|
+| Parse complexity | Can require backtracking | Linear, single-pass |
+| Predictability | Context-dependent | Always consistent |
+| Edge cases | Many surprising results | Minimal surprises |
+| Error recovery | Varies by parser | Predictable fallback |
+
+### Real-World Example
+
+```markdown
+_(_foo_)_
+```
+
+Different Markdown parsers produce different output for this. Some treat it as emphasis around `(_foo_)`, others as `_(_foo` followed by `)_`.
+
+In Djot, the rules are clear: underscores must balance, and the result is always predictable.
 
 ## Side-by-Side Comparison
 
