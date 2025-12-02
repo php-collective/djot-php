@@ -113,12 +113,14 @@ class Profile
     /**
      * Create a comment profile suitable for user-generated content
      *
-     * Only basic formatting is allowed: bold, italic, strikethrough, code,
-     * links, paragraphs, lists, and blockquotes. This prevents:
+     * Allowed formatting:
+     * - Inline: bold, italic, strikethrough, insert, highlight, superscript, subscript, code, links
+     * - Block: paragraphs, lists, blockquotes, code blocks
+     *
+     * This prevents:
      * - Headings: Users shouldn't structure page hierarchy
      * - Images: Prevents spam, inappropriate content, bandwidth abuse
      * - Tables: Too complex for comments, often misused for layout
-     * - Code blocks: Basic inline code is enough for comments
      * - Footnotes: Overkill for comments
      * - Raw HTML: XSS prevention
      * - Divs/Sections: Layout control not needed
@@ -140,6 +142,10 @@ class Profile
                 NodeType::SOFT_BREAK,
                 NodeType::HARD_BREAK,
                 NodeType::DELETE,
+                NodeType::INSERT,
+                NodeType::HIGHLIGHT,
+                NodeType::SUPERSCRIPT,
+                NodeType::SUBSCRIPT,
             ])
             ->allowBlock([
                 NodeType::PARAGRAPH,
@@ -170,10 +176,6 @@ class Profile
             NodeType::DEFINITION_DESCRIPTION => 'Definition lists are disabled in comments.',
             NodeType::THEMATIC_BREAK => 'Horizontal rules are disabled in comments.',
             NodeType::LINE_BLOCK => 'Line blocks are disabled in comments.',
-            NodeType::SUPERSCRIPT => 'Superscript is disabled to keep comments simple.',
-            NodeType::SUBSCRIPT => 'Subscript is disabled to keep comments simple.',
-            NodeType::HIGHLIGHT => 'Highlighting is disabled in comments.',
-            NodeType::INSERT => 'Insert markup is disabled in comments.',
             NodeType::SPAN => 'Custom spans are disabled in comments.',
             NodeType::SYMBOL => 'Symbol markup is disabled in comments.',
             NodeType::MATH => 'Math markup is disabled in comments.',
@@ -187,7 +189,7 @@ class Profile
      *
      * Allows all trivial inline formatting:
      * - Basic: text, bold, italic, strikethrough, code
-     * - Advanced: superscript, subscript, highlight, insert, delete
+     * - Advanced: superscript, subscript, insert, delete
      * - Breaks: soft/hard line breaks
      *
      * Blocks limited to paragraphs and lists. Suitable for:
@@ -208,7 +210,6 @@ class Profile
                 NodeType::CODE,
                 NodeType::DELETE,
                 NodeType::INSERT,
-                NodeType::HIGHLIGHT,
                 NodeType::SUPERSCRIPT,
                 NodeType::SUBSCRIPT,
                 NodeType::SOFT_BREAK,
@@ -223,6 +224,7 @@ class Profile
 
         $profile->featureReasons = [
             NodeType::LINK => 'Links are disabled in this minimal context.',
+            NodeType::HIGHLIGHT => 'Highlighting is disabled in this minimal context.',
             NodeType::IMAGE => 'Images are disabled in this minimal context.',
             NodeType::RAW_INLINE => 'Raw HTML is disabled for security reasons.',
             NodeType::FOOTNOTE_REF => 'Footnotes are disabled in this minimal context.',

@@ -48,10 +48,10 @@ $converter = new DjotConverter(profile: Profile::article());
 For user-generated content like comments. Basic formatting with nofollow links.
 
 **Allowed:**
-- Inline: text, emphasis, strong, code, strikethrough, line breaks
+- Inline: text, emphasis, strong, code, link, delete, insert, highlight, superscript, subscript, line breaks
 - Block: paragraphs, lists, blockquotes, code blocks
 
-**Denied:** Headings, images, tables, footnotes, raw HTML, divs, definition lists
+**Denied:** Headings, images, tables, footnotes, raw HTML, divs, spans, symbols, math, definition lists
 
 **Link policy:** Adds `rel="nofollow ugc"` to all links
 
@@ -61,19 +61,38 @@ $converter = new DjotConverter(profile: Profile::comment());
 
 ### `Profile::minimal()`
 
-For chat messages and micro-posts. All trivial inline formatting plus lists.
+For chat messages and micro-posts. Basic inline formatting plus lists.
 
 **Allowed:**
-- Inline: text, emphasis, strong, code, delete, insert, highlight, superscript, subscript, line breaks
+- Inline: text, emphasis, strong, code, delete, insert, superscript, subscript, line breaks
 - Block: paragraphs, lists
 
-**Denied:** Links, images, headings, tables, code blocks, raw HTML, footnotes
+**Denied:** Links, images, highlight, headings, tables, code blocks, raw HTML, footnotes
 
 **Max nesting:** 2 levels
 
 ```php
 $converter = new DjotConverter(profile: Profile::minimal());
 ```
+
+## Profile Hierarchy
+
+Each profile is a superset of the one below it:
+
+```
+full ⊃ article ⊃ comment ⊃ minimal
+```
+
+| Profile | Inline elements                                                              | Block elements                          |
+|---------|------------------------------------------------------------------------------|-----------------------------------------|
+| **minimal** | text, emphasis, strong, code, delete, insert, superscript, subscript, breaks | paragraph, lists                        |
+| **comment** | all of minimal + link, highlight                                             | all of minimal + blockquote, code_block |
+| **article** | all except raw_inline                                                        | all except raw_block                    |
+| **full** | all                                                                          | all                                     |
+
+This ensures consistent behavior: anything allowed in a more restrictive profile is also allowed in less restrictive ones.
+
+Note: For standard djot, `Profile::full()` and no profile behave identically. However, with extensions that add custom node types, `full()` will deny unknown types while no profile allows everything through unfiltered.
 
 ## Custom Profiles
 
