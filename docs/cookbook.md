@@ -1065,6 +1065,10 @@ echo $converter->convert($djot);
 
 ## Alternative Output Formats
 
+For detailed customization of alternative renderers, see:
+- [PlainText Cookbook](cookbook-plaintext.md) - PlainTextRenderer customizations
+- [Markdown Cookbook](cookbook-markdown.md) - MarkdownRenderer customizations
+
 ### Plain Text Extraction
 
 Extract plain text for search indexing or SEO:

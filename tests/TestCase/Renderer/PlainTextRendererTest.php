@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Renderer;
 
 use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Inline\Symbol;
 use Djot\Renderer\PlainTextRenderer;
 use PHPUnit\Framework\TestCase;
 
@@ -289,5 +291,71 @@ DJOT;
         $this->assertStringContainsString("That\u{2019}s all!", $result); // Smart quote
         $this->assertStringNotContainsString('*', $result);
         $this->assertStringNotContainsString('<', $result);
+    }
+
+    public function testEventReplaceContent(): void
+    {
+        $this->renderer->on('render.symbol', function (RenderEvent $event): void {
+            $symbol = $event->getNode();
+            if ($symbol instanceof Symbol) {
+                $emoji = match ($symbol->getName()) {
+                    'heart' => '[HEART]',
+                    'star' => '[STAR]',
+                    default => ':' . $symbol->getName() . ':',
+                };
+                $event->setHtml($emoji);
+            }
+        });
+
+        $djot = 'I :heart: Djot!';
+        $document = $this->converter->parse($djot);
+        $result = $this->renderer->render($document);
+
+        $this->assertStringContainsString('[HEART]', $result);
+    }
+
+    public function testEventWildcard(): void
+    {
+        $nodeTypes = [];
+        $this->renderer->on('render.*', function (RenderEvent $event) use (&$nodeTypes): void {
+            $nodeTypes[] = $event->getNode()->getType();
+        });
+
+        $djot = "# Hello\n\nWorld";
+        $document = $this->converter->parse($djot);
+        $this->renderer->render($document);
+
+        $this->assertContains('heading', $nodeTypes);
+        $this->assertContains('paragraph', $nodeTypes);
+        $this->assertContains('text', $nodeTypes);
+    }
+
+    public function testEventOff(): void
+    {
+        $called = false;
+        $this->renderer->on('render.paragraph', function () use (&$called): void {
+            $called = true;
+        });
+
+        $this->renderer->off('render.paragraph');
+        $djot = 'Test paragraph';
+        $document = $this->converter->parse($djot);
+        $this->renderer->render($document);
+
+        $this->assertFalse($called);
+    }
+
+    public function testEventPreventDefault(): void
+    {
+        $this->renderer->on('render.heading', function (RenderEvent $event): void {
+            $event->setHtml('CUSTOM HEADING');
+        });
+
+        $djot = '# Original Title';
+        $document = $this->converter->parse($djot);
+        $result = $this->renderer->render($document);
+
+        $this->assertStringContainsString('CUSTOM HEADING', $result);
+        $this->assertStringNotContainsString('Original Title', $result);
     }
 }

@@ -9,6 +9,8 @@ This directory contains detailed documentation for djot-php.
 - [API Reference](api.md) - Classes and methods
 - [Profiles](profiles.md) - Feature restriction for different contexts
 - [Cookbook](cookbook.md) - Common customizations and recipes
+- [PlainText Cookbook](cookbook-plaintext.md) - PlainTextRenderer customizations
+- [Markdown Cookbook](cookbook-markdown.md) - MarkdownRenderer customizations
 - [Architecture](architecture.md) - Internal design
 - [Converters](converters.md) - Markdown/BBCode to Djot conversion
 - [Performance](performance.md) - Benchmarks and performance data
