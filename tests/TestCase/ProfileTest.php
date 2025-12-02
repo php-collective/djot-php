@@ -115,13 +115,27 @@ class ProfileTest extends TestCase
         $this->assertStringNotContainsString('<table>', $html);
     }
 
-    public function testCommentProfileStripsRawHtml(): void
+    public function testCommentProfileConvertsRawHtmlToText(): void
     {
         $converter = new DjotConverter(profile: Profile::comment());
         $html = $converter->convert('`<script>alert(1)</script>`{=html}');
 
+        // Raw HTML tag should not appear (security)
+        $this->assertStringNotContainsString('<script>', $html);
+        // Content is preserved as escaped text (ACTION_TO_TEXT behavior)
+        $this->assertStringContainsString('&lt;script', $html);
+    }
+
+    public function testRawHtmlStrippedWithActionStrip(): void
+    {
+        $profile = Profile::comment()->onDisallowed(Profile::ACTION_STRIP);
+        $converter = new DjotConverter(profile: $profile);
+        $html = $converter->convert('`<script>alert(1)</script>`{=html}');
+
+        // With ACTION_STRIP, content is completely removed
         $this->assertStringNotContainsString('<script>', $html);
         $this->assertStringNotContainsString('&lt;script', $html);
+        $this->assertStringNotContainsString('alert', $html);
     }
 
     public function testCommentProfileReportsViolations(): void
@@ -773,6 +787,19 @@ DJOT;
         // Image converted to text preserving alt text
         $this->assertStringNotContainsString('<img', $html);
         $this->assertStringContainsString('descriptive alt text', $html);
+    }
+
+    public function testCodeBlockContentPreservedAsText(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        $html = $converter->convert("```\ncode block content\n```");
+
+        // Code block converted to text preserving content
+        $this->assertStringNotContainsString('<pre>', $html);
+        $this->assertStringNotContainsString('<code>', $html);
+        $this->assertStringContainsString('code block content', $html);
     }
 
     // ==================== Whitespace Preservation Tests ====================

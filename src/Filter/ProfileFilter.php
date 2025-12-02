@@ -268,6 +268,14 @@ class ProfileFilter
             return $node->getContent();
         }
 
+        // Handle nodes that store content directly (CodeBlock, RawBlock, etc.)
+        if (method_exists($node, 'getContent')) {
+            $content = $node->getContent();
+            if ($content !== null && $content !== '') {
+                return $content;
+            }
+        }
+
         $parts = [];
         foreach ($node->getChildren() as $child) {
             $childText = $this->extractTextContent($child);
