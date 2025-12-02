@@ -1,0 +1,5 @@
+# Python dependencies for markdown benchmarks
+markdown>=3.5
+markdown-it-py>=3.0
+mistune>=3.0
+commonmark>=0.9

@@ -1,0 +1,203 @@
+# Complex Document for Benchmarking
+
+This document contains a wide variety of djot features to stress-test the parser.
+
+## Typography and Inline Elements
+
+This paragraph has *strong emphasis* and _regular emphasis_ mixed together.
+Here's some `inline code` and a [link with title](https://example.com "Example Title").
+We also have {+inserted text+} and {-deleted text-} for editing marks.
+The {=highlighted text=} stands out, and we have H{~2~}O for subscript.
+Math formula: $E = mc^2$ is famous. And x{^2^} for superscript.
+
+## Smart Typography
+
+"Double quoted text" and 'single quoted text' should be converted.
+An ellipsis... and em-dash---here and en-dash--there.
+
+## Definition Lists
+
+: Apple
+  A fruit that grows on trees.
+  Can be red, green, or yellow.
+
+: Banana
+  A curved yellow fruit.
+
+: Cherry
+  A small red fruit.
+
+## Task Lists
+
+- [ ] Unchecked task
+- [x] Checked task
+- [ ] Another unchecked
+- [x] Another checked
+
+## Nested Lists
+
+- Level 1
+  - Level 2
+    - Level 3
+      - Level 4
+        - Level 5
+      - Back to 4
+    - Back to 3
+  - Back to 2
+- Back to 1
+
+1. Ordered level 1
+   1. Ordered level 2
+      1. Ordered level 3
+   2. Another 2
+2. Another 1
+
+## Tables
+
+| Header A | Header B | Header C | Header D | Header E |
+|:---------|:--------:|----------|---------:|----------|
+| Left     | Center   | Default  | Right    | Normal   |
+| Cell 1   | Cell 2   | Cell 3   | Cell 4   | Cell 5   |
+| Data A   | Data B   | Data C   | Data D   | Data E   |
+| More A   | More B   | More C   | More D   | More E   |
+
+## Code Blocks with Languages
+
+```python
+def fibonacci(n):
+    """Calculate the nth Fibonacci number."""
+    if n <= 1:
+        return n
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+class Calculator:
+    def __init__(self):
+        self.result = 0
+
+    def add(self, value):
+        self.result += value
+        return self
+```
+
+```javascript
+class EventEmitter {
+    constructor() {
+        this.events = {};
+    }
+
+    on(event, callback) {
+        if (!this.events[event]) {
+            this.events[event] = [];
+        }
+        this.events[event].push(callback);
+    }
+
+    emit(event, ...args) {
+        if (this.events[event]) {
+            this.events[event].forEach(cb => cb(...args));
+        }
+    }
+}
+```
+
+```rust
+fn main() {
+    let numbers: Vec<i32> = (1..=10).collect();
+    let sum: i32 = numbers.iter().sum();
+    println!("Sum: {}", sum);
+}
+```
+
+## Block Quotes with Nesting
+
+> This is a block quote.
+>
+> > This is a nested block quote.
+> > With multiple lines.
+> >
+> > > Triple nesting!
+>
+> Back to single nesting.
+
+## Footnotes
+
+This sentence has a footnote[^1]. And another[^longname].
+
+[^1]: This is the first footnote content.
+
+[^longname]: This is a longer footnote with a descriptive name.
+It can span multiple lines and contain *formatting*.
+
+## Divs with Attributes
+
+::: warning
+This is a warning div block.
+It contains important information.
+:::
+
+::: {.info #special-info}
+This div has custom classes and an ID.
+:::
+
+## Attributes on Elements
+
+{.highlight}
+This paragraph has a highlight class applied.
+
+{#unique-id .custom-class data-value="test"}
+This paragraph has multiple attributes.
+
+## Math Display
+
+$$
+\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}
+$$
+
+$$
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
+$$
+
+## Raw Content
+
+```{=html}
+<div class="custom-html">
+    <span>Raw HTML content</span>
+</div>
+```
+
+## Images
+
+![Alt text for image](image.jpg "Image Title")
+![Another image](photo.png)
+
+## Line Blocks
+
+| Line one of the poem
+| Line two continues
+| Line three ends the stanza
+|
+| New stanza begins
+| And continues here
+
+## Thematic Break
+
+Above the break.
+
+---
+
+Below the break.
+
+## Mixed Complex Content
+
+Here's a paragraph with [a link](url) and *emphasis* followed by:
+
+1. A list item with `code`
+   - Nested bullet with {+insert+}
+   - Another with {-delete-}
+2. Second item
+   > With a nested quote
+   > On multiple lines
+
+And back to regular content with a final footnote[^end].
+
+[^end]: The end footnote.

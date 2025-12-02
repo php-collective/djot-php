@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Results (generated)
+results/
+
+# Lock files
+package-lock.json
+
+# Python cache
+__pycache__/
+*.pyc

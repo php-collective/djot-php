@@ -1,0 +1,44 @@
+# Simple Document
+
+This is a simple document for benchmarking basic parsing performance.
+
+## Paragraphs
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod
+tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo.
+
+Another paragraph with *bold text* and _italic text_ as well as `inline code`.
+
+## Basic List
+
+- Item one
+- Item two
+- Item three
+- Item four
+- Item five
+
+## Numbered List
+
+1. First item
+2. Second item
+3. Third item
+4. Fourth item
+5. Fifth item
+
+## Simple Link
+
+Check out [this link](https://example.com) for more information.
+
+## Code Block
+
+```
+function hello() {
+    return "world";
+}
+```
+
+## Quote
+
+> This is a simple block quote.
+> It has multiple lines.

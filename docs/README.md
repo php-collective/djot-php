@@ -9,6 +9,7 @@ This directory contains detailed documentation for djot-php.
 - [Cookbook](cookbook.md) - Common customizations and recipes
 - [Architecture](architecture.md) - Internal design
 - [Converters](converters.md) - Markdown/BBCode to Djot conversion
+- [Performance](performance.md) - Benchmarks and performance data
 
 ## Examples
 

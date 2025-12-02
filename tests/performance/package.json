@@ -1,0 +1,16 @@
+{
+  "name": "djot-php-benchmarks",
+  "version": "1.0.0",
+  "description": "Cross-language benchmarks for djot-php",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench:js": "node benchmark-js.mjs",
+    "bench:compare": "node compare-languages.mjs"
+  },
+  "dependencies": {
+    "@djot/djot": "^0.3.0",
+    "marked": "^15.0.0",
+    "markdown-it": "^14.0.0"
+  }
+}

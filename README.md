@@ -105,6 +105,7 @@ https://sandbox.dereuromark.de/sandbox/djot
 - [Cookbook](docs/cookbook.md) - Common customizations and recipes
 - [Architecture](docs/architecture.md) - Internal design
 - [Enhancements](docs/enhancements.md) - Fixes beyond the current spec
+- [Performance](docs/performance.md) - Benchmarks and performance data
 
 ## Security
 
