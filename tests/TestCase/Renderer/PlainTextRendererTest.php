@@ -144,7 +144,17 @@ class PlainTextRendererTest extends TestCase
         $djot = '> This is quoted text.';
         $document = $this->converter->parse($djot);
 
-        $this->assertSame("This is quoted text.\n", $this->renderer->render($document));
+        $this->assertSame("\"This is quoted text.\"\n", $this->renderer->render($document));
+    }
+
+    public function testBlockQuoteCustomPrefixSuffix(): void
+    {
+        $this->renderer->setBlockQuotePrefix('« ');
+        $this->renderer->setBlockQuoteSuffix(' »');
+        $djot = '> This is quoted text.';
+        $document = $this->converter->parse($djot);
+
+        $this->assertSame("« This is quoted text. »\n", $this->renderer->render($document));
     }
 
     public function testThematicBreak(): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
+use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Comment;
 use Djot\Node\Block\DefinitionDescription;
@@ -49,6 +50,10 @@ class PlainTextRenderer
 
     protected string $tableCellSeparator = "\t";
 
+    protected string $blockQuotePrefix = '"';
+
+    protected string $blockQuoteSuffix = '"';
+
     public function render(Document $document): string
     {
         $text = $this->renderChildren($document);
@@ -68,6 +73,7 @@ class PlainTextRenderer
             $node instanceof CodeBlock => $this->renderCodeBlock($node),
             $node instanceof Comment => '', // Skip comments
             $node instanceof RawBlock => '', // Skip raw blocks (format-specific)
+            $node instanceof BlockQuote => $this->renderBlockQuote($node),
             $node instanceof ListBlock => $this->renderList($node),
             $node instanceof ListItem => $this->renderListItem($node),
             $node instanceof DefinitionList => $this->renderDefinitionList($node),
@@ -115,6 +121,13 @@ class PlainTextRenderer
     protected function renderCodeBlock(CodeBlock $node): string
     {
         return $node->getContent() . "\n\n";
+    }
+
+    protected function renderBlockQuote(BlockQuote $node): string
+    {
+        $content = trim($this->renderChildren($node));
+
+        return $this->blockQuotePrefix . $content . $this->blockQuoteSuffix . "\n\n";
     }
 
     protected function renderList(ListBlock $node): string
@@ -236,5 +249,21 @@ class PlainTextRenderer
     public function setTableCellSeparator(string $separator): void
     {
         $this->tableCellSeparator = $separator;
+    }
+
+    /**
+     * Set the prefix for block quotes
+     */
+    public function setBlockQuotePrefix(string $prefix): void
+    {
+        $this->blockQuotePrefix = $prefix;
+    }
+
+    /**
+     * Set the suffix for block quotes
+     */
+    public function setBlockQuoteSuffix(string $suffix): void
+    {
+        $this->blockQuoteSuffix = $suffix;
     }
 }
