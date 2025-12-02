@@ -704,4 +704,133 @@ DJOT;
         $this->assertStringContainsString('Paragraph', $html);
         $this->assertStringContainsString('Another', $html);
     }
+
+    // ==================== Empty Container Cleanup Tests ====================
+
+    public function testEmptyListItemsAreRemoved(): void
+    {
+        $profile = Profile::comment();
+        $converter = new DjotConverter(profile: $profile);
+
+        // List with images without alt text (not allowed in comment profile)
+        $djot = <<<'DJOT'
+- ![](img1.jpg)
+- ![](img2.jpg)
+- ![](img3.jpg)
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Images should be filtered, and empty list items should be removed
+        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringNotContainsString('<li>', $html);
+        $this->assertStringNotContainsString('<ul>', $html);
+    }
+
+    public function testMixedListItemsPreserveNonEmpty(): void
+    {
+        $profile = Profile::comment();
+        $converter = new DjotConverter(profile: $profile);
+
+        $djot = <<<'DJOT'
+- Text item
+- ![](img.jpg)
+- Another text
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Image should be filtered, but text items preserved
+        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringContainsString('Text item', $html);
+        $this->assertStringContainsString('Another text', $html);
+        // Should have list with 2 items
+        $this->assertEquals(2, substr_count($html, '<li>'));
+    }
+
+    public function testEmptyParagraphsAreRemoved(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        // Image without alt text alone in a paragraph (not allowed in minimal)
+        $html = $converter->convert("Text before\n\n![](img.jpg)\n\nText after");
+
+        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringContainsString('Text before', $html);
+        $this->assertStringContainsString('Text after', $html);
+        // Should have 2 paragraphs, not 3 with an empty one
+        $this->assertEquals(2, substr_count($html, '<p>'));
+    }
+
+    public function testImageAltTextPreserved(): void
+    {
+        $profile = Profile::comment();
+        $converter = new DjotConverter(profile: $profile);
+
+        $html = $converter->convert('![descriptive alt text](img.jpg)');
+
+        // Image converted to text preserving alt text
+        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringContainsString('descriptive alt text', $html);
+    }
+
+    // ==================== Whitespace Preservation Tests ====================
+
+    public function testFilteredBlocksDoNotRunTogether(): void
+    {
+        $profile = Profile::comment();
+        $converter = new DjotConverter(profile: $profile);
+
+        $djot = <<<'DJOT'
+# First Heading
+
+# Second Heading
+
+Regular paragraph
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Headings should be converted to text in separate paragraphs
+        $this->assertStringNotContainsString('<h1>', $html);
+        $this->assertStringContainsString('First Heading', $html);
+        $this->assertStringContainsString('Second Heading', $html);
+        // Text should not run together
+        $this->assertStringNotContainsString('First HeadingSecond Heading', $html);
+    }
+
+    public function testFilteredInlineElementsPreserveText(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        // Link with text (links not allowed in minimal)
+        $html = $converter->convert('Visit [our website](https://example.com) today!');
+
+        $this->assertStringNotContainsString('<a ', $html);
+        $this->assertStringContainsString('our website', $html);
+        $this->assertStringContainsString('Visit', $html);
+        $this->assertStringContainsString('today!', $html);
+    }
+
+    public function testNestedBlockContentPreservesWhitespace(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        // Blockquote with multiple paragraphs (not allowed in minimal)
+        $djot = <<<'DJOT'
+> First line
+> Second line
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringNotContainsString('<blockquote>', $html);
+        $this->assertStringContainsString('First line', $html);
+        $this->assertStringContainsString('Second line', $html);
+        // Should not run together
+        $this->assertStringNotContainsString('First lineSecond line', $html);
+    }
 }

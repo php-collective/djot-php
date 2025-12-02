@@ -7,6 +7,7 @@ namespace Djot\Filter;
 use Djot\Exception\ProfileViolationException;
 use Djot\LinkPolicy;
 use Djot\Node\Block\BlockNode;
+use Djot\Node\Block\Paragraph;
 use Djot\Node\Document;
 use Djot\Node\Inline\Image;
 use Djot\Node\Inline\Link;
@@ -45,6 +46,7 @@ class ProfileFilter
     {
         $this->violations = [];
         $this->filterChildren($doc, $profile, 0);
+        $this->cleanupEmptyContainers($doc);
 
         return $doc;
     }
@@ -179,21 +181,70 @@ class ProfileFilter
             return;
         }
 
-        // For block nodes, we need to convert to a paragraph with text
-        // For inline nodes, we just convert to text
+        // For block nodes, wrap text in a paragraph to maintain block structure
+        // For inline nodes, just replace with text
         if ($node instanceof BlockNode) {
-            // Extract all text nodes from the block
-            $textNodes = $this->extractTextNodes($node);
-            if ($textNodes !== []) {
-                $parent->replaceChildWithMany($node, $textNodes);
-            } else {
-                $parent->removeChild($node);
-            }
+            $paragraph = new Paragraph();
+            $paragraph->appendChild(new Text($textContent));
+            $parent->replaceChildNode($node, $paragraph);
         } else {
             // Inline node - replace with text
             $textNode = new Text($textContent);
             $parent->replaceChildNode($node, $textNode);
         }
+    }
+
+    /**
+     * Remove empty container nodes (list items, paragraphs with no content, empty lists)
+     */
+    protected function cleanupEmptyContainers(Node $parent): void
+    {
+        $children = $parent->getChildren();
+
+        foreach ($children as $child) {
+            // Recursively clean up children first
+            $this->cleanupEmptyContainers($child);
+
+            // Check if this node is now empty and should be removed
+            if ($this->isEmptyContainer($child)) {
+                $parent->removeChild($child);
+            }
+        }
+    }
+
+    /**
+     * Check if a node is an empty container that should be removed
+     */
+    protected function isEmptyContainer(Node $node): bool
+    {
+        // Text nodes are empty if they have no content
+        if ($node instanceof Text) {
+            return $node->getContent() === '';
+        }
+
+        // Nodes with content property (like CodeBlock) are not empty if they have content
+        if (method_exists($node, 'getContent')) {
+            $content = $node->getContent();
+            if ($content !== null && $content !== '') {
+                return false;
+            }
+        }
+
+        // Check if all children are empty
+        $children = $node->getChildren();
+        if ($children === []) {
+            // Empty containers should be removed, except for thematic breaks, etc.
+            return $node instanceof BlockNode;
+        }
+
+        // If all children are empty, this container is empty
+        foreach ($children as $child) {
+            if (!$this->isEmptyContainer($child)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected function extractTextContent(Node $node): string
@@ -217,35 +268,15 @@ class ProfileFilter
             return $node->getContent();
         }
 
-        $text = '';
+        $parts = [];
         foreach ($node->getChildren() as $child) {
-            $text .= $this->extractTextContent($child);
-        }
-
-        return $text;
-    }
-
-    /**
-     * Extract text nodes from a node, preserving structure where possible
-     *
-     * @return list<\Djot\Node\Node>
-     */
-    protected function extractTextNodes(Node $node): array
-    {
-        $nodes = [];
-
-        foreach ($node->getChildren() as $child) {
-            if ($child instanceof Text) {
-                $nodes[] = new Text($child->getContent());
-            } else {
-                // Recursively extract from child
-                $childNodes = $this->extractTextNodes($child);
-                foreach ($childNodes as $childNode) {
-                    $nodes[] = $childNode;
-                }
+            $childText = $this->extractTextContent($child);
+            if ($childText !== '') {
+                $parts[] = $childText;
             }
         }
 
-        return $nodes;
+        // Join with space for block elements to prevent text from running together
+        return implode(' ', $parts);
     }
 }
