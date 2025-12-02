@@ -4,8 +4,10 @@ This directory contains detailed documentation for djot-php.
 
 ## Contents
 
+- [Why Djot?](why-djot.md) - Comparison with Markdown, migration guide
 - [Syntax Reference](syntax.md) - Complete Djot syntax guide
 - [API Reference](api.md) - Classes and methods
+- [Profiles](profiles.md) - Feature restriction for different contexts
 - [Cookbook](cookbook.md) - Common customizations and recipes
 - [Architecture](architecture.md) - Internal design
 - [Converters](converters.md) - Markdown/BBCode to Djot conversion

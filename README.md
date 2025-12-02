@@ -97,6 +97,7 @@ https://sandbox.dereuromark.de/sandbox/djot
 
 ## Documentation
 
+- [Why Djot?](docs/why-djot.md) - Comparison with Markdown, migration guide
 - [Examples](docs/README.md) - Comprehensive usage examples
 - [Syntax Reference](docs/syntax.md) - Complete Djot syntax guide
 - [API Reference](docs/api.md) - Classes and methods
