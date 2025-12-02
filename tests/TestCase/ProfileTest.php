@@ -735,10 +735,11 @@ DJOT;
 
         $html = $converter->convert($djot);
 
-        // Images should be filtered, and empty list items should be removed
+        // Images should be filtered to [img] placeholder
         $this->assertStringNotContainsString('<img', $html);
-        $this->assertStringNotContainsString('<li>', $html);
-        $this->assertStringNotContainsString('<ul>', $html);
+        $this->assertStringContainsString('[img]', $html);
+        // List items should be preserved with placeholder
+        $this->assertEquals(3, substr_count($html, '<li>'));
     }
 
     public function testMixedListItemsPreserveNonEmpty(): void
@@ -754,15 +755,16 @@ DJOT;
 
         $html = $converter->convert($djot);
 
-        // Image should be filtered, but text items preserved
+        // Image should be filtered to [img], text items preserved
         $this->assertStringNotContainsString('<img', $html);
         $this->assertStringContainsString('Text item', $html);
         $this->assertStringContainsString('Another text', $html);
-        // Should have list with 2 items
-        $this->assertEquals(2, substr_count($html, '<li>'));
+        $this->assertStringContainsString('[img]', $html);
+        // Should have list with 3 items (all have content now)
+        $this->assertEquals(3, substr_count($html, '<li>'));
     }
 
-    public function testEmptyParagraphsAreRemoved(): void
+    public function testImagePlaceholderInParagraph(): void
     {
         $profile = Profile::minimal();
         $converter = new DjotConverter(profile: $profile);
@@ -773,8 +775,9 @@ DJOT;
         $this->assertStringNotContainsString('<img', $html);
         $this->assertStringContainsString('Text before', $html);
         $this->assertStringContainsString('Text after', $html);
-        // Should have 2 paragraphs, not 3 with an empty one
-        $this->assertEquals(2, substr_count($html, '<p>'));
+        $this->assertStringContainsString('[img]', $html);
+        // Should have 3 paragraphs (image becomes [img] placeholder)
+        $this->assertEquals(3, substr_count($html, '<p>'));
     }
 
     public function testImageAltTextPreserved(): void
@@ -818,12 +821,12 @@ DJOT;
 
         // Table tag should not appear
         $this->assertStringNotContainsString('<table>', $html);
-        // Content should be preserved with row structure
-        $this->assertStringContainsString('Name Type', $html);
-        $this->assertStringContainsString('Djot Markup', $html);
-        $this->assertStringContainsString('PHP Code', $html);
+        // Content should be preserved with pipe separators
+        $this->assertStringContainsString('Name | Type', $html);
+        $this->assertStringContainsString('Djot | Markup', $html);
+        $this->assertStringContainsString('PHP | Code', $html);
         // Rows should be on separate lines (converted to <br> tags)
-        $this->assertStringContainsString('Name Type<br>', $html);
+        $this->assertStringContainsString('Name | Type<br>', $html);
     }
 
     // ==================== Whitespace Preservation Tests ====================
@@ -915,6 +918,8 @@ DJOT;
         $this->assertStringNotContainsString('<a href="#fn', $html);
         // Footnote reference should be converted to text
         $this->assertStringContainsString('[^1]', $html);
+        // Footnote definition should preserve label with content
+        $this->assertStringContainsString('[^1]: The footnote content.', $html);
     }
 
     public function testBlockquoteWithMultipleParagraphsPreservesLineBreaks(): void
@@ -935,5 +940,89 @@ DJOT;
         $this->assertStringContainsString('Second paragraph.', $html);
         // Paragraphs should be separated by line breaks
         $this->assertStringContainsString('<br>', $html);
+    }
+
+    public function testListPreservesMarkers(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        // Unordered list (allowed in minimal, so renders as HTML)
+        // We need to test with a profile that doesn't allow lists
+        $profile = (new Profile())
+            ->allowInline([NodeType::TEXT, NodeType::SOFT_BREAK, NodeType::HARD_BREAK])
+            ->allowBlock([NodeType::PARAGRAPH]);
+        $converter = new DjotConverter(profile: $profile);
+
+        $html = $converter->convert("- First\n- Second");
+
+        $this->assertStringNotContainsString('<ul>', $html);
+        $this->assertStringNotContainsString('<li>', $html);
+        // Should have dash markers
+        $this->assertStringContainsString('- First', $html);
+        $this->assertStringContainsString('- Second', $html);
+    }
+
+    public function testOrderedListPreservesNumbers(): void
+    {
+        $profile = (new Profile())
+            ->allowInline([NodeType::TEXT, NodeType::SOFT_BREAK, NodeType::HARD_BREAK])
+            ->allowBlock([NodeType::PARAGRAPH]);
+        $converter = new DjotConverter(profile: $profile);
+
+        $html = $converter->convert("1. First\n2. Second\n3. Third");
+
+        $this->assertStringNotContainsString('<ol>', $html);
+        // Should have numbered markers
+        $this->assertStringContainsString('1. First', $html);
+        $this->assertStringContainsString('2. Second', $html);
+        $this->assertStringContainsString('3. Third', $html);
+    }
+
+    public function testThematicBreakPreservesMarker(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        $html = $converter->convert("Before\n\n---\n\nAfter");
+
+        // Thematic break tag should not appear
+        $this->assertStringNotContainsString('<hr', $html);
+        // Original marker should be preserved
+        $this->assertStringContainsString('---', $html);
+    }
+
+    public function testDefinitionListPreservesStructure(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        $djot = <<<'DJOT'
+: Djot
+
+  A lightweight markup language.
+
+: Markdown
+
+  The predecessor.
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Definition list tags should not appear
+        $this->assertStringNotContainsString('<dl>', $html);
+        $this->assertStringNotContainsString('<dt>', $html);
+        $this->assertStringNotContainsString('<dd>', $html);
+        // Content should be preserved
+        $this->assertStringContainsString('Djot', $html);
+        $this->assertStringContainsString('A lightweight markup language.', $html);
+        $this->assertStringContainsString('Markdown', $html);
+        $this->assertStringContainsString('The predecessor.', $html);
+        // Should have line breaks between terms and descriptions
+        $this->assertStringContainsString('<br>', $html);
+        // Descriptions should have dash prefix for visibility
+        $this->assertStringContainsString('- A lightweight markup language.', $html);
+        // Should not run together
+        $this->assertStringNotContainsString('DjotA lightweight', $html);
     }
 }

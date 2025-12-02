@@ -8,9 +8,18 @@ use Djot\Exception\ProfileViolationException;
 use Djot\LinkPolicy;
 use Djot\Node\Block\BlockNode;
 use Djot\Node\Block\BlockQuote;
+use Djot\Node\Block\CodeBlock;
+use Djot\Node\Block\DefinitionDescription;
+use Djot\Node\Block\DefinitionList;
+use Djot\Node\Block\DefinitionTerm;
+use Djot\Node\Block\Footnote;
+use Djot\Node\Block\Heading;
+use Djot\Node\Block\ListBlock;
+use Djot\Node\Block\ListItem;
 use Djot\Node\Block\Paragraph;
 use Djot\Node\Block\Table;
 use Djot\Node\Block\TableRow;
+use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
@@ -274,9 +283,33 @@ class ProfileFilter
 
     protected function extractTextContent(Node $node): string
     {
-        // Special handling for images - use alt text
+        // Special handling for images - show as [img: alt] or [img]
         if ($node instanceof Image) {
-            return $node->getAlt();
+            $alt = $node->getAlt();
+
+            return $alt !== '' ? '[img: ' . $alt . ']' : '[img]';
+        }
+
+        // Special handling for headings - preserve level with # prefix
+        if ($node instanceof Heading) {
+            $prefix = str_repeat('#', $node->getLevel()) . ' ';
+            $text = '';
+            foreach ($node->getChildren() as $child) {
+                $text .= $this->extractTextContent($child);
+            }
+
+            return $prefix . $text;
+        }
+
+        // Special handling for code blocks - wrap in backticks
+        if ($node instanceof CodeBlock) {
+            $content = $node->getContent();
+            // Use single backticks for single-line, triple for multi-line
+            if (str_contains($content, "\n")) {
+                return "```\n" . $content . "\n```";
+            }
+
+            return '`' . $content . '`';
         }
 
         // Special handling for links - get child text content
@@ -298,24 +331,67 @@ class ProfileFilter
                     foreach ($row->getChildren() as $cell) {
                         $cells[] = $this->extractTextContent($cell);
                     }
-                    $rows[] = implode(' ', $cells);
+                    $rows[] = implode(' | ', $cells);
                 }
             }
 
             return implode("\n", $rows);
         }
 
-        // Special handling for blockquotes - preserve paragraph structure
+        // Special handling for blockquotes - add > prefix
         if ($node instanceof BlockQuote) {
             $paragraphs = [];
             foreach ($node->getChildren() as $child) {
                 $text = $this->extractTextContent($child);
                 if ($text !== '') {
-                    $paragraphs[] = $text;
+                    $paragraphs[] = '> ' . $text;
                 }
             }
 
             return implode("\n", $paragraphs);
+        }
+
+        // Special handling for definition lists - preserve term/description structure
+        if ($node instanceof DefinitionList) {
+            $parts = [];
+            foreach ($node->getChildren() as $child) {
+                $text = $this->extractTextContent($child);
+                if ($text !== '') {
+                    // Add prefix for terms to distinguish from descriptions
+                    if ($child instanceof DefinitionTerm) {
+                        $parts[] = $text;
+                    } elseif ($child instanceof DefinitionDescription) {
+                        // Prefix descriptions with dash for visibility in HTML
+                        $parts[] = '- ' . $text;
+                    } else {
+                        $parts[] = $text;
+                    }
+                }
+            }
+
+            return implode("\n", $parts);
+        }
+
+        // Special handling for lists - preserve item structure with markers
+        if ($node instanceof ListBlock) {
+            $items = [];
+            $index = $node->getStart();
+            foreach ($node->getChildren() as $child) {
+                if ($child instanceof ListItem) {
+                    $text = $this->extractTextContent($child);
+                    if ($text !== '') {
+                        // Use appropriate marker based on list type
+                        $marker = match ($node->getListType()) {
+                            ListBlock::TYPE_ORDERED => $index . '. ',
+                            default => '- ',
+                        };
+                        $items[] = $marker . $text;
+                        $index++;
+                    }
+                }
+            }
+
+            return implode("\n", $items);
         }
 
         // Special handling for symbols - use the symbol name
@@ -326,6 +402,24 @@ class ProfileFilter
         // Special handling for footnote references - use the label
         if ($node instanceof FootnoteRef) {
             return '[^' . $node->getLabel() . ']';
+        }
+
+        // Special handling for footnote definitions - preserve label with content
+        if ($node instanceof Footnote) {
+            $content = [];
+            foreach ($node->getChildren() as $child) {
+                $text = $this->extractTextContent($child);
+                if ($text !== '') {
+                    $content[] = $text;
+                }
+            }
+
+            return '[^' . $node->getLabel() . ']: ' . implode(' ', $content);
+        }
+
+        // Special handling for thematic breaks - show original marker
+        if ($node instanceof ThematicBreak) {
+            return '---';
         }
 
         if ($node instanceof Text) {

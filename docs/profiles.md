@@ -160,6 +160,8 @@ $html = $converter->convert('Check [this link](https://example.com)!');
 // Link converted to text, URL removed
 ```
 
+See [Profile Filter Examples](profile-filter-examples.md) for a complete list of how each element type is converted.
+
 ## Link Policies
 
 Control how links are rendered:
