@@ -802,6 +802,30 @@ DJOT;
         $this->assertStringContainsString('code block content', $html);
     }
 
+    public function testTableConvertedToStructuredText(): void
+    {
+        $profile = Profile::comment();
+        $converter = new DjotConverter(profile: $profile);
+
+        $djot = <<<'DJOT'
+| Name | Type   |
+|------|--------|
+| Djot | Markup |
+| PHP  | Code   |
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Table tag should not appear
+        $this->assertStringNotContainsString('<table>', $html);
+        // Content should be preserved with row structure
+        $this->assertStringContainsString('Name Type', $html);
+        $this->assertStringContainsString('Djot Markup', $html);
+        $this->assertStringContainsString('PHP Code', $html);
+        // Rows should be on separate lines (converted to <br> tags)
+        $this->assertStringContainsString('Name Type<br>', $html);
+    }
+
     // ==================== Whitespace Preservation Tests ====================
 
     public function testFilteredBlocksDoNotRunTogether(): void
@@ -859,5 +883,57 @@ DJOT;
         $this->assertStringContainsString('Second line', $html);
         // Should not run together
         $this->assertStringNotContainsString('First lineSecond line', $html);
+    }
+
+    public function testSymbolConvertedToTextRepresentation(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        $html = $converter->convert('I :heart: this!');
+
+        // Symbol tag should not appear
+        $this->assertStringNotContainsString('<symbol', $html);
+        // Symbol name should be preserved with colons
+        $this->assertStringContainsString(':heart:', $html);
+    }
+
+    public function testFootnoteRefConvertedToTextRepresentation(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        $djot = <<<'DJOT'
+This has a footnote[^1].
+
+[^1]: The footnote content.
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Footnote elements should not appear
+        $this->assertStringNotContainsString('<a href="#fn', $html);
+        // Footnote reference should be converted to text
+        $this->assertStringContainsString('[^1]', $html);
+    }
+
+    public function testBlockquoteWithMultipleParagraphsPreservesLineBreaks(): void
+    {
+        $profile = Profile::minimal();
+        $converter = new DjotConverter(profile: $profile);
+
+        $djot = <<<'DJOT'
+> First paragraph.
+>
+> Second paragraph.
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringNotContainsString('<blockquote>', $html);
+        $this->assertStringContainsString('First paragraph.', $html);
+        $this->assertStringContainsString('Second paragraph.', $html);
+        // Paragraphs should be separated by line breaks
+        $this->assertStringContainsString('<br>', $html);
     }
 }

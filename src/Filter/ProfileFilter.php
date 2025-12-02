@@ -7,10 +7,16 @@ namespace Djot\Filter;
 use Djot\Exception\ProfileViolationException;
 use Djot\LinkPolicy;
 use Djot\Node\Block\BlockNode;
+use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\Paragraph;
+use Djot\Node\Block\Table;
+use Djot\Node\Block\TableRow;
 use Djot\Node\Document;
+use Djot\Node\Inline\FootnoteRef;
+use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
 use Djot\Node\Inline\Link;
+use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Profile;
@@ -185,12 +191,31 @@ class ProfileFilter
         // For inline nodes, just replace with text
         if ($node instanceof BlockNode) {
             $paragraph = new Paragraph();
-            $paragraph->appendChild(new Text($textContent));
+            $this->appendTextWithBreaks($paragraph, $textContent);
             $parent->replaceChildNode($node, $paragraph);
         } else {
             // Inline node - replace with text
             $textNode = new Text($textContent);
             $parent->replaceChildNode($node, $textNode);
+        }
+    }
+
+    /**
+     * Append text content to a node, converting newlines to HardBreak nodes
+     */
+    protected function appendTextWithBreaks(Node $parent, string $content): void
+    {
+        $lines = explode("\n", $content);
+        $lastIndex = count($lines) - 1;
+
+        foreach ($lines as $index => $line) {
+            if ($line !== '') {
+                $parent->appendChild(new Text($line));
+            }
+            // Add line break between lines (not after the last line)
+            if ($index < $lastIndex) {
+                $parent->appendChild(new HardBreak());
+            }
         }
     }
 
@@ -262,6 +287,45 @@ class ProfileFilter
             }
 
             return $text;
+        }
+
+        // Special handling for tables - preserve row structure
+        if ($node instanceof Table) {
+            $rows = [];
+            foreach ($node->getChildren() as $row) {
+                if ($row instanceof TableRow) {
+                    $cells = [];
+                    foreach ($row->getChildren() as $cell) {
+                        $cells[] = $this->extractTextContent($cell);
+                    }
+                    $rows[] = implode(' ', $cells);
+                }
+            }
+
+            return implode("\n", $rows);
+        }
+
+        // Special handling for blockquotes - preserve paragraph structure
+        if ($node instanceof BlockQuote) {
+            $paragraphs = [];
+            foreach ($node->getChildren() as $child) {
+                $text = $this->extractTextContent($child);
+                if ($text !== '') {
+                    $paragraphs[] = $text;
+                }
+            }
+
+            return implode("\n", $paragraphs);
+        }
+
+        // Special handling for symbols - use the symbol name
+        if ($node instanceof Symbol) {
+            return ':' . $node->getName() . ':';
+        }
+
+        // Special handling for footnote references - use the label
+        if ($node instanceof FootnoteRef) {
+            return '[^' . $node->getLabel() . ']';
         }
 
         if ($node instanceof Text) {
