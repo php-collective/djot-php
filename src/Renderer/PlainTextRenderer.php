@@ -48,7 +48,7 @@ class PlainTextRenderer
 
     protected string $orderedListItemPrefix = '. ';
 
-    protected string $tableCellSeparator = "\t";
+    protected string $tableCellSeparator = ' | ';
 
     protected string $blockQuotePrefix = '"';
 

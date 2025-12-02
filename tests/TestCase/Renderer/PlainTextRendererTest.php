@@ -117,7 +117,7 @@ class PlainTextRendererTest extends TestCase
         $djot = "| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob | 25 |";
         $document = $this->converter->parse($djot);
 
-        $expected = "Name\tAge\nAlice\t30\nBob\t25\n";
+        $expected = "Name | Age\nAlice | 30\nBob | 25\n";
         $this->assertSame($expected, $this->renderer->render($document));
     }
 
@@ -126,7 +126,7 @@ class PlainTextRendererTest extends TestCase
         $djot = "| A | B |\n|---|---|\n| 1 | 2 |\n^ User data";
         $document = $this->converter->parse($djot);
 
-        $expected = "A\tB\n1\t2\nUser data\n";
+        $expected = "A | B\n1 | 2\nUser data\n";
         $this->assertSame($expected, $this->renderer->render($document));
     }
 
@@ -250,11 +250,11 @@ class PlainTextRendererTest extends TestCase
 
     public function testCustomTableSeparator(): void
     {
-        $this->renderer->setTableCellSeparator(' | ');
+        $this->renderer->setTableCellSeparator("\t");
         $djot = "| A | B |\n|---|---|\n| 1 | 2 |";
         $document = $this->converter->parse($djot);
 
-        $expected = "A | B\n1 | 2\n";
+        $expected = "A\tB\n1\t2\n";
         $this->assertSame($expected, $this->renderer->render($document));
     }
 
