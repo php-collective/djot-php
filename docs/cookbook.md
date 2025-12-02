@@ -1068,6 +1068,7 @@ echo $converter->convert($djot);
 For detailed customization of alternative renderers, see:
 - [PlainText Cookbook](cookbook-plaintext.md) - PlainTextRenderer customizations
 - [Markdown Cookbook](cookbook-markdown.md) - MarkdownRenderer customizations
+- [ANSI Cookbook](cookbook-ansi.md) - AnsiRenderer customizations
 
 ### Plain Text Extraction
 
