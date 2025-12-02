@@ -14,7 +14,6 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use Djot\DjotConverter;
-use Djot\Profile;
 
 // Parse CLI arguments
 $options = getopt('', ['scenario:', 'json', 'help']);
@@ -48,6 +47,7 @@ function formatMs(float $ms): string
     if ($ms < 1000) {
         return sprintf('%.2f ms', $ms);
     }
+
     return sprintf('%.2f s', $ms / 1000);
 }
 
@@ -59,6 +59,7 @@ function formatSize(int $bytes): string
     if ($bytes < 1024 * 1024) {
         return sprintf('%.2f KB', $bytes / 1024);
     }
+
     return sprintf('%.2f MB', $bytes / (1024 * 1024));
 }
 
@@ -78,7 +79,7 @@ function runScenario(string $name, string $description, callable $generator, int
     $size = strlen($content);
 
     if (!$jsonOutput) {
-        echo "Input size: " . formatSize($size) . "\n";
+        echo 'Input size: ' . formatSize($size) . "\n";
     }
 
     // Warmup
@@ -134,19 +135,19 @@ function runScenario(string $name, string $description, callable $generator, int
             'mean' => array_sum($times) / $count,
             'median' => $count % 2 === 0
                 ? ($times[$count / 2 - 1] + $times[$count / 2]) / 2
-                : $times[(int) ($count / 2)],
-            'p95' => $times[(int) ($count * 0.95)],
+                : $times[(int)($count / 2)],
+            'p95' => $times[(int)($count * 0.95)],
         ],
         'peak_memory' => $peakMemory,
         'throughput' => $size / ((array_sum($times) / $count) / 1000),
     ];
 
     if (!$jsonOutput) {
-        echo "Output size: " . formatSize($result['output_size']) . "\n";
-        echo "Mean time: " . formatMs($result['stats']['mean']) . "\n";
-        echo "P95 time: " . formatMs($result['stats']['p95']) . "\n";
-        echo "Peak memory: " . formatSize($result['peak_memory']) . "\n";
-        echo "Throughput: " . formatSize((int) $result['throughput']) . "/s\n";
+        echo 'Output size: ' . formatSize($result['output_size']) . "\n";
+        echo 'Mean time: ' . formatMs($result['stats']['mean']) . "\n";
+        echo 'P95 time: ' . formatMs($result['stats']['p95']) . "\n";
+        echo 'Peak memory: ' . formatSize($result['peak_memory']) . "\n";
+        echo 'Throughput: ' . formatSize((int)$result['throughput']) . "/s\n";
         echo "Status: ✓ PASS\n";
     }
 
@@ -192,18 +193,23 @@ $scenarios = [
                 switch ($type) {
                     case 0:
                         $content .= "Plain paragraph number {$i}.\n\n";
+
                         break;
                     case 1:
                         $content .= "Paragraph {$i} with *bold* and _italic_ text.\n\n";
+
                         break;
                     case 2:
                         $content .= "Paragraph {$i} with `code` and [link](url).\n\n";
+
                         break;
                     case 3:
                         $content .= "Paragraph {$i}: {+ins+} {-del-} {=mark=}\n\n";
+
                         break;
                     case 4:
                         $content .= "Paragraph {$i}: H{~2~}O and x{^2^}\n\n";
+
                         break;
                 }
             }
@@ -220,7 +226,7 @@ $scenarios = [
             $rows = 100;
 
             // Header
-            $content .= '|' . implode('|', array_map(fn($c) => " H{$c} ", range(1, $cols))) . "|\n";
+            $content .= '|' . implode('|', array_map(fn ($c) => " H{$c} ", range(1, $cols))) . "|\n";
             $content .= '|' . str_repeat('---|', $cols) . "\n";
 
             // Rows
@@ -285,13 +291,13 @@ $scenarios = [
 
             // Repeated emphasis markers
             $content .= "## Emphasis Edge Cases\n\n";
-            $content .= str_repeat('_', 100) . "text" . str_repeat('_', 100) . "\n\n";
-            $content .= str_repeat('*', 100) . "text" . str_repeat('*', 100) . "\n\n";
+            $content .= str_repeat('_', 100) . 'text' . str_repeat('_', 100) . "\n\n";
+            $content .= str_repeat('*', 100) . 'text' . str_repeat('*', 100) . "\n\n";
 
             // Unclosed brackets (should not cause exponential blowup)
             $content .= "## Bracket Test\n\n";
-            $content .= str_repeat('[', 50) . "text" . str_repeat(']', 50) . "\n\n";
-            $content .= str_repeat('(', 50) . "text" . str_repeat(')', 50) . "\n\n";
+            $content .= str_repeat('[', 50) . 'text' . str_repeat(']', 50) . "\n\n";
+            $content .= str_repeat('(', 50) . 'text' . str_repeat(')', 50) . "\n\n";
 
             // Mixed markers
             $content .= "## Mixed Markers\n\n";
@@ -370,29 +376,36 @@ $scenarios = [
             $targetSize = 1024 * 1024 * 2; // 2MB
             $content = "# Memory Pressure Test\n\n";
 
-            while (strlen($content) < $targetSize) {
+            $contentLength = strlen($content);
+            while ($contentLength < $targetSize) {
                 $section = rand(0, 4);
                 switch ($section) {
                     case 0:
-                        $content .= "## Section " . strlen($content) . "\n\n";
+                        $content .= '## Section ' . strlen($content) . "\n\n";
                         $content .= "A paragraph with *bold* _italic_ `code` and [link](url).\n\n";
+
                         break;
                     case 1:
-                        $content .= "- List item " . strlen($content) . "\n";
+                        $content .= '- List item ' . strlen($content) . "\n";
                         $content .= "  - Nested item\n";
                         $content .= "    - Deep nested\n\n";
+
                         break;
                     case 2:
-                        $content .= "> Quote " . strlen($content) . "\n";
+                        $content .= '> Quote ' . strlen($content) . "\n";
                         $content .= "> Second line\n\n";
+
                         break;
                     case 3:
                         $content .= "```\ncode block " . strlen($content) . "\n```\n\n";
+
                         break;
                     case 4:
                         $content .= "| A | B | C |\n|---|---|---|\n| 1 | 2 | 3 |\n\n";
+
                         break;
                 }
+                $contentLength = strlen($content);
             }
 
             return $content;
@@ -406,8 +419,8 @@ $results = [];
 if (!$jsonOutput) {
     echo "Djot-PHP Stress Test Suite\n";
     echo "==========================\n";
-    echo "PHP Version: " . PHP_VERSION . "\n";
-    echo "Memory Limit: " . ini_get('memory_limit') . "\n";
+    echo 'PHP Version: ' . PHP_VERSION . "\n";
+    echo 'Memory Limit: ' . ini_get('memory_limit') . "\n";
 }
 
 foreach ($scenarios as $name => $scenario) {
@@ -418,15 +431,15 @@ foreach ($scenarios as $name => $scenario) {
     $results[$name] = runScenario(
         $name,
         $scenario['description'],
-        $scenario['generator']
+        $scenario['generator'],
     );
 }
 
 // Summary
 if (!$jsonOutput) {
-    echo "\n" . str_repeat("=", 60) . "\n";
+    echo "\n" . str_repeat('=', 60) . "\n";
     echo "SUMMARY\n";
-    echo str_repeat("=", 60) . "\n\n";
+    echo str_repeat('=', 60) . "\n\n";
 
     $passed = 0;
     $failed = 0;

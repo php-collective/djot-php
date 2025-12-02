@@ -45,6 +45,7 @@ function formatSize(int $bytes): string
     if ($bytes < 1024 * 1024) {
         return sprintf('%.2f KB', $bytes / 1024);
     }
+
     return sprintf('%.2f MB', $bytes / (1024 * 1024));
 }
 
@@ -83,6 +84,7 @@ function generateDocument(int $size): string
         $content .= "> A block quote here\n\n";
         $content .= "```php\necho 'code block';\n```\n\n";
     }
+
     return $content;
 }
 
@@ -115,17 +117,24 @@ $results = [];
 if (!$jsonOutput) {
     echo "Djot-PHP Memory Profiler\n";
     echo "========================\n";
-    echo "PHP Version: " . PHP_VERSION . "\n";
-    echo "Memory Limit: " . ini_get('memory_limit') . "\n";
+    echo 'PHP Version: ' . PHP_VERSION . "\n";
+    echo 'Memory Limit: ' . ini_get('memory_limit') . "\n";
     echo "\n";
 }
 
 // Per-fixture memory analysis
 if (!$jsonOutput) {
     echo "## Memory Usage by Document Size\n\n";
-    printf("%-15s %12s %12s %12s %12s %12s\n",
-        "Fixture", "Input Size", "Output Size", "AST Mem", "Total Mem", "Peak");
-    echo str_repeat("-", 75) . "\n";
+    printf(
+        "%-15s %12s %12s %12s %12s %12s\n",
+        'Fixture',
+        'Input Size',
+        'Output Size',
+        'AST Mem',
+        'Total Mem',
+        'Peak',
+    );
+    echo str_repeat('-', 75) . "\n";
 }
 
 foreach ($fixtures as $name => $content) {
@@ -159,13 +168,14 @@ foreach ($fixtures as $name => $content) {
     ];
 
     if (!$jsonOutput) {
-        printf("%-15s %12s %12s %12s %12s %12s\n",
+        printf(
+            "%-15s %12s %12s %12s %12s %12s\n",
             $name,
             formatSize($inputSize),
             formatSize($outputSize),
             formatSize($astMemory),
             formatSize($totalMemory),
-            formatSize($results['fixtures'][$name]['peak_memory'])
+            formatSize($results['fixtures'][$name]['peak_memory']),
         );
     }
 
@@ -215,10 +225,10 @@ if ($detailed) {
     ];
 
     if (!$jsonOutput) {
-        echo "Parse Memory:  " . formatSize($memAfterParse - $memStart) . "\n";
-        echo "Render Memory: " . formatSize($memAfterRender - $memAfterParse) . "\n";
+        echo 'Parse Memory:  ' . formatSize($memAfterParse - $memStart) . "\n";
+        echo 'Render Memory: ' . formatSize($memAfterRender - $memAfterParse) . "\n";
         echo "Total Nodes:   {$nodeCount}\n";
-        echo "Bytes/Node:    " . sprintf('%.2f', $results['detailed']['bytes_per_node']) . "\n\n";
+        echo 'Bytes/Node:    ' . sprintf('%.2f', $results['detailed']['bytes_per_node']) . "\n\n";
 
         echo "Node Type Distribution:\n";
         arsort($nodeCounts);
@@ -234,8 +244,8 @@ if ($detailed) {
 // Profile comparison memory usage
 if (!$jsonOutput) {
     echo "\n## Profile Memory Comparison (gen_medium)\n\n";
-    printf("%-15s %12s %12s\n", "Profile", "Memory Used", "Peak");
-    echo str_repeat("-", 42) . "\n";
+    printf("%-15s %12s %12s\n", 'Profile', 'Memory Used', 'Peak');
+    echo str_repeat('-', 42) . "\n";
 }
 
 $profiles = [
@@ -261,10 +271,11 @@ foreach ($profiles as $name => $profile) {
     ];
 
     if (!$jsonOutput) {
-        printf("%-15s %12s %12s\n",
+        printf(
+            "%-15s %12s %12s\n",
             $name,
             formatSize($result['used_delta']),
-            formatSize($result['peak'])
+            formatSize($result['peak']),
         );
     }
 
@@ -274,8 +285,8 @@ foreach ($profiles as $name => $profile) {
 // Scaling analysis
 if (!$jsonOutput) {
     echo "\n## Memory Scaling Analysis\n\n";
-    printf("%-12s %12s %12s %12s\n", "Paragraphs", "Input Size", "Memory", "Ratio");
-    echo str_repeat("-", 52) . "\n";
+    printf("%-12s %12s %12s %12s\n", 'Paragraphs', 'Input Size', 'Memory', 'Ratio');
+    echo str_repeat('-', 52) . "\n";
 }
 
 $results['scaling'] = [];
@@ -299,11 +310,12 @@ foreach ($sizes as $paragraphs) {
     ];
 
     if (!$jsonOutput) {
-        printf("%-12d %12s %12s %12.2fx\n",
+        printf(
+            "%-12d %12s %12s %12.2fx\n",
             $paragraphs,
             formatSize($inputSize),
             formatSize($result['used_delta']),
-            $ratio
+            $ratio,
         );
     }
 }
@@ -342,7 +354,7 @@ if ($jsonOutput) {
 
     // Find average memory ratio
     $avgRatio = array_sum(array_column($results['scaling'], 'ratio')) / count($results['scaling']);
-    echo "Average Memory Ratio: " . sprintf('%.2f', $avgRatio) . "x input size\n";
+    echo 'Average Memory Ratio: ' . sprintf('%.2f', $avgRatio) . "x input size\n";
     echo "Memory scales approximately linearly with document size.\n";
     echo "\nMemory profiling complete.\n";
 }

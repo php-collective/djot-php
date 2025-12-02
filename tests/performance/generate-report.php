@@ -38,7 +38,7 @@ if (!$inputFile) {
     if (is_dir($resultsDir)) {
         $files = glob($resultsDir . '/benchmark-*.json');
         if ($files) {
-            usort($files, fn($a, $b) => filemtime($b) - filemtime($a));
+            usort($files, fn ($a, $b) => filemtime($b) - filemtime($a));
             $inputFile = $files[0];
         }
     }
@@ -63,6 +63,7 @@ function formatMs(float $ms): string
     if ($ms < 1000) {
         return sprintf('%.2f ms', $ms);
     }
+
     return sprintf('%.2f s', $ms / 1000);
 }
 
@@ -74,6 +75,7 @@ function formatSize(int $bytes): string
     if ($bytes < 1024 * 1024) {
         return sprintf('%.1f KB', $bytes / 1024);
     }
+
     return sprintf('%.1f MB', $bytes / (1024 * 1024));
 }
 
@@ -311,7 +313,7 @@ if ($phpThroughput) {
             <div class="stat-value">%s/s</div>
             <div class="stat-label">PHP Throughput</div>
         </div>
-    ', formatSize((int) $phpThroughput));
+    ', formatSize((int)$phpThroughput));
 }
 
 if ($phpMean && $jsMean) {
@@ -322,7 +324,7 @@ if ($phpMean && $jsMean) {
             <div class="stat-value">%.2fx</div>
             <div class="stat-label">PHP vs JS (%s)</div>
         </div>
-    ', $ratio > 1 ? $ratio : 1/$ratio, $comparison);
+    ', $ratio > 1 ? $ratio : 1 / $ratio, $comparison);
 }
 
 $html .= '</div>';
@@ -356,7 +358,7 @@ if (isset($results['php']['conversion'])) {
             formatMs($stats['mean']),
             formatMs($stats['median']),
             formatMs($stats['p95']),
-            formatSize((int) $data['throughput_bps'])
+            formatSize((int)$data['throughput_bps']),
         );
     }
 
@@ -377,7 +379,7 @@ if (isset($results['javascript']['conversion'])) {
             formatMs($stats['mean']),
             formatMs($stats['median']),
             formatMs($stats['p95']),
-            formatSize((int) $data['throughput_bps'])
+            formatSize((int)$data['throughput_bps']),
         );
     }
 
@@ -406,7 +408,7 @@ if (isset($results['python']['libraries'])) {
                 formatMs($stats['mean']),
                 formatMs($stats['median']),
                 formatMs($stats['p95']),
-                formatSize((int) $data['throughput_bps'])
+                formatSize((int)$data['throughput_bps']),
             );
         }
 

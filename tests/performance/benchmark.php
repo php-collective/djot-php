@@ -36,8 +36,8 @@ HELP;
     exit(0);
 }
 
-$iterations = (int) ($options['iterations'] ?? 100);
-$warmup = (int) ($options['warmup'] ?? 10);
+$iterations = (int)($options['iterations'] ?? 100);
+$warmup = (int)($options['warmup'] ?? 10);
 $jsonOutput = isset($options['json']);
 
 // Test fixtures
@@ -61,6 +61,7 @@ function generateFixture(string $name, int $paragraphs): string
         $content .= "This is paragraph {$i} with some *bold* and _italic_ text. ";
         $content .= "Here's a [link](https://example.com) and `inline code`.\n\n";
     }
+
     return $content;
 }
 
@@ -189,6 +190,7 @@ function generateTableFixture(): string
         }
         $content .= "\n";
     }
+
     return $content;
 }
 
@@ -208,6 +210,7 @@ function generateCodeHeavyFixture(): string
         $content .= "}\n";
         $content .= "```\n\n";
     }
+
     return $content;
 }
 
@@ -216,13 +219,14 @@ function generateInlineHeavyFixture(): string
     $content = "# Inline-Heavy Document\n\n";
     for ($p = 0; $p < 100; $p++) {
         $content .= "Paragraph {$p}: ";
-        $content .= "*bold* _italic_ `code` ";
-        $content .= "[link](url) ![img](img.jpg) ";
-        $content .= "{+ins+} {-del-} {=mark=} ";
-        $content .= "H{~2~}O x{^2^} ";
-        $content .= ":symbol: \$math\$ ";
+        $content .= '*bold* _italic_ `code` ';
+        $content .= '[link](url) ![img](img.jpg) ';
+        $content .= '{+ins+} {-del-} {=mark=} ';
+        $content .= 'H{~2~}O x{^2^} ';
+        $content .= ':symbol: $math$ ';
         $content .= "\"smart quotes\" and---dashes.\n\n";
     }
+
     return $content;
 }
 
@@ -247,6 +251,7 @@ function generateNestedListsFixture(): string
         $content .= "2. Ordered 2\n";
         $content .= "3. Ordered 3\n\n";
     }
+
     return $content;
 }
 
@@ -275,9 +280,9 @@ function benchmark(callable $fn, int $iterations, int $warmup): array
         'mean' => array_sum($times) / $count,
         'median' => $count % 2 === 0
             ? ($times[$count / 2 - 1] + $times[$count / 2]) / 2
-            : $times[(int) ($count / 2)],
-        'p95' => $times[(int) ($count * 0.95)],
-        'p99' => $times[(int) ($count * 0.99)],
+            : $times[(int)($count / 2)],
+        'p95' => $times[(int)($count * 0.95)],
+        'p99' => $times[(int)($count * 0.99)],
         'stddev' => calculateStdDev($times),
         'iterations' => $iterations,
     ];
@@ -286,10 +291,13 @@ function benchmark(callable $fn, int $iterations, int $warmup): array
 function calculateStdDev(array $values): float
 {
     $count = count($values);
-    if ($count < 2) return 0.0;
+    if ($count < 2) {
+        return 0.0;
+    }
 
     $mean = array_sum($values) / $count;
-    $variance = array_sum(array_map(fn($x) => pow($x - $mean, 2), $values)) / ($count - 1);
+    $variance = array_sum(array_map(fn ($x) => pow($x - $mean, 2), $values)) / ($count - 1);
+
     return sqrt($variance);
 }
 
@@ -301,13 +309,19 @@ function formatMs(float $ms): string
     if ($ms < 1000) {
         return sprintf('%.2f ms', $ms);
     }
+
     return sprintf('%.2f s', $ms / 1000);
 }
 
 function formatSize(int $bytes): string
 {
-    if ($bytes < 1024) return "{$bytes} B";
-    if ($bytes < 1024 * 1024) return sprintf('%.1f KB', $bytes / 1024);
+    if ($bytes < 1024) {
+        return "{$bytes} B";
+    }
+    if ($bytes < 1024 * 1024) {
+        return sprintf('%.1f KB', $bytes / 1024);
+    }
+
     return sprintf('%.1f MB', $bytes / (1024 * 1024));
 }
 
@@ -318,7 +332,7 @@ $converter = new DjotConverter();
 if (!$jsonOutput) {
     echo "Djot-PHP Performance Benchmark\n";
     echo "==============================\n";
-    echo "PHP Version: " . PHP_VERSION . "\n";
+    echo 'PHP Version: ' . PHP_VERSION . "\n";
     echo "Iterations: {$iterations}, Warmup: {$warmup}\n";
     echo "\n";
 }
@@ -326,15 +340,22 @@ if (!$jsonOutput) {
 // Basic conversion benchmarks
 if (!$jsonOutput) {
     echo "## Document Size Benchmarks\n\n";
-    printf("%-15s %10s %12s %12s %12s %12s\n",
-        "Fixture", "Size", "Mean", "Median", "P95", "Throughput");
-    echo str_repeat("-", 75) . "\n";
+    printf(
+        "%-15s %10s %12s %12s %12s %12s\n",
+        'Fixture',
+        'Size',
+        'Mean',
+        'Median',
+        'P95',
+        'Throughput',
+    );
+    echo str_repeat('-', 75) . "\n";
 }
 
 foreach ($fixtures as $name => $content) {
     $size = strlen($content);
 
-    $stats = benchmark(function() use ($converter, $content) {
+    $stats = benchmark(function () use ($converter, $content) {
         $converter->convert($content);
     }, $iterations, $warmup);
 
@@ -347,13 +368,14 @@ foreach ($fixtures as $name => $content) {
     ];
 
     if (!$jsonOutput) {
-        printf("%-15s %10s %12s %12s %12s %10s/s\n",
+        printf(
+            "%-15s %10s %12s %12s %12s %10s/s\n",
             $name,
             formatSize($size),
             formatMs($stats['mean']),
             formatMs($stats['median']),
             formatMs($stats['p95']),
-            formatSize((int) $throughput)
+            formatSize((int)$throughput),
         );
     }
 }
@@ -361,8 +383,8 @@ foreach ($fixtures as $name => $content) {
 // Profile benchmarks
 if (!$jsonOutput) {
     echo "\n## Profile Benchmarks (medium fixture)\n\n";
-    printf("%-15s %12s %12s %12s\n", "Profile", "Mean", "Median", "P95");
-    echo str_repeat("-", 55) . "\n";
+    printf("%-15s %12s %12s %12s\n", 'Profile', 'Mean', 'Median', 'P95');
+    echo str_repeat('-', 55) . "\n";
 }
 
 $profiles = [
@@ -378,18 +400,19 @@ $mediumContent = $fixtures['medium'];
 foreach ($profiles as $name => $profile) {
     $conv = $profile ? new DjotConverter(profile: $profile) : new DjotConverter();
 
-    $stats = benchmark(function() use ($conv, $mediumContent) {
+    $stats = benchmark(function () use ($conv, $mediumContent) {
         $conv->convert($mediumContent);
     }, $iterations, $warmup);
 
     $results['profiles'][$name] = $stats;
 
     if (!$jsonOutput) {
-        printf("%-15s %12s %12s %12s\n",
+        printf(
+            "%-15s %12s %12s %12s\n",
             $name,
             formatMs($stats['mean']),
             formatMs($stats['median']),
-            formatMs($stats['p95'])
+            formatMs($stats['p95']),
         );
     }
 }
@@ -397,8 +420,8 @@ foreach ($profiles as $name => $profile) {
 // SafeMode benchmark
 if (!$jsonOutput) {
     echo "\n## SafeMode Benchmarks (medium fixture)\n\n";
-    printf("%-15s %12s %12s %12s\n", "Mode", "Mean", "Median", "P95");
-    echo str_repeat("-", 55) . "\n";
+    printf("%-15s %12s %12s %12s\n", 'Mode', 'Mean', 'Median', 'P95');
+    echo str_repeat('-', 55) . "\n";
 }
 
 $safeModes = [
@@ -409,18 +432,19 @@ $safeModes = [
 foreach ($safeModes as $name => $safeMode) {
     $conv = new DjotConverter(safeMode: $safeMode);
 
-    $stats = benchmark(function() use ($conv, $mediumContent) {
+    $stats = benchmark(function () use ($conv, $mediumContent) {
         $conv->convert($mediumContent);
     }, $iterations, $warmup);
 
     $results['safeMode'][$name] = $stats;
 
     if (!$jsonOutput) {
-        printf("%-15s %12s %12s %12s\n",
+        printf(
+            "%-15s %12s %12s %12s\n",
             $name,
             formatMs($stats['mean']),
             formatMs($stats['median']),
-            formatMs($stats['p95'])
+            formatMs($stats['p95']),
         );
     }
 }
@@ -428,37 +452,39 @@ foreach ($safeModes as $name => $safeMode) {
 // Parse-only benchmark
 if (!$jsonOutput) {
     echo "\n## Parse vs Render (medium fixture)\n\n";
-    printf("%-15s %12s %12s %12s\n", "Phase", "Mean", "Median", "P95");
-    echo str_repeat("-", 55) . "\n";
+    printf("%-15s %12s %12s %12s\n", 'Phase', 'Mean', 'Median', 'P95');
+    echo str_repeat('-', 55) . "\n";
 }
 
 // Full conversion (parse + render)
-$stats = benchmark(function() use ($converter, $mediumContent) {
+$stats = benchmark(function () use ($converter, $mediumContent) {
     $converter->convert($mediumContent);
 }, $iterations, $warmup);
 $results['phases']['full'] = $stats;
 
 if (!$jsonOutput) {
-    printf("%-15s %12s %12s %12s\n",
-        "full",
+    printf(
+        "%-15s %12s %12s %12s\n",
+        'full',
         formatMs($stats['mean']),
         formatMs($stats['median']),
-        formatMs($stats['p95'])
+        formatMs($stats['p95']),
     );
 }
 
 // Parse only
-$stats = benchmark(function() use ($converter, $mediumContent) {
+$stats = benchmark(function () use ($converter, $mediumContent) {
     $converter->parse($mediumContent);
 }, $iterations, $warmup);
 $results['phases']['parse'] = $stats;
 
 if (!$jsonOutput) {
-    printf("%-15s %12s %12s %12s\n",
-        "parse",
+    printf(
+        "%-15s %12s %12s %12s\n",
+        'parse',
         formatMs($stats['mean']),
         formatMs($stats['median']),
-        formatMs($stats['p95'])
+        formatMs($stats['p95']),
     );
 }
 
@@ -493,16 +519,23 @@ foreach (['small', 'medium', 'large'] as $fixtureName) {
 $results['memory'] = $memoryResults;
 
 if (!$jsonOutput) {
-    printf("%-10s %12s %12s %12s %12s\n",
-        "Fixture", "Input", "Output", "Delta", "Peak");
-    echo str_repeat("-", 60) . "\n";
+    printf(
+        "%-10s %12s %12s %12s %12s\n",
+        'Fixture',
+        'Input',
+        'Output',
+        'Delta',
+        'Peak',
+    );
+    echo str_repeat('-', 60) . "\n";
     foreach ($memoryResults as $name => $mem) {
-        printf("%-10s %12s %12s %12s %12s\n",
+        printf(
+            "%-10s %12s %12s %12s %12s\n",
             $name,
             formatSize($mem['input_size']),
             formatSize($mem['output_size']),
             formatSize($mem['memory_delta']),
-            formatSize($mem['memory_peak'])
+            formatSize($mem['memory_peak']),
         );
     }
 }
@@ -522,7 +555,7 @@ if ($jsonOutput) {
     $complexStats = $results['conversion']['complex']['stats'];
     $throughput = $results['conversion']['complex']['throughput_bps'];
     echo "Complex document ({$results['conversion']['complex']['size_bytes']} bytes):\n";
-    echo "  Mean: " . formatMs($complexStats['mean']) . "\n";
-    echo "  Throughput: " . formatSize((int) $throughput) . "/s\n";
+    echo '  Mean: ' . formatMs($complexStats['mean']) . "\n";
+    echo '  Throughput: ' . formatSize((int)$throughput) . "/s\n";
     echo "\nBenchmark complete.\n";
 }
