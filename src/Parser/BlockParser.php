@@ -1511,7 +1511,7 @@ class BlockParser
                 $list->setTight(false);
             }
 
-            $listItem = new ListItem($itemInfo['checked'] ?? null);
+            $listItem = new ListItem($itemInfo['taskMarker'] ?? null);
             $itemContent = $itemInfo['content'];
 
             // Collect item content lines (without blank line = tight continuation)
@@ -1968,18 +1968,24 @@ class BlockParser
     }
 
     /**
-     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string}|null
+     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, taskMarker?: string, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string}|null
      */
     protected function parseListItemMarker(string $line): ?array
     {
-        // Task list: - [ ] or - [x] or - [X]
+        // Task list: - [.] where . is any single character
+        // Standard markers: ' ' (unchecked), 'x'/'X' (checked)
+        // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred),
+        //                   '?' (question), '*' (active), '=' (paused), '.' (stopped), etc.
         // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^[-*+] +\[([ xX])\] +(.*)$/', $line, $matches)) {
+        if (preg_match('/^[-*+] +\[(.)\] +(.*)$/', $line, $matches)) {
+            $taskMarker = $matches[1];
+
             return [
                 'type' => ListBlock::TYPE_TASK,
                 'marker' => '-',
                 'content' => $matches[2],
-                'checked' => strtolower($matches[1]) === 'x',
+                'checked' => strtolower($taskMarker) === 'x', // backward compatibility
+                'taskMarker' => $taskMarker,
             ];
         }
 

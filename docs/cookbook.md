@@ -16,6 +16,7 @@ Common recipes and customizations for djot-php.
 - [Content Security](#content-security)
 - [Lazy Loading Images](#lazy-loading-images)
 - [Custom Footnotes](#custom-footnotes)
+- [Extended Task List States](#extended-task-list-states)
 - [Math Rendering](#math-rendering)
 - [Working with the AST](#working-with-the-ast)
 - [Custom Inline Patterns](#custom-inline-patterns)
@@ -517,6 +518,463 @@ $converter->on('render.footnote_ref', function (RenderEvent $event): void {
     $label = htmlspecialchars($ref->getLabel(), ENT_QUOTES, 'UTF-8');
     $event->setHtml('<sup class="footnote-ref"><a href="#fn-' . $label . '" id="fnref-' . $label . '">[' . $label . ']</a></sup>');
 });
+```
+
+## Extended Task List States
+
+Djot task lists support more than just checked and unchecked states. The parser captures
+the raw character inside brackets, enabling custom rendering for extended task states
+like "in progress", "cancelled", "deferred", etc.
+
+### Standard Task Lists
+
+Standard task markers work as expected:
+
+```djot
+- [ ] Unchecked task
+- [x] Completed task
+- [X] Also completed (case insensitive)
+```
+
+```php
+use Djot\DjotConverter;
+
+$djot = <<<'DJOT'
+- [ ] Unchecked task
+- [x] Completed task
+DJOT;
+
+$converter = new DjotConverter();
+echo $converter->convert($djot);
+```
+
+Output:
+```html
+<ul>
+<li><input type="checkbox" disabled> Unchecked task</li>
+<li><input type="checkbox" disabled checked> Completed task</li>
+</ul>
+```
+
+### Accessing the Raw Marker
+
+The `ListItem` node provides methods to access task state:
+
+```php
+use Djot\Parser\BlockParser;
+use Djot\Node\Block\ListItem;
+
+$parser = new BlockParser();
+$document = $parser->parse('- [/] In progress task');
+
+foreach ($document->getChildren() as $list) {
+    foreach ($list->getChildren() as $item) {
+        if ($item instanceof ListItem && $item->isTask()) {
+            echo "Marker: " . $item->getTaskMarker() . "\n";  // "/"
+            echo "Checked: " . ($item->getChecked() ? 'yes' : 'no') . "\n";  // "no"
+            echo "Completed: " . ($item->isCompleted() ? 'yes' : 'no') . "\n";  // "no"
+        }
+    }
+}
+```
+
+### Common Extended Markers
+
+Popular conventions for extended task markers (inspired by tools like Logseq, Org-mode, and Obsidian):
+
+| Marker | Meaning | Common Use |
+|:------:|---------|------------|
+| ` ` | Unchecked | Standard unchecked task |
+| `x`/`X` | Completed | Standard checked task |
+| `-` | Cancelled | Task no longer needed |
+| `/` | In progress | Currently working on |
+| `>` | Deferred | Forwarded/rescheduled |
+| `?` | Question | Needs clarification |
+| `!` | Important | High priority |
+| `*` | Active | Currently focused |
+
+The parser accepts **any single character** - these are just conventions. You can define your own markers.
+
+### Alternative: Progress Indicators
+
+Another approach (from [djot discussion #289](https://github.com/jgm/djot/discussions/289)) uses
+visual progression where the marker fills in as the task progresses:
+
+| Marker | Visual | Meaning |
+|:------:|:------:|---------|
+| ` ` | ` ` | Not started (0%) |
+| `/` | `/` | Started (25%) |
+| `-` | `-` | Halfway (50%) |
+| `\` | `\` | Three-quarters (75%) |
+| `x` | `x` | Complete (100%) |
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Block\ListItem;
+
+$converter = new DjotConverter();
+
+// Progress-based markers using pie chart symbols
+$progressIcons = [
+    ' ' => '○',      // Empty circle (0%)
+    '/' => '◔',      // Quarter filled (25%)
+    '-' => '◑',      // Half filled (50%)
+    '\\' => '◕',     // Three-quarters filled (75%)
+    'x' => '●',      // Full circle (100%)
+];
+
+$progressPercent = [
+    ' ' => 0,
+    '/' => 25,
+    '-' => 50,
+    '\\' => 75,
+    'x' => 100,
+];
+
+$converter->on('render.list_item', function (RenderEvent $event) use ($progressIcons, $progressPercent): void {
+    $item = $event->getNode();
+    if (!$item instanceof ListItem || !$item->isTask()) {
+        return;
+    }
+
+    $marker = $item->getTaskMarker();
+    $icon = $progressIcons[$marker] ?? '○';
+    $percent = $progressPercent[$marker] ?? 0;
+
+    $html = '<li class="task-progress" data-progress="' . $percent . '">';
+    $html .= '<span class="progress-icon">' . $icon . '</span> ';
+    $html .= $event->getChildrenHtml();
+    $html .= '</li>' . "\n";
+
+    $event->setHtml($html);
+});
+
+$djot = <<<'DJOT'
+- [ ] Not started
+- [/] Just begun
+- [-] Halfway there
+- [\] Almost done
+- [x] Complete!
+DJOT;
+
+echo $converter->convert($djot);
+```
+
+Output:
+```html
+<ul>
+<li class="task-progress" data-progress="0"><span class="progress-icon">○</span> Not started</li>
+<li class="task-progress" data-progress="25"><span class="progress-icon">◔</span> Just begun</li>
+<li class="task-progress" data-progress="50"><span class="progress-icon">◑</span> Halfway there</li>
+<li class="task-progress" data-progress="75"><span class="progress-icon">◕</span> Almost done</li>
+<li class="task-progress" data-progress="100"><span class="progress-icon">●</span> Complete!</li>
+</ul>
+```
+
+With CSS progress bar styling:
+
+```css
+.task-progress {
+    position: relative;
+    list-style: none;
+}
+
+.task-progress::before {
+    content: '';
+    position: absolute;
+    left: -100%;
+    width: 80%;
+    height: 3px;
+    bottom: 0;
+    background: linear-gradient(to right,
+        #28a745 0%,
+        #28a745 var(--progress),
+        #e9ecef var(--progress),
+        #e9ecef 100%);
+}
+
+.task-progress[data-progress="0"] { --progress: 0%; }
+.task-progress[data-progress="25"] { --progress: 25%; }
+.task-progress[data-progress="50"] { --progress: 50%; }
+.task-progress[data-progress="75"] { --progress: 75%; }
+.task-progress[data-progress="100"] { --progress: 100%; color: #28a745; }
+```
+
+### Custom Checkbox Rendering
+
+Use render events to create custom checkbox appearances:
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Block\ListItem;
+
+$converter = new DjotConverter();
+
+$taskIcons = [
+    ' ' => '☐',      // Unchecked
+    'x' => '☑',      // Completed
+    'X' => '☑',      // Completed
+    '-' => '☒',      // Cancelled
+    '/' => '◐',      // In progress (half-filled)
+    '>' => '→',      // Deferred
+    '?' => '?',      // Question
+    '!' => '⚠',      // Important
+    '*' => '★',      // Active/starred
+];
+
+$converter->on('render.list_item', function (RenderEvent $event) use ($taskIcons): void {
+    $item = $event->getNode();
+    if (!$item instanceof ListItem || !$item->isTask()) {
+        return;
+    }
+
+    $marker = $item->getTaskMarker();
+    $icon = $taskIcons[$marker] ?? '○';
+
+    // Get marker-specific class
+    $stateClass = match ($marker) {
+        ' ' => 'task-unchecked',
+        'x', 'X' => 'task-completed',
+        '-' => 'task-cancelled',
+        '/' => 'task-in-progress',
+        '>' => 'task-deferred',
+        '?' => 'task-question',
+        '!' => 'task-important',
+        '*' => 'task-active',
+        default => 'task-custom',
+    };
+
+    $html = '<li class="task-item ' . $stateClass . '">';
+    $html .= '<span class="task-marker">' . $icon . '</span> ';
+    $html .= $event->getChildrenHtml();
+    $html .= '</li>' . "\n";
+
+    $event->setHtml($html);
+});
+
+$djot = <<<'DJOT'
+- [ ] Todo item
+- [x] Done item
+- [-] Cancelled item
+- [/] In progress
+- [>] Deferred to next week
+- [?] Needs discussion
+DJOT;
+
+echo $converter->convert($djot);
+```
+
+Output:
+```html
+<ul>
+<li class="task-item task-unchecked"><span class="task-marker">☐</span> Todo item</li>
+<li class="task-item task-completed"><span class="task-marker">☑</span> Done item</li>
+<li class="task-item task-cancelled"><span class="task-marker">☒</span> Cancelled item</li>
+<li class="task-item task-in-progress"><span class="task-marker">◐</span> In progress</li>
+<li class="task-item task-deferred"><span class="task-marker">→</span> Deferred to next week</li>
+<li class="task-item task-question"><span class="task-marker">?</span> Needs discussion</li>
+</ul>
+```
+
+### CSS Styling for Extended States
+
+Style the extended states with CSS:
+
+```css
+/* Base task styling */
+.task-item {
+    list-style: none;
+    margin-left: -1.5em;
+}
+
+.task-marker {
+    display: inline-block;
+    width: 1.2em;
+    text-align: center;
+    margin-right: 0.3em;
+}
+
+/* State-specific styling */
+.task-completed {
+    color: #28a745;
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.task-cancelled {
+    color: #6c757d;
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
+.task-in-progress {
+    color: #007bff;
+    font-weight: bold;
+}
+
+.task-deferred {
+    color: #fd7e14;
+    font-style: italic;
+}
+
+.task-question {
+    color: #6f42c1;
+    background: #f8f9fa;
+}
+
+.task-important {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.task-active {
+    color: #ffc107;
+    background: #fffbe6;
+}
+```
+
+### HTML5 Checkbox with Data Attributes
+
+Keep semantic HTML while adding extended state info:
+
+```php
+$converter->on('render.list_item', function (RenderEvent $event): void {
+    $item = $event->getNode();
+    if (!$item instanceof ListItem || !$item->isTask()) {
+        return;
+    }
+
+    $marker = $item->getTaskMarker();
+    $checked = $item->isCompleted() ? ' checked' : '';
+
+    // Store marker as data attribute for CSS/JS
+    $html = '<li>';
+    $html .= '<input type="checkbox" disabled' . $checked;
+    $html .= ' data-task-state="' . htmlspecialchars($marker) . '">';
+    $html .= ' ' . $event->getChildrenHtml();
+    $html .= '</li>' . "\n";
+
+    $event->setHtml($html);
+});
+```
+
+Then use CSS attribute selectors:
+
+```css
+input[data-task-state="-"] + * {
+    text-decoration: line-through;
+    color: gray;
+}
+
+input[data-task-state="/"]::before {
+    content: "🔄 ";
+}
+
+input[data-task-state=">"] + * {
+    font-style: italic;
+    color: orange;
+}
+```
+
+### Extracting Task Statistics
+
+Analyze documents for task completion:
+
+```php
+use Djot\Parser\BlockParser;
+use Djot\Node\Block\ListItem;
+
+function getTaskStats(string $djot): array
+{
+    $parser = new BlockParser();
+    $document = $parser->parse($djot);
+
+    $stats = [
+        'total' => 0,
+        'completed' => 0,
+        'cancelled' => 0,
+        'in_progress' => 0,
+        'unchecked' => 0,
+        'by_marker' => [],
+    ];
+
+    // Recursive function to find all list items
+    $findTasks = function ($node) use (&$findTasks, &$stats): void {
+        if ($node instanceof ListItem && $node->isTask()) {
+            $marker = $node->getTaskMarker();
+            $stats['total']++;
+            $stats['by_marker'][$marker] = ($stats['by_marker'][$marker] ?? 0) + 1;
+
+            if ($node->isCompleted()) {
+                $stats['completed']++;
+            } elseif ($marker === '-') {
+                $stats['cancelled']++;
+            } elseif ($marker === '/') {
+                $stats['in_progress']++;
+            } elseif ($marker === ' ') {
+                $stats['unchecked']++;
+            }
+        }
+
+        if (method_exists($node, 'getChildren')) {
+            foreach ($node->getChildren() as $child) {
+                $findTasks($child);
+            }
+        }
+    };
+
+    $findTasks($document);
+
+    return $stats;
+}
+
+$djot = <<<'DJOT'
+## Project Tasks
+
+- [x] Setup project
+- [x] Write documentation
+- [/] Implement feature A
+- [ ] Implement feature B
+- [-] Cancelled feature
+- [>] Deferred to v2
+DJOT;
+
+$stats = getTaskStats($djot);
+echo "Progress: {$stats['completed']}/{$stats['total']} completed\n";
+echo "In progress: {$stats['in_progress']}\n";
+echo "Remaining: {$stats['unchecked']}\n";
+```
+
+Output:
+```
+Progress: 2/6 completed
+In progress: 1
+Remaining: 1
+```
+
+### Backward Compatibility
+
+The `getChecked()` method maintains backward compatibility:
+
+- `' '` (space) returns `false`
+- `'x'` or `'X'` returns `true`
+- Any other marker returns `false` (safe default)
+
+This means existing code continues to work while new code can access the full marker:
+
+```php
+// Old code - still works
+if ($item->getChecked()) {
+    echo "Task is done";
+}
+
+// New code - access extended states
+$marker = $item->getTaskMarker();
+if ($marker === '/') {
+    echo "Task in progress";
+}
 ```
 
 ## Math Rendering
