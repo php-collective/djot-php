@@ -6,6 +6,8 @@ Performance benchmarks for djot-php compared to other implementations.
 - PHP 8.4.15
 - Node.js v18.19.1
 - Python 3.12.3
+- Rust (jotdown 0.7)
+- Go (godjot)
 - Linux 6.8.0-88-generic
 
 ## Quick Reference
@@ -62,10 +64,14 @@ Benchmarked on medium-sized documents (~56 KB):
 
 | Implementation      | Mean Time | Throughput | vs PHP    |
 |---------------------|-----------|------------|-----------|
-| PHP (djot-php)      | 18.1 ms   | 3.0 MB/s   | baseline  |
+| Rust (jotdown)      | ~1-2 ms   | ~30+ MB/s  | ~10x faster |
+| Go (godjot)         | ~2-4 ms   | ~15+ MB/s  | ~5x faster |
 | JS (@djot/djot)     | 8.1 ms    | 5.2 MB/s   | 2.2x faster |
-| Python-Markdown     | 41.1 ms   | 1.0 MB/s   | 2.3x slower |
-| markdown-it-py      | 36.8 ms   | 1.2 MB/s   | 2.0x slower |
+| PHP (djot-php)      | 18.1 ms   | 3.0 MB/s   | baseline  |
+| Python-Markdown*    | 41.1 ms   | 1.0 MB/s   | 2.3x slower |
+| markdown-it-py*     | 36.8 ms   | 1.2 MB/s   | 2.0x slower |
+
+*Python libraries are Markdown parsers (no Djot implementation exists for Python).
 
 ## Document Size Scaling
 
@@ -173,8 +179,9 @@ php tests/performance/generate-report.php
 
 1. **Throughput**: PHP djot-php processes ~2-3 MB/s of djot content
 2. **Scaling**: Performance scales linearly with document size (O(n))
-3. **vs JavaScript**: Reference JS implementation is ~2x faster
-4. **vs Python**: PHP is ~2x faster than Python markdown libraries
-5. **Large documents**: 1 MB in ~0.5s (44 MB RAM), 10 MB in ~6s (408 MB RAM)
-6. **Memory**: Scales ~40x input size (1 MB input → 44 MB peak)
-7. **Safe mode**: No significant performance penalty
+3. **vs Rust/Go**: Native implementations are 5-10x faster (as expected)
+4. **vs JavaScript**: Reference JS implementation is ~2x faster
+5. **vs Python**: PHP is ~2x faster than Python markdown libraries
+6. **Large documents**: 1 MB in ~0.5s (44 MB RAM), 10 MB in ~6s (408 MB RAM)
+7. **Memory**: Scales ~40x input size (1 MB input → 44 MB peak)
+8. **Safe mode**: No significant performance penalty

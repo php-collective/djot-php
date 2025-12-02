@@ -10,3 +10,11 @@ package-lock.json
 # Python cache
 __pycache__/
 *.pyc
+
+# Rust build artifacts
+rust-benchmark/target/
+rust-benchmark/Cargo.lock
+
+# Go build artifacts
+benchmark-go-bin
+go.sum

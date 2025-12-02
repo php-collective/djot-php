@@ -71,7 +71,9 @@ async function main() {
     const results = {
         php: null,
         javascript: null,
-        python: null
+        python: null,
+        rust: null,
+        go: null
     };
 
     // Run PHP benchmark
@@ -119,6 +121,62 @@ async function main() {
         }
     } catch (e) {
         console.log('   ✗ Python benchmark failed (missing dependencies?)\n');
+    }
+
+    // Run Rust benchmark
+    console.log('4. Running Rust benchmark...');
+    try {
+        // Check if Rust binary exists, build if needed
+        const rustBinaryPath = join(__dirname, 'rust-benchmark/target/release/benchmark');
+        if (!existsSync(rustBinaryPath)) {
+            console.log('   Building Rust benchmark...');
+            try {
+                execSync('cargo build --release', {
+                    cwd: join(__dirname, 'rust-benchmark'),
+                    stdio: 'ignore',
+                    timeout: 300000
+                });
+            } catch (buildErr) {
+                throw new Error('Rust build failed');
+            }
+        }
+        results.rust = runCommand(
+            `./rust-benchmark/target/release/benchmark --iterations=${iterations} --warmup=${warmup} --json`,
+            'Rust markdown libraries'
+        );
+        if (results.rust) {
+            console.log('   ✓ Rust benchmark complete\n');
+        }
+    } catch (e) {
+        console.log('   ✗ Rust benchmark failed (cargo not installed?)\n');
+    }
+
+    // Run Go benchmark
+    console.log('5. Running Go benchmark...');
+    try {
+        // Check if Go binary exists, build if needed
+        const goBinaryPath = join(__dirname, 'benchmark-go-bin');
+        if (!existsSync(goBinaryPath)) {
+            console.log('   Building Go benchmark...');
+            try {
+                execSync('go build -o benchmark-go-bin benchmark-go.go', {
+                    cwd: __dirname,
+                    stdio: 'ignore',
+                    timeout: 300000
+                });
+            } catch (buildErr) {
+                throw new Error('Go build failed');
+            }
+        }
+        results.go = runCommand(
+            `./benchmark-go-bin --iterations=${iterations} --warmup=${warmup} --json`,
+            'Go markdown libraries'
+        );
+        if (results.go) {
+            console.log('   ✓ Go benchmark complete\n');
+        }
+    } catch (e) {
+        console.log('   ✗ Go benchmark failed (go not installed?)\n');
     }
 
     // Save raw results
@@ -190,6 +248,34 @@ async function main() {
         }
     }
 
+    // Rust (jotdown)
+    if (results.rust?.conversion) {
+        const rsConv = results.rust.conversion || [];
+        const rsMedium = rsConv.find(f => f.name === 'generated_medium' || f.name === 'medium');
+        if (rsMedium?.stats) {
+            const stats = rsMedium.stats;
+            const throughput = rsMedium.throughput_bps;
+            const name = results.rust.name || 'jotdown';
+            console.log(
+                `${'Rust (' + name + ')'.padEnd(25)} ${formatMs(stats.mean).padStart(12)} ${formatMs(stats.median).padStart(12)} ${formatMs(stats.p95).padStart(12)} ${(formatSize(Math.round(throughput)) + '/s').padStart(14)}`
+            );
+        }
+    }
+
+    // Go (godjot)
+    if (results.go?.conversion) {
+        const goConv = results.go.conversion || [];
+        const goMedium = goConv.find(f => f.name === 'generated_medium' || f.name === 'medium');
+        if (goMedium?.stats) {
+            const stats = goMedium.stats;
+            const throughput = goMedium.throughput_bps;
+            const name = results.go.name || 'godjot';
+            console.log(
+                `${'Go (' + name + ')'.padEnd(25)} ${formatMs(stats.mean).padStart(12)} ${formatMs(stats.median).padStart(12)} ${formatMs(stats.p95).padStart(12)} ${(formatSize(Math.round(throughput)) + '/s').padStart(14)}`
+            );
+        }
+    }
+
     // Relative performance comparison
     console.log('\n## Relative Performance (PHP as baseline)\n');
 
@@ -219,6 +305,36 @@ async function main() {
                     } else {
                         console.log(`Py ${lib.name}: ${(1/ratio).toFixed(2)}x slower than PHP`);
                     }
+                }
+            }
+        }
+
+        if (results.rust?.conversion) {
+            const rsConv = results.rust.conversion || [];
+            const rsMedium = rsConv.find(f => f.name === 'generated_medium' || f.name === 'medium');
+            const rsMean = rsMedium?.stats?.mean;
+            if (rsMean) {
+                const name = results.rust.name || 'jotdown';
+                const ratio = phpMean / rsMean;
+                if (ratio >= 1) {
+                    console.log(`Rust ${name}: ${ratio.toFixed(2)}x faster than PHP`);
+                } else {
+                    console.log(`Rust ${name}: ${(1/ratio).toFixed(2)}x slower than PHP`);
+                }
+            }
+        }
+
+        if (results.go?.conversion) {
+            const goConv = results.go.conversion || [];
+            const goMedium = goConv.find(f => f.name === 'generated_medium' || f.name === 'medium');
+            const goMean = goMedium?.stats?.mean;
+            if (goMean) {
+                const name = results.go.name || 'godjot';
+                const ratio = phpMean / goMean;
+                if (ratio >= 1) {
+                    console.log(`Go ${name}: ${ratio.toFixed(2)}x faster than PHP`);
+                } else {
+                    console.log(`Go ${name}: ${(1/ratio).toFixed(2)}x slower than PHP`);
                 }
             }
         }
