@@ -137,6 +137,50 @@ class MarkdownToDjot
         // Only single tildes, not double (strikethrough)
         $line = preg_replace('/(?<![~{])~([^~}]+)~(?![~}])/', '{~$1~}', $line) ?? $line;
 
+        // Convert HTML tags to Djot equivalents (for round-trip support)
+        // These run AFTER Markdown extension conversions to avoid double-processing
+
+        // <mark>text</mark> → {=text=}
+        $line = preg_replace('/<mark>([^<]+)<\/mark>/i', '{=$1=}', $line) ?? $line;
+
+        // <ins>text</ins> → {+text+}
+        $line = preg_replace('/<ins>([^<]+)<\/ins>/i', '{+$1+}', $line) ?? $line;
+
+        // <del>text</del> → {-text-} (alternative to ~~)
+        $line = preg_replace('/<del>([^<]+)<\/del>/i', '{-$1-}', $line) ?? $line;
+
+        // <sup>text</sup> → ^text^
+        $line = preg_replace('/<sup>([^<]+)<\/sup>/i', '^$1^', $line) ?? $line;
+
+        // <sub>text</sub> → ~text~
+        $line = preg_replace('/<sub>([^<]+)<\/sub>/i', '~$1~', $line) ?? $line;
+
+        // <em>text</em> → _text_
+        $line = preg_replace('/<em>([^<]+)<\/em>/i', '_$1_', $line) ?? $line;
+
+        // <strong>text</strong> → *text*
+        $line = preg_replace('/<strong>([^<]+)<\/strong>/i', '*$1*', $line) ?? $line;
+
+        // <b>text</b> → *text*
+        $line = preg_replace('/<b>([^<]+)<\/b>/i', '*$1*', $line) ?? $line;
+
+        // <i>text</i> → _text_
+        $line = preg_replace('/<i>([^<]+)<\/i>/i', '_$1_', $line) ?? $line;
+
+        // <code>text</code> → `text`
+        $line = preg_replace('/<code>([^<]+)<\/code>/i', '`$1`', $line) ?? $line;
+
+        // Convert $math$ to $`math` (Djot inline math)
+        // Only match $...$ that looks like math (not currency)
+        $line = preg_replace_callback('/\$([^$\s][^$]*[^$\s]|\S)\$/', function ($match) {
+            // Skip if it looks like currency ($5, $100)
+            if (preg_match('/^\d/', $match[1])) {
+                return $match[0];
+            }
+
+            return '$`' . $match[1] . '`';
+        }, $line) ?? $line;
+
         // Restore strong placeholders
         foreach ($strongPlaceholders as $placeholder => $content) {
             $line = str_replace($placeholder, $content, $line);
