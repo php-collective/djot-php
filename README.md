@@ -130,3 +130,4 @@ See [Security Considerations](docs/README.md#security-considerations) for detail
 
 - [Djot](https://djot.net/) - Official Djot website with syntax reference and playground
 - [jgm/djot](https://github.com/jgm/djot) - Reference implementation in JavaScript by John MacFarlane
+- [JetBrains IDE support](https://github.com/php-collective/djot-intellij) - Plugin for PhpStorm, IntelliJ IDEA, WebStorm, etc.
