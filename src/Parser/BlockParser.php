@@ -83,11 +83,51 @@ class BlockParser
      */
     protected array $customBlockPatterns = [];
 
-    public function __construct(bool $collectWarnings = false, bool $strictMode = false)
-    {
+    /**
+     * When true, enables "significant newlines" mode:
+     * - Block elements can interrupt paragraphs without blank lines
+     * - Nested blocks in lists don't need blank lines
+     * - More markdown-like, chat-friendly parsing
+     *
+     * This deviates from djot spec but provides more intuitive behavior
+     * for chat messages, comments, and quick notes.
+     */
+    protected bool $significantNewlines = false;
+
+    public function __construct(
+        bool $collectWarnings = false,
+        bool $strictMode = false,
+        bool $significantNewlines = false,
+    ) {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
+        $this->significantNewlines = $significantNewlines;
         $this->inlineParser = new InlineParser($this);
+    }
+
+    /**
+     * Enable or disable significant newlines mode
+     *
+     * When enabled:
+     * - Lists, blockquotes, code blocks can interrupt paragraphs
+     * - Nested blocks in list items don't need preceding blank lines
+     * - Indentation alone triggers block nesting
+     *
+     * This provides markdown-like behavior for chat and quick note use cases.
+     */
+    public function setSignificantNewlines(bool $value): self
+    {
+        $this->significantNewlines = $value;
+
+        return $this;
+    }
+
+    /**
+     * Check if significant newlines mode is enabled
+     */
+    public function getSignificantNewlines(): bool
+    {
+        return $this->significantNewlines;
     }
 
     /**
@@ -1107,13 +1147,17 @@ class BlockParser
                 break;
             }
 
-            // Check for continuation with # prefix (same level or less)
+            // Check for continuation with # prefix (same level or less) - these continue the heading
+            // e.g., "# Heading\n# more" becomes "Heading\nmore" for a level-1 heading
             if (preg_match('/^[ ]{0,3}#{1,' . $level . '} +(.+)$/', $nextLine, $contMatch)) {
                 if ($content !== '') {
                     $content .= "\n";
                 }
                 $content .= $contMatch[1];
                 $i++;
+            } elseif (preg_match('/^[ ]{0,3}#{1,6}(?: |$)/', $nextLine)) {
+                // Different level heading marker (or empty heading) starts a new heading
+                break;
             } elseif (!$this->startsNewBlock($nextLine)) {
                 // "Lazy" continuation - plain text continues the heading
                 if ($content !== '') {
@@ -1556,7 +1600,16 @@ class BlockParser
 
                 // Content at content indent or more is continuation (even if it looks like a list marker)
                 // In djot, "  - b" after "- a" (no blank line) is literal text, not a nested list
+                // Unless significantNewlines is enabled, then indented block markers start nested blocks
                 if ($nextIndent >= $contentIndent) {
+                    // Check if significantNewlines mode allows immediate nested blocks
+                    if ($this->significantNewlines) {
+                        // Check for any block starter (list, blockquote, code fence, div)
+                        if ($this->startsNewBlock($nextTrimmed) || $this->parseListItemMarker($nextTrimmed) !== null) {
+                            // This is a nested block - break out to let normal nesting handle it
+                            break;
+                        }
+                    }
                     // Properly indented continuation - include with original indentation relative to content
                     $itemLines[] = $this->stripLeadingIndent($nextLine, $contentIndent);
                 } else {
@@ -1590,6 +1643,36 @@ class BlockParser
                 $listItem->appendChild($paragraph);
             } else {
                 $this->parseBlocks($listItem, $itemLines, 0);
+            }
+
+            // In significantNewlines mode, check for immediate nested content (any block type)
+            if ($this->significantNewlines && $i < $count) {
+                $nextLine = $lines[$i];
+                $nextIndent = $this->getLeadingSpaces($nextLine);
+
+                // If there's indented content that could be a nested block
+                if ($nextIndent >= $contentIndent) {
+                    $subLines = [];
+                    while ($i < $count) {
+                        $subLine = $lines[$i];
+                        if ($this->isBlankLine($subLine)) {
+                            break;
+                        }
+                        $lineIndent = $this->getLeadingSpaces($subLine);
+                        if ($lineIndent >= $contentIndent) {
+                            $subLines[] = $this->stripLeadingIndent($subLine, $contentIndent);
+                            $i++;
+                        } elseif ($lineIndent === $baseIndent) {
+                            // Back to parent level - check if it's a sibling item
+                            break;
+                        } else {
+                            break;
+                        }
+                    }
+                    if ($subLines !== []) {
+                        $this->parseBlocks($listItem, $subLines, 0);
+                    }
+                }
             }
 
             // Apply attributes to list item
@@ -2663,23 +2746,56 @@ class BlockParser
 
     protected function startsNewBlock(string $line): bool
     {
-        // Check if line starts a new block element
-        // Note: Block quotes (>) are NOT included here - they don't interrupt paragraphs
-        // Block quotes can only start after a blank line or at document start
-        // Note: Ordered lists (\d+[.)]) are NOT included - they don't interrupt paragraphs in djot
-        // Note: Fenced divs (:::) are NOT included - they don't interrupt paragraphs in djot
-        // Only unordered lists (-*+) can interrupt paragraphs
+        // In significantNewlines mode, block elements can interrupt paragraphs
+        if ($this->significantNewlines) {
+            return $this->startsNewBlockSignificant($line);
+        }
+
+        // Standard djot behavior:
+        // NO block elements can interrupt paragraphs - they all require a blank line
+        // See: https://djot.net - "Paragraphs can never be interrupted by other block-level elements"
+        return false;
+    }
+
+    /**
+     * Check if line starts a new block in significantNewlines mode
+     *
+     * In this mode, more elements can interrupt paragraphs:
+     * - Block quotes (>)
+     * - Ordered lists (1. 2. etc)
+     * - Code fences (```)
+     * - Fenced divs (:::)
+     */
+    protected function startsNewBlockSignificant(string $line): bool
+    {
+        // Headings, unordered lists, tables (same as standard)
         if (preg_match('/^(#{1,6}\s|[-*+]\s|\|)/', $line)) {
             return true;
         }
-        // Code fences: backticks start a new block only if they have content or info string
-        // A bare ``` by itself should be treated as inline code
-        if (preg_match('/^(`{3,})(.*)$/', $line, $matches)) {
-            $info = trim($matches[2]);
 
-            // If there's an info string or the fence is closing style (backticks followed by content),
-            // then it's a code block. But bare backticks alone should be inline code.
-            return $info !== '';
+        // Block quotes
+        if (preg_match('/^>\s?/', $line)) {
+            return true;
+        }
+
+        // Ordered lists (digit or letter followed by . or ))
+        if (preg_match('/^(\d+|[a-zA-Z])[.)]\s/', $line)) {
+            return true;
+        }
+
+        // Code fences (with or without info string)
+        if (preg_match('/^`{3,}/', $line)) {
+            return true;
+        }
+
+        // Fenced divs
+        if (preg_match('/^:{3,}/', $line)) {
+            return true;
+        }
+
+        // Thematic breaks
+        if (preg_match('/^(\*\s*\*\s*\*|\-\s*\-\s*\-)/', $line)) {
+            return true;
         }
 
         return false;

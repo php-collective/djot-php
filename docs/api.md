@@ -18,7 +18,9 @@ public function __construct(
     bool $xhtml = false,
     bool $warnings = false,
     bool $strict = false,
-    bool|SafeMode|null $safeMode = null
+    bool|SafeMode|null $safeMode = null,
+    ?Profile $profile = null,
+    bool $significantNewlines = false,
 )
 ```
 
@@ -26,6 +28,24 @@ public function __construct(
 - `$warnings`: When `true`, collects warnings during parsing (see [Error Handling](#error-handling)).
 - `$strict`: When `true`, throws `ParseException` on parse errors (see [Error Handling](#error-handling)).
 - `$safeMode`: When `true` or a `SafeMode` instance, enables XSS protection (see [Safe Mode](#safe-mode)).
+- `$profile`: A `Profile` instance for feature restriction (see [Profiles](profiles.md)).
+- `$significantNewlines`: When `true`, enables markdown-like parsing where block elements can interrupt paragraphs (see [Significant Newlines Mode](#significant-newlines-mode)).
+
+### Factory Methods
+
+#### withSignificantNewlines
+
+```php
+public static function withSignificantNewlines(
+    bool $xhtml = false,
+    bool $warnings = false,
+    bool $strict = false,
+    bool|SafeMode|null $safeMode = null,
+    ?Profile $profile = null,
+): self
+```
+
+Creates a converter with significant newlines mode enabled. See [Significant Newlines Mode](#significant-newlines-mode).
 
 ### Methods
 
@@ -416,13 +436,18 @@ use Djot\Parser\BlockParser;
 
 $parser = new BlockParser(
     collectWarnings: false,
-    strictMode: false
+    strictMode: false,
+    significantNewlines: false,
 );
 $document = $parser->parse($djotString);
 
 // Get warnings (if collectWarnings: true)
 // Get exception on errors (if strictMode: true)
 $warnings = $parser->getWarnings();
+
+// Enable/disable significant newlines mode
+$parser->setSignificantNewlines(true);
+$isEnabled = $parser->getSignificantNewlines();
 ```
 
 #### Custom Block Patterns
@@ -741,3 +766,86 @@ $node->getAttributes(): array
 $node->setAttributes(array $attrs): void
 $node->addClass(string $class): void
 ```
+
+## Significant Newlines Mode
+
+An optional parsing mode for chat messages, comments, and quick notes where markdown-like behavior is more intuitive.
+
+### Enabling
+
+```php
+// Via factory method (recommended)
+$converter = DjotConverter::withSignificantNewlines();
+
+// Via constructor parameter
+$converter = new DjotConverter(significantNewlines: true);
+
+// Via parser directly
+$parser = new BlockParser(significantNewlines: true);
+
+// Via setter (for runtime switching)
+$parser->setSignificantNewlines(true);
+```
+
+### Behavior Changes
+
+| Feature | Standard Mode | Significant Newlines Mode |
+|---------|---------------|---------------------------|
+| Block elements interrupt paragraphs | No (blank line required) | Yes |
+| Nested lists need blank lines | Yes | No |
+| Soft breaks render as | `\n` or space | `<br>` |
+
+### Example
+
+```php
+$converter = DjotConverter::withSignificantNewlines();
+
+$djot = <<<'DJOT'
+Here is a list:
+- item one
+- item two
+DJOT;
+
+echo $converter->convert($djot);
+```
+
+**Output:**
+```html
+<p>Here is a list:</p>
+<ul>
+<li>item one</li>
+<li>item two</li>
+</ul>
+```
+
+In standard mode, the same input would produce:
+```html
+<p>Here is a list:
+- item one
+- item two</p>
+```
+
+### Escaping Block Markers
+
+In significant newlines mode, escape the first character of block markers to keep them literal:
+
+```djot
+They said:
+\> This stays as literal text, not a blockquote
+
+Steps:
+\1. This is not an ordered list
+```
+
+### Soft Break Behavior
+
+When `significantNewlines` is enabled, soft breaks automatically render as `<br>`. You can override this after construction:
+
+```php
+use Djot\Renderer\SoftBreakMode;
+
+$converter = DjotConverter::withSignificantNewlines();
+$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space);
+```
+
+See [enhancements.md](enhancements.md#significant-newlines-mode) for upstream tracking.
