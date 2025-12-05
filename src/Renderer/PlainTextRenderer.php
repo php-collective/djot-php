@@ -25,9 +25,11 @@ use Djot\Node\Block\TableRow;
 use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\Code;
+use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
+use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Math;
 use Djot\Node\Inline\RawInline;
 use Djot\Node\Inline\SoftBreak;
@@ -172,6 +174,8 @@ class PlainTextRenderer implements RendererInterface
             $node instanceof Code => $node->getContent(),
             $node instanceof Math => $node->getContent(),
             $node instanceof Image => $node->getAlt(),
+            $node instanceof Link => $this->renderLink($node),
+            $node instanceof Delete => '~' . $this->renderChildren($node) . '~',
             $node instanceof Symbol => ':' . $node->getName() . ':',
             $node instanceof FootnoteRef => '[' . $node->getLabel() . ']',
             $node instanceof SoftBreak => $this->softBreakMode === SoftBreakMode::Space ? ' ' : "\n",
@@ -308,6 +312,11 @@ class PlainTextRenderer implements RendererInterface
     protected function renderFootnote(Footnote $node): string
     {
         return '[' . $node->getLabel() . ']: ' . trim($this->renderChildren($node)) . "\n";
+    }
+
+    protected function renderLink(Link $node): string
+    {
+        return $node->getDestination() ?? $this->renderChildren($node);
     }
 
     /**

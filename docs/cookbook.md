@@ -1543,7 +1543,7 @@ $renderer = new PlainTextRenderer();
 $djot = <<<'DJOT'
 # Welcome
 
-This is *formatted* text with a [link](https://example.com).
+This is *formatted* text. Visit [our website](https://example.com) for more.
 
 - Item one
 - Item two
@@ -1559,10 +1559,90 @@ Output:
 ```
 Welcome
 
-This is formatted text with a link.
+This is formatted text. Visit https://example.com for more.
 
 - Item one
 - Item two
+```
+
+### Multipart Email (HTML + Plain Text)
+
+Parse once, render to multiple formats for email clients:
+
+```php
+use Djot\DjotConverter;
+use Djot\Renderer\HtmlRenderer;
+use Djot\Renderer\PlainTextRenderer;
+
+$template = <<<'DJOT'
+# Order Confirmation
+
+Thank you for your order, **John**!
+
+## Order Details
+
+| Item | Qty | Price |
+|------|-----|-------|
+| Widget Pro | 2 | $49.99 |
+| Gadget X | 1 | $29.99 |
+
+**Total:** $79.98
+
+[Track Your Order](https://example.com/track/12345)
+
+Questions? Reply to this email or visit our [help center](https://example.com/help).
+DJOT;
+
+// Parse once
+$converter = new DjotConverter();
+$document = $converter->parse($template);
+
+// Render to HTML for rich email clients
+$htmlRenderer = new HtmlRenderer();
+$htmlBody = $htmlRenderer->render($document);
+
+// Render to plain text for basic clients
+$textRenderer = new PlainTextRenderer();
+$textBody = $textRenderer->render($document);
+
+// Send multipart email (using your preferred mail library)
+$email = new YourMailer();
+$email->setSubject('Order Confirmation');
+$email->setHtmlBody($htmlBody);
+$email->setTextBody($textBody);
+$email->send();
+```
+
+HTML output (for rich clients):
+```html
+<h1>Order Confirmation</h1>
+<p>Thank you for your order, <strong>John</strong>!</p>
+<h2>Order Details</h2>
+<table>
+<tr><th>Item</th><th>Qty</th><th>Price</th></tr>
+<tr><td>Widget Pro</td><td>2</td><td>$49.99</td></tr>
+<tr><td>Gadget X</td><td>1</td><td>$29.99</td></tr>
+</table>
+...
+```
+
+Plain text output (for basic clients):
+```
+Order Confirmation
+
+Thank you for your order, John!
+
+Order Details
+
+Item | Qty | Price
+Widget Pro | 2 | $49.99
+Gadget X | 1 | $29.99
+
+Total: $79.98
+
+https://example.com/track/12345
+
+Questions? Reply to this email or visit our https://example.com/help.
 ```
 
 ### Markdown Conversion
