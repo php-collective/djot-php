@@ -1749,6 +1749,31 @@ Output:
 | Nested lists without blank lines | No | Yes |
 | Soft breaks render as | `\n` | `<br>` |
 
+### Preventing Block Interruption with Escaping
+
+In significant newlines mode, if you want to include literal block markers without triggering block parsing, escape the first character with a backslash:
+
+```php
+$converter = DjotConverter::withSignificantNewlines();
+
+// Without escaping - creates a list
+$result = $converter->convert("Price:
+- 10 dollars");
+// Output: <p>Price:</p><ul><li>10 dollars</li></ul>
+
+// With escaping - literal text
+$result = $converter->convert("Price:
+\\- 10 dollars");
+// Output: <p>Price:<br>- 10 dollars</p>
+```
+
+Common escapes:
+- `\-`, `\*`, `\+` - Prevent list interpretation
+- `\>` - Prevent blockquote interpretation
+- `\#` - Prevent heading interpretation
+- `\|` - Prevent table interpretation
+- `` \` `` - Prevent code fence interpretation
+
 ### Use Cases
 
 **Chat/Messaging Applications:**
