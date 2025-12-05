@@ -1025,4 +1025,70 @@ DJOT;
         // Should not run together
         $this->assertStringNotContainsString('DjotA lightweight', $html);
     }
+
+    // ==================== Empty Table Cell Preservation Tests ====================
+
+    public function testFullProfilePreservesEmptyTableCells(): void
+    {
+        $converter = new DjotConverter(profile: Profile::full());
+
+        $djot = <<<'DJOT'
+| A | B | C |
+|---|---|---|
+| 1 |   | 3 |
+|   | 2 |   |
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Table should be preserved with correct structure
+        $this->assertStringContainsString('<table>', $html);
+        // Count cells - should have 9 cells total (3 header + 6 body)
+        $this->assertEquals(9, substr_count($html, '<td>') + substr_count($html, '<th>'));
+        // Data rows should have 3 cells each
+        preg_match_all('/<tr>.*?<\/tr>/s', $html, $matches);
+        $this->assertCount(3, $matches[0]); // 1 header row + 2 data rows
+    }
+
+    public function testArticleProfilePreservesEmptyTableCells(): void
+    {
+        $converter = new DjotConverter(profile: Profile::article());
+
+        $djot = <<<'DJOT'
+| Header |   |
+|--------|---|
+|        | X |
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('<table>', $html);
+        // Should have 4 cells (2 header + 2 body)
+        $this->assertEquals(4, substr_count($html, '<td>') + substr_count($html, '<th>'));
+    }
+
+    public function testThematicBreakPreservedWhenAllowed(): void
+    {
+        $profile = (new Profile())
+            ->allowInline([NodeType::TEXT, NodeType::SOFT_BREAK, NodeType::HARD_BREAK])
+            ->allowBlock([NodeType::PARAGRAPH, NodeType::THEMATIC_BREAK]);
+
+        $converter = new DjotConverter(profile: $profile);
+
+        $djot = <<<'DJOT'
+Before
+
+---
+
+After
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Thematic break should be preserved as <hr>
+        $this->assertStringContainsString('<hr>', $html);
+        $this->assertStringContainsString('Before', $html);
+        $this->assertStringContainsString('After', $html);
+        $this->assertFalse($converter->hasProfileViolations());
+    }
 }
