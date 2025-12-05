@@ -66,7 +66,7 @@ class PlainTextRenderer implements RendererInterface
     /**
      * Set how soft breaks are rendered
      *
-     * @param SoftBreakMode $mode How to render soft breaks:
+     * @param \Djot\Renderer\SoftBreakMode $mode How to render soft breaks:
      *   - Newline: renders as "\n"
      *   - Space: renders as " " (default)
      *   - Break: renders as "\n" (same as Newline for plain text)

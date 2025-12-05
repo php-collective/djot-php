@@ -134,7 +134,7 @@ class HtmlRenderer implements RendererInterface
     /**
      * Set how soft breaks are rendered
      *
-     * @param SoftBreakMode $mode How to render soft breaks:
+     * @param \Djot\Renderer\SoftBreakMode $mode How to render soft breaks:
      *   - Newline: renders as "\n" (default, not visible in browser)
      *   - Space: renders as " " (not visible in browser)
      *   - Break: renders as "<br>" (visible line break)
