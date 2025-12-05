@@ -254,4 +254,125 @@ class BlockParserTest extends TestCase
         $this->assertInstanceOf(Document::class, $doc);
         $this->assertCount(0, $doc->getChildren());
     }
+
+    public function testSignificantNewlinesDisabledByDefault(): void
+    {
+        // Without blank line, sublist syntax is treated as text
+        $doc = $this->parser->parse("- Item\n  - Not a sublist");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+        $this->assertCount(1, $list->getChildren());
+    }
+
+    public function testSignificantNewlinesNestedLists(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Fruits\n  - Apples\n  - Bananas\n- Vegetables");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+        $this->assertCount(2, $list->getChildren()); // Fruits, Vegetables
+
+        // Check first item has a sublist
+        $firstItem = $list->getChildren()[0];
+        $children = $firstItem->getChildren();
+
+        // Should have paragraph and sublist
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+
+        // Sublist should have 2 items
+        $sublist = $children[1];
+        $this->assertCount(2, $sublist->getChildren());
+    }
+
+    public function testSignificantNewlinesThreeLevels(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- L1\n  - L2\n    - L3");
+
+        $list = $doc->getChildren()[0];
+        $l1Item = $list->getChildren()[0];
+        $l2List = $l1Item->getChildren()[1];
+        $l2Item = $l2List->getChildren()[0];
+        $l3List = $l2Item->getChildren()[1];
+
+        $this->assertInstanceOf(ListBlock::class, $l3List);
+        $this->assertCount(1, $l3List->getChildren());
+    }
+
+    public function testSignificantNewlinesMixedListTypes(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Unordered\n  1. Ordered\n  2. Second");
+
+        $list = $doc->getChildren()[0];
+        $this->assertSame(ListBlock::TYPE_BULLET, $list->getListType());
+
+        $item = $list->getChildren()[0];
+        $sublist = $item->getChildren()[1];
+        $this->assertInstanceOf(ListBlock::class, $sublist);
+        $this->assertSame(ListBlock::TYPE_ORDERED, $sublist->getListType());
+    }
+
+    public function testSignificantNewlinesBlockquoteInList(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Item\n  > quoted");
+
+        $list = $doc->getChildren()[0];
+        $item = $list->getChildren()[0];
+        $children = $item->getChildren();
+
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(BlockQuote::class, $children[1]);
+    }
+
+    public function testSignificantNewlinesListInterruptsParagraph(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Here is a list:\n- item one\n- item two");
+
+        $children = $doc->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+    }
+
+    public function testSignificantNewlinesBlockquoteInterruptsParagraph(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("They said:\n> This is important");
+
+        $children = $doc->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(BlockQuote::class, $children[1]);
+    }
+
+    public function testSignificantNewlinesSetterMethod(): void
+    {
+        $parser = new BlockParser();
+        $this->assertFalse($parser->getSignificantNewlines());
+
+        $parser->setSignificantNewlines(true);
+        $this->assertTrue($parser->getSignificantNewlines());
+
+        // Test chaining
+        $result = $parser->setSignificantNewlines(false);
+        $this->assertSame($parser, $result);
+    }
+
+    public function testStandardModeBlockquoteDoesNotInterrupt(): void
+    {
+        // Standard djot: blockquote doesn't interrupt paragraph
+        $doc = $this->parser->parse("They said:\n> This is important");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
 }

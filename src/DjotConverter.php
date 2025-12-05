@@ -9,6 +9,7 @@ use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
 use Djot\Renderer\HtmlRenderer;
+use Djot\Renderer\SoftBreakMode;
 use LengthException;
 use RuntimeException;
 
@@ -35,6 +36,7 @@ class DjotConverter
      * @param bool $strict Whether to throw exceptions on parse errors
      * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode (true for defaults, SafeMode instance for custom config)
      * @param \Djot\Profile|null $profile Profile for feature restriction (null = all features allowed)
+     * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
      */
     public function __construct(
         bool $xhtml = false,
@@ -42,10 +44,11 @@ class DjotConverter
         bool $strict = false,
         bool|SafeMode|null $safeMode = null,
         ?Profile $profile = null,
+        bool $significantNewlines = false,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
-        $this->parser = new BlockParser($warnings, $strict);
+        $this->parser = new BlockParser($warnings, $strict, $significantNewlines);
         $this->renderer = new HtmlRenderer($xhtml);
 
         // Configure safe mode
@@ -55,11 +58,36 @@ class DjotConverter
             $this->renderer->setSafeMode($safeMode);
         }
 
+        // In significant newlines mode, soft breaks become visible <br>
+        if ($significantNewlines) {
+            $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
+        }
+
         // Configure profile
         $this->profile = $profile;
         if ($profile !== null) {
             $this->profileFilter = new ProfileFilter();
         }
+    }
+
+    /**
+     * Create a converter with significant newlines mode enabled
+     *
+     * In this mode:
+     * - Block elements (lists, blockquotes, code) can interrupt paragraphs
+     * - Soft breaks render as visible <br> tags
+     * - Nested blocks in lists don't need blank lines
+     *
+     * Ideal for chat messages, comments, and quick notes.
+     */
+    public static function withSignificantNewlines(
+        bool $xhtml = false,
+        bool $warnings = false,
+        bool $strict = false,
+        bool|SafeMode|null $safeMode = null,
+        ?Profile $profile = null,
+    ): self {
+        return new self($xhtml, $warnings, $strict, $safeMode, $profile, true);
     }
 
     /**
