@@ -158,6 +158,69 @@ Unmatched `{-` does not prevent em/en-dash conversion:
 
 ---
 
+## Optional Modes
+
+These are optional parser modes that deviate from spec behavior for specific use cases.
+
+### Significant Newlines Mode
+
+**Related:** [jgm/djot#161](https://github.com/jgm/djot/issues/161)
+
+**Status:** Implemented in djot-php (opt-in)
+
+An optional mode for chat messages, comments, and quick notes where markdown-like behavior is more intuitive.
+
+**Enable via:**
+```php
+// Factory method
+$converter = DjotConverter::withSignificantNewlines();
+
+// Constructor parameter
+$converter = new DjotConverter(significantNewlines: true);
+
+// Parser directly
+$parser = new BlockParser(significantNewlines: true);
+```
+
+**Changes from spec:**
+
+| Behavior | Standard Mode | Significant Newlines Mode |
+|----------|---------------|---------------------------|
+| Block elements interrupt paragraphs | No (blank line required) | Yes |
+| Nested lists need blank lines | Yes | No |
+| Soft breaks render as | `\n` or space | `<br>` |
+
+**Example:**
+```djot
+Here is a list:
+- item one
+- item two
+```
+
+**Standard mode output:**
+```html
+<p>Here is a list:
+- item one
+- item two</p>
+```
+
+**Significant newlines mode output:**
+```html
+<p>Here is a list:</p>
+<ul>
+<li>item one</li>
+<li>item two</li>
+</ul>
+```
+
+**Escaping:** In this mode, escape block markers to keep them literal:
+```djot
+They said:
+\> This is not a blockquote
+```
+
+---
+
 ## Language Features Beyond Spec
 
 These are djot syntax features we've implemented that aren't yet in the upstream spec.
@@ -281,6 +344,12 @@ vendor/bin/phpunit
 |---------------------------|------------------------------------------------|------------|
 | List item attributes      | [#262](https://github.com/jgm/djot/pull/262)   | Open PR    |
 | Multiple definition terms | -                                              | djot-php   |
+
+### Optional Modes
+
+| Mode                  | Upstream Issue                              | Status            |
+|-----------------------|---------------------------------------------|-------------------|
+| Significant newlines  | [#161](https://github.com/jgm/djot/issues/161) | djot-php (opt-in) |
 
 These enhancements may be adopted into the official spec. We track upstream discussions and adjust our implementation accordingly.
 
