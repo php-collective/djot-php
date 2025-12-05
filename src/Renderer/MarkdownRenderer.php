@@ -51,7 +51,7 @@ use Djot\Node\Node;
  * Note: Some Djot features don't have direct Markdown equivalents
  * and will be rendered as HTML or approximated.
  */
-class MarkdownRenderer
+class MarkdownRenderer implements RendererInterface
 {
     protected int $listDepth = 0;
 

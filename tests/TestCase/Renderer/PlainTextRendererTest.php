@@ -8,6 +8,7 @@ use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Inline\Symbol;
 use Djot\Renderer\PlainTextRenderer;
+use Djot\Renderer\SoftBreakMode;
 use PHPUnit\Framework\TestCase;
 
 class PlainTextRendererTest extends TestCase
@@ -174,6 +175,44 @@ class PlainTextRendererTest extends TestCase
         $document = $this->converter->parse($djot);
 
         $this->assertSame("Line one\nLine two\n", $this->renderer->render($document));
+    }
+
+    public function testSoftBreakDefault(): void
+    {
+        $djot = "Line one\nLine two";
+        $document = $this->converter->parse($djot);
+
+        // Default: soft break as space
+        $this->assertSame("Line one Line two\n", $this->renderer->render($document));
+    }
+
+    public function testSoftBreakAsNewline(): void
+    {
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Newline);
+
+        $djot = "Line one\nLine two";
+        $document = $this->converter->parse($djot);
+
+        $this->assertSame("Line one\nLine two\n", $this->renderer->render($document));
+    }
+
+    public function testSoftBreakAsBreak(): void
+    {
+        // In plain text, Break mode behaves the same as Newline
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
+
+        $djot = "Line one\nLine two";
+        $document = $this->converter->parse($djot);
+
+        $this->assertSame("Line one\nLine two\n", $this->renderer->render($document));
+    }
+
+    public function testGetSoftBreakMode(): void
+    {
+        $this->assertSame(SoftBreakMode::Space, $this->renderer->getSoftBreakMode());
+
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Newline);
+        $this->assertSame(SoftBreakMode::Newline, $this->renderer->getSoftBreakMode());
     }
 
     public function testSuperscriptSubscript(): void
