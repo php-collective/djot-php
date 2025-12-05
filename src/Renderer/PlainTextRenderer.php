@@ -44,7 +44,7 @@ use Djot\Node\Node;
  * - Plain text email fallbacks
  * - Word count / reading time estimation
  */
-class PlainTextRenderer
+class PlainTextRenderer implements RendererInterface
 {
     protected string $listItemPrefix = '- ';
 
@@ -56,10 +56,35 @@ class PlainTextRenderer
 
     protected string $blockQuoteSuffix = '"';
 
+    protected SoftBreakMode $softBreakMode = SoftBreakMode::Space;
+
     /**
      * @var array<string, array<\Closure(\Djot\Event\RenderEvent): void>>
      */
     protected array $listeners = [];
+
+    /**
+     * Set how soft breaks are rendered
+     *
+     * @param \Djot\Renderer\SoftBreakMode $mode How to render soft breaks:
+     *   - Newline: renders as "\n"
+     *   - Space: renders as " " (default)
+     *   - Break: renders as "\n" (same as Newline for plain text)
+     */
+    public function setSoftBreakMode(SoftBreakMode $mode): self
+    {
+        $this->softBreakMode = $mode;
+
+        return $this;
+    }
+
+    /**
+     * Get the current soft break mode
+     */
+    public function getSoftBreakMode(): SoftBreakMode
+    {
+        return $this->softBreakMode;
+    }
 
     /**
      * Register an event listener
@@ -149,7 +174,7 @@ class PlainTextRenderer
             $node instanceof Image => $node->getAlt(),
             $node instanceof Symbol => ':' . $node->getName() . ':',
             $node instanceof FootnoteRef => '[' . $node->getLabel() . ']',
-            $node instanceof SoftBreak => ' ',
+            $node instanceof SoftBreak => $this->softBreakMode === SoftBreakMode::Space ? ' ' : "\n",
             $node instanceof HardBreak => "\n",
             $node instanceof RawInline => '', // Skip raw inlines (format-specific)
             default => $this->renderChildren($node),

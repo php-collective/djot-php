@@ -17,6 +17,7 @@ use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Strong;
 use Djot\Node\Inline\Text;
 use Djot\Renderer\HtmlRenderer;
+use Djot\Renderer\SoftBreakMode;
 use PHPUnit\Framework\TestCase;
 
 class HtmlRendererTest extends TestCase
@@ -174,7 +175,7 @@ class HtmlRendererTest extends TestCase
 
     public function testRenderSoftBreakAsSpace(): void
     {
-        $this->renderer->setSoftBreakAsNewline(false);
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Space);
 
         $doc = new Document();
         $para = new Paragraph();
@@ -186,6 +187,47 @@ class HtmlRendererTest extends TestCase
         $result = $this->renderer->render($doc);
 
         $this->assertSame("<p>Line 1 Line 2</p>\n", $result);
+    }
+
+    public function testRenderSoftBreakAsBr(): void
+    {
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
+
+        $doc = new Document();
+        $para = new Paragraph();
+        $para->appendChild(new Text('Line 1'));
+        $para->appendChild(new SoftBreak());
+        $para->appendChild(new Text('Line 2'));
+        $doc->appendChild($para);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertSame("<p>Line 1<br>\nLine 2</p>\n", $result);
+    }
+
+    public function testRenderSoftBreakAsBrXhtml(): void
+    {
+        $this->renderer = new HtmlRenderer(xhtml: true);
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
+
+        $doc = new Document();
+        $para = new Paragraph();
+        $para->appendChild(new Text('Line 1'));
+        $para->appendChild(new SoftBreak());
+        $para->appendChild(new Text('Line 2'));
+        $doc->appendChild($para);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertSame("<p>Line 1<br />\nLine 2</p>\n", $result);
+    }
+
+    public function testGetSoftBreakMode(): void
+    {
+        $this->assertSame(SoftBreakMode::Newline, $this->renderer->getSoftBreakMode());
+
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
+        $this->assertSame(SoftBreakMode::Break, $this->renderer->getSoftBreakMode());
     }
 
     public function testRenderWithAttributes(): void

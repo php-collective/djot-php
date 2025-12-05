@@ -9,6 +9,7 @@ use Djot\Event\RenderEvent;
 use Djot\Exception\ParseException;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Symbol;
+use Djot\Renderer\SoftBreakMode;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -1859,7 +1860,7 @@ DJOT;
      */
     public function testSmartQuotesConsecutiveOpenersAtLineStart(): void
     {
-        $this->converter->getRenderer()->setSoftBreakAsNewline(true);
+        $this->converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
 
         $djot = "\"Hello,\" said the spider.\n\"'Shelob' is my name.\"";
         $result = $this->converter->convert($djot);

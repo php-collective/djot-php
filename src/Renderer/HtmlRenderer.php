@@ -49,9 +49,9 @@ use Djot\SafeMode;
 /**
  * Renders AST to HTML
  */
-class HtmlRenderer
+class HtmlRenderer implements RendererInterface
 {
-    protected bool $softBreakAsNewline = true;
+    protected SoftBreakMode $softBreakMode = SoftBreakMode::Newline;
 
     /**
      * Safe mode configuration (null = disabled)
@@ -131,9 +131,27 @@ class HtmlRenderer
         return $this->safeMode !== null;
     }
 
-    public function setSoftBreakAsNewline(bool $value): void
+    /**
+     * Set how soft breaks are rendered
+     *
+     * @param \Djot\Renderer\SoftBreakMode $mode How to render soft breaks:
+     *   - Newline: renders as "\n" (default, not visible in browser)
+     *   - Space: renders as " " (not visible in browser)
+     *   - Break: renders as "<br>" (visible line break)
+     */
+    public function setSoftBreakMode(SoftBreakMode $mode): self
     {
-        $this->softBreakAsNewline = $value;
+        $this->softBreakMode = $mode;
+
+        return $this;
+    }
+
+    /**
+     * Get the current soft break mode
+     */
+    public function getSoftBreakMode(): SoftBreakMode
+    {
+        return $this->softBreakMode;
     }
 
     /**
@@ -710,7 +728,11 @@ class HtmlRenderer
 
     protected function renderSoftBreak(): string
     {
-        return $this->softBreakAsNewline ? "\n" : ' ';
+        return match ($this->softBreakMode) {
+            SoftBreakMode::Newline => "\n",
+            SoftBreakMode::Space => ' ',
+            SoftBreakMode::Break => $this->xhtml ? "<br />\n" : "<br>\n",
+        };
     }
 
     protected function renderHardBreak(): string

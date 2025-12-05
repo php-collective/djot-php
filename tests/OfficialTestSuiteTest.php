@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test;
 
 use Djot\DjotConverter;
+use Djot\Renderer\SoftBreakMode;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
@@ -33,7 +34,7 @@ class OfficialTestSuiteTest extends TestCase
     {
         $this->converter = new DjotConverter();
         // Official djot renders soft breaks as newlines
-        $this->converter->getRenderer()->setSoftBreakAsNewline(true);
+        $this->converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
     }
 
     /**
