@@ -408,4 +408,35 @@ class BlockParserTest extends TestCase
         $this->assertCount(1, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
     }
+
+    public function testCodeBlockTrimsLeadingAndTrailingBlankLines(): void
+    {
+        // Leading and trailing blank lines inside code block should be trimmed
+        $doc = $this->parser->parse("```\n\nbin/cake linter\n\n```");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(CodeBlock::class, $children[0]);
+        $this->assertSame('bin/cake linter', $children[0]->getContent());
+    }
+
+    public function testCodeBlockPreservesInternalBlankLines(): void
+    {
+        // Blank lines in the middle of content should be preserved
+        $doc = $this->parser->parse("```\nline1\n\nline2\n```");
+
+        $children = $doc->getChildren();
+        $this->assertInstanceOf(CodeBlock::class, $children[0]);
+        $this->assertSame("line1\n\nline2", $children[0]->getContent());
+    }
+
+    public function testRawBlockTrimsLeadingAndTrailingBlankLines(): void
+    {
+        // Leading and trailing blank lines inside raw block should be trimmed
+        $doc = $this->parser->parse("``` =html\n\n<b>bold</b>\n\n```");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertSame('<b>bold</b>', $children[0]->getContent());
+    }
 }

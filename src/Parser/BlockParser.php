@@ -901,7 +901,7 @@ class BlockParser
 
         $language = $info !== '' ? $info : null;
 
-        $codeBlock = new CodeBlock(rtrim($content, "\n"), $language);
+        $codeBlock = new CodeBlock(trim($content, "\n"), $language);
         $this->applyPendingAttributes($codeBlock);
         $parent->appendChild($codeBlock);
 
@@ -1031,7 +1031,7 @@ class BlockParser
             $this->addWarning('Unclosed raw block', $start, 1, true);
         }
 
-        $rawBlock = new RawBlock(rtrim($content, "\n"), $format);
+        $rawBlock = new RawBlock(trim($content, "\n"), $format);
         $this->applyPendingAttributes($rawBlock);
         $parent->appendChild($rawBlock);
 
