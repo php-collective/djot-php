@@ -1544,8 +1544,11 @@ class BlockParser
                     break;
                 }
 
-                // For ordered lists with styles (roman/alpha), also check style matches
-                if (isset($listInfo['style']) && isset($itemInfo['style']) && $itemInfo['style'] !== $listInfo['style']) {
+                // For ordered lists, check if styles match (roman/alpha vs numeric)
+                // If one has a style and the other doesn't, they're different list types
+                $listStyle = $listInfo['style'] ?? null;
+                $itemStyle = $itemInfo['style'] ?? null;
+                if (($listStyle === null) !== ($itemStyle === null) || $listStyle !== $itemStyle) {
                     break;
                 }
             }
@@ -1965,12 +1968,15 @@ class BlockParser
     {
         $marker = $listInfo['marker'];
         $firstMarkerLetter = null;
+        $firstIsLower = null;
 
         // Extract the letter from the first marker for comparison
         if (preg_match('/^([ivxlcdmIVXLCDM])/', $lines[$start], $m)) {
             $firstMarkerLetter = strtolower($m[1]);
+            $firstIsLower = ctype_lower($m[1]);
         } elseif (preg_match('/^\(([ivxlcdmIVXLCDM])\)/', $lines[$start], $m)) {
             $firstMarkerLetter = strtolower($m[1]);
+            $firstIsLower = ctype_lower($m[1]);
         }
 
         $hasMultiCharRoman = false;
@@ -1994,21 +2000,30 @@ class BlockParser
                 break;
             }
 
-            // Extract the marker text
-            $markerText = null;
+            // Extract the marker text (preserve original case for comparison)
+            $markerTextRaw = null;
             if ($marker === '()') {
                 if (preg_match('/^\(([^)]+)\)/', $line, $m)) {
-                    $markerText = strtolower($m[1]);
+                    $markerTextRaw = $m[1];
                 }
             } else {
                 if (preg_match('/^([a-zA-Z]+)[.)]/', $line, $m)) {
-                    $markerText = strtolower($m[1]);
+                    $markerTextRaw = $m[1];
                 }
             }
 
-            if ($markerText === null) {
+            if ($markerTextRaw === null) {
                 break;
             }
+
+            // Check if case matches - different case means different list style
+            // Per djot spec: "Changing ordered list style... will stop one list and start a new one"
+            $itemIsLower = ctype_lower($markerTextRaw[0]);
+            if ($firstIsLower !== null && $itemIsLower !== $firstIsLower) {
+                break;
+            }
+
+            $markerText = strtolower($markerTextRaw);
 
             // Check for multi-character roman numerals
             if (strlen($markerText) > 1 && preg_match('/^[ivxlcdm]+$/', $markerText)) {

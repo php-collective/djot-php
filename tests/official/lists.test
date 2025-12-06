@@ -501,6 +501,30 @@ d
 </ol>
 ```
 
+Mixed styles start new lists (issue #23).
+
+```
+i. item
+A. item
+1. item
+.
+<ol type="i">
+<li>
+item
+</li>
+</ol>
+<ol type="A">
+<li>
+item
+</li>
+</ol>
+<ol>
+<li>
+item
+</li>
+</ol>
+```
+
 ```
 The civil war ended in
 1865. And this should not start a list.
