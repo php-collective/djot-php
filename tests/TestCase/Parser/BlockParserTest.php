@@ -223,6 +223,39 @@ class BlockParserTest extends TestCase
         $this->assertSame('intro', $para->getAttribute('id'));
     }
 
+    public function testParseBooleanAttribute(): void
+    {
+        // {reversed} should create a boolean attribute with empty value
+        $doc = $this->parser->parse("{reversed}\n1. First\n2. Second");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+        $this->assertSame('', $list->getAttribute('reversed'));
+    }
+
+    public function testParseBooleanAttributeWithOthers(): void
+    {
+        // Boolean attr combined with class, id
+        $doc = $this->parser->parse("{#mylist .fancy reversed}\n1. First\n2. Second");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+        $this->assertSame('mylist', $list->getAttribute('id'));
+        $this->assertSame('fancy', $list->getAttribute('class'));
+        $this->assertSame('', $list->getAttribute('reversed'));
+    }
+
+    public function testParseMultipleBooleanAttributes(): void
+    {
+        // Multiple boolean attrs
+        $doc = $this->parser->parse("{hidden inert}\nParagraph");
+
+        $para = $doc->getChildren()[0];
+        $this->assertInstanceOf(Paragraph::class, $para);
+        $this->assertSame('', $para->getAttribute('hidden'));
+        $this->assertSame('', $para->getAttribute('inert'));
+    }
+
     public function testParseReferenceDefinition(): void
     {
         $doc = $this->parser->parse("[example]: https://example.com\n\n[example][]");
