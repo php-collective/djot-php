@@ -125,6 +125,7 @@ See [Security Considerations](docs/README.md#security-considerations) for detail
 ## Implementations
 
 - [php-collective/wp-djot](https://github.com/php-collective/wp-djot) - WordPress plugin for Djot support
+- [dereuromark/cakephp-markup](https://github.com/dereuromark/cakephp-markup) - CakePHP integration with Djot helper and view class
 
 ## See Also
 
