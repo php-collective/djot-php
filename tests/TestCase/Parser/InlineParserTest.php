@@ -444,4 +444,34 @@ class InlineParserTest extends TestCase
         $this->assertInstanceOf(Link::class, $link);
         $this->assertSame('', $link->getAttribute('download'));
     }
+
+    public function testBooleanAttributeNotMatchedInsideQuotedValue(): void
+    {
+        // Words inside quoted values should NOT be treated as boolean attributes
+        $para = $this->parseInline('[CSS]{abbr="Cascading Style Sheets"}');
+
+        $span = $this->getFirstChild($para);
+        $this->assertInstanceOf(Span::class, $span);
+        $this->assertSame('Cascading Style Sheets', $span->getAttribute('abbr'));
+        // These words should NOT exist as attributes
+        $this->assertNull($span->getAttribute('Cascading'));
+        $this->assertNull($span->getAttribute('Style'));
+        $this->assertNull($span->getAttribute('Sheets'));
+    }
+
+    public function testBooleanAttributeWithQuotedValueAndClass(): void
+    {
+        // Boolean + quoted value + class should all work correctly
+        $para = $this->parseInline('[Get it](file.zip){download title="Download file" .btn}');
+
+        $link = $this->getFirstChild($para);
+        $this->assertInstanceOf(Link::class, $link);
+        $this->assertSame('', $link->getAttribute('download'));
+        $this->assertSame('Download file', $link->getAttribute('title'));
+        $class = $link->getAttribute('class') ?? '';
+        $this->assertTrue(str_contains($class, 'btn'));
+        // "Download" and "file" should NOT be boolean attributes
+        $this->assertNull($link->getAttribute('Download'));
+        $this->assertNull($link->getAttribute('file'));
+    }
 }

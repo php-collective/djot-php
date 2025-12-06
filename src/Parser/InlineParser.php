@@ -1508,8 +1508,12 @@ class InlineParser
         }
 
         // Parse boolean attributes (bare words like "disabled", "hidden")
-        // Must not start with . or # and must not contain =
-        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $attrStr, $boolMatches)) {
+        // First, strip out quoted values and key=value pairs to avoid matching words inside them
+        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*="(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
+        $strippedAttr = preg_replace("/[a-zA-Z_][a-zA-Z0-9_-]*='(?:[^'\\\\]|\\\\.)*'/", '', $strippedAttr) ?? $strippedAttr;
+        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}"\']+/', '', $strippedAttr) ?? $strippedAttr;
+        // Now match bare words (must not start with . or #)
+        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $strippedAttr, $boolMatches)) {
             foreach ($boolMatches[1] as $boolAttr) {
                 $node->setAttribute($boolAttr, '');
             }
