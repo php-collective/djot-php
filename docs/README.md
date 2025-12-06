@@ -14,6 +14,7 @@ This directory contains detailed documentation for djot-php.
 - [Architecture](architecture.md) - Internal design
 - [Converters](converters.md) - Markdown/BBCode to Djot conversion
 - [Performance](performance.md) - Benchmarks and performance data
+- [Enhancements](enhancements.md) - Features beyond the current spec
 
 ## Examples
 
