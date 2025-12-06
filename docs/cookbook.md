@@ -21,6 +21,7 @@ Common recipes and customizations for djot-php.
 - [Working with the AST](#working-with-the-ast)
 - [Custom Inline Patterns](#custom-inline-patterns)
 - [Custom Block Patterns](#custom-block-patterns)
+- [Boolean Attributes](#boolean-attributes)
 - [Alternative Output Formats](#alternative-output-formats)
 - [Soft Break Modes](#soft-break-modes)
 - [Significant Newlines Mode](#significant-newlines-mode)
@@ -1522,6 +1523,118 @@ DJOT;
 
 echo $converter->convert($djot);
 ```
+
+## Boolean Attributes
+
+HTML boolean attributes (like `reversed`, `hidden`, `disabled`) can be specified as bare words in djot attribute blocks.
+
+### Reversed Ordered Lists
+
+Use `{reversed}` to create a descending ordered list:
+
+```php
+use Djot\DjotConverter;
+
+$djot = <<<'DJOT'
+{reversed}
+3. Bronze medal
+2. Silver medal
+1. Gold medal
+DJOT;
+
+$converter = new DjotConverter();
+echo $converter->convert($djot);
+```
+
+Output:
+```html
+<ol start="3" reversed="">
+<li>Bronze medal</li>
+<li>Silver medal</li>
+<li>Gold medal</li>
+</ol>
+```
+
+The browser displays this as:
+```
+3. Bronze medal
+2. Silver medal
+1. Gold medal
+```
+
+### Hidden Content
+
+Use `{hidden}` to hide elements:
+
+```djot
+{hidden}
+This paragraph is hidden.
+```
+
+Output:
+```html
+<p hidden="">This paragraph is hidden.</p>
+```
+
+### Combining Boolean Attributes
+
+Boolean attributes can be combined with classes, IDs, and key-value attributes:
+
+```djot
+{#countdown .fancy reversed}
+3. Third
+2. Second
+1. First
+```
+
+Output:
+```html
+<ol id="countdown" class="fancy" start="3" reversed="">
+<li>Third</li>
+<li>Second</li>
+<li>First</li>
+</ol>
+```
+
+### Inline Boolean Attributes
+
+Boolean attributes also work on inline spans and links:
+
+```djot
+[Download PDF](report.pdf){download .btn}
+
+[Hidden text]{hidden}
+```
+
+Output:
+```html
+<p><a href="report.pdf" class="btn" download="">Download PDF</a></p>
+<p><span hidden="">Hidden text</span></p>
+```
+
+### Syntax Reference
+
+| Syntax | Result |
+|--------|--------|
+| `{.class}` | `class="class"` |
+| `{#id}` | `id="id"` |
+| `{key=value}` | `key="value"` |
+| `{key="value"}` | `key="value"` (quoted) |
+| `{reversed}` | `reversed=""` (boolean) |
+| `{hidden}` | `hidden=""` (boolean) |
+
+Boolean attributes are rendered as `attr=""` which is valid HTML5. Browsers treat this identically to `attr` or `attr="attr"`.
+
+### Common HTML Boolean Attributes
+
+Useful boolean attributes for djot elements:
+
+| Attribute | Elements | Effect |
+|-----------|----------|--------|
+| `reversed` | `<ol>` | Count down instead of up |
+| `hidden` | Any | Hide element from display |
+| `open` | `<details>` | Show details content by default |
+| `download` | `<a>` (links) | Download linked resource |
 
 ## Alternative Output Formats
 

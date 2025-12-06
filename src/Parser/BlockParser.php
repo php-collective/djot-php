@@ -394,6 +394,14 @@ class BlockParser
             }
         }
 
+        // Match boolean attributes (bare words not starting with . or # and not containing =)
+        // Examples: {reversed}, {hidden}, {.class reversed #id}
+        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $attrStr, $boolMatches)) {
+            foreach ($boolMatches[1] as $boolAttr) {
+                $attrs[$boolAttr] = '';
+            }
+        }
+
         return $attrs;
     }
 
@@ -650,7 +658,8 @@ class BlockParser
         if (preg_match('/^\{(.+)\}\s*$/', $line, $matches)) {
             $attrStr = $matches[1];
             // Exclude _ * = + - ~ ^ which are braced inline markers (not block attributes)
-            if (!preg_match('/^[.#a-zA-Z%]/', $attrStr)) {
+            // Exclude % which starts comments (handled by tryParseComment)
+            if (!preg_match('/^[.#a-zA-Z]/', $attrStr) || str_starts_with($attrStr, '%')) {
                 return null;
             }
 
@@ -686,7 +695,8 @@ class BlockParser
                 $attrStr = trim($attrContent);
 
                 // Exclude _ * = + - ~ ^ which are braced inline markers (not block attributes)
-                if (!preg_match('/^[.#a-zA-Z%]/', $attrStr)) {
+                // Exclude % which starts comments (handled by tryParseComment)
+                if (!preg_match('/^[.#a-zA-Z]/', $attrStr) || str_starts_with($attrStr, '%')) {
                     return null;
                 }
                 $this->parseAttributeString($attrStr);
@@ -738,6 +748,14 @@ class BlockParser
                     // key=unquoted
                     $this->pendingAttributes[$match[5]] = $match[6] ?? '';
                 }
+            }
+        }
+
+        // Parse boolean attributes (bare words like "reversed", "hidden")
+        // Must not start with . or # and must not contain =
+        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $attrStr, $boolMatches)) {
+            foreach ($boolMatches[1] as $boolAttr) {
+                $this->pendingAttributes[$boolAttr] = '';
             }
         }
     }

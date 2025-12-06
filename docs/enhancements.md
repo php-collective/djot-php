@@ -270,6 +270,58 @@ Works with all list types:
 
 ---
 
+### Boolean Attribute Shorthand
+
+**Related:** [jgm/djot#257](https://github.com/jgm/djot/issues/257)
+
+**Status:** Implemented in djot-php
+
+Boolean/flag attributes can be specified without a value for cleaner syntax:
+
+```djot
+{reversed}
+1. Third
+2. Second
+3. First
+
+::: details
+{open}
+This is expanded by default.
+:::
+
+[Download](file.zip){download .btn}
+```
+
+**Output:**
+```html
+<ol reversed="">
+<li>Third</li>
+<li>Second</li>
+<li>First</li>
+</ol>
+
+<details open="">
+<p>This is expanded by default.</p>
+</details>
+
+<p><a href="file.zip" class="btn" download="">Download</a></p>
+```
+
+**Supported syntax:**
+- `{reversed}` - bare attribute name (no `=` required)
+- `{hidden .class}` - combinable with classes
+- `{#id open disabled}` - multiple boolean attributes with ID
+- `{.alert hidden data-value="x"}` - mixed with key=value attributes
+- `[text](url){download}` - works on inline links too
+
+**Common use cases:**
+- `{reversed}` - reversed ordered lists
+- `{open}` - expanded `<details>` elements
+- `{hidden}` - hidden elements
+- `{download}` - downloadable links
+
+---
+
 ### Multiple Definition Terms
 
 **Status:** Implemented in djot-php
@@ -343,6 +395,7 @@ vendor/bin/phpunit
 | Feature                   | Upstream PR/Issue                              | Status     |
 |---------------------------|------------------------------------------------|------------|
 | List item attributes      | [#262](https://github.com/jgm/djot/pull/262)   | Open PR    |
+| Boolean attribute shorthand | [#257](https://github.com/jgm/djot/issues/257) | Open       |
 | Multiple definition terms | -                                              | djot-php   |
 
 ### Optional Modes

@@ -388,4 +388,60 @@ class InlineParserTest extends TestCase
         }
         $this->assertSame('_}b_', $content);
     }
+
+    public function testParseBooleanAttribute(): void
+    {
+        // {disabled} should create a boolean attribute with empty value
+        $para = $this->parseInline('[Click me]{disabled}');
+
+        $span = $this->getFirstChild($para);
+        $this->assertInstanceOf(Span::class, $span);
+        $this->assertSame('', $span->getAttribute('disabled'));
+    }
+
+    public function testParseBooleanAttributeWithClass(): void
+    {
+        // Boolean attr combined with class
+        $para = $this->parseInline('[Submit]{disabled .btn}');
+
+        $span = $this->getFirstChild($para);
+        $this->assertInstanceOf(Span::class, $span);
+        $this->assertSame('', $span->getAttribute('disabled'));
+        $class = $span->getAttribute('class') ?? '';
+        $this->assertTrue(str_contains($class, 'btn'));
+    }
+
+    public function testParseBooleanAttributeWithIdAndClass(): void
+    {
+        // Boolean attr combined with class and id
+        $para = $this->parseInline('[Submit]{.btn disabled #submit}');
+
+        $span = $this->getFirstChild($para);
+        $this->assertInstanceOf(Span::class, $span);
+        $this->assertSame('', $span->getAttribute('disabled'));
+        $this->assertSame('submit', $span->getAttribute('id'));
+        $class = $span->getAttribute('class') ?? '';
+        $this->assertTrue(str_contains($class, 'btn'));
+    }
+
+    public function testParseMultipleBooleanAttributes(): void
+    {
+        // Multiple boolean attrs
+        $para = $this->parseInline('[Secret]{hidden readonly}');
+
+        $span = $this->getFirstChild($para);
+        $this->assertInstanceOf(Span::class, $span);
+        $this->assertSame('', $span->getAttribute('hidden'));
+        $this->assertSame('', $span->getAttribute('readonly'));
+    }
+
+    public function testParseBooleanAttributeOnLink(): void
+    {
+        // Boolean attr on a link
+        $para = $this->parseInline('[Download](file.zip){download}');
+
+        $link = $this->getFirstChild($para);
+        $this->assertInstanceOf(Link::class, $link);
+        $this->assertSame('', $link->getAttribute('download'));
+    }
 }
