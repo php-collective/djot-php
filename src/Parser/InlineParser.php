@@ -1506,6 +1506,14 @@ class InlineParser
                 $node->setAttribute($match[7], $match[8] ?? '');
             }
         }
+
+        // Parse boolean attributes (bare words like "disabled", "hidden")
+        // Must not start with . or # and must not contain =
+        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $attrStr, $boolMatches)) {
+            foreach ($boolMatches[1] as $boolAttr) {
+                $node->setAttribute($boolAttr, '');
+            }
+        }
     }
 
     /**

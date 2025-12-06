@@ -1596,6 +1596,22 @@ Output:
 </ol>
 ```
 
+### Inline Boolean Attributes
+
+Boolean attributes also work on inline spans and links:
+
+```djot
+[Download PDF](report.pdf){download .btn}
+
+[Hidden text]{hidden}
+```
+
+Output:
+```html
+<p><a href="report.pdf" class="btn" download="">Download PDF</a></p>
+<p><span hidden="">Hidden text</span></p>
+```
+
 ### Syntax Reference
 
 | Syntax | Result |
@@ -1618,7 +1634,7 @@ Useful boolean attributes for djot elements:
 | `reversed` | `<ol>` | Count down instead of up |
 | `hidden` | Any | Hide element from display |
 | `open` | `<details>` | Show details content by default |
-| `disabled` | Form elements | Disable interaction |
+| `download` | `<a>` (links) | Download linked resource |
 
 ## Alternative Output Formats
 
