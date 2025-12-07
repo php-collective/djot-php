@@ -27,6 +27,9 @@ use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Node;
+use Djot\Parser\Block\FencedBlockParser;
+use Djot\Parser\Block\ListParser;
+use Djot\Parser\Block\TableParser;
 use Djot\Parser\Utility\AttributeParser;
 use Djot\Parser\Utility\IndentationHelper;
 
@@ -36,6 +39,12 @@ use Djot\Parser\Utility\IndentationHelper;
 class BlockParser
 {
     protected InlineParser $inlineParser;
+
+    protected ListParser $listParser;
+
+    protected TableParser $tableParser;
+
+    protected FencedBlockParser $fencedBlockParser;
 
     /**
      * @var array<string, \Djot\Parser\ReferenceDefinition>
@@ -105,6 +114,9 @@ class BlockParser
         $this->strictMode = $strictMode;
         $this->significantNewlines = $significantNewlines;
         $this->inlineParser = new InlineParser($this);
+        $this->listParser = new ListParser();
+        $this->tableParser = new TableParser();
+        $this->fencedBlockParser = new FencedBlockParser();
     }
 
     /**
@@ -371,40 +383,7 @@ class BlockParser
      */
     protected function parseInlineAttributes(string $attrStr): array
     {
-        $attrs = [];
-
-        // Match: .class, #id, key="quoted value", key='quoted value', key=unquoted
-        preg_match_all('/\.([^\s.#=]+)|#([^\s.#=]+)|([^\s.#=]+)="([^"]*)"|([^\s.#=]+)=\'([^\']*)\'|([^\s.#=]+)=([^\s}"\']+)/', $attrStr, $matches, PREG_SET_ORDER);
-
-        foreach ($matches as $match) {
-            if (!empty($match[1])) {
-                // Class attribute
-                $existing = $attrs['class'] ?? '';
-                $attrs['class'] = trim($existing . ' ' . $match[1]);
-            } elseif (!empty($match[2])) {
-                // ID attribute
-                $attrs['id'] = $match[2];
-            } elseif (($match[3] ?? '') !== '') {
-                // key="double quoted value"
-                $attrs[$match[3]] = $match[4] ?? '';
-            } elseif (($match[5] ?? '') !== '') {
-                // key='single quoted value'
-                $attrs[$match[5]] = $match[6] ?? '';
-            } elseif (($match[7] ?? '') !== '') {
-                // key=unquoted
-                $attrs[$match[7]] = $match[8] ?? '';
-            }
-        }
-
-        // Match boolean attributes (bare words not starting with . or # and not containing =)
-        // Examples: {reversed}, {hidden}, {.class reversed #id}
-        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $attrStr, $boolMatches)) {
-            foreach ($boolMatches[1] as $boolAttr) {
-                $attrs[$boolAttr] = '';
-            }
-        }
-
-        return $attrs;
+        return AttributeParser::parse($attrStr);
     }
 
     /**
@@ -757,44 +736,27 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: code blocks start with ` or ~ (possibly after whitespace)
-        $trimmed = ltrim($line);
-        if ($trimmed === '' || ($trimmed[0] !== '`' && $trimmed[0] !== '~')) {
+        // Use FencedBlockParser to detect code fence opener
+        $fenceInfo = $this->fencedBlockParser->parseCodeFenceOpener($line);
+        if ($fenceInfo === null) {
             return null;
         }
 
-        // Match opening fence: 3+ backticks or tildes, optionally with leading whitespace
-        if (!preg_match('/^(\s*)(`{3,}|~{3,})(.*)$/', $line, $matches)) {
-            return null;
-        }
-
-        $indent = $matches[1];
-        $fence = $matches[2];
-        $fenceChar = $fence[0]; // Either ` or ~
-        $fenceLength = strlen($fence);
-        $info = trim($matches[3]);
-
-        // Check for inline code on a single line: ``` foo ``` should be inline code
-        // If the info string contains closing backticks of same or greater length, it's inline code
-        if ($fenceChar === '`') {
-            $closingPattern = '/`{' . $fenceLength . ',}/';
-            if (preg_match($closingPattern, $info)) {
-                // This looks like inline code on a single line, let paragraph parser handle it
-                return null;
-            }
-        }
+        $fenceChar = $fenceInfo['char'];
+        $fenceLength = $fenceInfo['length'];
+        $info = $fenceInfo['info'];
+        $indentLen = strlen($fenceInfo['indent']);
 
         $content = '';
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
-        $indentLen = strlen($indent);
 
         while ($i < $count) {
             $currentLine = $lines[$i];
 
-            // Check for closing fence (same char, equal or longer length), with optional indent
-            if (preg_match('/^\s*' . preg_quote($fenceChar, '/') . '{' . $fenceLength . ',}\s*$/', $currentLine)) {
+            // Check for closing fence
+            if ($this->fencedBlockParser->isCodeFenceCloser($currentLine, $fenceChar, $fenceLength)) {
                 $i++;
                 $closed = true;
 
@@ -802,9 +764,7 @@ class BlockParser
             }
 
             // Remove indent from content lines (up to the same amount as opening fence)
-            if ($indentLen > 0 && preg_match('/^(\s{0,' . $indentLen . '})(.*)$/', $currentLine, $lineMatch)) {
-                $currentLine = $lineMatch[2];
-            }
+            $currentLine = $this->fencedBlockParser->removeIndent($currentLine, $indentLen);
 
             $content .= $currentLine . "\n";
             $i++;
@@ -846,13 +806,8 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: comments must contain {%
-        if (!str_contains($line, '{%')) {
-            return null;
-        }
-
-        // Match comment opening: {%
-        if (!str_starts_with(trim($line), '{%')) {
+        // Use FencedBlockParser to check for comment opener
+        if (!$this->fencedBlockParser->isCommentOpener($line)) {
             return null;
         }
 
@@ -920,19 +875,14 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: raw blocks start with ` and contain =
-        if (!isset($line[0]) || $line[0] !== '`' || !str_contains($line, '=')) {
+        // Use FencedBlockParser to detect raw block opener
+        $rawInfo = $this->fencedBlockParser->parseRawBlockOpener($line);
+        if ($rawInfo === null) {
             return null;
         }
 
-        // Match opening fence with =format: ``` =html (space before = is syntax delimiter)
-        if (!preg_match('/^(`{3,}) +=(\w+) *$/', $line, $matches)) {
-            return null;
-        }
-
-        $fence = $matches[1];
-        $fenceLength = strlen($fence);
-        $format = $matches[2];
+        $fenceLength = $rawInfo['length'];
+        $format = $rawInfo['format'];
 
         $content = '';
         $i = $start + 1;
@@ -943,7 +893,7 @@ class BlockParser
             $currentLine = $lines[$i];
 
             // Check for closing fence (equal or longer)
-            if (preg_match('/^`{' . $fenceLength . ',}\s*$/', $currentLine)) {
+            if ($this->fencedBlockParser->isCodeFenceCloser($currentLine, '`', $fenceLength)) {
                 $i++;
                 $closed = true;
 
@@ -974,19 +924,14 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: divs start with :
-        if (!isset($line[0]) || $line[0] !== ':') {
+        // Use FencedBlockParser to detect div opener
+        $divInfo = $this->fencedBlockParser->parseDivFenceOpener($line);
+        if ($divInfo === null) {
             return null;
         }
 
-        // Match opening fence: 3+ colons with optional class
-        if (!preg_match('/^(:{3,})\s*(.*)$/', $line, $matches)) {
-            return null;
-        }
-
-        $fence = $matches[1];
-        $fenceLength = strlen($fence);
-        $className = trim($matches[2]);
+        $fenceLength = $divInfo['length'];
+        $className = $divInfo['className'];
 
         $div = new Div();
         if ($className !== '') {
@@ -1009,18 +954,21 @@ class BlockParser
             $currentLine = $lines[$i];
 
             // Track code blocks so we don't mistake ::: inside code blocks as closing fences
-            if (!$inCodeBlock && preg_match('/^(`{3,}|~{3,})/', $currentLine, $codeFenceMatch)) {
-                $inCodeBlock = true;
-                $codeBlockFence = $codeFenceMatch[1][0]; // ` or ~
-                $codeBlockFenceLength = strlen($codeFenceMatch[1]);
-                $innerLines[] = $currentLine;
-                $i++;
+            if (!$inCodeBlock) {
+                $codeFenceInfo = $this->fencedBlockParser->parseCodeFenceOpener($currentLine);
+                if ($codeFenceInfo !== null) {
+                    $inCodeBlock = true;
+                    $codeBlockFence = $codeFenceInfo['char'];
+                    $codeBlockFenceLength = $codeFenceInfo['length'];
+                    $innerLines[] = $currentLine;
+                    $i++;
 
-                continue;
+                    continue;
+                }
             }
             if ($inCodeBlock) {
                 // Check for closing code fence
-                if (preg_match('/^' . preg_quote($codeBlockFence, '/') . '{' . $codeBlockFenceLength . ',}\s*$/', $currentLine)) {
+                if ($this->fencedBlockParser->isCodeFenceCloser($currentLine, $codeBlockFence, $codeBlockFenceLength)) {
                     $inCodeBlock = false;
                 }
                 $innerLines[] = $currentLine;
@@ -1030,7 +978,7 @@ class BlockParser
             }
 
             // Check for closing fence (equal or longer) - only when not in code block
-            if (preg_match('/^:{' . $fenceLength . ',}\s*$/', $currentLine)) {
+            if ($this->fencedBlockParser->isDivFenceCloser($currentLine, $fenceLength)) {
                 $i++;
                 $closed = true;
 
@@ -1344,7 +1292,7 @@ class BlockParser
         $line = $lines[$start];
 
         // Try to match list item marker
-        $listInfo = $this->parseListItemMarker($line);
+        $listInfo = $this->listParser->parseListItemMarker($line);
         if ($listInfo === null) {
             return null;
         }
@@ -1357,11 +1305,11 @@ class BlockParser
         // Disambiguate roman vs alphabetical for single-letter markers
         // by looking at subsequent items
         if (!empty($listInfo['ambiguous'])) {
-            $listInfo = $this->disambiguateListStyle($listInfo, $lines, $start);
+            $listInfo = $this->listParser->disambiguateListStyle($listInfo, $lines, $start);
         }
 
         // Get the base indentation of this list
-        $baseIndent = $this->getLeadingSpaces($line);
+        $baseIndent = IndentationHelper::getLeadingSpaces($line);
 
         $list = new ListBlock(
             $listInfo['type'],
@@ -1392,7 +1340,7 @@ class BlockParser
             }
 
             // Get indentation of current line
-            $currentIndent = $this->getLeadingSpaces($currentLine);
+            $currentIndent = IndentationHelper::getLeadingSpaces($currentLine);
 
             // If line is less indented than base, we're done with this list
             if ($currentIndent < $baseIndent) {
@@ -1402,13 +1350,13 @@ class BlockParser
             // Check for indented continuation (after blank line = nested content)
             if ($lastItemHadBlankAfter && $currentIndent > $baseIndent) {
                 // Content after blank line with indentation belongs to previous item
-                $lastItem = $this->getLastListItem($list);
+                $lastItem = $this->listParser->getLastListItem($list);
                 if ($lastItem !== null) {
                     // Check if the first indented content is a list marker or regular text
                     // Blank line followed by indented TEXT = loose list (multiple paragraphs)
                     // Blank line followed by indented LIST MARKER = tight nesting
                     $trimmedCurrent = ltrim($currentLine);
-                    $firstContentIsListMarker = $this->parseListItemMarker($trimmedCurrent) !== null;
+                    $firstContentIsListMarker = $this->listParser->parseListItemMarker($trimmedCurrent) !== null;
                     if (!$firstContentIsListMarker) {
                         // Indented text after blank = loose list
                         $list->setTight(false);
@@ -1427,17 +1375,17 @@ class BlockParser
 
                             continue;
                         }
-                        $lineIndent = $this->getLeadingSpaces($subLine);
+                        $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
                         // Check if line has at least the subIndent level
                         if ($lineIndent >= $subIndent) {
                             // Remove subIndent worth of indentation (handling tabs)
-                            $subLines[] = $this->stripLeadingIndent($subLine, $subIndent);
+                            $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $subIndent);
                             $sawBlankLine = false;
                             $i++;
                         } elseif ($lineIndent >= $baseIndent) {
                             // Check if it's a same-level list item (at base indent)
                             $trimmedLine = ltrim($subLine);
-                            $itemInfo = $this->parseListItemMarker($trimmedLine);
+                            $itemInfo = $this->listParser->parseListItemMarker($trimmedLine);
                             $sameStyle = !isset($listInfo['style']) || !isset($itemInfo['style']) || $itemInfo['style'] === $listInfo['style'];
                             if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle && $lineIndent === $baseIndent) {
                                 break;
@@ -1486,18 +1434,10 @@ class BlockParser
                 if ($currentIndent !== $baseIndent) {
                     break;
                 }
-                $itemInfo = $this->parseListItemMarker($trimmedLine);
+                $itemInfo = $this->listParser->parseListItemMarker($trimmedLine);
 
                 // Check if this is a list item of the same type, marker, and style
-                if ($itemInfo === null || $itemInfo['type'] !== $listInfo['type'] || $itemInfo['marker'] !== $listInfo['marker']) {
-                    break;
-                }
-
-                // For ordered lists, check if styles match (roman/alpha vs numeric)
-                // If one has a style and the other doesn't, they're different list types
-                $listStyle = $listInfo['style'] ?? null;
-                $itemStyle = $itemInfo['style'] ?? null;
-                if (($listStyle === null) !== ($itemStyle === null) || $listStyle !== $itemStyle) {
+                if ($itemInfo === null || !$this->listParser->itemMatchesList($listInfo, $itemInfo)) {
                     break;
                 }
             }
@@ -1526,12 +1466,12 @@ class BlockParser
                     break;
                 }
 
-                $nextIndent = $this->getLeadingSpaces($nextLine);
+                $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
                 $nextTrimmed = ltrim($nextLine);
 
                 // Check if next line starts a new list item at same level (base indent)
                 if ($nextIndent === $baseIndent) {
-                    $nextInfo = $this->parseListItemMarker($nextTrimmed);
+                    $nextInfo = $this->listParser->parseListItemMarker($nextTrimmed);
                     if ($nextInfo !== null) {
                         break;
                     }
@@ -1557,13 +1497,13 @@ class BlockParser
                     // Check if significantNewlines mode allows immediate nested blocks
                     if ($this->significantNewlines) {
                         // Check for any block starter (list, blockquote, code fence, div)
-                        if ($this->startsNewBlock($nextTrimmed) || $this->parseListItemMarker($nextTrimmed) !== null) {
+                        if ($this->startsNewBlock($nextTrimmed) || $this->listParser->parseListItemMarker($nextTrimmed) !== null) {
                             // This is a nested block - break out to let normal nesting handle it
                             break;
                         }
                     }
                     // Properly indented continuation - include with original indentation relative to content
-                    $itemLines[] = $this->stripLeadingIndent($nextLine, $contentIndent);
+                    $itemLines[] = IndentationHelper::stripLeadingIndent($nextLine, $contentIndent);
                 } else {
                     // Lazy continuation (not properly indented but not at base level either)
                     $itemLines[] = $nextTrimmed;
@@ -1580,7 +1520,7 @@ class BlockParser
                 // Check if it's an attribute block at content indent level
                 if (
                     preg_match('/^\{([^{}]+)\}\s*$/', $trimmedAttrLine, $attrMatch) &&
-                    $this->getLeadingSpaces($potentialAttrLine) >= $contentIndent
+                    IndentationHelper::getLeadingSpaces($potentialAttrLine) >= $contentIndent
                 ) {
                     $itemAttributes = $this->parseAttributeStringToArray($attrMatch[1]);
                     $i++;
@@ -1600,7 +1540,7 @@ class BlockParser
             // In significantNewlines mode, check for immediate nested content (any block type)
             if ($this->significantNewlines && $i < $count) {
                 $nextLine = $lines[$i];
-                $nextIndent = $this->getLeadingSpaces($nextLine);
+                $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
 
                 // If there's indented content that could be a nested block
                 if ($nextIndent >= $contentIndent) {
@@ -1610,9 +1550,9 @@ class BlockParser
                         if ($this->isBlankLine($subLine)) {
                             break;
                         }
-                        $lineIndent = $this->getLeadingSpaces($subLine);
+                        $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
                         if ($lineIndent >= $contentIndent) {
-                            $subLines[] = $this->stripLeadingIndent($subLine, $contentIndent);
+                            $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $contentIndent);
                             $i++;
                         } elseif ($lineIndent === $baseIndent) {
                             // Back to parent level - check if it's a sibling item
@@ -1643,66 +1583,6 @@ class BlockParser
         $parent->appendChild($list);
 
         return $i - $start;
-    }
-
-    /**
-     * Get number of leading whitespace as space-equivalent count.
-     *
-     * Tabs are counted as 2 spaces (one indentation level) to support
-     * tab-based indentation for nested structures.
-     *
-     * @see https://github.com/jgm/djot/issues/255
-     */
-    protected function getLeadingSpaces(string $line): int
-    {
-        return IndentationHelper::getLeadingSpaces($line);
-    }
-
-    /**
-     * Strip leading whitespace from a line, up to the specified space-equivalent count.
-     *
-     * Tabs count as 2 spaces. This correctly handles mixed spaces and tabs.
-     */
-    protected function stripLeadingIndent(string $line, int $amount): string
-    {
-        return IndentationHelper::stripLeadingIndent($line, $amount);
-    }
-
-    /**
-     * Get the last list item from a list
-     */
-    protected function getLastListItem(ListBlock $list): ?ListItem
-    {
-        $children = $list->getChildren();
-        $count = count($children);
-        if ($count === 0) {
-            return null;
-        }
-        $last = $children[$count - 1];
-
-        return $last instanceof ListItem ? $last : null;
-    }
-
-    /**
-     * Get indentation level (number of leading spaces / 2, rounded down)
-     */
-    protected function getIndentLevel(string $line): int
-    {
-        if (preg_match('/^(\s+)/', $line, $matches)) {
-            return (int)(strlen($matches[1]) / 2);
-        }
-
-        return 0;
-    }
-
-    /**
-     * Remove N levels of indentation from a line
-     */
-    protected function removeIndent(string $line, int $levels): string
-    {
-        $spaces = $levels * 2;
-
-        return preg_replace('/^\s{0,' . $spaces . '}/', '', $line) ?? $line;
     }
 
     /**
@@ -1868,287 +1748,6 @@ class BlockParser
     }
 
     /**
-     * Disambiguate between roman numeral and alphabetical list styles
-     * by looking at subsequent list items.
-     *
-     * Rules:
-     * - If any subsequent item is multi-char roman (ii, iv, etc) -> roman
-     * - If any subsequent item is NOT a valid roman letter (j, k, etc) -> alphabetical
-     * - If items repeat the same letter (i, i, i) -> roman (alpha would require sequence)
-     * - Otherwise -> roman (default for ambiguous single letters like i, v, x)
-     *
-     * @param array<string, mixed> $listInfo
-     * @param array<string> $lines
-     * @param int $start
-     *
-     * @return array<string, mixed>
-     */
-    protected function disambiguateListStyle(array $listInfo, array $lines, int $start): array
-    {
-        $marker = $listInfo['marker'];
-        $firstMarkerLetter = null;
-        $firstIsLower = null;
-
-        // Extract the letter from the first marker for comparison
-        if (preg_match('/^([ivxlcdmIVXLCDM])/', $lines[$start], $m)) {
-            $firstMarkerLetter = strtolower($m[1]);
-            $firstIsLower = ctype_lower($m[1]);
-        } elseif (preg_match('/^\(([ivxlcdmIVXLCDM])\)/', $lines[$start], $m)) {
-            $firstMarkerLetter = strtolower($m[1]);
-            $firstIsLower = ctype_lower($m[1]);
-        }
-
-        $hasMultiCharRoman = false;
-        $hasNonRomanLetter = false;
-        $allSameLetter = true;
-        $romanChars = 'ivxlcdm';
-        $lineCount = count($lines);
-
-        // Look ahead at subsequent items
-        for ($i = $start + 1; $i < $lineCount; $i++) {
-            $line = $lines[$i];
-
-            // Stop at blank lines or non-list content
-            if ($this->isBlankLine($line)) {
-                continue;
-            }
-
-            // Check if this line is a list item with the same marker type
-            $itemInfo = $this->parseListItemMarker($line);
-            if ($itemInfo === null || $itemInfo['marker'] !== $marker) {
-                break;
-            }
-
-            // Extract the marker text (preserve original case for comparison)
-            $markerTextRaw = null;
-            if ($marker === '()') {
-                if (preg_match('/^\(([^)]+)\)/', $line, $m)) {
-                    $markerTextRaw = $m[1];
-                }
-            } else {
-                if (preg_match('/^([a-zA-Z]+)[.)]/', $line, $m)) {
-                    $markerTextRaw = $m[1];
-                }
-            }
-
-            if ($markerTextRaw === null) {
-                break;
-            }
-
-            // Check if case matches - different case means different list style
-            // Per djot spec: "Changing ordered list style... will stop one list and start a new one"
-            $itemIsLower = ctype_lower($markerTextRaw[0]);
-            if ($firstIsLower !== null && $itemIsLower !== $firstIsLower) {
-                break;
-            }
-
-            $markerText = strtolower($markerTextRaw);
-
-            // Check for multi-character roman numerals
-            if (strlen($markerText) > 1 && preg_match('/^[ivxlcdm]+$/', $markerText)) {
-                $hasMultiCharRoman = true;
-
-                break;
-            }
-
-            // Check if it's a letter not used in roman numerals
-            if (strlen($markerText) === 1 && strpos($romanChars, $markerText) === false) {
-                $hasNonRomanLetter = true;
-
-                break;
-            }
-
-            // Check if all letters are the same
-            if ($firstMarkerLetter !== null && $markerText !== $firstMarkerLetter) {
-                $allSameLetter = false;
-            }
-        }
-
-        // Decision logic
-        if ($hasMultiCharRoman) {
-            // Clearly roman - keep original interpretation
-            return $listInfo;
-        }
-
-        if ($hasNonRomanLetter) {
-            // Must be alphabetical since the sequence includes non-roman letters
-            $listInfo['start'] = $listInfo['alpha_start'];
-            $listInfo['style'] = $listInfo['alpha_style'];
-            unset($listInfo['ambiguous'], $listInfo['alpha_start'], $listInfo['alpha_style']);
-
-            return $listInfo;
-        }
-
-        // If all items are the same single letter, it's likely roman (numbering that restarts)
-        // Otherwise, default to roman for ambiguous single letters
-        return $listInfo;
-    }
-
-    /**
-     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, taskMarker?: string, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string}|null
-     */
-    protected function parseListItemMarker(string $line): ?array
-    {
-        // Task list: - [.] where . is any single character
-        // Standard markers: ' ' (unchecked), 'x'/'X' (checked)
-        // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred),
-        //                   '?' (question), '*' (active), '=' (paused), '.' (stopped), etc.
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^[-*+] +\[(.)\] +(.*)$/', $line, $matches)) {
-            $taskMarker = $matches[1];
-
-            return [
-                'type' => ListBlock::TYPE_TASK,
-                'marker' => '-',
-                'content' => $matches[2],
-                'checked' => strtolower($taskMarker) === 'x', // backward compatibility
-                'taskMarker' => $taskMarker,
-            ];
-        }
-
-        // Bullet list: -, +, or *
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^([-*+]) +(.*)$/', $line, $matches)) {
-            $marker = $matches[1];
-            $content = $matches[2];
-
-            // Don't treat as list if content ends with same marker (likely emphasis)
-            // e.g., "* foo *" should be emphasis, not a list
-            if ($marker === '*' || $marker === '-') {
-                $trimmed = rtrim($content);
-                if ($trimmed !== '' && substr($trimmed, -1) === $marker) {
-                    // Check if there's non-whitespace between markers
-                    $inner = substr($trimmed, 0, -1);
-                    if (trim($inner) !== '' && !str_contains($inner, "\n")) {
-                        return null;
-                    }
-                }
-            }
-
-            return [
-                'type' => ListBlock::TYPE_BULLET,
-                'marker' => $marker,
-                'content' => $content,
-            ];
-        }
-
-        // Ordered list: 1. or 1) or (1)
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^(\d+)([.)]) +(.*)$/', $line, $matches)) {
-            return [
-                'type' => ListBlock::TYPE_ORDERED,
-                'marker' => $matches[2],
-                'content' => $matches[3],
-                'start' => (int)$matches[1],
-            ];
-        }
-
-        if (preg_match('/^\((\d+)\) +(.*)$/', $line, $matches)) {
-            return [
-                'type' => ListBlock::TYPE_ORDERED,
-                'marker' => '()',
-                'content' => $matches[2],
-                'start' => (int)$matches[1],
-            ];
-        }
-
-        // Roman numeral ordered list: i. or I. or i) or I) or (i) or (I)
-        // Single letters are ambiguous - could be alpha or roman
-        // Return both possibilities and let the list parser disambiguate based on subsequent items
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)]) +(.*)$/', $line, $matches)) {
-            $roman = $matches[1];
-            $isLower = ctype_lower($roman[0]);
-            $start = $this->romanToInt(strtoupper($roman));
-            if ($start > 0) {
-                $result = [
-                    'type' => ListBlock::TYPE_ORDERED,
-                    'marker' => $matches[2],
-                    'content' => $matches[3],
-                    'start' => $start,
-                    'style' => $isLower ? 'i' : 'I',
-                ];
-                // For single letters that are ambiguous, add alternate interpretation
-                if (strlen($roman) === 1) {
-                    $alphaStart = ord(strtolower($roman)) - ord('a') + 1;
-                    $result['ambiguous'] = true;
-                    $result['alpha_start'] = $alphaStart;
-                    $result['alpha_style'] = $isLower ? 'a' : 'A';
-                }
-
-                return $result;
-            }
-        }
-
-        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\) +(.*)$/', $line, $matches)) {
-            $roman = $matches[1];
-            $isLower = ctype_lower($roman[0]);
-            $start = $this->romanToInt(strtoupper($roman));
-            if ($start > 0) {
-                $result = [
-                    'type' => ListBlock::TYPE_ORDERED,
-                    'marker' => '()',
-                    'content' => $matches[2],
-                    'start' => $start,
-                    'style' => $isLower ? 'i' : 'I',
-                ];
-                // For single letters that are ambiguous, add alternate interpretation
-                if (strlen($roman) === 1) {
-                    $alphaStart = ord(strtolower($roman)) - ord('a') + 1;
-                    $result['ambiguous'] = true;
-                    $result['alpha_start'] = $alphaStart;
-                    $result['alpha_style'] = $isLower ? 'a' : 'A';
-                }
-
-                return $result;
-            }
-        }
-
-        // Alpha ordered list: a. or A. or a) or A) or (a) or (A)
-        // Only single letters - multi-letter checked above as roman
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^([a-zA-Z])([.)]) +(.*)$/', $line, $matches)) {
-            $letter = $matches[1];
-            $isLower = ctype_lower($letter);
-            $start = ord(strtolower($letter)) - ord('a') + 1;
-
-            return [
-                'type' => ListBlock::TYPE_ORDERED,
-                'marker' => $matches[2],
-                'content' => $matches[3],
-                'start' => $start,
-                'style' => $isLower ? 'a' : 'A',
-            ];
-        }
-
-        if (preg_match('/^\(([a-zA-Z])\) +(.*)$/', $line, $matches)) {
-            $letter = $matches[1];
-            $isLower = ctype_lower($letter);
-            $start = ord(strtolower($letter)) - ord('a') + 1;
-
-            return [
-                'type' => ListBlock::TYPE_ORDERED,
-                'marker' => '()',
-                'content' => $matches[2],
-                'start' => $start,
-                'style' => $isLower ? 'a' : 'A',
-            ];
-        }
-
-        // Definition list: :
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^: +(.*)$/', $line, $matches)) {
-            return [
-                'type' => ListBlock::TYPE_DEFINITION,
-                'marker' => ':',
-                'content' => $matches[1],
-            ];
-        }
-
-        return null;
-    }
-
-    /**
      * Try to parse a line block (preserves line breaks)
      *
      * | Line one
@@ -2169,7 +1768,7 @@ class BlockParser
         }
 
         // Make sure it's not a table (tables have | at start and end outside of code spans)
-        if (preg_match('/^\|.*\|$/', $line) && $this->lineEndsWithPipeOutsideCodeSpan($line)) {
+        if ($this->tableParser->isTableRow($line)) {
             return null;
         }
 
@@ -2226,19 +1825,8 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: tables start with |
-        if (!isset($line[0]) || $line[0] !== '|') {
-            return null;
-        }
-
-        // Table rows start and end with | (but the ending | must be outside code spans)
-        if (!preg_match('/^\|.*\|$/', $line)) {
-            return null;
-        }
-
-        // Verify the line truly ends with | outside of code spans
-        // A line like `| `a |`` has its final | inside a code span, so it's not a table
-        if (!$this->lineEndsWithPipeOutsideCodeSpan($line)) {
+        // Use TableParser to check if this is a valid table row
+        if (!$this->tableParser->isTableRow($line)) {
             return null;
         }
 
@@ -2255,10 +1843,9 @@ class BlockParser
                 break;
             }
 
-            // Check if this is a separator row (contains |, -, with optional : and spaces)
-            // Must have at least one - to be a separator (| | is not a separator)
-            if (preg_match('/^\|[\s:|-]+\|$/', $currentLine) && str_contains($currentLine, '-')) {
-                $alignments = $this->parseTableAlignments($currentLine);
+            // Check if this is a separator row
+            if ($this->tableParser->isSeparatorRow($currentLine)) {
+                $alignments = $this->tableParser->parseTableAlignments($currentLine);
                 $headerFound = true;
 
                 // Mark previous row as header and apply alignments to it
@@ -2291,7 +1878,7 @@ class BlockParser
 
             // Parse regular row
             $row = new TableRow(false);
-            $cells = $this->parseTableCells($currentLine);
+            $cells = $this->tableParser->parseTableCells($currentLine);
 
             foreach ($cells as $index => $cellContent) {
                 $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
@@ -2390,194 +1977,6 @@ class BlockParser
         }
 
         return $i - $start;
-    }
-
-    /**
-     * @return array<string>
-     */
-    protected function parseTableAlignments(string $separatorLine): array
-    {
-        $alignments = [];
-        $cells = $this->parseTableCells($separatorLine);
-
-        foreach ($cells as $cell) {
-            $cell = trim($cell);
-            if (str_starts_with($cell, ':') && str_ends_with($cell, ':')) {
-                $alignments[] = TableCell::ALIGN_CENTER;
-            } elseif (str_ends_with($cell, ':')) {
-                $alignments[] = TableCell::ALIGN_RIGHT;
-            } elseif (str_starts_with($cell, ':')) {
-                $alignments[] = TableCell::ALIGN_LEFT;
-            } else {
-                $alignments[] = TableCell::ALIGN_DEFAULT;
-            }
-        }
-
-        return $alignments;
-    }
-
-    /**
-     * @return array<string>
-     */
-    protected function parseTableCells(string $line): array
-    {
-        // Remove leading and trailing |
-        $line = substr($line, 1, -1);
-
-        // Split by | but not \| and not | inside code spans
-        $cells = [];
-        $currentCell = '';
-        $inCode = false;
-        $codeDelimLength = 0;
-        $length = strlen($line);
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $line[$i];
-
-            // Track code spans (backticks)
-            if ($char === '`' && !$inCode) {
-                // Count backticks for code span opener
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                $inCode = true;
-                $codeDelimLength = $backtickCount;
-                $currentCell .= substr($line, $i, $backtickCount);
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            if ($inCode && $char === '`') {
-                // Check for matching closing backticks
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                $currentCell .= substr($line, $i, $backtickCount);
-                if ($backtickCount === $codeDelimLength) {
-                    $inCode = false;
-                }
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            // Check for escaped pipe
-            if ($char === '\\' && $i + 1 < $length && $line[$i + 1] === '|') {
-                $currentCell .= '|';
-                $i++; // Skip the |
-
-                continue;
-            }
-
-            // Cell delimiter (unescaped | outside code span)
-            if ($char === '|' && !$inCode) {
-                $cells[] = $currentCell;
-                $currentCell = '';
-
-                continue;
-            }
-
-            $currentCell .= $char;
-        }
-
-        // Add the last cell
-        $cells[] = $currentCell;
-
-        return $cells;
-    }
-
-    /**
-     * Check if a line has unclosed code spans
-     */
-    protected function hasUnclosedCodeSpan(string $line): bool
-    {
-        $length = strlen($line);
-        $inCode = false;
-        $codeDelimLength = 0;
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $line[$i];
-
-            if ($char === '`' && !$inCode) {
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                $inCode = true;
-                $codeDelimLength = $backtickCount;
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            if ($inCode && $char === '`') {
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                if ($backtickCount === $codeDelimLength) {
-                    $inCode = false;
-                }
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-        }
-
-        return $inCode;
-    }
-
-    /**
-     * Check if a line ends with | outside of code spans
-     * Used to verify table row syntax (| `a |` is not a table because final | is in code span)
-     */
-    protected function lineEndsWithPipeOutsideCodeSpan(string $line): bool
-    {
-        $length = strlen($line);
-        $inCode = false;
-        $codeDelimLength = 0;
-        $lastPipeOutsideCode = -1;
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $line[$i];
-
-            // Track code spans
-            if ($char === '`' && !$inCode) {
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                $inCode = true;
-                $codeDelimLength = $backtickCount;
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            if ($inCode && $char === '`') {
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                if ($backtickCount === $codeDelimLength) {
-                    $inCode = false;
-                }
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            // Track pipe positions outside code spans
-            if ($char === '|' && !$inCode) {
-                $lastPipeOutsideCode = $i;
-            }
-        }
-
-        // The line ends with | outside code span if the last | is at the end
-        return $lastPipeOutsideCode === $length - 1;
     }
 
     /**
@@ -2788,42 +2187,6 @@ class BlockParser
     protected function splitLines(string $input): array
     {
         return explode("\n", str_replace(["\r\n", "\r"], "\n", $input));
-    }
-
-    /**
-     * Convert roman numeral to integer
-     */
-    protected function romanToInt(string $roman): int
-    {
-        $values = [
-            'I' => 1,
-            'V' => 5,
-            'X' => 10,
-            'L' => 50,
-            'C' => 100,
-            'D' => 500,
-            'M' => 1000,
-        ];
-
-        $result = 0;
-        $prev = 0;
-        $length = strlen($roman);
-
-        for ($i = $length - 1; $i >= 0; $i--) {
-            $char = $roman[$i];
-            if (!isset($values[$char])) {
-                return 0; // Invalid roman numeral
-            }
-            $value = $values[$char];
-            if ($value < $prev) {
-                $result -= $value;
-            } else {
-                $result += $value;
-            }
-            $prev = $value;
-        }
-
-        return $result;
     }
 
     public function getReference(string $label): ?ReferenceDefinition
