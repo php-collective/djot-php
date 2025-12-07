@@ -383,40 +383,7 @@ class BlockParser
      */
     protected function parseInlineAttributes(string $attrStr): array
     {
-        $attrs = [];
-
-        // Match: .class, #id, key="quoted value", key='quoted value', key=unquoted
-        preg_match_all('/\.([^\s.#=]+)|#([^\s.#=]+)|([^\s.#=]+)="([^"]*)"|([^\s.#=]+)=\'([^\']*)\'|([^\s.#=]+)=([^\s}"\']+)/', $attrStr, $matches, PREG_SET_ORDER);
-
-        foreach ($matches as $match) {
-            if (!empty($match[1])) {
-                // Class attribute
-                $existing = $attrs['class'] ?? '';
-                $attrs['class'] = trim($existing . ' ' . $match[1]);
-            } elseif (!empty($match[2])) {
-                // ID attribute
-                $attrs['id'] = $match[2];
-            } elseif (($match[3] ?? '') !== '') {
-                // key="double quoted value"
-                $attrs[$match[3]] = $match[4] ?? '';
-            } elseif (($match[5] ?? '') !== '') {
-                // key='single quoted value'
-                $attrs[$match[5]] = $match[6] ?? '';
-            } elseif (($match[7] ?? '') !== '') {
-                // key=unquoted
-                $attrs[$match[7]] = $match[8] ?? '';
-            }
-        }
-
-        // Match boolean attributes (bare words not starting with . or # and not containing =)
-        // Examples: {reversed}, {hidden}, {.class reversed #id}
-        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $attrStr, $boolMatches)) {
-            foreach ($boolMatches[1] as $boolAttr) {
-                $attrs[$boolAttr] = '';
-            }
-        }
-
-        return $attrs;
+        return AttributeParser::parse($attrStr);
     }
 
     /**
@@ -1639,28 +1606,6 @@ class BlockParser
     protected function stripLeadingIndent(string $line, int $amount): string
     {
         return IndentationHelper::stripLeadingIndent($line, $amount);
-    }
-
-    /**
-     * Get indentation level (number of leading spaces / 2, rounded down)
-     */
-    protected function getIndentLevel(string $line): int
-    {
-        if (preg_match('/^(\s+)/', $line, $matches)) {
-            return (int)(strlen($matches[1]) / 2);
-        }
-
-        return 0;
-    }
-
-    /**
-     * Remove N levels of indentation from a line
-     */
-    protected function removeIndent(string $line, int $levels): string
-    {
-        $spaces = $levels * 2;
-
-        return preg_replace('/^\s{0,' . $spaces . '}/', '', $line) ?? $line;
     }
 
     /**
