@@ -27,6 +27,7 @@ use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Node;
+use Djot\Parser\Block\ListParser;
 use Djot\Parser\Utility\AttributeParser;
 use Djot\Parser\Utility\IndentationHelper;
 
@@ -36,6 +37,8 @@ use Djot\Parser\Utility\IndentationHelper;
 class BlockParser
 {
     protected InlineParser $inlineParser;
+
+    protected ListParser $listParser;
 
     /**
      * @var array<string, \Djot\Parser\ReferenceDefinition>
@@ -105,6 +108,7 @@ class BlockParser
         $this->strictMode = $strictMode;
         $this->significantNewlines = $significantNewlines;
         $this->inlineParser = new InlineParser($this);
+        $this->listParser = new ListParser();
     }
 
     /**
@@ -1344,7 +1348,7 @@ class BlockParser
         $line = $lines[$start];
 
         // Try to match list item marker
-        $listInfo = $this->parseListItemMarker($line);
+        $listInfo = $this->listParser->parseListItemMarker($line);
         if ($listInfo === null) {
             return null;
         }
@@ -1357,7 +1361,7 @@ class BlockParser
         // Disambiguate roman vs alphabetical for single-letter markers
         // by looking at subsequent items
         if (!empty($listInfo['ambiguous'])) {
-            $listInfo = $this->disambiguateListStyle($listInfo, $lines, $start);
+            $listInfo = $this->listParser->disambiguateListStyle($listInfo, $lines, $start);
         }
 
         // Get the base indentation of this list
@@ -1402,13 +1406,13 @@ class BlockParser
             // Check for indented continuation (after blank line = nested content)
             if ($lastItemHadBlankAfter && $currentIndent > $baseIndent) {
                 // Content after blank line with indentation belongs to previous item
-                $lastItem = $this->getLastListItem($list);
+                $lastItem = $this->listParser->getLastListItem($list);
                 if ($lastItem !== null) {
                     // Check if the first indented content is a list marker or regular text
                     // Blank line followed by indented TEXT = loose list (multiple paragraphs)
                     // Blank line followed by indented LIST MARKER = tight nesting
                     $trimmedCurrent = ltrim($currentLine);
-                    $firstContentIsListMarker = $this->parseListItemMarker($trimmedCurrent) !== null;
+                    $firstContentIsListMarker = $this->listParser->parseListItemMarker($trimmedCurrent) !== null;
                     if (!$firstContentIsListMarker) {
                         // Indented text after blank = loose list
                         $list->setTight(false);
@@ -1437,7 +1441,7 @@ class BlockParser
                         } elseif ($lineIndent >= $baseIndent) {
                             // Check if it's a same-level list item (at base indent)
                             $trimmedLine = ltrim($subLine);
-                            $itemInfo = $this->parseListItemMarker($trimmedLine);
+                            $itemInfo = $this->listParser->parseListItemMarker($trimmedLine);
                             $sameStyle = !isset($listInfo['style']) || !isset($itemInfo['style']) || $itemInfo['style'] === $listInfo['style'];
                             if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle && $lineIndent === $baseIndent) {
                                 break;
@@ -1486,18 +1490,10 @@ class BlockParser
                 if ($currentIndent !== $baseIndent) {
                     break;
                 }
-                $itemInfo = $this->parseListItemMarker($trimmedLine);
+                $itemInfo = $this->listParser->parseListItemMarker($trimmedLine);
 
                 // Check if this is a list item of the same type, marker, and style
-                if ($itemInfo === null || $itemInfo['type'] !== $listInfo['type'] || $itemInfo['marker'] !== $listInfo['marker']) {
-                    break;
-                }
-
-                // For ordered lists, check if styles match (roman/alpha vs numeric)
-                // If one has a style and the other doesn't, they're different list types
-                $listStyle = $listInfo['style'] ?? null;
-                $itemStyle = $itemInfo['style'] ?? null;
-                if (($listStyle === null) !== ($itemStyle === null) || $listStyle !== $itemStyle) {
+                if ($itemInfo === null || !$this->listParser->itemMatchesList($listInfo, $itemInfo)) {
                     break;
                 }
             }
@@ -1531,7 +1527,7 @@ class BlockParser
 
                 // Check if next line starts a new list item at same level (base indent)
                 if ($nextIndent === $baseIndent) {
-                    $nextInfo = $this->parseListItemMarker($nextTrimmed);
+                    $nextInfo = $this->listParser->parseListItemMarker($nextTrimmed);
                     if ($nextInfo !== null) {
                         break;
                     }
@@ -1557,7 +1553,7 @@ class BlockParser
                     // Check if significantNewlines mode allows immediate nested blocks
                     if ($this->significantNewlines) {
                         // Check for any block starter (list, blockquote, code fence, div)
-                        if ($this->startsNewBlock($nextTrimmed) || $this->parseListItemMarker($nextTrimmed) !== null) {
+                        if ($this->startsNewBlock($nextTrimmed) || $this->listParser->parseListItemMarker($nextTrimmed) !== null) {
                             // This is a nested block - break out to let normal nesting handle it
                             break;
                         }
@@ -1666,21 +1662,6 @@ class BlockParser
     protected function stripLeadingIndent(string $line, int $amount): string
     {
         return IndentationHelper::stripLeadingIndent($line, $amount);
-    }
-
-    /**
-     * Get the last list item from a list
-     */
-    protected function getLastListItem(ListBlock $list): ?ListItem
-    {
-        $children = $list->getChildren();
-        $count = count($children);
-        if ($count === 0) {
-            return null;
-        }
-        $last = $children[$count - 1];
-
-        return $last instanceof ListItem ? $last : null;
     }
 
     /**
@@ -1865,287 +1846,6 @@ class BlockParser
         $parent->appendChild($defList);
 
         return $i - $start;
-    }
-
-    /**
-     * Disambiguate between roman numeral and alphabetical list styles
-     * by looking at subsequent list items.
-     *
-     * Rules:
-     * - If any subsequent item is multi-char roman (ii, iv, etc) -> roman
-     * - If any subsequent item is NOT a valid roman letter (j, k, etc) -> alphabetical
-     * - If items repeat the same letter (i, i, i) -> roman (alpha would require sequence)
-     * - Otherwise -> roman (default for ambiguous single letters like i, v, x)
-     *
-     * @param array<string, mixed> $listInfo
-     * @param array<string> $lines
-     * @param int $start
-     *
-     * @return array<string, mixed>
-     */
-    protected function disambiguateListStyle(array $listInfo, array $lines, int $start): array
-    {
-        $marker = $listInfo['marker'];
-        $firstMarkerLetter = null;
-        $firstIsLower = null;
-
-        // Extract the letter from the first marker for comparison
-        if (preg_match('/^([ivxlcdmIVXLCDM])/', $lines[$start], $m)) {
-            $firstMarkerLetter = strtolower($m[1]);
-            $firstIsLower = ctype_lower($m[1]);
-        } elseif (preg_match('/^\(([ivxlcdmIVXLCDM])\)/', $lines[$start], $m)) {
-            $firstMarkerLetter = strtolower($m[1]);
-            $firstIsLower = ctype_lower($m[1]);
-        }
-
-        $hasMultiCharRoman = false;
-        $hasNonRomanLetter = false;
-        $allSameLetter = true;
-        $romanChars = 'ivxlcdm';
-        $lineCount = count($lines);
-
-        // Look ahead at subsequent items
-        for ($i = $start + 1; $i < $lineCount; $i++) {
-            $line = $lines[$i];
-
-            // Stop at blank lines or non-list content
-            if ($this->isBlankLine($line)) {
-                continue;
-            }
-
-            // Check if this line is a list item with the same marker type
-            $itemInfo = $this->parseListItemMarker($line);
-            if ($itemInfo === null || $itemInfo['marker'] !== $marker) {
-                break;
-            }
-
-            // Extract the marker text (preserve original case for comparison)
-            $markerTextRaw = null;
-            if ($marker === '()') {
-                if (preg_match('/^\(([^)]+)\)/', $line, $m)) {
-                    $markerTextRaw = $m[1];
-                }
-            } else {
-                if (preg_match('/^([a-zA-Z]+)[.)]/', $line, $m)) {
-                    $markerTextRaw = $m[1];
-                }
-            }
-
-            if ($markerTextRaw === null) {
-                break;
-            }
-
-            // Check if case matches - different case means different list style
-            // Per djot spec: "Changing ordered list style... will stop one list and start a new one"
-            $itemIsLower = ctype_lower($markerTextRaw[0]);
-            if ($firstIsLower !== null && $itemIsLower !== $firstIsLower) {
-                break;
-            }
-
-            $markerText = strtolower($markerTextRaw);
-
-            // Check for multi-character roman numerals
-            if (strlen($markerText) > 1 && preg_match('/^[ivxlcdm]+$/', $markerText)) {
-                $hasMultiCharRoman = true;
-
-                break;
-            }
-
-            // Check if it's a letter not used in roman numerals
-            if (strlen($markerText) === 1 && strpos($romanChars, $markerText) === false) {
-                $hasNonRomanLetter = true;
-
-                break;
-            }
-
-            // Check if all letters are the same
-            if ($firstMarkerLetter !== null && $markerText !== $firstMarkerLetter) {
-                $allSameLetter = false;
-            }
-        }
-
-        // Decision logic
-        if ($hasMultiCharRoman) {
-            // Clearly roman - keep original interpretation
-            return $listInfo;
-        }
-
-        if ($hasNonRomanLetter) {
-            // Must be alphabetical since the sequence includes non-roman letters
-            $listInfo['start'] = $listInfo['alpha_start'];
-            $listInfo['style'] = $listInfo['alpha_style'];
-            unset($listInfo['ambiguous'], $listInfo['alpha_start'], $listInfo['alpha_style']);
-
-            return $listInfo;
-        }
-
-        // If all items are the same single letter, it's likely roman (numbering that restarts)
-        // Otherwise, default to roman for ambiguous single letters
-        return $listInfo;
-    }
-
-    /**
-     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, taskMarker?: string, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string}|null
-     */
-    protected function parseListItemMarker(string $line): ?array
-    {
-        // Task list: - [.] where . is any single character
-        // Standard markers: ' ' (unchecked), 'x'/'X' (checked)
-        // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred),
-        //                   '?' (question), '*' (active), '=' (paused), '.' (stopped), etc.
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^[-*+] +\[(.)\] +(.*)$/', $line, $matches)) {
-            $taskMarker = $matches[1];
-
-            return [
-                'type' => ListBlock::TYPE_TASK,
-                'marker' => '-',
-                'content' => $matches[2],
-                'checked' => strtolower($taskMarker) === 'x', // backward compatibility
-                'taskMarker' => $taskMarker,
-            ];
-        }
-
-        // Bullet list: -, +, or *
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^([-*+]) +(.*)$/', $line, $matches)) {
-            $marker = $matches[1];
-            $content = $matches[2];
-
-            // Don't treat as list if content ends with same marker (likely emphasis)
-            // e.g., "* foo *" should be emphasis, not a list
-            if ($marker === '*' || $marker === '-') {
-                $trimmed = rtrim($content);
-                if ($trimmed !== '' && substr($trimmed, -1) === $marker) {
-                    // Check if there's non-whitespace between markers
-                    $inner = substr($trimmed, 0, -1);
-                    if (trim($inner) !== '' && !str_contains($inner, "\n")) {
-                        return null;
-                    }
-                }
-            }
-
-            return [
-                'type' => ListBlock::TYPE_BULLET,
-                'marker' => $marker,
-                'content' => $content,
-            ];
-        }
-
-        // Ordered list: 1. or 1) or (1)
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^(\d+)([.)]) +(.*)$/', $line, $matches)) {
-            return [
-                'type' => ListBlock::TYPE_ORDERED,
-                'marker' => $matches[2],
-                'content' => $matches[3],
-                'start' => (int)$matches[1],
-            ];
-        }
-
-        if (preg_match('/^\((\d+)\) +(.*)$/', $line, $matches)) {
-            return [
-                'type' => ListBlock::TYPE_ORDERED,
-                'marker' => '()',
-                'content' => $matches[2],
-                'start' => (int)$matches[1],
-            ];
-        }
-
-        // Roman numeral ordered list: i. or I. or i) or I) or (i) or (I)
-        // Single letters are ambiguous - could be alpha or roman
-        // Return both possibilities and let the list parser disambiguate based on subsequent items
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)]) +(.*)$/', $line, $matches)) {
-            $roman = $matches[1];
-            $isLower = ctype_lower($roman[0]);
-            $start = $this->romanToInt(strtoupper($roman));
-            if ($start > 0) {
-                $result = [
-                    'type' => ListBlock::TYPE_ORDERED,
-                    'marker' => $matches[2],
-                    'content' => $matches[3],
-                    'start' => $start,
-                    'style' => $isLower ? 'i' : 'I',
-                ];
-                // For single letters that are ambiguous, add alternate interpretation
-                if (strlen($roman) === 1) {
-                    $alphaStart = ord(strtolower($roman)) - ord('a') + 1;
-                    $result['ambiguous'] = true;
-                    $result['alpha_start'] = $alphaStart;
-                    $result['alpha_style'] = $isLower ? 'a' : 'A';
-                }
-
-                return $result;
-            }
-        }
-
-        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\) +(.*)$/', $line, $matches)) {
-            $roman = $matches[1];
-            $isLower = ctype_lower($roman[0]);
-            $start = $this->romanToInt(strtoupper($roman));
-            if ($start > 0) {
-                $result = [
-                    'type' => ListBlock::TYPE_ORDERED,
-                    'marker' => '()',
-                    'content' => $matches[2],
-                    'start' => $start,
-                    'style' => $isLower ? 'i' : 'I',
-                ];
-                // For single letters that are ambiguous, add alternate interpretation
-                if (strlen($roman) === 1) {
-                    $alphaStart = ord(strtolower($roman)) - ord('a') + 1;
-                    $result['ambiguous'] = true;
-                    $result['alpha_start'] = $alphaStart;
-                    $result['alpha_style'] = $isLower ? 'a' : 'A';
-                }
-
-                return $result;
-            }
-        }
-
-        // Alpha ordered list: a. or A. or a) or A) or (a) or (A)
-        // Only single letters - multi-letter checked above as roman
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^([a-zA-Z])([.)]) +(.*)$/', $line, $matches)) {
-            $letter = $matches[1];
-            $isLower = ctype_lower($letter);
-            $start = ord(strtolower($letter)) - ord('a') + 1;
-
-            return [
-                'type' => ListBlock::TYPE_ORDERED,
-                'marker' => $matches[2],
-                'content' => $matches[3],
-                'start' => $start,
-                'style' => $isLower ? 'a' : 'A',
-            ];
-        }
-
-        if (preg_match('/^\(([a-zA-Z])\) +(.*)$/', $line, $matches)) {
-            $letter = $matches[1];
-            $isLower = ctype_lower($letter);
-            $start = ord(strtolower($letter)) - ord('a') + 1;
-
-            return [
-                'type' => ListBlock::TYPE_ORDERED,
-                'marker' => '()',
-                'content' => $matches[2],
-                'start' => $start,
-                'style' => $isLower ? 'a' : 'A',
-            ];
-        }
-
-        // Definition list: :
-        // Space after marker is syntax delimiter - must be space(s) per spec, not tab
-        if (preg_match('/^: +(.*)$/', $line, $matches)) {
-            return [
-                'type' => ListBlock::TYPE_DEFINITION,
-                'marker' => ':',
-                'content' => $matches[1],
-            ];
-        }
-
-        return null;
     }
 
     /**
@@ -2788,42 +2488,6 @@ class BlockParser
     protected function splitLines(string $input): array
     {
         return explode("\n", str_replace(["\r\n", "\r"], "\n", $input));
-    }
-
-    /**
-     * Convert roman numeral to integer
-     */
-    protected function romanToInt(string $roman): int
-    {
-        $values = [
-            'I' => 1,
-            'V' => 5,
-            'X' => 10,
-            'L' => 50,
-            'C' => 100,
-            'D' => 500,
-            'M' => 1000,
-        ];
-
-        $result = 0;
-        $prev = 0;
-        $length = strlen($roman);
-
-        for ($i = $length - 1; $i >= 0; $i--) {
-            $char = $roman[$i];
-            if (!isset($values[$char])) {
-                return 0; // Invalid roman numeral
-            }
-            $value = $values[$char];
-            if ($value < $prev) {
-                $result -= $value;
-            } else {
-                $result += $value;
-            }
-            $prev = $value;
-        }
-
-        return $result;
     }
 
     public function getReference(string $label): ?ReferenceDefinition
