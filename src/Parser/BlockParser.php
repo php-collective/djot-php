@@ -326,7 +326,7 @@ class BlockParser
 
             // Check for attributes that may precede a reference definition
             if (preg_match('/^\{([^}]+)\}\s*$/', $line, $attrMatches)) {
-                $pendingAttrs = $this->parseInlineAttributes($attrMatches[1]);
+                $pendingAttrs = AttributeParser::parse($attrMatches[1]);
                 $i++;
 
                 continue;
@@ -342,7 +342,7 @@ class BlockParser
                 $j = $i + 1;
                 while ($j < $count) {
                     $nextLine = $lines[$j];
-                    if ($this->isBlankLine($nextLine)) {
+                    if (IndentationHelper::isBlankLine($nextLine)) {
                         break;
                     }
                     // Check if next line starts a new reference definition
@@ -368,22 +368,12 @@ class BlockParser
             }
 
             // Non-reference line, clear any pending attributes
-            if (!$this->isBlankLine($line)) {
+            if (!IndentationHelper::isBlankLine($line)) {
                 $pendingAttrs = [];
             }
 
             $i++;
         }
-    }
-
-    /**
-     * Parse inline attributes from a string like ".class #id title=foo"
-     *
-     * @return array<string, mixed>
-     */
-    protected function parseInlineAttributes(string $attrStr): array
-    {
-        return AttributeParser::parse($attrStr);
     }
 
     /**
@@ -416,7 +406,7 @@ class BlockParser
                 $hasContent = false;
                 while ($j < $count) {
                     $nextLine = $lines[$j];
-                    if ($this->isBlankLine($nextLine)) {
+                    if (IndentationHelper::isBlankLine($nextLine)) {
                         // Add blank line to preserve structure
                         $contentLines[] = '';
                         $j++;
@@ -524,7 +514,7 @@ class BlockParser
                 }
             } else {
                 // Non-heading, non-attribute line - clear pending ID
-                if (!$this->isBlankLine($line)) {
+                if (!IndentationHelper::isBlankLine($line)) {
                     $pendingId = null;
                 }
             }
@@ -545,7 +535,7 @@ class BlockParser
             $line = $lines[$i];
 
             // Skip blank lines
-            if ($this->isBlankLine($line)) {
+            if (IndentationHelper::isBlankLine($line)) {
                 $i++;
 
                 continue;
@@ -648,7 +638,7 @@ class BlockParser
             // (they were already applied during extractReferences)
             $count = count($lines);
             $nextIdx = $start + 1;
-            while ($nextIdx < $count && $this->isBlankLine($lines[$nextIdx])) {
+            while ($nextIdx < $count && IndentationHelper::isBlankLine($lines[$nextIdx])) {
                 $nextIdx++;
             }
             if ($nextIdx < $count && preg_match('/^\[([^\]]+)\]:/', $lines[$nextIdx])) {
@@ -704,16 +694,6 @@ class BlockParser
     protected function parseAttributeString(string $attrStr): void
     {
         $this->pendingAttributes = AttributeParser::parseAndMerge($this->pendingAttributes, $attrStr);
-    }
-
-    /**
-     * Parse attribute string and return as array (without affecting pendingAttributes)
-     *
-     * @return array<string, string>
-     */
-    protected function parseAttributeStringToArray(string $attrStr): array
-    {
-        return AttributeParser::parse($attrStr);
     }
 
     /**
@@ -1040,7 +1020,7 @@ class BlockParser
             $nextLine = $lines[$i];
 
             // Empty line ends the heading
-            if ($this->isBlankLine($nextLine)) {
+            if (IndentationHelper::isBlankLine($nextLine)) {
                 break;
             }
 
@@ -1145,7 +1125,7 @@ class BlockParser
         while ($i < $count) {
             $currentLine = $lines[$i];
 
-            if ($this->isBlankLine($currentLine)) {
+            if (IndentationHelper::isBlankLine($currentLine)) {
                 break;
             }
 
@@ -1199,7 +1179,7 @@ class BlockParser
         $defLine = $lines[$start + 1];
 
         // Term must not start with special characters
-        if (preg_match('/^[>#\-*+\d`:|]/', $termLine) || $this->isBlankLine($termLine)) {
+        if (preg_match('/^[>#\-*+\d`:|]/', $termLine) || IndentationHelper::isBlankLine($termLine)) {
             return null;
         }
 
@@ -1216,7 +1196,7 @@ class BlockParser
             $currentLine = $lines[$i];
 
             // Skip blank lines between items
-            if ($this->isBlankLine($currentLine)) {
+            if (IndentationHelper::isBlankLine($currentLine)) {
                 $i++;
 
                 continue;
@@ -1243,7 +1223,7 @@ class BlockParser
                             $i++;
                             while ($i < $count) {
                                 $contLine = $lines[$i];
-                                if ($this->isBlankLine($contLine)) {
+                                if (IndentationHelper::isBlankLine($contLine)) {
                                     break;
                                 }
                                 if (preg_match('/^\s+(.+)$/', $contLine, $contMatch)) {
@@ -1332,7 +1312,7 @@ class BlockParser
             $currentLine = $lines[$i];
 
             // Skip blank lines, track them for tight/loose determination
-            if ($this->isBlankLine($currentLine)) {
+            if (IndentationHelper::isBlankLine($currentLine)) {
                 $lastItemHadBlankAfter = true;
                 $i++;
 
@@ -1368,7 +1348,7 @@ class BlockParser
                     $sawBlankLine = false;
                     while ($i < $count) {
                         $subLine = $lines[$i];
-                        if ($this->isBlankLine($subLine)) {
+                        if (IndentationHelper::isBlankLine($subLine)) {
                             $subLines[] = '';
                             $sawBlankLine = true;
                             $i++;
@@ -1462,7 +1442,7 @@ class BlockParser
             while ($i < $count) {
                 $nextLine = $lines[$i];
 
-                if ($this->isBlankLine($nextLine)) {
+                if (IndentationHelper::isBlankLine($nextLine)) {
                     break;
                 }
 
@@ -1522,7 +1502,7 @@ class BlockParser
                     preg_match('/^\{([^{}]+)\}\s*$/', $trimmedAttrLine, $attrMatch) &&
                     IndentationHelper::getLeadingSpaces($potentialAttrLine) >= $contentIndent
                 ) {
-                    $itemAttributes = $this->parseAttributeStringToArray($attrMatch[1]);
+                    $itemAttributes = AttributeParser::parse($attrMatch[1]);
                     $i++;
                 }
             }
@@ -1547,7 +1527,7 @@ class BlockParser
                     $subLines = [];
                     while ($i < $count) {
                         $subLine = $lines[$i];
-                        if ($this->isBlankLine($subLine)) {
+                        if (IndentationHelper::isBlankLine($subLine)) {
                             break;
                         }
                         $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
@@ -1602,7 +1582,7 @@ class BlockParser
             $line = $lines[$i];
 
             // Skip blank lines
-            if ($this->isBlankLine($line)) {
+            if (IndentationHelper::isBlankLine($line)) {
                 $i++;
 
                 continue;
@@ -1621,7 +1601,7 @@ class BlockParser
                 $termLine = $lines[$i];
 
                 // Skip blank lines between terms
-                if ($this->isBlankLine($termLine)) {
+                if (IndentationHelper::isBlankLine($termLine)) {
                     $i++;
 
                     continue;
@@ -1652,7 +1632,7 @@ class BlockParser
                 // Collect continuation lines for term (before blank line, single-space indent)
                 while ($i < $count) {
                     $nextLine = $lines[$i];
-                    if ($this->isBlankLine($nextLine)) {
+                    if (IndentationHelper::isBlankLine($nextLine)) {
                         break;
                     }
                     // Single space continuation is part of term
@@ -1668,7 +1648,7 @@ class BlockParser
 
                 // Check if next non-blank line is another term or definition content
                 $peekIdx = $i;
-                while ($peekIdx < $count && $this->isBlankLine($lines[$peekIdx])) {
+                while ($peekIdx < $count && IndentationHelper::isBlankLine($lines[$peekIdx])) {
                     $peekIdx++;
                 }
 
@@ -1698,7 +1678,7 @@ class BlockParser
             while ($i < $count) {
                 $defLine = $lines[$i];
 
-                if ($this->isBlankLine($defLine)) {
+                if (IndentationHelper::isBlankLine($defLine)) {
                     $defLines[] = '';
                     $i++;
 
@@ -1902,7 +1882,7 @@ class BlockParser
 
         // Check for caption: ^ Caption text (can have blank line before it)
         $captionStart = $i;
-        if ($captionStart < $count && $this->isBlankLine($lines[$captionStart])) {
+        if ($captionStart < $count && IndentationHelper::isBlankLine($lines[$captionStart])) {
             $captionStart++;
         }
 
@@ -1914,7 +1894,7 @@ class BlockParser
             // Caption can continue on non-blank lines that don't start a new block
             while ($captionStart < $count) {
                 $nextLine = $lines[$captionStart];
-                if ($this->isBlankLine($nextLine)) {
+                if (IndentationHelper::isBlankLine($nextLine)) {
                     break;
                 }
                 // Stop at block-level elements
@@ -1964,7 +1944,7 @@ class BlockParser
 
         while ($i < $count) {
             $nextLine = $lines[$i];
-            if ($this->isBlankLine($nextLine)) {
+            if (IndentationHelper::isBlankLine($nextLine)) {
                 $i++;
 
                 continue;
@@ -2000,7 +1980,7 @@ class BlockParser
 
         while ($i < $count) {
             $nextLine = $lines[$i];
-            if ($this->isBlankLine($nextLine)) {
+            if (IndentationHelper::isBlankLine($nextLine)) {
                 break;
             }
             // Check if next line starts a new reference definition
@@ -2040,7 +2020,7 @@ class BlockParser
             // This handles cases like: text{a=x\n# not-a-heading
             $hasUnclosedBrace = $this->hasUnclosedBrace($content);
 
-            if ($this->isBlankLine($nextLine)) {
+            if (IndentationHelper::isBlankLine($nextLine)) {
                 break;
             }
 
@@ -2070,11 +2050,6 @@ class BlockParser
         if ($lastChild instanceof Paragraph) {
             $this->inlineParser->parse($lastChild, ' ' . $content, $line);
         }
-    }
-
-    protected function isBlankLine(string $line): bool
-    {
-        return trim($line) === '';
     }
 
     protected function startsNewBlock(string $line): bool
