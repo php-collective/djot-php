@@ -1309,7 +1309,7 @@ class BlockParser
         }
 
         // Get the base indentation of this list
-        $baseIndent = $this->getLeadingSpaces($line);
+        $baseIndent = IndentationHelper::getLeadingSpaces($line);
 
         $list = new ListBlock(
             $listInfo['type'],
@@ -1340,7 +1340,7 @@ class BlockParser
             }
 
             // Get indentation of current line
-            $currentIndent = $this->getLeadingSpaces($currentLine);
+            $currentIndent = IndentationHelper::getLeadingSpaces($currentLine);
 
             // If line is less indented than base, we're done with this list
             if ($currentIndent < $baseIndent) {
@@ -1375,11 +1375,11 @@ class BlockParser
 
                             continue;
                         }
-                        $lineIndent = $this->getLeadingSpaces($subLine);
+                        $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
                         // Check if line has at least the subIndent level
                         if ($lineIndent >= $subIndent) {
                             // Remove subIndent worth of indentation (handling tabs)
-                            $subLines[] = $this->stripLeadingIndent($subLine, $subIndent);
+                            $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $subIndent);
                             $sawBlankLine = false;
                             $i++;
                         } elseif ($lineIndent >= $baseIndent) {
@@ -1466,7 +1466,7 @@ class BlockParser
                     break;
                 }
 
-                $nextIndent = $this->getLeadingSpaces($nextLine);
+                $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
                 $nextTrimmed = ltrim($nextLine);
 
                 // Check if next line starts a new list item at same level (base indent)
@@ -1503,7 +1503,7 @@ class BlockParser
                         }
                     }
                     // Properly indented continuation - include with original indentation relative to content
-                    $itemLines[] = $this->stripLeadingIndent($nextLine, $contentIndent);
+                    $itemLines[] = IndentationHelper::stripLeadingIndent($nextLine, $contentIndent);
                 } else {
                     // Lazy continuation (not properly indented but not at base level either)
                     $itemLines[] = $nextTrimmed;
@@ -1520,7 +1520,7 @@ class BlockParser
                 // Check if it's an attribute block at content indent level
                 if (
                     preg_match('/^\{([^{}]+)\}\s*$/', $trimmedAttrLine, $attrMatch) &&
-                    $this->getLeadingSpaces($potentialAttrLine) >= $contentIndent
+                    IndentationHelper::getLeadingSpaces($potentialAttrLine) >= $contentIndent
                 ) {
                     $itemAttributes = $this->parseAttributeStringToArray($attrMatch[1]);
                     $i++;
@@ -1540,7 +1540,7 @@ class BlockParser
             // In significantNewlines mode, check for immediate nested content (any block type)
             if ($this->significantNewlines && $i < $count) {
                 $nextLine = $lines[$i];
-                $nextIndent = $this->getLeadingSpaces($nextLine);
+                $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
 
                 // If there's indented content that could be a nested block
                 if ($nextIndent >= $contentIndent) {
@@ -1550,9 +1550,9 @@ class BlockParser
                         if ($this->isBlankLine($subLine)) {
                             break;
                         }
-                        $lineIndent = $this->getLeadingSpaces($subLine);
+                        $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
                         if ($lineIndent >= $contentIndent) {
-                            $subLines[] = $this->stripLeadingIndent($subLine, $contentIndent);
+                            $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $contentIndent);
                             $i++;
                         } elseif ($lineIndent === $baseIndent) {
                             // Back to parent level - check if it's a sibling item
@@ -1583,29 +1583,6 @@ class BlockParser
         $parent->appendChild($list);
 
         return $i - $start;
-    }
-
-    /**
-     * Get number of leading whitespace as space-equivalent count.
-     *
-     * Tabs are counted as 2 spaces (one indentation level) to support
-     * tab-based indentation for nested structures.
-     *
-     * @see https://github.com/jgm/djot/issues/255
-     */
-    protected function getLeadingSpaces(string $line): int
-    {
-        return IndentationHelper::getLeadingSpaces($line);
-    }
-
-    /**
-     * Strip leading whitespace from a line, up to the specified space-equivalent count.
-     *
-     * Tabs count as 2 spaces. This correctly handles mixed spaces and tabs.
-     */
-    protected function stripLeadingIndent(string $line, int $amount): string
-    {
-        return IndentationHelper::stripLeadingIndent($line, $amount);
     }
 
     /**
