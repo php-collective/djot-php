@@ -27,7 +27,9 @@ use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Node;
+use Djot\Parser\Block\FencedBlockParser;
 use Djot\Parser\Block\ListParser;
+use Djot\Parser\Block\TableParser;
 use Djot\Parser\Utility\AttributeParser;
 use Djot\Parser\Utility\IndentationHelper;
 
@@ -39,6 +41,10 @@ class BlockParser
     protected InlineParser $inlineParser;
 
     protected ListParser $listParser;
+
+    protected TableParser $tableParser;
+
+    protected FencedBlockParser $fencedBlockParser;
 
     /**
      * @var array<string, \Djot\Parser\ReferenceDefinition>
@@ -109,6 +115,8 @@ class BlockParser
         $this->significantNewlines = $significantNewlines;
         $this->inlineParser = new InlineParser($this);
         $this->listParser = new ListParser();
+        $this->tableParser = new TableParser();
+        $this->fencedBlockParser = new FencedBlockParser();
     }
 
     /**
@@ -761,44 +769,27 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: code blocks start with ` or ~ (possibly after whitespace)
-        $trimmed = ltrim($line);
-        if ($trimmed === '' || ($trimmed[0] !== '`' && $trimmed[0] !== '~')) {
+        // Use FencedBlockParser to detect code fence opener
+        $fenceInfo = $this->fencedBlockParser->parseCodeFenceOpener($line);
+        if ($fenceInfo === null) {
             return null;
         }
 
-        // Match opening fence: 3+ backticks or tildes, optionally with leading whitespace
-        if (!preg_match('/^(\s*)(`{3,}|~{3,})(.*)$/', $line, $matches)) {
-            return null;
-        }
-
-        $indent = $matches[1];
-        $fence = $matches[2];
-        $fenceChar = $fence[0]; // Either ` or ~
-        $fenceLength = strlen($fence);
-        $info = trim($matches[3]);
-
-        // Check for inline code on a single line: ``` foo ``` should be inline code
-        // If the info string contains closing backticks of same or greater length, it's inline code
-        if ($fenceChar === '`') {
-            $closingPattern = '/`{' . $fenceLength . ',}/';
-            if (preg_match($closingPattern, $info)) {
-                // This looks like inline code on a single line, let paragraph parser handle it
-                return null;
-            }
-        }
+        $fenceChar = $fenceInfo['char'];
+        $fenceLength = $fenceInfo['length'];
+        $info = $fenceInfo['info'];
+        $indentLen = strlen($fenceInfo['indent']);
 
         $content = '';
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
-        $indentLen = strlen($indent);
 
         while ($i < $count) {
             $currentLine = $lines[$i];
 
-            // Check for closing fence (same char, equal or longer length), with optional indent
-            if (preg_match('/^\s*' . preg_quote($fenceChar, '/') . '{' . $fenceLength . ',}\s*$/', $currentLine)) {
+            // Check for closing fence
+            if ($this->fencedBlockParser->isCodeFenceCloser($currentLine, $fenceChar, $fenceLength)) {
                 $i++;
                 $closed = true;
 
@@ -806,9 +797,7 @@ class BlockParser
             }
 
             // Remove indent from content lines (up to the same amount as opening fence)
-            if ($indentLen > 0 && preg_match('/^(\s{0,' . $indentLen . '})(.*)$/', $currentLine, $lineMatch)) {
-                $currentLine = $lineMatch[2];
-            }
+            $currentLine = $this->fencedBlockParser->removeIndent($currentLine, $indentLen);
 
             $content .= $currentLine . "\n";
             $i++;
@@ -850,13 +839,8 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: comments must contain {%
-        if (!str_contains($line, '{%')) {
-            return null;
-        }
-
-        // Match comment opening: {%
-        if (!str_starts_with(trim($line), '{%')) {
+        // Use FencedBlockParser to check for comment opener
+        if (!$this->fencedBlockParser->isCommentOpener($line)) {
             return null;
         }
 
@@ -924,19 +908,14 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: raw blocks start with ` and contain =
-        if (!isset($line[0]) || $line[0] !== '`' || !str_contains($line, '=')) {
+        // Use FencedBlockParser to detect raw block opener
+        $rawInfo = $this->fencedBlockParser->parseRawBlockOpener($line);
+        if ($rawInfo === null) {
             return null;
         }
 
-        // Match opening fence with =format: ``` =html (space before = is syntax delimiter)
-        if (!preg_match('/^(`{3,}) +=(\w+) *$/', $line, $matches)) {
-            return null;
-        }
-
-        $fence = $matches[1];
-        $fenceLength = strlen($fence);
-        $format = $matches[2];
+        $fenceLength = $rawInfo['length'];
+        $format = $rawInfo['format'];
 
         $content = '';
         $i = $start + 1;
@@ -947,7 +926,7 @@ class BlockParser
             $currentLine = $lines[$i];
 
             // Check for closing fence (equal or longer)
-            if (preg_match('/^`{' . $fenceLength . ',}\s*$/', $currentLine)) {
+            if ($this->fencedBlockParser->isCodeFenceCloser($currentLine, '`', $fenceLength)) {
                 $i++;
                 $closed = true;
 
@@ -978,19 +957,14 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: divs start with :
-        if (!isset($line[0]) || $line[0] !== ':') {
+        // Use FencedBlockParser to detect div opener
+        $divInfo = $this->fencedBlockParser->parseDivFenceOpener($line);
+        if ($divInfo === null) {
             return null;
         }
 
-        // Match opening fence: 3+ colons with optional class
-        if (!preg_match('/^(:{3,})\s*(.*)$/', $line, $matches)) {
-            return null;
-        }
-
-        $fence = $matches[1];
-        $fenceLength = strlen($fence);
-        $className = trim($matches[2]);
+        $fenceLength = $divInfo['length'];
+        $className = $divInfo['className'];
 
         $div = new Div();
         if ($className !== '') {
@@ -1013,18 +987,21 @@ class BlockParser
             $currentLine = $lines[$i];
 
             // Track code blocks so we don't mistake ::: inside code blocks as closing fences
-            if (!$inCodeBlock && preg_match('/^(`{3,}|~{3,})/', $currentLine, $codeFenceMatch)) {
-                $inCodeBlock = true;
-                $codeBlockFence = $codeFenceMatch[1][0]; // ` or ~
-                $codeBlockFenceLength = strlen($codeFenceMatch[1]);
-                $innerLines[] = $currentLine;
-                $i++;
+            if (!$inCodeBlock) {
+                $codeFenceInfo = $this->fencedBlockParser->parseCodeFenceOpener($currentLine);
+                if ($codeFenceInfo !== null) {
+                    $inCodeBlock = true;
+                    $codeBlockFence = $codeFenceInfo['char'];
+                    $codeBlockFenceLength = $codeFenceInfo['length'];
+                    $innerLines[] = $currentLine;
+                    $i++;
 
-                continue;
+                    continue;
+                }
             }
             if ($inCodeBlock) {
                 // Check for closing code fence
-                if (preg_match('/^' . preg_quote($codeBlockFence, '/') . '{' . $codeBlockFenceLength . ',}\s*$/', $currentLine)) {
+                if ($this->fencedBlockParser->isCodeFenceCloser($currentLine, $codeBlockFence, $codeBlockFenceLength)) {
                     $inCodeBlock = false;
                 }
                 $innerLines[] = $currentLine;
@@ -1034,7 +1011,7 @@ class BlockParser
             }
 
             // Check for closing fence (equal or longer) - only when not in code block
-            if (preg_match('/^:{' . $fenceLength . ',}\s*$/', $currentLine)) {
+            if ($this->fencedBlockParser->isDivFenceCloser($currentLine, $fenceLength)) {
                 $i++;
                 $closed = true;
 
@@ -1869,7 +1846,7 @@ class BlockParser
         }
 
         // Make sure it's not a table (tables have | at start and end outside of code spans)
-        if (preg_match('/^\|.*\|$/', $line) && $this->lineEndsWithPipeOutsideCodeSpan($line)) {
+        if ($this->tableParser->isTableRow($line)) {
             return null;
         }
 
@@ -1926,19 +1903,8 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Fast early exit: tables start with |
-        if (!isset($line[0]) || $line[0] !== '|') {
-            return null;
-        }
-
-        // Table rows start and end with | (but the ending | must be outside code spans)
-        if (!preg_match('/^\|.*\|$/', $line)) {
-            return null;
-        }
-
-        // Verify the line truly ends with | outside of code spans
-        // A line like `| `a |`` has its final | inside a code span, so it's not a table
-        if (!$this->lineEndsWithPipeOutsideCodeSpan($line)) {
+        // Use TableParser to check if this is a valid table row
+        if (!$this->tableParser->isTableRow($line)) {
             return null;
         }
 
@@ -1955,10 +1921,9 @@ class BlockParser
                 break;
             }
 
-            // Check if this is a separator row (contains |, -, with optional : and spaces)
-            // Must have at least one - to be a separator (| | is not a separator)
-            if (preg_match('/^\|[\s:|-]+\|$/', $currentLine) && str_contains($currentLine, '-')) {
-                $alignments = $this->parseTableAlignments($currentLine);
+            // Check if this is a separator row
+            if ($this->tableParser->isSeparatorRow($currentLine)) {
+                $alignments = $this->tableParser->parseTableAlignments($currentLine);
                 $headerFound = true;
 
                 // Mark previous row as header and apply alignments to it
@@ -1991,7 +1956,7 @@ class BlockParser
 
             // Parse regular row
             $row = new TableRow(false);
-            $cells = $this->parseTableCells($currentLine);
+            $cells = $this->tableParser->parseTableCells($currentLine);
 
             foreach ($cells as $index => $cellContent) {
                 $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
@@ -2090,194 +2055,6 @@ class BlockParser
         }
 
         return $i - $start;
-    }
-
-    /**
-     * @return array<string>
-     */
-    protected function parseTableAlignments(string $separatorLine): array
-    {
-        $alignments = [];
-        $cells = $this->parseTableCells($separatorLine);
-
-        foreach ($cells as $cell) {
-            $cell = trim($cell);
-            if (str_starts_with($cell, ':') && str_ends_with($cell, ':')) {
-                $alignments[] = TableCell::ALIGN_CENTER;
-            } elseif (str_ends_with($cell, ':')) {
-                $alignments[] = TableCell::ALIGN_RIGHT;
-            } elseif (str_starts_with($cell, ':')) {
-                $alignments[] = TableCell::ALIGN_LEFT;
-            } else {
-                $alignments[] = TableCell::ALIGN_DEFAULT;
-            }
-        }
-
-        return $alignments;
-    }
-
-    /**
-     * @return array<string>
-     */
-    protected function parseTableCells(string $line): array
-    {
-        // Remove leading and trailing |
-        $line = substr($line, 1, -1);
-
-        // Split by | but not \| and not | inside code spans
-        $cells = [];
-        $currentCell = '';
-        $inCode = false;
-        $codeDelimLength = 0;
-        $length = strlen($line);
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $line[$i];
-
-            // Track code spans (backticks)
-            if ($char === '`' && !$inCode) {
-                // Count backticks for code span opener
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                $inCode = true;
-                $codeDelimLength = $backtickCount;
-                $currentCell .= substr($line, $i, $backtickCount);
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            if ($inCode && $char === '`') {
-                // Check for matching closing backticks
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                $currentCell .= substr($line, $i, $backtickCount);
-                if ($backtickCount === $codeDelimLength) {
-                    $inCode = false;
-                }
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            // Check for escaped pipe
-            if ($char === '\\' && $i + 1 < $length && $line[$i + 1] === '|') {
-                $currentCell .= '|';
-                $i++; // Skip the |
-
-                continue;
-            }
-
-            // Cell delimiter (unescaped | outside code span)
-            if ($char === '|' && !$inCode) {
-                $cells[] = $currentCell;
-                $currentCell = '';
-
-                continue;
-            }
-
-            $currentCell .= $char;
-        }
-
-        // Add the last cell
-        $cells[] = $currentCell;
-
-        return $cells;
-    }
-
-    /**
-     * Check if a line has unclosed code spans
-     */
-    protected function hasUnclosedCodeSpan(string $line): bool
-    {
-        $length = strlen($line);
-        $inCode = false;
-        $codeDelimLength = 0;
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $line[$i];
-
-            if ($char === '`' && !$inCode) {
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                $inCode = true;
-                $codeDelimLength = $backtickCount;
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            if ($inCode && $char === '`') {
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                if ($backtickCount === $codeDelimLength) {
-                    $inCode = false;
-                }
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-        }
-
-        return $inCode;
-    }
-
-    /**
-     * Check if a line ends with | outside of code spans
-     * Used to verify table row syntax (| `a |` is not a table because final | is in code span)
-     */
-    protected function lineEndsWithPipeOutsideCodeSpan(string $line): bool
-    {
-        $length = strlen($line);
-        $inCode = false;
-        $codeDelimLength = 0;
-        $lastPipeOutsideCode = -1;
-
-        for ($i = 0; $i < $length; $i++) {
-            $char = $line[$i];
-
-            // Track code spans
-            if ($char === '`' && !$inCode) {
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                $inCode = true;
-                $codeDelimLength = $backtickCount;
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            if ($inCode && $char === '`') {
-                $backtickCount = 1;
-                while ($i + $backtickCount < $length && $line[$i + $backtickCount] === '`') {
-                    $backtickCount++;
-                }
-                if ($backtickCount === $codeDelimLength) {
-                    $inCode = false;
-                }
-                $i += $backtickCount - 1;
-
-                continue;
-            }
-
-            // Track pipe positions outside code spans
-            if ($char === '|' && !$inCode) {
-                $lastPipeOutsideCode = $i;
-            }
-        }
-
-        // The line ends with | outside code span if the last | is at the end
-        return $lastPipeOutsideCode === $length - 1;
     }
 
     /**
