@@ -23,6 +23,7 @@ use Djot\Node\Inline\Superscript;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Parser\Utility\AttributeParser;
 
 /**
  * Inline parser for Djot
@@ -1481,54 +1482,7 @@ class InlineParser
      */
     protected function applyAttributesToNode(Node $node, string $attrStr): void
     {
-        // Match: .class, #id, key="quoted value" (with escapes), key='quoted value', key=unquoted
-        // The regex uses ([^"\\]|\\.)* to match content with escaped characters
-        $pattern = '/\.([^\s.#=}]+)|#([^\s.#=}]+)'
-            . '|([^\s.#=}]+)="((?:[^"\\\\]|\\\\.)*)"|([^\s.#=}]+)=\'((?:[^\'\\\\]|\\\\.)*)\''
-            . '|([^\s.#=}]+)=([^\s}"\']+)/';
-        preg_match_all($pattern, $attrStr, $matches, PREG_SET_ORDER);
-
-        foreach ($matches as $match) {
-            if (!empty($match[1])) {
-                // Class attribute
-                $node->addClass($match[1]);
-            } elseif (!empty($match[2])) {
-                // ID attribute
-                $node->setAttribute('id', $match[2]);
-            } elseif (($match[3] ?? '') !== '') {
-                // key="double quoted value"
-                $node->setAttribute($match[3], $this->processAttributeEscapes($match[4] ?? ''));
-            } elseif (($match[5] ?? '') !== '') {
-                // key='single quoted value'
-                $node->setAttribute($match[5], $this->processAttributeEscapes($match[6] ?? ''));
-            } elseif (($match[7] ?? '') !== '') {
-                // key=unquoted
-                $node->setAttribute($match[7], $match[8] ?? '');
-            }
-        }
-
-        // Parse boolean attributes (bare words like "disabled", "hidden")
-        // First, strip out quoted values and key=value pairs to avoid matching words inside them
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*="(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
-        $strippedAttr = preg_replace("/[a-zA-Z_][a-zA-Z0-9_-]*='(?:[^'\\\\]|\\\\.)*'/", '', $strippedAttr) ?? $strippedAttr;
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}"\']+/', '', $strippedAttr) ?? $strippedAttr;
-        // Now match bare words (must not start with . or #)
-        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $strippedAttr, $boolMatches)) {
-            foreach ($boolMatches[1] as $boolAttr) {
-                $node->setAttribute($boolAttr, '');
-            }
-        }
-    }
-
-    /**
-     * Process escape sequences in attribute values
-     *
-     * Handles \\ -> \ and \" -> " (and other escaped characters)
-     */
-    protected function processAttributeEscapes(string $value): string
-    {
-        // Replace escape sequences: \X -> X for any character X
-        return preg_replace('/\\\\(.)/', '$1', $value) ?? $value;
+        AttributeParser::applyToNode($node, $attrStr);
     }
 
     /**

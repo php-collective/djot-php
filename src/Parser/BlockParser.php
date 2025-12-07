@@ -27,6 +27,8 @@ use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Node;
+use Djot\Parser\Utility\AttributeParser;
+use Djot\Parser\Utility\IndentationHelper;
 
 /**
  * Block-level parser for Djot
@@ -722,57 +724,7 @@ class BlockParser
      */
     protected function parseAttributeString(string $attrStr): void
     {
-        // Parse .class
-        if (preg_match_all('/\.([^\s.#=}]+)/', $attrStr, $classMatches)) {
-            $existingClass = $this->pendingAttributes['class'] ?? '';
-            $newClasses = implode(' ', $classMatches[1]);
-            $this->pendingAttributes['class'] = trim($existingClass . ' ' . $newClasses);
-        }
-
-        // Parse #id
-        if (preg_match('/#([^\s.#=}]+)/', $attrStr, $idMatch)) {
-            $this->pendingAttributes['id'] = $idMatch[1];
-        }
-
-        // Parse key="double quoted value" (with escape support), key='single quoted value', or key=unquoted
-        // The regex uses ([^"\\]|\\.)* to match content with escaped characters
-        if (preg_match_all('/([a-zA-Z_][a-zA-Z0-9_-]*)="((?:[^"\\\\]|\\\\.)*)"|([a-zA-Z_][a-zA-Z0-9_-]*)=\'((?:[^\'\\\\]|\\\\.)*)\'|([a-zA-Z_][a-zA-Z0-9_-]*)=([^\s}"\']+)/', $attrStr, $kvMatches, PREG_SET_ORDER)) {
-            foreach ($kvMatches as $match) {
-                if (($match[1] ?? '') !== '') {
-                    // key="double quoted value"
-                    $this->pendingAttributes[$match[1]] = $this->processAttributeEscapes($match[2] ?? '');
-                } elseif (($match[3] ?? '') !== '') {
-                    // key='single quoted value'
-                    $this->pendingAttributes[$match[3]] = $this->processAttributeEscapes($match[4] ?? '');
-                } elseif (($match[5] ?? '') !== '') {
-                    // key=unquoted
-                    $this->pendingAttributes[$match[5]] = $match[6] ?? '';
-                }
-            }
-        }
-
-        // Parse boolean attributes (bare words like "reversed", "hidden")
-        // First, strip out quoted values and key=value pairs to avoid matching words inside them
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*="(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
-        $strippedAttr = preg_replace("/[a-zA-Z_][a-zA-Z0-9_-]*='(?:[^'\\\\]|\\\\.)*'/", '', $strippedAttr) ?? $strippedAttr;
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}"\']+/', '', $strippedAttr) ?? $strippedAttr;
-        // Now match bare words (must not start with . or #)
-        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $strippedAttr, $boolMatches)) {
-            foreach ($boolMatches[1] as $boolAttr) {
-                $this->pendingAttributes[$boolAttr] = '';
-            }
-        }
-    }
-
-    /**
-     * Process escape sequences in attribute values
-     *
-     * Handles \\ -> \ and \" -> " (and other escaped characters)
-     */
-    protected function processAttributeEscapes(string $value): string
-    {
-        // Replace escape sequences: \X -> X for any character X
-        return preg_replace('/\\\\(.)/', '$1', $value) ?? $value;
+        $this->pendingAttributes = AttributeParser::parseAndMerge($this->pendingAttributes, $attrStr);
     }
 
     /**
@@ -782,32 +734,7 @@ class BlockParser
      */
     protected function parseAttributeStringToArray(string $attrStr): array
     {
-        $attributes = [];
-
-        // Parse .class
-        if (preg_match_all('/\.([^\s.#=}]+)/', $attrStr, $classMatches)) {
-            $attributes['class'] = implode(' ', $classMatches[1]);
-        }
-
-        // Parse #id
-        if (preg_match('/#([^\s.#=}]+)/', $attrStr, $idMatch)) {
-            $attributes['id'] = $idMatch[1];
-        }
-
-        // Parse key="double quoted value", key='single quoted value', or key=unquoted
-        if (preg_match_all('/([a-zA-Z_][a-zA-Z0-9_-]*)="((?:[^"\\\\]|\\\\.)*)"|([a-zA-Z_][a-zA-Z0-9_-]*)=\'((?:[^\'\\\\]|\\\\.)*)\'|([a-zA-Z_][a-zA-Z0-9_-]*)=([^\s}"\']+)/', $attrStr, $kvMatches, PREG_SET_ORDER)) {
-            foreach ($kvMatches as $match) {
-                if (($match[1] ?? '') !== '') {
-                    $attributes[$match[1]] = $this->processAttributeEscapes($match[2] ?? '');
-                } elseif (($match[3] ?? '') !== '') {
-                    $attributes[$match[3]] = $this->processAttributeEscapes($match[4] ?? '');
-                } elseif (($match[5] ?? '') !== '') {
-                    $attributes[$match[5]] = $match[6] ?? '';
-                }
-            }
-        }
-
-        return $attributes;
+        return AttributeParser::parse($attrStr);
     }
 
     /**
@@ -1728,21 +1655,7 @@ class BlockParser
      */
     protected function getLeadingSpaces(string $line): int
     {
-        $count = 0;
-        $len = strlen($line);
-
-        for ($i = 0; $i < $len; $i++) {
-            if ($line[$i] === ' ') {
-                $count++;
-            } elseif ($line[$i] === "\t") {
-                // Tab counts as 2 spaces (one indentation level)
-                $count += 2;
-            } else {
-                break;
-            }
-        }
-
-        return $count;
+        return IndentationHelper::getLeadingSpaces($line);
     }
 
     /**
@@ -1752,23 +1665,7 @@ class BlockParser
      */
     protected function stripLeadingIndent(string $line, int $amount): string
     {
-        $stripped = 0;
-        $len = strlen($line);
-        $i = 0;
-
-        while ($i < $len && $stripped < $amount) {
-            if ($line[$i] === ' ') {
-                $stripped++;
-                $i++;
-            } elseif ($line[$i] === "\t") {
-                $stripped += 2;
-                $i++;
-            } else {
-                break;
-            }
-        }
-
-        return substr($line, $i);
+        return IndentationHelper::stripLeadingIndent($line, $amount);
     }
 
     /**

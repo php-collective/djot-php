@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
-use Closure;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
@@ -44,6 +43,7 @@ use Djot\Node\Inline\Superscript;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Renderer\Utility\EventDispatcherTrait;
 use Djot\SafeMode;
 
 /**
@@ -51,17 +51,14 @@ use Djot\SafeMode;
  */
 class HtmlRenderer implements RendererInterface
 {
+    use EventDispatcherTrait;
+
     protected SoftBreakMode $softBreakMode = SoftBreakMode::Newline;
 
     /**
      * Safe mode configuration (null = disabled)
      */
     protected ?SafeMode $safeMode = null;
-
-    /**
-     * @var array<string, array<\Closure(\Djot\Event\RenderEvent): void>>
-     */
-    protected array $listeners = [];
 
     /**
      * Tracks footnote reference counts for generating unique IDs
@@ -152,33 +149,6 @@ class HtmlRenderer implements RendererInterface
     public function getSoftBreakMode(): SoftBreakMode
     {
         return $this->softBreakMode;
-    }
-
-    /**
-     * Register a listener for a render event
-     *
-     * Event names correspond to node types:
-     * - render.link, render.image, render.paragraph, etc.
-     * - render.* for all nodes
-     *
-     * @param string $event
-     * @param \Closure(\Djot\Event\RenderEvent): void $listener
-     */
-    public function on(string $event, Closure $listener): void
-    {
-        $this->listeners[$event][] = $listener;
-    }
-
-    /**
-     * Remove all listeners for an event (or all events if no event specified)
-     */
-    public function off(?string $event = null): void
-    {
-        if ($event === null) {
-            $this->listeners = [];
-        } else {
-            unset($this->listeners[$event]);
-        }
     }
 
     public function render(Document $document): string
@@ -1063,24 +1033,5 @@ class HtmlRenderer implements RendererInterface
         // By default, symbols are rendered as their name
         // Could be extended to support emoji mappings
         return ':' . $this->escape($node->getName()) . ':';
-    }
-
-    /**
-     * Dispatch an event to all registered listeners
-     */
-    protected function dispatchEvent(string $event, RenderEvent $renderEvent): void
-    {
-        if (!isset($this->listeners[$event])) {
-            return;
-        }
-
-        foreach ($this->listeners[$event] as $listener) {
-            $listener($renderEvent);
-
-            // Stop propagation if default was prevented
-            if ($renderEvent->isDefaultPrevented()) {
-                break;
-            }
-        }
     }
 }

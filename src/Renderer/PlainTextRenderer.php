@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
-use Closure;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
@@ -36,6 +35,7 @@ use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Renderer\Utility\EventDispatcherTrait;
 
 /**
  * Renders AST to plain text
@@ -48,6 +48,8 @@ use Djot\Node\Node;
  */
 class PlainTextRenderer implements RendererInterface
 {
+    use EventDispatcherTrait;
+
     protected string $listItemPrefix = '- ';
 
     protected string $orderedListItemPrefix = '. ';
@@ -59,11 +61,6 @@ class PlainTextRenderer implements RendererInterface
     protected string $blockQuoteSuffix = '"';
 
     protected SoftBreakMode $softBreakMode = SoftBreakMode::Space;
-
-    /**
-     * @var array<string, array<\Closure(\Djot\Event\RenderEvent): void>>
-     */
-    protected array $listeners = [];
 
     /**
      * Set how soft breaks are rendered
@@ -86,47 +83,6 @@ class PlainTextRenderer implements RendererInterface
     public function getSoftBreakMode(): SoftBreakMode
     {
         return $this->softBreakMode;
-    }
-
-    /**
-     * Register an event listener
-     *
-     * @param string $event Event name (e.g., 'render.paragraph', 'render.*')
-     * @param \Closure(\Djot\Event\RenderEvent): void $listener
-     */
-    public function on(string $event, Closure $listener): void
-    {
-        $this->listeners[$event][] = $listener;
-    }
-
-    /**
-     * Remove event listeners
-     *
-     * @param string|null $event Event name or null to remove all listeners
-     */
-    public function off(?string $event = null): void
-    {
-        if ($event === null) {
-            $this->listeners = [];
-        } else {
-            unset($this->listeners[$event]);
-        }
-    }
-
-    /**
-     * Dispatch an event to all registered listeners
-     */
-    protected function dispatchEvent(string $event, RenderEvent $renderEvent): void
-    {
-        if (!isset($this->listeners[$event])) {
-            return;
-        }
-        foreach ($this->listeners[$event] as $listener) {
-            $listener($renderEvent);
-            if ($renderEvent->isDefaultPrevented()) {
-                break;
-            }
-        }
     }
 
     public function render(Document $document): string
