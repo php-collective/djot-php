@@ -520,6 +520,81 @@ Attributes can be attached to individual `<dl>`, `<dt>`, and `<dd>` elements:
 
 ---
 
+### Captions for Images, Tables, and Block Quotes
+
+**Related:** [php-collective/djot-php#37](https://github.com/php-collective/djot-php/issues/37)
+
+**Status:** Implemented in djot-php
+
+The `^ caption text` syntax adds captions to images, tables, and block quotes:
+
+**Image captions** (wrapped in `<figure>` with `<figcaption>`):
+
+```djot
+![Sunset over the ocean](sunset.jpg)
+^ A beautiful sunset captured at the beach
+```
+
+**Output:**
+```html
+<figure>
+<img alt="Sunset over the ocean" src="sunset.jpg"><figcaption>A beautiful sunset captured at the beach</figcaption>
+</figure>
+```
+
+**Table captions** (adds `<caption>` element):
+
+```djot
+| Product | Price |
+|---------|-------|
+| Widget  | $10   |
+^ Product pricing as of 2024
+```
+
+**Output:**
+```html
+<table>
+<caption>Product pricing as of 2024</caption>
+<tr><th>Product</th><th>Price</th></tr>
+<tr><td>Widget</td><td>$10</td></tr>
+</table>
+```
+
+**Block quote captions** (wrapped in `<figure>` with `<figcaption>`, useful for attributions):
+
+```djot
+> To be or not to be, that is the question.
+^ William Shakespeare, Hamlet
+```
+
+**Output:**
+```html
+<figure>
+<blockquote>
+<p>To be or not to be, that is the question.</p>
+</blockquote>
+<figcaption>William Shakespeare, Hamlet</figcaption>
+</figure>
+```
+
+**Features:**
+- `^ ` marker at start of line triggers caption parsing
+- Can interrupt paragraphs (no blank line required before caption)
+- Blank line between element and caption is allowed for readability
+- Multi-line captions supported (continues until blank line or new block)
+- Full roundtrip support in HtmlToDjot converter
+
+**Multi-line caption example:**
+
+```djot
+![Historic photo](apollo.jpg)
+^ This photograph was taken in 1969
+during the Apollo 11 mission.
+Credit: NASA
+```
+
+---
+
 ## Testing
 
 All enhancements have dedicated test coverage:
@@ -556,6 +631,7 @@ vendor/bin/phpunit
 | Multiple definition terms | -                                              | djot-php   |
 | Definition list attributes | [#323](https://github.com/jgm/djot/issues/323) | Open       |
 | Fenced comment blocks     | [#67](https://github.com/jgm/djot/issues/67)   | Open       |
+| Captions (image/table/blockquote) | [djot-php#37](https://github.com/php-collective/djot-php/issues/37) | djot-php |
 
 ### Optional Modes
 
