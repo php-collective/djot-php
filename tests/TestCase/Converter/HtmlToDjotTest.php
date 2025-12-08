@@ -293,4 +293,124 @@ HTML;
         // Should normalize to single spaces
         $this->assertSame("Multiple spaces and newlines\n", $result);
     }
+
+    // ==================== Blank Line Handling for Valid Djot ====================
+
+    public function testNestedListWithBlankLine(): void
+    {
+        // Djot requires blank line before nested list content
+        $html = '<ul><li>Item 1</li><li>Item 2<ul><li>Nested 1</li><li>Nested 2</li></ul></li><li>Item 3</li></ul>';
+        $result = $this->converter->convert($html);
+
+        // Verify nested list is properly indented
+        $this->assertStringContainsString('- Item 1', $result);
+        $this->assertStringContainsString('- Item 2', $result);
+        $this->assertStringContainsString('  - Nested 1', $result);
+        $this->assertStringContainsString('  - Nested 2', $result);
+        $this->assertStringContainsString('- Item 3', $result);
+
+        // Verify blank line before nested list (required by Djot)
+        $this->assertMatchesRegularExpression('/- Item 2\n\n\s+- Nested 1/', $result);
+    }
+
+    public function testDeeplyNestedList(): void
+    {
+        $html = '<ul><li>Level 1<ul><li>Level 2<ul><li>Level 3</li></ul></li></ul></li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('- Level 1', $result);
+        $this->assertStringContainsString('  - Level 2', $result);
+        $this->assertStringContainsString('    - Level 3', $result);
+    }
+
+    public function testMixedNestedLists(): void
+    {
+        $html = '<ul><li>Unordered<ol><li>Ordered 1</li><li>Ordered 2</li></ol></li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('- Unordered', $result);
+        $this->assertStringContainsString('  1. Ordered 1', $result);
+        $this->assertStringContainsString('  2. Ordered 2', $result);
+    }
+
+    public function testNestedOrderedList(): void
+    {
+        $html = '<ol><li>First</li><li>Second<ol><li>Sub A</li><li>Sub B</li></ol></li><li>Third</li></ol>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('1. First', $result);
+        $this->assertStringContainsString('2. Second', $result);
+        $this->assertStringContainsString('  1. Sub A', $result);
+        $this->assertStringContainsString('  2. Sub B', $result);
+        $this->assertStringContainsString('3. Third', $result);
+    }
+
+    public function testNoLeadingWhitespaceOnParagraphs(): void
+    {
+        $html = "  <p>  Text with surrounding whitespace  </p>  ";
+        $result = $this->converter->convert($html);
+
+        // Should not have leading whitespace
+        $this->assertSame("Text with surrounding whitespace\n", $result);
+    }
+
+    public function testNoLeadingWhitespaceOnHeadings(): void
+    {
+        $html = "<h1>  Heading  </h1><p>  Text  </p>";
+        $result = $this->converter->convert($html);
+
+        $this->assertStringStartsWith('# Heading', $result);
+        $this->assertStringContainsString('Text', $result);
+        // No leading space on Text line
+        $this->assertStringNotContainsString("\n Text", $result);
+    }
+
+    public function testCodeBlockPreservesIndentation(): void
+    {
+        $html = '<pre><code>  indented code
+    more indented</code></pre>';
+        $result = $this->converter->convert($html);
+
+        // Indentation inside code should be preserved
+        $this->assertStringContainsString('  indented code', $result);
+        $this->assertStringContainsString('    more indented', $result);
+    }
+
+    public function testCompleteDocumentWithValidDjot(): void
+    {
+        $html = <<<'HTML'
+<h1>Title</h1>
+<p>Introduction paragraph.</p>
+<h2>Section</h2>
+<p>Some content.</p>
+<ul>
+  <li>Item 1</li>
+  <li>Item 2
+    <ul>
+      <li>Nested item</li>
+    </ul>
+  </li>
+</ul>
+<pre><code class="language-php">echo "hello";</code></pre>
+<blockquote><p>A quote</p></blockquote>
+<p>Conclusion with <strong>bold</strong> and <em>italic</em>.</p>
+HTML;
+
+        $result = $this->converter->convert($html);
+
+        // All elements should be present
+        $this->assertStringContainsString('# Title', $result);
+        $this->assertStringContainsString('Introduction paragraph.', $result);
+        $this->assertStringContainsString('## Section', $result);
+        $this->assertStringContainsString('- Item 1', $result);
+        $this->assertStringContainsString('- Item 2', $result);
+        $this->assertStringContainsString('  - Nested item', $result);
+        $this->assertStringContainsString('```php', $result);
+        $this->assertStringContainsString('> A quote', $result);
+        $this->assertStringContainsString('*bold*', $result);
+        $this->assertStringContainsString('_italic_', $result);
+
+        // Content lines should not have leading whitespace (except list indentation)
+        $this->assertStringNotContainsString("\n Introduction", $result);
+    }
 }
