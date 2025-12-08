@@ -27,6 +27,18 @@ class HtmlToDjot
     protected bool $inPre = false;
 
     /**
+     * Attributes to skip when converting (these don't translate well to Djot)
+     *
+     * @var array<string>
+     */
+    protected array $skipAttributes = [
+        'style', // CSS doesn't map to Djot
+        'onclick', 'onload', 'onmouseover', 'onmouseout', 'onsubmit', // JS events
+        'xmlns', // XML namespace
+        'role', // ARIA (could be kept, but often noise)
+    ];
+
+    /**
      * Convert HTML to Djot markup
      */
     public function convert(string $html): string
@@ -154,7 +166,9 @@ class HtmlToDjot
             return '';
         }
 
-        return $content . "\n\n";
+        $attrs = $this->formatBlockAttributes($node);
+
+        return $attrs . $content . "\n\n";
     }
 
     protected function processHeading(DOMElement $node): string
@@ -162,8 +176,9 @@ class HtmlToDjot
         $level = (int)substr($node->tagName, 1);
         $content = trim($this->processChildren($node));
         $prefix = str_repeat('#', $level) . ' ';
+        $attrs = $this->formatBlockAttributes($node);
 
-        return $prefix . $content . "\n\n";
+        return $attrs . $prefix . $content . "\n\n";
     }
 
     protected function processInlineFormatting(DOMElement $node, string $open, string $close): string
@@ -173,7 +188,9 @@ class HtmlToDjot
             return '';
         }
 
-        return $open . $content . $close;
+        $attrs = $this->formatInlineAttributes($node);
+
+        return $open . $content . $close . $attrs;
     }
 
     protected function processCode(DOMElement $node): string
@@ -192,7 +209,9 @@ class HtmlToDjot
             $backticks .= '`';
         }
 
-        return $backticks . $content . $backticks;
+        $attrs = $this->formatInlineAttributes($node);
+
+        return $backticks . $content . $backticks . $attrs;
     }
 
     protected function processPreBlock(DOMElement $node): string
@@ -222,7 +241,10 @@ class HtmlToDjot
 
         $this->inPre = false;
 
-        return "\n" . $backticks . $language . "\n" . rtrim($content) . "\n" . $backticks . "\n\n";
+        // Get attributes from pre element (skip class on code since used for language)
+        $attrs = $this->formatBlockAttributes($node);
+
+        return $attrs . "\n" . $backticks . $language . "\n" . rtrim($content) . "\n" . $backticks . "\n\n";
     }
 
     protected function processLink(DOMElement $node): string
@@ -235,11 +257,14 @@ class HtmlToDjot
             $text = $href;
         }
 
+        // Skip href and title since they're in the link syntax
+        $attrs = $this->formatInlineAttributes($node, ['href', 'title']);
+
         if ($title !== '') {
-            return '[' . $text . '](' . $href . ' "' . $title . '")';
+            return '[' . $text . '](' . $href . ' "' . $title . '")' . $attrs;
         }
 
-        return '[' . $text . '](' . $href . ')';
+        return '[' . $text . '](' . $href . ')' . $attrs;
     }
 
     protected function processImage(DOMElement $node): string
@@ -248,11 +273,14 @@ class HtmlToDjot
         $alt = $node->getAttribute('alt');
         $title = $node->getAttribute('title');
 
+        // Skip src, alt, title since they're in the image syntax
+        $attrs = $this->formatInlineAttributes($node, ['src', 'alt', 'title']);
+
         if ($title !== '') {
-            return '![' . $alt . '](' . $src . ' "' . $title . '")';
+            return '![' . $alt . '](' . $src . ' "' . $title . '")' . $attrs;
         }
 
-        return '![' . $alt . '](' . $src . ')';
+        return '![' . $alt . '](' . $src . ')' . $attrs;
     }
 
     protected function processBlockquote(DOMElement $node): string
@@ -268,7 +296,9 @@ class HtmlToDjot
             }
         }
 
-        return "\n" . implode("\n", $quoted) . "\n\n";
+        $attrs = $this->formatBlockAttributes($node);
+
+        return $attrs . "\n" . implode("\n", $quoted) . "\n\n";
     }
 
     protected function processList(DOMElement $node): string
@@ -285,7 +315,9 @@ class HtmlToDjot
 
         // Add leading newline for top-level lists to ensure blank line before
         if ($this->listDepth === 1) {
-            $output .= "\n";
+            // Add list-level attributes (skip 'start' since it's in the syntax for ol)
+            $listAttrs = $this->formatBlockAttributes($node, $isOrdered ? ['start'] : []);
+            $output .= $listAttrs . "\n";
         }
 
         foreach ($node->childNodes as $child) {
@@ -317,6 +349,12 @@ class HtmlToDjot
                 $lines = explode("\n", $textContent);
                 $firstLine = array_shift($lines);
                 $output .= $indent . $prefix . $firstLine . "\n";
+
+                // Add list item attributes on next line (indented)
+                $liAttrs = $this->getElementAttributes($child);
+                if ($liAttrs !== '') {
+                    $output .= $indent . str_repeat(' ', strlen($prefix)) . '{' . $liAttrs . "}\n";
+                }
 
                 if ($lines) {
                     $continuation = str_repeat(' ', strlen($prefix));
@@ -351,6 +389,7 @@ class HtmlToDjot
     {
         $rows = [];
         $headerRow = null;
+        $headerRowAttrs = '';
         $columnCount = 0;
 
         // Find all rows
@@ -364,7 +403,15 @@ class HtmlToDjot
                 if ($cell instanceof DOMElement) {
                     $tag = strtolower($cell->tagName);
                     if ($tag === 'th' || $tag === 'td') {
-                        $cells[] = trim($this->processChildren($cell));
+                        // Get cell content with cell attributes
+                        $cellContent = trim($this->processChildren($cell));
+                        $cellAttrs = $this->getElementAttributes($cell);
+                        if ($cellAttrs !== '') {
+                            // Cell attributes go after opening pipe: |{.class} content |
+                            $cells[] = '{' . $cellAttrs . '} ' . $cellContent;
+                        } else {
+                            $cells[] = $cellContent;
+                        }
                         if ($tag === 'th') {
                             $isHeader = true;
                         }
@@ -374,17 +421,25 @@ class HtmlToDjot
 
             if ($cells) {
                 $columnCount = max($columnCount, count($cells));
-                $row = '| ' . implode(' | ', $cells) . ' |';
+
+                // Get row attributes
+                $rowAttrs = $this->getElementAttributes($tr);
+                $rowAttrSuffix = $rowAttrs !== '' ? '{' . $rowAttrs . '}' : '';
+
+                $row = '| ' . implode(' | ', $cells) . ' |' . $rowAttrSuffix;
 
                 if ($isHeader && $headerRow === null) {
                     $headerRow = $row;
+                    $headerRowAttrs = $rowAttrSuffix;
                 } else {
                     $rows[] = $row;
                 }
             }
         }
 
-        $output = "\n";
+        // Table-level attributes
+        $tableAttrs = $this->formatBlockAttributes($node);
+        $output = $tableAttrs . "\n";
 
         if ($headerRow !== null) {
             $output .= $headerRow . "\n";
@@ -399,14 +454,9 @@ class HtmlToDjot
 
     protected function processDefinitionList(DOMElement $node): string
     {
-        $output = "\n";
-
-        // Output dl attributes before the list
-        $dlAttrs = $this->getElementAttributes($node);
-        if ($dlAttrs !== '') {
-            $output .= '{' . $dlAttrs . "}\n";
-        }
-
+        // Definition list level attributes
+        $dlAttrs = $this->formatBlockAttributes($node);
+        $output = $dlAttrs . "\n";
         $lastWasTerm = false;
         $ddCount = 0;
 
@@ -416,7 +466,7 @@ class HtmlToDjot
                 if ($tag === 'dt') {
                     // Term: `: term` format
                     $output .= ': ' . trim($this->processChildren($child)) . "\n";
-                    // Output dt attributes after term
+                    // dt attributes on next line
                     $dtAttrs = $this->getElementAttributes($child);
                     if ($dtAttrs !== '') {
                         $output .= '{' . $dtAttrs . "}\n";
@@ -450,55 +500,16 @@ class HtmlToDjot
         return $output . "\n";
     }
 
-    /**
-     * Get element attributes formatted as Djot attribute syntax
-     */
-    protected function getElementAttributes(DOMElement $node): string
-    {
-        $attrs = '';
-        $class = $node->getAttribute('class');
-        $id = $node->getAttribute('id');
-
-        if ($class !== '') {
-            $classes = explode(' ', $class);
-            foreach ($classes as $c) {
-                $attrs .= '.' . $c . ' ';
-            }
-        }
-        if ($id !== '') {
-            $attrs .= '#' . $id . ' ';
-        }
-
-        // Get other attributes (excluding class and id)
-        foreach ($node->attributes as $attr) {
-            if ($attr->name !== 'class' && $attr->name !== 'id') {
-                $attrs .= $attr->name . '="' . $attr->value . '" ';
-            }
-        }
-
-        return trim($attrs);
-    }
-
     protected function processSpan(DOMElement $node): string
     {
         $content = $this->processChildren($node);
-        $class = $node->getAttribute('class');
-        $id = $node->getAttribute('id');
 
-        // If span has class or id, convert to Djot span syntax
-        if ($class !== '' || $id !== '') {
-            $attrs = '';
-            if ($class !== '') {
-                $classes = explode(' ', $class);
-                foreach ($classes as $c) {
-                    $attrs .= '.' . $c . ' ';
-                }
-            }
-            if ($id !== '') {
-                $attrs .= '#' . $id;
-            }
+        // Use getElementAttributes to get all attributes including data-*
+        $attrs = $this->getElementAttributes($node);
 
-            return '[' . $content . ']{' . trim($attrs) . '}';
+        // If span has any attributes, convert to Djot span syntax
+        if ($attrs !== '') {
+            return '[' . $content . ']{' . $attrs . '}';
         }
 
         return $content;
@@ -523,12 +534,113 @@ class HtmlToDjot
         return $output . "\n\n";
     }
 
+    /**
+     * Format element attributes as Djot block attribute syntax.
+     * Returns empty string if no relevant attributes.
+     *
+     * @param \DOMElement $node The element to extract attributes from
+     * @param array<string> $skipAttrs Additional attributes to skip for this element
+     *
+     * @return string Djot attribute block like "{#id .class key=value}\n" or ""
+     */
+    protected function formatBlockAttributes(DOMElement $node, array $skipAttrs = []): string
+    {
+        $attrs = $this->getElementAttributes($node, $skipAttrs);
+        if (!$attrs) {
+            return '';
+        }
+
+        return '{' . $attrs . "}\n";
+    }
+
+    /**
+     * Format element attributes as Djot inline attribute syntax.
+     * Returns empty string if no relevant attributes.
+     *
+     * @param \DOMElement $node The element to extract attributes from
+     * @param array<string> $skipAttrs Additional attributes to skip for this element
+     *
+     * @return string Djot inline attributes like "{#id .class}" or ""
+     */
+    protected function formatInlineAttributes(DOMElement $node, array $skipAttrs = []): string
+    {
+        $attrs = $this->getElementAttributes($node, $skipAttrs);
+        if (!$attrs) {
+            return '';
+        }
+
+        return '{' . $attrs . '}';
+    }
+
+    /**
+     * Extract and format attributes from a DOM element.
+     *
+     * @param \DOMElement $node The element to extract attributes from
+     * @param array<string> $skipAttrs Additional attributes to skip
+     *
+     * @return string Formatted attributes (without braces) or empty string
+     */
+    protected function getElementAttributes(DOMElement $node, array $skipAttrs = []): string
+    {
+        $parts = [];
+        $allSkip = array_merge($this->skipAttributes, $skipAttrs);
+
+        // Process id first
+        $id = $node->getAttribute('id');
+        if ($id !== '') {
+            $parts[] = '#' . $id;
+        }
+
+        // Process class
+        $class = $node->getAttribute('class');
+        if ($class !== '') {
+            $classes = preg_split('/\s+/', trim($class));
+            if ($classes) {
+                foreach ($classes as $c) {
+                    if ($c !== '') {
+                        $parts[] = '.' . $c;
+                    }
+                }
+            }
+        }
+
+        // Process other attributes
+        /** @var \DOMAttr $attr */
+        foreach ($node->attributes as $attr) {
+            $name = $attr->name;
+
+            // Skip already processed and skip-list attributes
+            if ($name === 'id' || $name === 'class') {
+                continue;
+            }
+            if (in_array($name, $allSkip, true)) {
+                continue;
+            }
+
+            $value = $attr->value;
+            if ($value === '') {
+                // Boolean attribute
+                $parts[] = $name;
+            } else {
+                // Quote value if it contains spaces or special chars
+                if (preg_match('/[\s"\'{}]/', $value)) {
+                    $parts[] = $name . '="' . str_replace('"', '\\"', $value) . '"';
+                } else {
+                    $parts[] = $name . '=' . $value;
+                }
+            }
+        }
+
+        return implode(' ', $parts);
+    }
+
     protected function cleanup(string $djot): string
     {
         // Remove leading whitespace from lines (except in code blocks and indented content)
         $lines = explode("\n", $djot);
         $inCodeBlock = false;
         $inDefinitionList = false;
+        $inList = false;
         $result = [];
 
         foreach ($lines as $line) {
@@ -549,15 +661,24 @@ class HtmlToDjot
             // Track definition lists (`: term` starts one)
             if (preg_match('/^: /', $line)) {
                 $inDefinitionList = true;
+                $inList = false;
                 $result[] = $line;
 
                 continue;
             }
 
-            // Preserve indentation for list items
+            // Preserve indentation for list items and track list context
             if (preg_match('/^(\s*)([-*+]|\d+\.)\s/', $line, $m)) {
                 $result[] = $line;
                 $inDefinitionList = false;
+                $inList = true;
+
+                continue;
+            }
+
+            // Preserve indented attribute blocks after list items (li attributes)
+            if ($inList && preg_match('/^\s+\{[^{}]+\}\s*$/', $line)) {
+                $result[] = $line;
 
                 continue;
             }
@@ -576,16 +697,17 @@ class HtmlToDjot
                 continue;
             }
 
-            // Blank line (or whitespace-only line) ends definition list context
+            // Blank line (or whitespace-only line) ends definition list context but not list context
             if (trim($line) === '') {
                 $result[] = ''; // Normalize to empty string
 
                 continue;
             }
 
-            // Regular line - trim leading whitespace and reset definition list context
+            // Regular line - trim leading whitespace and reset contexts
             $result[] = ltrim($line);
             $inDefinitionList = false;
+            $inList = false;
         }
 
         $djot = implode("\n", $result);

@@ -280,7 +280,8 @@ HTML;
     public function testSpanWithClassAndId(): void
     {
         $result = $this->converter->convert('<span class="note" id="n1">text</span>');
-        $this->assertSame("[text]{.note #n1}\n", $result);
+        // id comes first, then class (consistent with getElementAttributes order)
+        $this->assertSame("[text]{#n1 .note}\n", $result);
     }
 
     // ==================== Figures ====================
@@ -503,5 +504,151 @@ HTML;
         $this->assertStringContainsString('<dt class="british">colour</dt>', $htmlBack);
         $this->assertStringContainsString('<dd class="primary">', $htmlBack);
         $this->assertStringContainsString('<dd class="secondary">', $htmlBack);
+    }
+
+    // ==================== Attribute Extraction ====================
+
+    public function testHeadingWithIdAndClass(): void
+    {
+        $result = $this->converter->convert('<h1 id="intro" class="title">Heading</h1>');
+        $this->assertStringContainsString('{#intro .title}', $result);
+        $this->assertStringContainsString('# Heading', $result);
+    }
+
+    public function testParagraphWithClass(): void
+    {
+        $result = $this->converter->convert('<p class="lead">Paragraph</p>');
+        $this->assertStringContainsString('{.lead}', $result);
+        $this->assertStringContainsString('Paragraph', $result);
+    }
+
+    public function testLinkWithAttributes(): void
+    {
+        $result = $this->converter->convert('<a href="https://example.com" class="btn" target="_blank">Link</a>');
+        $this->assertStringContainsString('[Link](https://example.com)', $result);
+        $this->assertStringContainsString('{.btn target=_blank}', $result);
+    }
+
+    public function testImageWithAttributes(): void
+    {
+        $result = $this->converter->convert('<img src="photo.jpg" alt="Photo" class="responsive" loading="lazy">');
+        $this->assertStringContainsString('![Photo](photo.jpg)', $result);
+        $this->assertStringContainsString('{.responsive loading=lazy}', $result);
+    }
+
+    public function testTableWithAttributes(): void
+    {
+        $html = <<<'HTML'
+<table class="table striped">
+    <tr class="header">
+        <th class="name">Name</th>
+        <th>Type</th>
+    </tr>
+    <tr>
+        <td data-sort="1">Value</td>
+        <td>Text</td>
+    </tr>
+</table>
+HTML;
+        $result = $this->converter->convert($html);
+
+        // Table-level attributes
+        $this->assertStringContainsString('{.table .striped}', $result);
+        // Row attributes
+        $this->assertStringContainsString('{.header}', $result);
+        // Cell attributes
+        $this->assertStringContainsString('{.name}', $result);
+        $this->assertStringContainsString('{data-sort=1}', $result);
+    }
+
+    public function testListWithAttributes(): void
+    {
+        $html = '<ul class="menu"><li class="active">Item 1</li><li>Item 2</li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('{.menu}', $result);
+        $this->assertStringContainsString('{.active}', $result);
+    }
+
+    public function testBlockquoteWithAttributes(): void
+    {
+        $result = $this->converter->convert('<blockquote class="quote" cite="source">Text</blockquote>');
+        $this->assertStringContainsString('{.quote cite=source}', $result);
+        $this->assertStringContainsString('> Text', $result);
+    }
+
+    public function testInlineFormattingWithAttributes(): void
+    {
+        $result = $this->converter->convert('<strong class="important">bold</strong>');
+        $this->assertStringContainsString('*bold*{.important}', $result);
+
+        $result = $this->converter->convert('<em class="note">italic</em>');
+        $this->assertStringContainsString('_italic_{.note}', $result);
+
+        $result = $this->converter->convert('<code class="lang-php">code</code>');
+        $this->assertStringContainsString('`code`{.lang-php}', $result);
+    }
+
+    public function testDataAttributesPreserved(): void
+    {
+        $result = $this->converter->convert('<p data-id="123" data-type="test">Content</p>');
+        $this->assertStringContainsString('data-id=123', $result);
+        $this->assertStringContainsString('data-type=test', $result);
+    }
+
+    public function testStyleAttributeSkipped(): void
+    {
+        $result = $this->converter->convert('<p style="color: red" class="note">Text</p>');
+        // style should be skipped, class should be preserved
+        $this->assertStringContainsString('{.note}', $result);
+        $this->assertStringNotContainsString('style', $result);
+    }
+
+    public function testAttributeValueQuoting(): void
+    {
+        $result = $this->converter->convert('<p data-msg="hello world">Text</p>');
+        // Values with spaces should be quoted
+        $this->assertStringContainsString('data-msg="hello world"', $result);
+    }
+
+    public function testBooleanAttributes(): void
+    {
+        $result = $this->converter->convert('<input type="text" disabled>');
+        // DOMDocument doesn't preserve empty tags well, but we test the concept
+        $result = $this->converter->convert('<a href="#" download>Link</a>');
+        $this->assertStringContainsString('download', $result);
+    }
+
+    public function testDefinitionListWithAttributes(): void
+    {
+        $html = '<dl class="glossary"><dt class="term">Term</dt><dd class="def">Definition</dd></dl>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('{.glossary}', $result);
+        $this->assertStringContainsString('{.term}', $result);
+        $this->assertStringContainsString('{.def}', $result);
+    }
+
+    public function testMultipleClassesPreserved(): void
+    {
+        $result = $this->converter->convert('<p class="one two three">Text</p>');
+        $this->assertStringContainsString('.one', $result);
+        $this->assertStringContainsString('.two', $result);
+        $this->assertStringContainsString('.three', $result);
+    }
+
+    public function testAttributeRoundtrip(): void
+    {
+        $html = '<h1 id="title" class="main">Title</h1><p class="intro">Intro text</p>';
+        $djot = $this->converter->convert($html);
+
+        // Convert back to HTML
+        $djotConverter = new DjotConverter();
+        $htmlBack = $djotConverter->convert($djot);
+
+        // Attributes should be preserved
+        $this->assertStringContainsString('id="title"', $htmlBack);
+        $this->assertStringContainsString('class="main"', $htmlBack);
+        $this->assertStringContainsString('class="intro"', $htmlBack);
     }
 }
