@@ -523,9 +523,9 @@ class HtmlToDjot
                 continue;
             }
 
-            // Blank line ends definition list context
+            // Blank line (or whitespace-only line) ends definition list context
             if (trim($line) === '') {
-                $result[] = $line;
+                $result[] = '';  // Normalize to empty string
 
                 continue;
             }
