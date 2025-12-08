@@ -461,9 +461,6 @@ class HtmlToDjot
 
     protected function cleanup(string $djot): string
     {
-        // Normalize multiple blank lines to max 2
-        $djot = preg_replace("/\n{3,}/", "\n\n", $djot) ?? $djot;
-
         // Remove leading whitespace from lines (except in code blocks)
         $lines = explode("\n", $djot);
         $inCodeBlock = false;
@@ -493,6 +490,9 @@ class HtmlToDjot
         }
 
         $djot = implode("\n", $result);
+
+        // Normalize multiple blank lines to max 2 (must run after line processing)
+        $djot = preg_replace("/\n{3,}/", "\n\n", $djot) ?? $djot;
 
         // Remove leading/trailing whitespace
         $djot = trim($djot);
