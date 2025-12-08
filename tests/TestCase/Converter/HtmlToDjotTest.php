@@ -234,8 +234,20 @@ HTML;
         $html = '<dl><dt>Term</dt><dd>Definition</dd></dl>';
         $result = $this->converter->convert($html);
 
-        $this->assertStringContainsString('Term', $result);
-        $this->assertStringContainsString(': Definition', $result);
+        // Djot format: `: term` for term, indented content for definition
+        $this->assertStringContainsString(': Term', $result);
+        $this->assertStringContainsString('  Definition', $result);
+    }
+
+    public function testDefinitionListMultipleTerms(): void
+    {
+        $html = '<dl><dt>color</dt><dt>colour</dt><dd>The visual property.</dd></dl>';
+        $result = $this->converter->convert($html);
+
+        // Multiple terms share one definition
+        $this->assertStringContainsString(': color', $result);
+        $this->assertStringContainsString(': colour', $result);
+        $this->assertStringContainsString('  The visual property.', $result);
     }
 
     // ==================== Spans with Attributes ====================
