@@ -322,6 +322,48 @@ This is expanded by default.
 
 ---
 
+### Fenced Comment Blocks
+
+**Related:** [jgm/djot#67](https://github.com/jgm/djot/issues/67)
+
+**Status:** Implemented in djot-php
+
+Standard `{% %}` comments cannot contain blank lines (they act as paragraph separators).
+Fenced comment blocks using `%%%` solve this:
+
+```djot
+%%%
+This comment can contain
+
+blank lines
+
+and multiple paragraphs.
+%%%
+```
+
+**Output:**
+```html
+<!-- nothing rendered -->
+```
+
+**Features:**
+- Uses `%%%` (3+ percent signs) as delimiters
+- Closing fence must have at least as many `%` as opening
+- Blank lines inside are preserved in the Comment node
+- Like code fences, use more `%` to include `%%%` inside
+
+```djot
+%%%%
+%%% this is not the end
+still inside
+%%%%
+```
+
+**Rationale:** The `%` character is already associated with comments in Djot (`{% %}`).
+This fenced syntax is consistent with code fences (`` ``` ``) and div fences (`:::`).
+
+---
+
 ### Multiple Definition Terms
 
 **Status:** Implemented in djot-php
@@ -397,6 +439,7 @@ vendor/bin/phpunit
 | List item attributes      | [#262](https://github.com/jgm/djot/pull/262)   | Open PR    |
 | Boolean attribute shorthand | [#257](https://github.com/jgm/djot/issues/257) | Open       |
 | Multiple definition terms | -                                              | djot-php   |
+| Fenced comment blocks     | [#67](https://github.com/jgm/djot/issues/67)   | Open       |
 
 ### Optional Modes
 
