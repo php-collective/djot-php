@@ -336,6 +336,36 @@ class Profile
     }
 
     /**
+     * Remove types from the inline deny list
+     *
+     * This allows customizing built-in profiles like article() to enable
+     * specific features that would otherwise be denied.
+     *
+     * @param list<string> $types
+     */
+    public function unDenyInline(array $types): self
+    {
+        $this->deniedInline = array_values(array_diff($this->deniedInline, $types));
+
+        return $this;
+    }
+
+    /**
+     * Remove types from the block deny list
+     *
+     * This allows customizing built-in profiles like article() to enable
+     * specific features that would otherwise be denied.
+     *
+     * @param list<string> $types
+     */
+    public function unDenyBlock(array $types): self
+    {
+        $this->deniedBlock = array_values(array_diff($this->deniedBlock, $types));
+
+        return $this;
+    }
+
+    /**
      * @return list<string>|null
      */
     public function getAllowedInline(): ?array

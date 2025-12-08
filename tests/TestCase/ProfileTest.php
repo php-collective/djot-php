@@ -637,6 +637,114 @@ DJOT;
         $this->assertContains(NodeType::HEADING, $denied);
     }
 
+    // ==================== UnDeny Methods Tests ====================
+
+    public function testUnDenyInlineRemovesFromDenyList(): void
+    {
+        $profile = Profile::article();
+
+        // Initially, raw_inline is denied
+        $this->assertContains(NodeType::RAW_INLINE, $profile->getDeniedInline());
+        $this->assertFalse($profile->isInlineAllowed(NodeType::RAW_INLINE));
+
+        // Remove from deny list
+        $profile->unDenyInline([NodeType::RAW_INLINE]);
+
+        // Now it should be allowed
+        $this->assertNotContains(NodeType::RAW_INLINE, $profile->getDeniedInline());
+        $this->assertTrue($profile->isInlineAllowed(NodeType::RAW_INLINE));
+    }
+
+    public function testUnDenyBlockRemovesFromDenyList(): void
+    {
+        $profile = Profile::article();
+
+        // Initially, raw_block is denied
+        $this->assertContains(NodeType::RAW_BLOCK, $profile->getDeniedBlock());
+        $this->assertFalse($profile->isBlockAllowed(NodeType::RAW_BLOCK));
+
+        // Remove from deny list
+        $profile->unDenyBlock([NodeType::RAW_BLOCK]);
+
+        // Now it should be allowed
+        $this->assertNotContains(NodeType::RAW_BLOCK, $profile->getDeniedBlock());
+        $this->assertTrue($profile->isBlockAllowed(NodeType::RAW_BLOCK));
+    }
+
+    public function testUnDenyWithMultipleTypes(): void
+    {
+        $profile = (new Profile())
+            ->denyInline([NodeType::RAW_INLINE, NodeType::LINK, NodeType::IMAGE]);
+
+        $this->assertCount(3, $profile->getDeniedInline());
+
+        // Remove two types
+        $profile->unDenyInline([NodeType::RAW_INLINE, NodeType::IMAGE]);
+
+        $denied = $profile->getDeniedInline();
+        $this->assertCount(1, $denied);
+        $this->assertContains(NodeType::LINK, $denied);
+        $this->assertNotContains(NodeType::RAW_INLINE, $denied);
+        $this->assertNotContains(NodeType::IMAGE, $denied);
+    }
+
+    public function testUnDenyWithNonExistentType(): void
+    {
+        $profile = Profile::article();
+        $originalDenied = $profile->getDeniedInline();
+
+        // Try to remove a type that isn't in the deny list
+        $profile->unDenyInline([NodeType::EMPHASIS]);
+
+        // Should be unchanged
+        $this->assertEquals($originalDenied, $profile->getDeniedInline());
+    }
+
+    public function testUnDenyPreservesIndexing(): void
+    {
+        $profile = (new Profile())
+            ->denyBlock([NodeType::HEADING, NodeType::RAW_BLOCK, NodeType::TABLE]);
+
+        // Remove middle item
+        $profile->unDenyBlock([NodeType::RAW_BLOCK]);
+
+        $denied = $profile->getDeniedBlock();
+
+        // Should be re-indexed (0, 1) not (0, 2)
+        $this->assertCount(2, $denied);
+        $this->assertEquals([NodeType::HEADING, NodeType::TABLE], $denied);
+    }
+
+    public function testArticleProfileWithRawHtmlEnabled(): void
+    {
+        $profile = Profile::article()
+            ->unDenyInline([NodeType::RAW_INLINE])
+            ->unDenyBlock([NodeType::RAW_BLOCK]);
+
+        $converter = new DjotConverter(profile: $profile);
+
+        // Raw HTML should now work
+        $html = $converter->convert('`<b>bold</b>`{=html}');
+        $this->assertStringContainsString('<b>bold</b>', $html);
+
+        // But all other article features should still be available
+        $this->assertTrue($profile->isBlockAllowed(NodeType::HEADING));
+        $this->assertTrue($profile->isBlockAllowed(NodeType::TABLE));
+        $this->assertTrue($profile->isInlineAllowed(NodeType::IMAGE));
+
+        $this->assertFalse($converter->hasProfileViolations());
+    }
+
+    public function testChainedUnDenyCalls(): void
+    {
+        $profile = Profile::article()
+            ->unDenyInline([NodeType::RAW_INLINE])
+            ->unDenyBlock([NodeType::RAW_BLOCK]);
+
+        $this->assertEmpty($profile->getDeniedInline());
+        $this->assertEmpty($profile->getDeniedBlock());
+    }
+
     public function testIsTypeAllowedWithUnknownType(): void
     {
         $profile = Profile::full();
