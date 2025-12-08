@@ -1,7 +1,8 @@
 # Attribute Support in djot-php
 
-This document details attribute support for all Djot elements in djot-php.
-We maintain **100% attribute coverage** across all supported node types.
+This document details attribute support for Djot elements in djot-php.
+
+**Status:** Block elements and sub-elements have full attribute support. Some inline elements (emphasis, strong, code spans, etc.) do not yet support trailing attributes.
 
 ---
 
@@ -41,22 +42,24 @@ All block-level elements receive attributes from a standalone `{...}` on the pre
 
 ### Attribute Placement Rule: **After the Element (Suffix)**
 
-All inline elements receive attributes immediately following the closing delimiter.
+Inline elements receive attributes immediately following the closing delimiter.
 
-| Element | Syntax | HTML Output |
-|---------|--------|-------------|
-| Emphasis | `_text_{.highlight}` | `<em class="highlight">` |
-| Strong | `*text*{.important}` | `<strong class="important">` |
-| Link | `[text](url){.external}` | `<a href="url" class="external">` |
-| Image | `![alt](src){.photo}` | `<img src="src" class="photo">` |
-| Code Span | `` `code`{.lang-js} `` | `<code class="lang-js">` |
-| Span | `[text]{.note}` | `<span class="note">` |
-| Superscript | `{^text^}{.ref}` | `<sup class="ref">` |
-| Subscript | `{~text~}{.chemical}` | `<sub class="chemical">` |
-| Insert | `{+text+}{.added}` | `<ins class="added">` |
-| Delete | `{-text-}{.removed}` | `<del class="removed">` |
-| Highlight | `{=text=}{.match}` | `<mark class="match">` |
-| Symbol | `:emoji:{.large}` | `<span class="symbol large">` |
+| Element | Syntax | HTML Output | Status |
+|---------|--------|-------------|--------|
+| Link | `[text](url){.external}` | `<a href="url" class="external">` | ✓ |
+| Image | `![alt](src){.photo}` | `<img src="src" class="photo">` | ✓ |
+| Span | `[text]{.note}` | `<span class="note">` | ✓ |
+| Emphasis | `_text_{.highlight}` | `<em class="highlight">` | No |
+| Strong | `*text*{.important}` | `<strong class="important">` | No |
+| Code Span | `` `code`{.lang-js} `` | `<code class="lang-js">` | No |
+| Superscript | `{^text^}{.ref}` | `<sup class="ref">` | No |
+| Subscript | `{~text~}{.chemical}` | `<sub class="chemical">` | No |
+| Insert | `{+text+}{.added}` | `<ins class="added">` | No |
+| Delete | `{-text-}{.removed}` | `<del class="removed">` | No |
+| Highlight | `{=text=}{.match}` | `<mark class="match">` | No |
+| Symbol | `:emoji:{.large}` | `<span class="symbol large">` | No |
+
+If needed, one can always wrap with a "span": `[...]{...}`.
 
 ---
 
@@ -206,19 +209,19 @@ The general rule follows Djot conventions:
 | Section | Yes | Inherited from heading | Auto-sections |
 | Footnote | Yes | Preceding line | Footnote defs |
 | **Inline Elements** ||||
-| Emphasis | Yes | Suffix | `_..._{}` |
-| Strong | Yes | Suffix | `*...*{}` |
 | Link | Yes | Suffix | `[](url){}` |
 | Image | Yes | Suffix | `![](url){}` |
-| CodeSpan | Yes | Suffix | `` `...`{} `` |
 | Span | Yes | Suffix | `[text]{}` |
-| Superscript | Yes | Suffix | `{^...^}{}` |
-| Subscript | Yes | Suffix | `{~...~}{}` |
-| Insert | Yes | Suffix | `{+...+}{}` |
-| Delete | Yes | Suffix | `{-...-}{}` |
-| Highlight | Yes | Suffix | `{=...=}{}` |
-| Symbol | Yes | Suffix | `:name:{}` |
-| FootnoteRef | Yes | Suffix | `[^ref]{}` |
+| Emphasis | No | Suffix | `_..._{}` |
+| Strong | No | Suffix | `*...*{}` |
+| CodeSpan | No | Suffix | `` `...`{} `` |
+| Superscript | No | Suffix | `{^...^}{}` |
+| Subscript | No | Suffix | `{~...~}{}` |
+| Insert | No | Suffix | `{+...+}{}` |
+| Delete | No | Suffix | `{-...-}{}` |
+| Highlight | No | Suffix | `{=...=}{}` |
+| Symbol | No | Suffix | `:name:{}` |
+| FootnoteRef | No | Suffix | `[^ref]{}` |
 | **Special** ||||
 | Comment | No | N/A | Not rendered |
 | RawBlock | Yes | Preceding line | Format-specific |
