@@ -1727,7 +1727,9 @@ class BlockParser
             }
 
             // Now collect definition content (after blank line, 2-space indent)
+            // When multiple terms share definitions, each paragraph block becomes a separate dd
             $defLines = [];
+            $multipleTerms = count($terms) > 1;
 
             // If term started with code fence, add it to definition content
             if ($codeFenceInfo !== null) {
@@ -1758,22 +1760,33 @@ class BlockParser
                 }
             }
 
-            // Create definition node
-            $def = new DefinitionDescription();
-            if ($defLines !== []) {
-                // Remove leading blank lines
-                while ($defLines !== [] && $defLines[0] === '') {
-                    array_shift($defLines);
+            // Create definition node(s)
+            if ($multipleTerms && $defLines !== []) {
+                // Split by blank lines - each block becomes a separate dd
+                $blocks = $this->splitByBlankLines($defLines);
+                foreach ($blocks as $block) {
+                    $def = new DefinitionDescription();
+                    $this->parseBlocks($def, $block, 0);
+                    $defList->appendChild($def);
                 }
-                // Remove trailing blank lines
-                $defLineCount = count($defLines);
-                while ($defLineCount > 0 && $defLines[$defLineCount - 1] === '') {
-                    array_pop($defLines);
-                    $defLineCount--;
+            } else {
+                // Single term: all content goes in one dd
+                $def = new DefinitionDescription();
+                if ($defLines !== []) {
+                    // Remove leading blank lines
+                    while ($defLines !== [] && $defLines[0] === '') {
+                        array_shift($defLines);
+                    }
+                    // Remove trailing blank lines
+                    $defLineCount = count($defLines);
+                    while ($defLineCount > 0 && $defLines[$defLineCount - 1] === '') {
+                        array_pop($defLines);
+                        $defLineCount--;
+                    }
+                    $this->parseBlocks($def, $defLines, 0);
                 }
-                $this->parseBlocks($def, $defLines, 0);
+                $defList->appendChild($def);
             }
-            $defList->appendChild($def);
         }
 
         if (count($defList->getChildren()) === 0) {
@@ -1784,6 +1797,42 @@ class BlockParser
         $parent->appendChild($defList);
 
         return $i - $start;
+    }
+
+    /**
+     * Split lines into blocks separated by blank lines
+     *
+     * @param array<string> $lines
+     *
+     * @return array<array<string>>
+     */
+    protected function splitByBlankLines(array $lines): array
+    {
+        $blocks = [];
+        $current = [];
+
+        // Remove leading blank lines
+        while ($lines !== [] && $lines[0] === '') {
+            array_shift($lines);
+        }
+
+        foreach ($lines as $line) {
+            if ($line === '') {
+                if ($current !== []) {
+                    $blocks[] = $current;
+                    $current = [];
+                }
+            } else {
+                $current[] = $line;
+            }
+        }
+
+        // Don't forget the last block
+        if ($current !== []) {
+            $blocks[] = $current;
+        }
+
+        return $blocks;
     }
 
     /**
