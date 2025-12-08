@@ -558,8 +558,10 @@ class BlockParser
             }
 
             // Try to match block elements in order of precedence
+            // Fenced comment must come before thematic break (%%% vs ---)
             // Comment and raw block must come before code block since ``` =format is a special case
-            $consumed = $this->tryParseComment($parent, $lines, $i)
+            $consumed = $this->tryParseFencedComment($parent, $lines, $i)
+                ?? $this->tryParseComment($parent, $lines, $i)
                 ?? $this->tryParseRawBlock($parent, $lines, $i)
                 ?? $this->tryParseCodeBlock($parent, $lines, $i)
                 ?? $this->tryParseDiv($parent, $lines, $i)
@@ -836,6 +838,63 @@ class BlockParser
         if (!$closed) {
             $this->addWarning('Unclosed comment', $start, 1, true);
         }
+
+        // Comments are stored but not rendered
+        $comment = new Comment(trim($content));
+        $parent->appendChild($comment);
+
+        return $i - $start;
+    }
+
+    /**
+     * Try to parse a fenced comment block %%% ... %%%
+     *
+     * This is an extension that allows multi-line comments with blank lines,
+     * which the standard {% %} syntax cannot handle.
+     *
+     * @param \Djot\Node\Node $parent
+     * @param array<string> $lines
+     * @param int $start
+     */
+    protected function tryParseFencedComment(Node $parent, array $lines, int $start): ?int
+    {
+        $line = $lines[$start];
+
+        $fenceInfo = $this->fencedBlockParser->parseFencedCommentOpener($line);
+        if ($fenceInfo === null) {
+            return null;
+        }
+
+        $fenceLength = $fenceInfo['length'];
+        $contentLines = [];
+        $i = $start + 1;
+        $count = count($lines);
+        $closed = false;
+
+        while ($i < $count) {
+            $currentLine = $lines[$i];
+
+            if ($this->fencedBlockParser->isFencedCommentCloser($currentLine, $fenceLength)) {
+                $closed = true;
+                $i++;
+
+                break;
+            }
+
+            $contentLines[] = $currentLine;
+            $i++;
+        }
+
+        if (!$closed) {
+            $this->addWarning('Unclosed fenced comment', $start, 1, true);
+        }
+
+        // Trim trailing empty lines but preserve internal blank lines
+        while ($contentLines && trim(end($contentLines)) === '') {
+            array_pop($contentLines);
+        }
+
+        $content = implode("\n", $contentLines);
 
         // Comments are stored but not rendered
         $comment = new Comment(trim($content));

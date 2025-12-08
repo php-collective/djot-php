@@ -410,6 +410,51 @@ More visible text
 <p>More visible text</p>
 ```
 
+### Fenced Comments (Extension)
+
+Standard `{% %}` comments cannot contain blank lines. For longer comments that need blank lines,
+use fenced comments with `%%%`:
+
+**Input:**
+```djot
+Visible text
+
+%%%
+This is a fenced comment block.
+
+It can contain blank lines.
+
+Multiple paragraphs of notes, TODOs,
+or documentation that won't render.
+%%%
+
+More visible text
+```
+
+**Output:**
+```html
+<p>Visible text</p>
+<p>More visible text</p>
+```
+
+Like code fences, you can use more than three `%` characters. The closing fence must have
+at least as many `%` as the opening fence:
+
+**Input:**
+```djot
+%%%%
+%%% This is not the end
+Still inside the comment
+%%%%
+```
+
+**Output:**
+```html
+```
+
+> **Note:** This is a djot-php extension, not part of the official Djot specification.
+> See [discussion](https://github.com/jgm/djot/issues/67) for background.
+
 ### Line Blocks
 
 Preserve line breaks using `|` at the start of each line. Useful for poetry or addresses.

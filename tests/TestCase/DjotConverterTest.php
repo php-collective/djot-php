@@ -575,6 +575,54 @@ DJOT;
         $this->assertStringNotContainsString('multiline', $result);
     }
 
+    public function testFencedComment(): void
+    {
+        $djot = "Before\n\n%%%\nThis is a fenced comment\n%%%\n\nAfter";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<p>Before</p>', $result);
+        $this->assertStringContainsString('<p>After</p>', $result);
+        $this->assertStringNotContainsString('fenced comment', $result);
+    }
+
+    public function testFencedCommentWithBlankLines(): void
+    {
+        $djot = "Before\n\n%%%\nComment line 1\n\nBlank line above\n\nComment line 3\n%%%\n\nAfter";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<p>Before</p>', $result);
+        $this->assertStringContainsString('<p>After</p>', $result);
+        $this->assertStringNotContainsString('Comment line', $result);
+        $this->assertStringNotContainsString('Blank line', $result);
+    }
+
+    public function testFencedCommentWithMorePercents(): void
+    {
+        // Can use more than 3 percent signs, and can contain shorter runs inside
+        $djot = "Before\n\n%%%%\n%% not closing\n%%% also not closing\n%%%%\n\nAfter";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<p>Before</p>', $result);
+        $this->assertStringContainsString('<p>After</p>', $result);
+        $this->assertStringNotContainsString('not closing', $result);
+    }
+
+    public function testFencedCommentClosingNeedsMatchingLength(): void
+    {
+        // Closing fence must have at least as many % as opening
+        $djot = "Before\n\n%%%%\ncomment\n%%%\nstill comment\n%%%%\n\nAfter";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<p>Before</p>', $result);
+        $this->assertStringContainsString('<p>After</p>', $result);
+        $this->assertStringNotContainsString('comment', $result);
+        $this->assertStringNotContainsString('still', $result);
+    }
+
     // Edge cases from official Djot test suite
 
     public function testEmphasisIntraword(): void
