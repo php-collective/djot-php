@@ -101,7 +101,7 @@ class MarkdownToDjot
             }
 
             // Add blank line before nested list content to enable nesting in Djot
-            if ($isList && $isNestedContent && $prevLineType === 'list') {
+            if ($isList && $isNestedContent) {
                 $result[] = '';
             }
 
@@ -118,9 +118,7 @@ class MarkdownToDjot
             }
 
             // Update prev line type
-            if ($isBlank) {
-                $prevLineType = 'blank';
-            } elseif ($isHeading) {
+            if ($isHeading) {
                 $prevLineType = 'heading';
             } elseif ($isList) {
                 $prevLineType = 'list';
