@@ -270,6 +270,51 @@ Works with all list types:
 
 ---
 
+### Table Row and Cell Attributes
+
+**Related:** [jgm/djot#250](https://github.com/jgm/djot/issues/250)
+
+**Status:** Implemented in djot-php (issue #18)
+
+Attributes can be added to table rows and cells:
+
+**Row attributes** (after final pipe):
+```djot
+| Name | Age |{.header-row}
+|------|-----|
+| John | 30  |{.highlight}
+```
+
+**Cell attributes** (after opening pipe):
+```djot
+|{.name} Name |{.age} Age |
+|-------------|-----------|
+|{.emphasis} John | 30 |
+```
+
+**Output:**
+```html
+<table>
+<tr class="header-row">
+<th class="name">Name</th>
+<th class="age">Age</th>
+</tr>
+<tr class="highlight">
+<td class="emphasis">John</td>
+<td>30</td>
+</tr>
+</table>
+```
+
+**Rules:**
+- Row attributes: `| cell | cell |{.class}` (after final pipe)
+- Cell attributes: `|{.class} content |` (after opening pipe)
+- Separator row attributes are ignored: `|---|---|{.ignored}`
+- Attributes preserved when rows are converted to headers
+- Works with alignment specifiers
+
+---
+
 ### Boolean Attribute Shorthand
 
 **Related:** [jgm/djot#257](https://github.com/jgm/djot/issues/257)
@@ -463,6 +508,7 @@ vendor/bin/phpunit
 | Feature                   | Upstream PR/Issue                              | Status     |
 |---------------------------|------------------------------------------------|------------|
 | List item attributes      | [#262](https://github.com/jgm/djot/pull/262)   | Open PR    |
+| Table row/cell attributes | [#250](https://github.com/jgm/djot/issues/250) | Open       |
 | Boolean attribute shorthand | [#257](https://github.com/jgm/djot/issues/257) | Open       |
 | Multiple definition terms | -                                              | djot-php   |
 | Fenced comment blocks     | [#67](https://github.com/jgm/djot/issues/67)   | Open       |
