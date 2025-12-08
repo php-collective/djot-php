@@ -218,13 +218,11 @@ class MarkdownToDjot
         // Convert ==highlight== to {=highlight=} (Djot highlight, GFM extension)
         $line = preg_replace('/==([^=]+)==/', '{=$1=}', $line) ?? $line;
 
-        // Convert ^superscript^ to {^superscript^} (some Markdown extensions)
-        // Only if not already in Djot format
-        $line = preg_replace('/(?<!\{)\^([^^]+)\^(?!\})/', '{^$1^}', $line) ?? $line;
+        // Convert ^superscript^ to ^superscript^ (already valid Djot, just ensure not double-wrapped)
+        // No conversion needed - bare form is valid Djot
 
-        // Convert ~subscript~ to {~subscript~} (some Markdown extensions)
-        // Only single tildes, not double (strikethrough)
-        $line = preg_replace('/(?<![~{])~([^~}]+)~(?![~}])/', '{~$1~}', $line) ?? $line;
+        // Convert ~subscript~ - already valid Djot bare form
+        // No conversion needed - bare form is valid Djot
 
         // Convert HTML tags to Djot equivalents (for round-trip support)
         // These run AFTER Markdown extension conversions to avoid double-processing
@@ -237,6 +235,9 @@ class MarkdownToDjot
 
         // <del>text</del> → {-text-} (alternative to ~~)
         $line = preg_replace('/<del>([^<]+)<\/del>/i', '{-$1-}', $line) ?? $line;
+
+        // <s>text</s> → {-text-} (HTML5 strikethrough)
+        $line = preg_replace('/<s>([^<]+)<\/s>/i', '{-$1-}', $line) ?? $line;
 
         // <sup>text</sup> → ^text^
         $line = preg_replace('/<sup>([^<]+)<\/sup>/i', '^$1^', $line) ?? $line;

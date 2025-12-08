@@ -58,16 +58,18 @@ class MarkdownToDjotTest extends TestCase
 
     public function testSuperscript(): void
     {
+        // ^text^ is already valid Djot, no conversion needed
         $markdown = 'E=mc^2^';
-        $expected = 'E=mc{^2^}';
+        $expected = 'E=mc^2^';
 
         $this->assertSame($expected, $this->converter->convert($markdown));
     }
 
     public function testSubscript(): void
     {
+        // ~text~ is already valid Djot, no conversion needed
         $markdown = 'H~2~O';
-        $expected = 'H{~2~}O';
+        $expected = 'H~2~O';
 
         $this->assertSame($expected, $this->converter->convert($markdown));
     }
@@ -250,6 +252,14 @@ class MarkdownToDjotTest extends TestCase
     {
         $html = 'This is <del>deleted</del> text';
         $expected = 'This is {-deleted-} text';
+
+        $this->assertSame($expected, $this->converter->convert($html));
+    }
+
+    public function testHtmlSToDelete(): void
+    {
+        $html = 'This is <s>strikethrough</s> text';
+        $expected = 'This is {-strikethrough-} text';
 
         $this->assertSame($expected, $this->converter->convert($html));
     }
