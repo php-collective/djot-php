@@ -422,6 +422,8 @@ class HtmlToDjot
                     foreach ($lines as $line) {
                         $output .= '  ' . $line . "\n";
                     }
+                    // Add blank line after dd for visual separation
+                    $output .= "\n";
                     $lastWasTerm = false;
                     $ddCount++;
                 }
