@@ -69,6 +69,27 @@ class HtmlToDjotTest extends TestCase
         $this->assertSame("*_bold italic_*\n", $result);
     }
 
+    public function testEmptyInlineTags(): void
+    {
+        // Empty tags should produce no output
+        $this->assertSame("\n", $this->converter->convert('<strong></strong>'));
+        $this->assertSame("\n", $this->converter->convert('<em></em>'));
+        $this->assertSame("\n", $this->converter->convert('<sup></sup>'));
+        $this->assertSame("\n", $this->converter->convert('<sub></sub>'));
+        $this->assertSame("\n", $this->converter->convert('<del></del>'));
+        $this->assertSame("\n", $this->converter->convert('<mark></mark>'));
+        $this->assertSame("\n", $this->converter->convert('<ins></ins>'));
+    }
+
+    public function testWhitespaceInInlineTags(): void
+    {
+        // Whitespace should be trimmed
+        $this->assertSame("E=mc^2^\n", $this->converter->convert('E=mc<sup> 2 </sup>'));
+        $this->assertSame("H~2~O\n", $this->converter->convert('H<sub> 2 </sub>O'));
+        $this->assertSame("*bold*\n", $this->converter->convert('<strong> bold </strong>'));
+        $this->assertSame("{-deleted-}\n", $this->converter->convert('<del> deleted </del>'));
+    }
+
     // ==================== Headings ====================
 
     public function testHeadings(): void
