@@ -568,6 +568,48 @@ DJOT;
         $this->assertSame(2, substr_count($result, '<dd>'));
     }
 
+    public function testDefinitionListDlAttribute(): void
+    {
+        $djot = "{.vocabulary}\n: Term\n\n  Definition";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dl class="vocabulary">', $result);
+        $this->assertStringContainsString('<dt>Term</dt>', $result);
+    }
+
+    public function testDefinitionListDtAttribute(): void
+    {
+        $djot = ": Term\n{.highlighted}\n\n  Definition";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dt class="highlighted">Term</dt>', $result);
+    }
+
+    public function testDefinitionListDdAttribute(): void
+    {
+        $djot = ": Term\n\n  {.note}\n  Definition content";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dd class="note">', $result);
+        $this->assertStringContainsString('Definition content', $result);
+    }
+
+    public function testDefinitionListAllAttributes(): void
+    {
+        $djot = "{.vocabulary}\n: color\n{.american}\n: colour\n{.british}\n\n  {.primary}\n  The visual property.\n\n  {.secondary}\n  Used in design.";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dl class="vocabulary">', $result);
+        $this->assertStringContainsString('<dt class="american">color</dt>', $result);
+        $this->assertStringContainsString('<dt class="british">colour</dt>', $result);
+        $this->assertStringContainsString('<dd class="primary">', $result);
+        $this->assertStringContainsString('<dd class="secondary">', $result);
+    }
+
     public function testComment(): void
     {
         $djot = "Before\n\n{% This is a comment %}\n\nAfter";

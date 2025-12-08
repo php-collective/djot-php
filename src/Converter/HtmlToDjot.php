@@ -400,6 +400,13 @@ class HtmlToDjot
     protected function processDefinitionList(DOMElement $node): string
     {
         $output = "\n";
+
+        // Output dl attributes before the list
+        $dlAttrs = $this->getElementAttributes($node);
+        if ($dlAttrs !== '') {
+            $output .= '{' . $dlAttrs . "}\n";
+        }
+
         $lastWasTerm = false;
         $ddCount = 0;
 
@@ -409,12 +416,22 @@ class HtmlToDjot
                 if ($tag === 'dt') {
                     // Term: `: term` format
                     $output .= ': ' . trim($this->processChildren($child)) . "\n";
+                    // Output dt attributes after term
+                    $dtAttrs = $this->getElementAttributes($child);
+                    if ($dtAttrs !== '') {
+                        $output .= '{' . $dtAttrs . "}\n";
+                    }
                     $lastWasTerm = true;
                     $ddCount = 0;
                 } elseif ($tag === 'dd') {
                     // Definition: indented content after blank line
                     if ($lastWasTerm || $ddCount > 0) {
                         $output .= "\n";
+                    }
+                    // Output dd attributes as first indented line
+                    $ddAttrs = $this->getElementAttributes($child);
+                    if ($ddAttrs !== '') {
+                        $output .= '  {' . $ddAttrs . "}\n";
                     }
                     $content = trim($this->processChildren($child));
                     // Indent definition content
@@ -431,6 +448,35 @@ class HtmlToDjot
         }
 
         return $output . "\n";
+    }
+
+    /**
+     * Get element attributes formatted as Djot attribute syntax
+     */
+    protected function getElementAttributes(DOMElement $node): string
+    {
+        $attrs = '';
+        $class = $node->getAttribute('class');
+        $id = $node->getAttribute('id');
+
+        if ($class !== '') {
+            $classes = explode(' ', $class);
+            foreach ($classes as $c) {
+                $attrs .= '.' . $c . ' ';
+            }
+        }
+        if ($id !== '') {
+            $attrs .= '#' . $id . ' ';
+        }
+
+        // Get other attributes (excluding class and id)
+        foreach ($node->attributes as $attr) {
+            if ($attr->name !== 'class' && $attr->name !== 'id') {
+                $attrs .= $attr->name . '="' . $attr->value . '" ';
+            }
+        }
+
+        return trim($attrs);
     }
 
     protected function processSpan(DOMElement $node): string
@@ -518,6 +564,13 @@ class HtmlToDjot
 
             // Preserve indentation for definition content (indented lines after `: term`)
             if ($inDefinitionList && preg_match('/^  /', $line)) {
+                $result[] = $line;
+
+                continue;
+            }
+
+            // Preserve standalone attribute blocks in definition lists (dt/dd attributes)
+            if ($inDefinitionList && preg_match('/^\{[^{}]+\}\s*$/', $line)) {
                 $result[] = $line;
 
                 continue;

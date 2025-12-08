@@ -1634,6 +1634,11 @@ class BlockParser
     protected function tryParseDjotDefinitionList(Node $parent, array $lines, int $start): ?int
     {
         $defList = new DefinitionList();
+
+        // Save pending attributes for the definition list before parsing children
+        $defListAttributes = $this->pendingAttributes;
+        $this->pendingAttributes = [];
+
         $i = $start;
         $count = count($lines);
 
@@ -1679,13 +1684,14 @@ class BlockParser
                 if ($termStartsWithCodeFence) {
                     // Code fence starts definition - create empty term and break
                     $codeFenceInfo = $termContent;
-                    $terms[] = [];
+                    $terms[] = ['lines' => [], 'attributes' => []];
                     $i++;
 
                     break;
                 }
 
                 $termLines = [$termContent];
+                $termAttributes = [];
                 $i++;
 
                 // Collect continuation lines for term (before blank line, single-space indent)
@@ -1703,7 +1709,16 @@ class BlockParser
                     }
                 }
 
-                $terms[] = $termLines;
+                // Check for term attributes on the next line (standalone attribute block)
+                if ($i < $count) {
+                    $potentialAttrLine = $lines[$i];
+                    if (preg_match('/^\{([^{}]+)\}\s*$/', $potentialAttrLine, $attrMatch)) {
+                        $termAttributes = AttributeParser::parse($attrMatch[1]);
+                        $i++;
+                    }
+                }
+
+                $terms[] = ['lines' => $termLines, 'attributes' => $termAttributes];
 
                 // Check if next non-blank line is another term or definition content
                 $peekIdx = $i;
@@ -1718,10 +1733,17 @@ class BlockParser
             }
 
             // Create term nodes
-            foreach ($terms as $termLines) {
+            foreach ($terms as $termData) {
                 $term = new DefinitionTerm();
+                $termLines = $termData['lines'];
                 if ($termLines !== []) {
                     $this->inlineParser->parse($term, implode("\n", $termLines), $start);
+                }
+                // Apply term attributes
+                if ($termData['attributes'] !== []) {
+                    foreach ($termData['attributes'] as $key => $value) {
+                        $term->setAttribute($key, $value);
+                    }
                 }
                 $defList->appendChild($term);
             }
@@ -1766,12 +1788,28 @@ class BlockParser
                 $blocks = $this->splitByBlankLines($defLines);
                 foreach ($blocks as $block) {
                     $def = new DefinitionDescription();
+                    $defAttributes = [];
+
+                    // Check if first line is a standalone attribute block for the dd
+                    if ($block !== [] && preg_match('/^\{([^{}]+)\}\s*$/', $block[0], $attrMatch)) {
+                        $defAttributes = AttributeParser::parse($attrMatch[1]);
+                        array_shift($block);
+                    }
+
                     $this->parseBlocks($def, $block, 0);
+
+                    // Apply definition attributes
+                    if ($defAttributes !== []) {
+                        foreach ($defAttributes as $key => $value) {
+                            $def->setAttribute($key, $value);
+                        }
+                    }
                     $defList->appendChild($def);
                 }
             } else {
                 // Single term: all content goes in one dd
                 $def = new DefinitionDescription();
+                $defAttributes = [];
                 if ($defLines !== []) {
                     // Remove leading blank lines
                     while ($defLines !== [] && $defLines[0] === '') {
@@ -1783,7 +1821,24 @@ class BlockParser
                         array_pop($defLines);
                         $defLineCount--;
                     }
+
+                    // Check if first line is a standalone attribute block for the dd
+                    if ($defLines !== [] && preg_match('/^\{([^{}]+)\}\s*$/', $defLines[0], $attrMatch)) {
+                        $defAttributes = AttributeParser::parse($attrMatch[1]);
+                        array_shift($defLines);
+                        // Remove any blank lines after the attribute
+                        while ($defLines !== [] && $defLines[0] === '') {
+                            array_shift($defLines);
+                        }
+                    }
+
                     $this->parseBlocks($def, $defLines, 0);
+                }
+                // Apply definition attributes
+                if ($defAttributes !== []) {
+                    foreach ($defAttributes as $key => $value) {
+                        $def->setAttribute($key, $value);
+                    }
                 }
                 $defList->appendChild($def);
             }
@@ -1793,7 +1848,10 @@ class BlockParser
             return null;
         }
 
-        $this->applyPendingAttributes($defList);
+        // Apply the saved attributes to the definition list
+        if ($defListAttributes !== []) {
+            $defList->setAttributes($defListAttributes);
+        }
         $parent->appendChild($defList);
 
         return $i - $start;
