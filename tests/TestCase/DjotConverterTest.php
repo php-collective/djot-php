@@ -589,7 +589,8 @@ DJOT;
 
     public function testDefinitionListDdAttribute(): void
     {
-        $djot = ": Term\n\n  {.note}\n  Definition content";
+        // DD attribute comes AFTER content (consistent with list items)
+        $djot = ": Term\n\n  Definition content\n  {.note}";
 
         $result = $this->converter->convert($djot);
 
@@ -599,7 +600,8 @@ DJOT;
 
     public function testDefinitionListAllAttributes(): void
     {
-        $djot = "{.vocabulary}\n: color\n{.american}\n: colour\n{.british}\n\n  {.primary}\n  The visual property.\n\n  {.secondary}\n  Used in design.";
+        // DD attributes come AFTER content (consistent with list items)
+        $djot = "{.vocabulary}\n: color\n{.american}\n: colour\n{.british}\n\n  The visual property.\n  {.primary}\n\n  Used in design.\n  {.secondary}";
 
         $result = $this->converter->convert($djot);
 

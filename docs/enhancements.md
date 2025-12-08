@@ -492,11 +492,11 @@ Attributes can be attached to individual `<dl>`, `<dt>`, and `<dd>` elements:
 : colour
 {.british}
 
-  {.primary}
   The visual property of objects.
+  {.primary}
 
-  {.secondary}
   Used in art and design.
+  {.secondary}
 ```
 
 **Output:**
@@ -516,7 +516,7 @@ Attributes can be attached to individual `<dl>`, `<dt>`, and `<dd>` elements:
 **Syntax:**
 - `{...}` before first term → applies to `<dl>`
 - `{...}` on line after term → applies to that `<dt>`
-- `{...}` as first line in definition block → applies to that `<dd>`
+- `{...}` as last line in definition block → applies to that `<dd>` (consistent with list items)
 
 ---
 

@@ -428,16 +428,16 @@ class HtmlToDjot
                     if ($lastWasTerm || $ddCount > 0) {
                         $output .= "\n";
                     }
-                    // Output dd attributes as first indented line
-                    $ddAttrs = $this->getElementAttributes($child);
-                    if ($ddAttrs !== '') {
-                        $output .= '  {' . $ddAttrs . "}\n";
-                    }
                     $content = trim($this->processChildren($child));
                     // Indent definition content
                     $lines = explode("\n", $content);
                     foreach ($lines as $line) {
                         $output .= '  ' . $line . "\n";
+                    }
+                    // Output dd attributes as last indented line (after content)
+                    $ddAttrs = $this->getElementAttributes($child);
+                    if ($ddAttrs !== '') {
+                        $output .= '  {' . $ddAttrs . "}\n";
                     }
                     // Add blank line after dd for visual separation
                     $output .= "\n";

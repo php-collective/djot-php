@@ -1790,10 +1790,11 @@ class BlockParser
                     $def = new DefinitionDescription();
                     $defAttributes = [];
 
-                    // Check if first line is a standalone attribute block for the dd
-                    if ($block !== [] && preg_match('/^\{([^{}]+)\}\s*$/', $block[0], $attrMatch)) {
+                    // Check if last line is a standalone attribute block for the dd
+                    $blockCount = count($block);
+                    if ($blockCount > 0 && preg_match('/^\{([^{}]+)\}\s*$/', $block[$blockCount - 1], $attrMatch)) {
                         $defAttributes = AttributeParser::parse($attrMatch[1]);
-                        array_shift($block);
+                        array_pop($block);
                     }
 
                     $this->parseBlocks($def, $block, 0);
@@ -1815,20 +1816,21 @@ class BlockParser
                     while ($defLines !== [] && $defLines[0] === '') {
                         array_shift($defLines);
                     }
-                    // Remove trailing blank lines
+                    // Remove trailing blank lines (but preserve potential attribute line)
                     $defLineCount = count($defLines);
-                    while ($defLineCount > 0 && $defLines[$defLineCount - 1] === '') {
+                    while ($defLineCount > 1 && $defLines[$defLineCount - 1] === '') {
                         array_pop($defLines);
                         $defLineCount--;
                     }
 
-                    // Check if first line is a standalone attribute block for the dd
-                    if ($defLines !== [] && preg_match('/^\{([^{}]+)\}\s*$/', $defLines[0], $attrMatch)) {
+                    // Check if last line is a standalone attribute block for the dd
+                    $defLineCount = count($defLines);
+                    if ($defLineCount > 0 && preg_match('/^\{([^{}]+)\}\s*$/', $defLines[$defLineCount - 1], $attrMatch)) {
                         $defAttributes = AttributeParser::parse($attrMatch[1]);
-                        array_shift($defLines);
-                        // Remove any blank lines after the attribute
-                        while ($defLines !== [] && $defLines[0] === '') {
-                            array_shift($defLines);
+                        array_pop($defLines);
+                        // Remove any trailing blank lines before the attribute
+                        while ($defLines !== [] && $defLines[count($defLines) - 1] === '') {
+                            array_pop($defLines);
                         }
                     }
 
