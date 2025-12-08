@@ -6,12 +6,14 @@ namespace Djot\Renderer;
 
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\BlockQuote;
+use Djot\Node\Block\Caption;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Comment;
 use Djot\Node\Block\DefinitionDescription;
 use Djot\Node\Block\DefinitionList;
 use Djot\Node\Block\DefinitionTerm;
 use Djot\Node\Block\Div;
+use Djot\Node\Block\Figure;
 use Djot\Node\Block\Footnote;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\LineBlock;
@@ -389,6 +391,8 @@ class HtmlRenderer implements RendererInterface
             $node instanceof ListItem => $this->renderListItem($node),
             $node instanceof ThematicBreak => $this->renderThematicBreak($node),
             $node instanceof Div => $this->renderDiv($node),
+            $node instanceof Figure => $this->renderFigure($node),
+            $node instanceof Caption => $this->renderCaption($node),
             $node instanceof Table => $this->renderTable($node),
             $node instanceof TableRow => $this->renderTableRow($node),
             $node instanceof TableCell => $this->renderTableCell($node),
@@ -579,20 +583,45 @@ class HtmlRenderer implements RendererInterface
         return '<div class="line-block"' . $attrs . ">\n" . $this->renderChildren($node) . "</div>\n";
     }
 
+    protected function renderFigure(Figure $node): string
+    {
+        $attrs = $this->renderAttributes($node);
+        $html = '<figure' . $attrs . ">\n";
+
+        foreach ($node->getChildren() as $child) {
+            if ($child instanceof Caption) {
+                // Caption becomes figcaption
+                $html .= '<figcaption>' . rtrim($this->renderChildren($child)) . "</figcaption>\n";
+            } elseif ($child instanceof Image) {
+                // Image rendered directly (not wrapped in p)
+                $html .= $this->renderImage($child);
+            } else {
+                // Other content (blockquote, etc.)
+                $html .= $this->renderNode($child);
+            }
+        }
+
+        return $html . "</figure>\n";
+    }
+
+    protected function renderCaption(Caption $node): string
+    {
+        // Caption is usually rendered as part of figure or table
+        // This is a fallback if caption appears standalone
+        return '<figcaption>' . rtrim($this->renderChildren($node)) . "</figcaption>\n";
+    }
+
     protected function renderTable(Table $node): string
     {
         $attrs = $this->renderAttributes($node);
         $html = '<table' . $attrs . ">\n";
 
-        // Render caption if present (with parsed inline content)
-        if ($node->hasCaptionChildren()) {
-            $captionHtml = '';
-            foreach ($node->getCaptionChildren() as $child) {
-                $captionHtml .= $this->renderNode($child);
-            }
-            // Remove trailing newline from last text node
-            $captionHtml = rtrim($captionHtml);
-            $html .= '<caption>' . $captionHtml . "</caption>\n";
+        // Render caption if present
+        if ($node->hasCaption()) {
+            /** @var \Djot\Node\Block\Caption $caption */
+            $caption = $node->getCaption();
+            $captionHtml = $this->renderChildren($caption);
+            $html .= '<caption>' . rtrim($captionHtml) . "</caption>\n";
         }
 
         // djot tables don't use thead/tbody - just rows with th or td cells

@@ -123,6 +123,26 @@ Nested block quotes:
 </blockquote>
 ```
 
+#### Block Quote Captions
+
+Use `^` after a block quote to add an attribution/caption. The block quote will be wrapped in a `<figure>` element with a `<figcaption>`.
+
+**Input:**
+```djot
+> To be or not to be, that is the question.
+^ William Shakespeare
+```
+
+**Output:**
+```html
+<figure>
+<blockquote>
+<p>To be or not to be, that is the question.</p>
+</blockquote>
+<figcaption>William Shakespeare</figcaption>
+</figure>
+```
+
 ### Lists
 
 #### Bullet Lists
@@ -626,6 +646,23 @@ Link-level attributes can override or extend definition attributes:
 ```html
 <p><img src="image.png" alt="Alt text"></p>
 <p><img src="image.png" alt="Alt text" title="Title"></p>
+```
+
+#### Image Captions
+
+Use `^` after an image to add a caption. The image will be wrapped in a `<figure>` element with a `<figcaption>`.
+
+**Input:**
+```djot
+![Sunset over the ocean](sunset.jpg)
+^ A beautiful sunset captured at the beach
+```
+
+**Output:**
+```html
+<figure>
+<img src="sunset.jpg" alt="Sunset over the ocean"><figcaption>A beautiful sunset captured at the beach</figcaption>
+</figure>
 ```
 
 ### Superscript and Subscript

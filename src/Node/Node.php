@@ -157,6 +157,11 @@ abstract class Node
         return isset($this->attributes[$key]);
     }
 
+    public function removeAttribute(string $key): void
+    {
+        unset($this->attributes[$key]);
+    }
+
     /**
      * Add a CSS class to the node
      */

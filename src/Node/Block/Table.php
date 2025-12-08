@@ -4,50 +4,30 @@ declare(strict_types=1);
 
 namespace Djot\Node\Block;
 
-use Djot\Node\Node;
-
 /**
  * Table container
  */
 class Table extends BlockNode
 {
-    protected ?string $caption = null;
-
-    /**
-     * @var array<\Djot\Node\Node>
-     */
-    protected array $captionChildren = [];
+    protected ?Caption $caption = null;
 
     public function getType(): string
     {
         return 'table';
     }
 
-    public function setCaption(string $caption): void
+    public function setCaption(Caption $caption): void
     {
         $this->caption = $caption;
     }
 
-    public function getCaption(): ?string
+    public function getCaption(): ?Caption
     {
         return $this->caption;
     }
 
-    public function addCaptionChild(Node $node): void
+    public function hasCaption(): bool
     {
-        $this->captionChildren[] = $node;
-    }
-
-    /**
-     * @return array<\Djot\Node\Node>
-     */
-    public function getCaptionChildren(): array
-    {
-        return $this->captionChildren;
-    }
-
-    public function hasCaptionChildren(): bool
-    {
-        return !empty($this->captionChildren);
+        return $this->caption !== null;
     }
 }
