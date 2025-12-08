@@ -513,6 +513,24 @@ class MarkdownToDjotTest extends TestCase
         $this->assertSame($expected, $this->converter->convert($markdown));
     }
 
+    public function testBlockquoteFollowedByList(): void
+    {
+        // Blank line required between blockquote and list
+        $markdown = "> Quote\n- List item";
+        $expected = "> Quote\n\n- List item";
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testListFollowedByBlockquote(): void
+    {
+        // Blank line required between list and blockquote
+        $markdown = "- List item\n> Quote";
+        $expected = "- List item\n\n> Quote";
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
     public function testExcessiveBlankLinesNormalized(): void
     {
         // Multiple blank lines should be normalized to max 2

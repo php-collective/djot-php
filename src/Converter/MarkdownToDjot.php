@@ -90,13 +90,13 @@ class MarkdownToDjot
                 $result[] = '';
             }
 
-            // Add blank line before blockquote if previous was regular text
-            if ($isBlockquote && $prevLineType === 'text') {
+            // Add blank line before blockquote if previous was non-blank content
+            if ($isBlockquote && $prevLineType !== 'blank' && $prevLineType !== 'blockquote') {
                 $result[] = '';
             }
 
-            // Add blank line before top-level list if previous was regular text
-            if ($isList && $currentIndent === 0 && $prevLineType === 'text') {
+            // Add blank line before top-level list if previous was non-blank, non-list content
+            if ($isList && $currentIndent === 0 && $prevLineType !== 'blank' && $prevLineType !== 'list') {
                 $result[] = '';
             }
 

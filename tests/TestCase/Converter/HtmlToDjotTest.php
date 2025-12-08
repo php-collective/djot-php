@@ -315,6 +315,16 @@ HTML;
         $this->assertSame("Multiple spaces and newlines\n", $result);
     }
 
+    public function testExcessiveBlankLinesNormalized(): void
+    {
+        // Multiple block elements should not create more than 2 consecutive newlines
+        $html = '<h1>Title</h1><p>Text</p><hr><h2>Section</h2>';
+        $result = $this->converter->convert($html);
+
+        // Should never have more than 2 consecutive newlines
+        $this->assertDoesNotMatchRegularExpression('/\n{3,}/', $result);
+    }
+
     // ==================== Blank Line Handling for Valid Djot ====================
 
     public function testNestedListWithBlankLine(): void
