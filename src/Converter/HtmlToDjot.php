@@ -400,14 +400,27 @@ class HtmlToDjot
     protected function processDefinitionList(DOMElement $node): string
     {
         $output = "\n";
+        $lastWasTerm = false;
 
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement) {
                 $tag = strtolower($child->tagName);
                 if ($tag === 'dt') {
-                    $output .= trim($this->processChildren($child)) . "\n";
-                } elseif ($tag === 'dd') {
+                    // Term: `: term` format
                     $output .= ': ' . trim($this->processChildren($child)) . "\n";
+                    $lastWasTerm = true;
+                } elseif ($tag === 'dd') {
+                    // Definition: indented content after blank line
+                    if ($lastWasTerm) {
+                        $output .= "\n";
+                    }
+                    $content = trim($this->processChildren($child));
+                    // Indent definition content
+                    $lines = explode("\n", $content);
+                    foreach ($lines as $line) {
+                        $output .= '  ' . $line . "\n";
+                    }
+                    $lastWasTerm = false;
                 }
             }
         }
@@ -461,9 +474,10 @@ class HtmlToDjot
 
     protected function cleanup(string $djot): string
     {
-        // Remove leading whitespace from lines (except in code blocks)
+        // Remove leading whitespace from lines (except in code blocks and indented content)
         $lines = explode("\n", $djot);
         $inCodeBlock = false;
+        $inDefinitionList = false;
         $result = [];
 
         foreach ($lines as $line) {
@@ -477,16 +491,43 @@ class HtmlToDjot
 
             if ($inCodeBlock) {
                 $result[] = $line;
-            } else {
-                // Preserve indentation for list items, trim other leading whitespace
-                if (preg_match('/^(\s*)([-*+]|\d+\.)\s/', $line, $m)) {
-                    // It's a list item - preserve indentation
-                    $result[] = $line;
-                } else {
-                    // Regular line - trim leading whitespace
-                    $result[] = ltrim($line);
-                }
+
+                continue;
             }
+
+            // Track definition lists (`: term` starts one)
+            if (preg_match('/^: /', $line)) {
+                $inDefinitionList = true;
+                $result[] = $line;
+
+                continue;
+            }
+
+            // Preserve indentation for list items
+            if (preg_match('/^(\s*)([-*+]|\d+\.)\s/', $line, $m)) {
+                $result[] = $line;
+                $inDefinitionList = false;
+
+                continue;
+            }
+
+            // Preserve indentation for definition content (indented lines after `: term`)
+            if ($inDefinitionList && preg_match('/^  /', $line)) {
+                $result[] = $line;
+
+                continue;
+            }
+
+            // Blank line ends definition list context
+            if (trim($line) === '') {
+                $result[] = $line;
+
+                continue;
+            }
+
+            // Regular line - trim leading whitespace and reset definition list context
+            $result[] = ltrim($line);
+            $inDefinitionList = false;
         }
 
         $djot = implode("\n", $result);
