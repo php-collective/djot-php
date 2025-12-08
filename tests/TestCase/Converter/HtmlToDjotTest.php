@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Converter;
 
 use Djot\Converter\HtmlToDjot;
+use Djot\DjotConverter;
 use PHPUnit\Framework\TestCase;
 
 class HtmlToDjotTest extends TestCase
@@ -250,6 +251,18 @@ HTML;
         $this->assertStringContainsString('  The visual property.', $result);
     }
 
+    public function testDefinitionListMultipleDefinitions(): void
+    {
+        // Multiple dd elements under multiple terms become separate indented paragraphs
+        $html = '<dl><dt>color</dt><dt>colour</dt><dd>The visual property.</dd><dd>Used in design.</dd></dl>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString(': color', $result);
+        $this->assertStringContainsString(': colour', $result);
+        // Each dd becomes a separate indented block separated by blank line
+        $this->assertStringContainsString("  The visual property.\n\n  Used in design.", $result);
+    }
+
     // ==================== Spans with Attributes ====================
 
     public function testSpanWithClass(): void
@@ -455,5 +468,22 @@ HTML;
 
         // Content lines should not have leading whitespace (except list indentation)
         $this->assertStringNotContainsString("\n Introduction", $result);
+    }
+
+    public function testDefinitionListMultipleDdRoundtrip(): void
+    {
+        // Test that multiple dd elements roundtrip correctly
+        $html = '<dl><dt>color</dt><dt>colour</dt><dd><p>The visual property.</p></dd><dd><p>Used in design.</p></dd></dl>';
+        $djot = $this->converter->convert($html);
+
+        // Convert back to HTML
+        $djotConverter = new DjotConverter();
+        $htmlBack = $djotConverter->convert($djot);
+
+        // Should have 2 dt and 2 dd
+        $this->assertSame(2, substr_count($htmlBack, '<dt>'));
+        $this->assertSame(2, substr_count($htmlBack, '<dd>'));
+        $this->assertStringContainsString('The visual property.', $htmlBack);
+        $this->assertStringContainsString('Used in design.', $htmlBack);
     }
 }

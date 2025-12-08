@@ -368,7 +368,7 @@ This fenced syntax is consistent with code fences (`` ``` ``) and div fences (`:
 
 **Status:** Implemented in djot-php
 
-Multiple terms can share a single definition in definition lists:
+Multiple terms can share definitions in definition lists:
 
 ```djot
 : CLI
@@ -398,10 +398,36 @@ Multiple terms can share a single definition in definition lists:
 </dl>
 ```
 
+**Multiple definitions:** When multiple terms share definitions, each indented paragraph block (separated by blank lines) becomes a separate `<dd>`:
+
+```djot
+: color
+: colour
+
+  The visual property of objects.
+
+  Used in art and design.
+```
+
+**Output:**
+```html
+<dl>
+<dt>color</dt>
+<dt>colour</dt>
+<dd>
+<p>The visual property of objects.</p>
+</dd>
+<dd>
+<p>Used in art and design.</p>
+</dd>
+</dl>
+```
+
 **Rules:**
 - Consecutive `: term` lines are grouped as multiple terms
 - Blank lines between terms are allowed
 - Definition follows after blank line with indentation
+- Each paragraph block becomes a separate `<dd>` element
 - Common in dictionaries for synonyms, abbreviations, and alternate spellings
 
 ---

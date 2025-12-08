@@ -553,6 +553,21 @@ DJOT;
         $this->assertSame(1, substr_count($result, '<dd>'));
     }
 
+    public function testDefinitionListMultipleTermsMultipleDefinitions(): void
+    {
+        // When multiple terms share definitions, each paragraph block becomes a separate dd
+        $djot = ": color\n: colour\n\n  The visual property of objects.\n\n  Used in art and design.";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dt>color</dt>', $result);
+        $this->assertStringContainsString('<dt>colour</dt>', $result);
+        $this->assertStringContainsString('The visual property', $result);
+        $this->assertStringContainsString('Used in art and design', $result);
+        // Multiple terms with blank-line-separated paragraphs = multiple dd elements
+        $this->assertSame(2, substr_count($result, '<dd>'));
+    }
+
     public function testComment(): void
     {
         $djot = "Before\n\n{% This is a comment %}\n\nAfter";

@@ -401,6 +401,7 @@ class HtmlToDjot
     {
         $output = "\n";
         $lastWasTerm = false;
+        $ddCount = 0;
 
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement) {
@@ -409,9 +410,10 @@ class HtmlToDjot
                     // Term: `: term` format
                     $output .= ': ' . trim($this->processChildren($child)) . "\n";
                     $lastWasTerm = true;
+                    $ddCount = 0;
                 } elseif ($tag === 'dd') {
                     // Definition: indented content after blank line
-                    if ($lastWasTerm) {
+                    if ($lastWasTerm || $ddCount > 0) {
                         $output .= "\n";
                     }
                     $content = trim($this->processChildren($child));
@@ -421,6 +423,7 @@ class HtmlToDjot
                         $output .= '  ' . $line . "\n";
                     }
                     $lastWasTerm = false;
+                    $ddCount++;
                 }
             }
         }
