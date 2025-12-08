@@ -43,20 +43,20 @@ All block-level elements receive attributes from a standalone `{...}` on the pre
 
 All inline elements receive attributes immediately following the closing delimiter.
 
-| Element | Syntax | HTML Output |
-|---------|--------|-------------|
-| Emphasis | `_text_{.highlight}` | `<em class="highlight">` |
-| Strong | `*text*{.important}` | `<strong class="important">` |
-| Link | `[text](url){.external}` | `<a href="url" class="external">` |
-| Image | `![alt](src){.photo}` | `<img src="src" class="photo">` |
-| Code Span | `` `code`{.lang-js} `` | `<code class="lang-js">` |
-| Span | `[text]{.note}` | `<span class="note">` |
-| Superscript | `{^text^}{.ref}` | `<sup class="ref">` |
-| Subscript | `{~text~}{.chemical}` | `<sub class="chemical">` |
-| Insert | `{+text+}{.added}` | `<ins class="added">` |
-| Delete | `{-text-}{.removed}` | `<del class="removed">` |
-| Highlight | `{=text=}{.match}` | `<mark class="match">` |
-| Symbol | `:emoji:{.large}` | `<span class="symbol large">` |
+| Element | Syntax | HTML Output | Status |
+|---------|--------|-------------|--------|
+| Link | `[text](url){.external}` | `<a href="url" class="external">` | ✓ |
+| Image | `![alt](src){.photo}` | `<img src="src" class="photo">` | ✓ |
+| Span | `[text]{.note}` | `<span class="note">` | ✓ |
+| Emphasis | `_text_{.highlight}` | `<em class="highlight">` | Not yet |
+| Strong | `*text*{.important}` | `<strong class="important">` | Not yet |
+| Code Span | `` `code`{.lang-js} `` | `<code class="lang-js">` | Not yet |
+| Superscript | `{^text^}{.ref}` | `<sup class="ref">` | Not yet |
+| Subscript | `{~text~}{.chemical}` | `<sub class="chemical">` | Not yet |
+| Insert | `{+text+}{.added}` | `<ins class="added">` | Not yet |
+| Delete | `{-text-}{.removed}` | `<del class="removed">` | Not yet |
+| Highlight | `{=text=}{.match}` | `<mark class="match">` | Not yet |
+| Symbol | `:emoji:{.large}` | `<span class="symbol large">` | Not yet |
 
 ---
 
@@ -206,19 +206,19 @@ The general rule follows Djot conventions:
 | Section | Yes | Inherited from heading | Auto-sections |
 | Footnote | Yes | Preceding line | Footnote defs |
 | **Inline Elements** ||||
-| Emphasis | Yes | Suffix | `_..._{}` |
-| Strong | Yes | Suffix | `*...*{}` |
 | Link | Yes | Suffix | `[](url){}` |
 | Image | Yes | Suffix | `![](url){}` |
-| CodeSpan | Yes | Suffix | `` `...`{} `` |
 | Span | Yes | Suffix | `[text]{}` |
-| Superscript | Yes | Suffix | `{^...^}{}` |
-| Subscript | Yes | Suffix | `{~...~}{}` |
-| Insert | Yes | Suffix | `{+...+}{}` |
-| Delete | Yes | Suffix | `{-...-}{}` |
-| Highlight | Yes | Suffix | `{=...=}{}` |
-| Symbol | Yes | Suffix | `:name:{}` |
-| FootnoteRef | Yes | Suffix | `[^ref]{}` |
+| Emphasis | Not yet | Suffix | `_..._{}` |
+| Strong | Not yet | Suffix | `*...*{}` |
+| CodeSpan | Not yet | Suffix | `` `...`{} `` |
+| Superscript | Not yet | Suffix | `{^...^}{}` |
+| Subscript | Not yet | Suffix | `{~...~}{}` |
+| Insert | Not yet | Suffix | `{+...+}{}` |
+| Delete | Not yet | Suffix | `{-...-}{}` |
+| Highlight | Not yet | Suffix | `{=...=}{}` |
+| Symbol | Not yet | Suffix | `:name:{}` |
+| FootnoteRef | Not yet | Suffix | `[^ref]{}` |
 | **Special** ||||
 | Comment | No | N/A | Not rendered |
 | RawBlock | Yes | Preceding line | Format-specific |
