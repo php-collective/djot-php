@@ -155,6 +155,55 @@ class BlockParserTest extends TestCase
         $this->assertInstanceOf(DefinitionList::class, $doc->getChildren()[0]);
     }
 
+    public function testParseDefinitionListDdAttributeAfterContent(): void
+    {
+        // DD attribute must come AFTER content (consistent with list items)
+        $djot = ": Term\n\n  Definition content\n  {.highlight}";
+        $doc = $this->parser->parse($djot);
+
+        $this->assertCount(1, $doc->getChildren());
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        // Get the definition_description (dd)
+        $children = $dl->getChildren();
+        $dd = null;
+        foreach ($children as $child) {
+            if ($child->getType() === 'definition_description') {
+                $dd = $child;
+
+                break;
+            }
+        }
+        $this->assertNotNull($dd);
+        $this->assertSame('highlight', $dd->getAttribute('class'));
+    }
+
+    public function testParseDefinitionListDdAttributeBeforeContentNotParsed(): void
+    {
+        // Attribute BEFORE content should NOT be parsed as dd attribute
+        // (this is the old syntax that we've changed)
+        $djot = ": Term\n\n  {.highlight}\n  Definition content";
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        // Get the definition_description (dd)
+        $children = $dl->getChildren();
+        $dd = null;
+        foreach ($children as $child) {
+            if ($child->getType() === 'definition_description') {
+                $dd = $child;
+
+                break;
+            }
+        }
+        $this->assertNotNull($dd);
+        // The attribute should NOT be on the dd - it's just content now
+        $this->assertNull($dd->getAttribute('class'));
+    }
+
     public function testParseThematicBreak(): void
     {
         $doc = $this->parser->parse('---');

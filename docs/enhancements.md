@@ -477,6 +477,49 @@ Multiple terms can share definitions in definition lists:
 
 ---
 
+### Definition List Element Attributes
+
+**Related:** [jgm/djot#323](https://github.com/jgm/djot/issues/323)
+
+**Status:** Implemented in djot-php
+
+Attributes can be attached to individual `<dl>`, `<dt>`, and `<dd>` elements:
+
+```djot
+{.vocabulary}
+: color
+{.american}
+: colour
+{.british}
+
+  The visual property of objects.
+  {.primary}
+
+  Used in art and design.
+  {.secondary}
+```
+
+**Output:**
+```html
+<dl class="vocabulary">
+<dt class="american">color</dt>
+<dt class="british">colour</dt>
+<dd class="primary">
+<p>The visual property of objects.</p>
+</dd>
+<dd class="secondary">
+<p>Used in art and design.</p>
+</dd>
+</dl>
+```
+
+**Syntax:**
+- `{...}` before first term → applies to `<dl>`
+- `{...}` on line after term → applies to that `<dt>`
+- `{...}` as last line in definition block → applies to that `<dd>` (consistent with list items)
+
+---
+
 ## Testing
 
 All enhancements have dedicated test coverage:
@@ -511,6 +554,7 @@ vendor/bin/phpunit
 | Table row/cell attributes | [#250](https://github.com/jgm/djot/issues/250) | Open       |
 | Boolean attribute shorthand | [#257](https://github.com/jgm/djot/issues/257) | Open       |
 | Multiple definition terms | -                                              | djot-php   |
+| Definition list attributes | [#323](https://github.com/jgm/djot/issues/323) | Open       |
 | Fenced comment blocks     | [#67](https://github.com/jgm/djot/issues/67)   | Open       |
 
 ### Optional Modes

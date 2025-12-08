@@ -486,4 +486,22 @@ HTML;
         $this->assertStringContainsString('The visual property.', $htmlBack);
         $this->assertStringContainsString('Used in design.', $htmlBack);
     }
+
+    public function testDefinitionListAttributesRoundtrip(): void
+    {
+        $html = '<dl class="vocabulary"><dt class="american">color</dt><dt class="british">colour</dt>'
+            . '<dd class="primary"><p>Visual property.</p></dd><dd class="secondary"><p>Used in design.</p></dd></dl>';
+        $djot = $this->converter->convert($html);
+
+        // Convert back to HTML
+        $djotConverter = new DjotConverter();
+        $htmlBack = $djotConverter->convert($djot);
+
+        // All attributes should roundtrip
+        $this->assertStringContainsString('<dl class="vocabulary">', $htmlBack);
+        $this->assertStringContainsString('<dt class="american">color</dt>', $htmlBack);
+        $this->assertStringContainsString('<dt class="british">colour</dt>', $htmlBack);
+        $this->assertStringContainsString('<dd class="primary">', $htmlBack);
+        $this->assertStringContainsString('<dd class="secondary">', $htmlBack);
+    }
 }
