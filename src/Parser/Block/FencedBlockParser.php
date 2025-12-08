@@ -150,6 +150,49 @@ class FencedBlockParser
     }
 
     /**
+     * Check if a line opens a fenced comment block (%%%).
+     *
+     * This is an extension to support multi-line comments with blank lines,
+     * which the standard {% %} syntax cannot handle.
+     *
+     * @param string $line The line to check
+     *
+     * @return array{fence: string, length: int}|null
+     */
+    public function parseFencedCommentOpener(string $line): ?array
+    {
+        $trimmed = trim($line);
+
+        // Fast early exit: fenced comments start with %
+        if (!isset($trimmed[0]) || $trimmed[0] !== '%') {
+            return null;
+        }
+
+        // Match opening fence: 3+ percent signs
+        if (!preg_match('/^(%{3,})\s*$/', $trimmed, $matches)) {
+            return null;
+        }
+
+        return [
+            'fence' => $matches[1],
+            'length' => strlen($matches[1]),
+        ];
+    }
+
+    /**
+     * Check if a line closes a fenced comment block.
+     *
+     * @param string $line The line to check
+     * @param int $fenceLength The minimum fence length required
+     *
+     * @return bool True if this line closes the fence
+     */
+    public function isFencedCommentCloser(string $line, int $fenceLength): bool
+    {
+        return preg_match('/^\s*%{' . $fenceLength . ',}\s*$/', $line) === 1;
+    }
+
+    /**
      * Remove indent from a content line.
      *
      * @param string $line The line to process
