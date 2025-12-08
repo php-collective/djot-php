@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Parser\Block;
 
 use Djot\Node\Block\TableCell;
+use Djot\Parser\Utility\AttributeParser;
 
 /**
  * Parser for table blocks.
@@ -13,12 +14,14 @@ use Djot\Node\Block\TableCell;
  * - Table rows (| cell | cell |)
  * - Table alignments from separator rows
  * - Table cells with code span awareness
+ * - Row attributes (|...|{.class})
+ * - Cell attributes (|{.class} content |)
  */
 class TableParser
 {
     /**
      * Check if a line could be a table row.
-     * A line must start with | and end with | outside of code spans.
+     * A line must start with | and end with | (optionally followed by row attributes).
      *
      * @param string $line The line to check
      *
@@ -31,13 +34,49 @@ class TableParser
             return false;
         }
 
+        // Strip row attributes if present (|...|{.class})
+        $lineWithoutRowAttrs = $this->stripRowAttributes($line);
+
         // Table rows start and end with |
-        if (!preg_match('/^\|.*\|$/', $line)) {
+        if (!preg_match('/^\|.*\|$/', $lineWithoutRowAttrs)) {
             return false;
         }
 
         // Verify the line truly ends with | outside of code spans
-        return $this->lineEndsWithPipeOutsideCodeSpan($line);
+        return $this->lineEndsWithPipeOutsideCodeSpan($lineWithoutRowAttrs);
+    }
+
+    /**
+     * Strip row attributes from end of line.
+     *
+     * @param string $line The line to process
+     *
+     * @return string Line without trailing row attributes
+     */
+    public function stripRowAttributes(string $line): string
+    {
+        // Row attributes appear after final pipe: |...|{.class}
+        if (preg_match('/^(.*\|)\{([^{}]+)\}\s*$/', $line, $matches)) {
+            return $matches[1];
+        }
+
+        return $line;
+    }
+
+    /**
+     * Extract row attributes from end of line.
+     *
+     * @param string $line The line to process
+     *
+     * @return array<string, mixed> Parsed attributes or empty array
+     */
+    public function extractRowAttributes(string $line): array
+    {
+        if (preg_match('/\|\{([^{}]+)\}\s*$/', $line, $matches)) {
+            return AttributeParser::parse($matches[1]);
+        }
+
+        return [];
     }
 
     /**
@@ -89,6 +128,9 @@ class TableParser
      */
     public function parseTableCells(string $line): array
     {
+        // Strip row attributes first
+        $line = $this->stripRowAttributes($line);
+
         // Remove leading and trailing |
         $line = substr($line, 1, -1);
 
@@ -155,6 +197,44 @@ class TableParser
         $cells[] = $currentCell;
 
         return $cells;
+    }
+
+    /**
+     * Parse table cells with their attributes.
+     * Cell attributes appear at the start: |{.class} content |
+     *
+     * @param string $line The table row line
+     *
+     * @return array<array{content: string, attributes: array<string, mixed>}> Array of cell data
+     */
+    public function parseTableCellsWithAttributes(string $line): array
+    {
+        $cells = $this->parseTableCells($line);
+        $result = [];
+
+        foreach ($cells as $cellContent) {
+            $attributes = [];
+            $content = $cellContent;
+
+            // Check for cell attribute at start: {.class} content
+            // Must be at the very start (after optional whitespace)
+            $trimmed = ltrim($cellContent);
+            if (preg_match('/^\{([^{}]+)\}\s*/', $trimmed, $matches)) {
+                $attributes = AttributeParser::parse($matches[1]);
+                // Remove the attribute from content
+                $content = substr($trimmed, strlen($matches[0]));
+                // Preserve any leading whitespace that was before the attribute
+                $leadingSpace = substr($cellContent, 0, strlen($cellContent) - strlen($trimmed));
+                $content = $leadingSpace . $content;
+            }
+
+            $result[] = [
+                'content' => $content,
+                'attributes' => $attributes,
+            ];
+        }
+
+        return $result;
     }
 
     /**

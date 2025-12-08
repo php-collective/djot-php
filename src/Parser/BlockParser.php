@@ -1927,13 +1927,16 @@ class BlockParser
         while ($i < $count) {
             $currentLine = $lines[$i];
 
-            if (!preg_match('/^\|.*\|$/', $currentLine)) {
+            // Strip row attributes for validation (|...|{.class} → |...|)
+            $lineWithoutRowAttrs = $this->tableParser->stripRowAttributes($currentLine);
+
+            if (!preg_match('/^\|.*\|$/', $lineWithoutRowAttrs)) {
                 break;
             }
 
-            // Check if this is a separator row
-            if ($this->tableParser->isSeparatorRow($currentLine)) {
-                $alignments = $this->tableParser->parseTableAlignments($currentLine);
+            // Check if this is a separator row (attributes ignored on separator rows)
+            if ($this->tableParser->isSeparatorRow($lineWithoutRowAttrs)) {
+                $alignments = $this->tableParser->parseTableAlignments($lineWithoutRowAttrs);
                 $headerFound = true;
 
                 // Mark previous row as header and apply alignments to it
@@ -1943,11 +1946,15 @@ class BlockParser
                     if ($lastRow instanceof TableRow) {
                         // Recreate as header row with alignments
                         $headerRow = new TableRow(true);
+                        // Preserve row attributes from original row
+                        $headerRow->setAttributes($lastRow->getAttributes());
                         $cellIndex = 0;
                         foreach ($lastRow->getChildren() as $cell) {
                             if ($cell instanceof TableCell) {
                                 $alignment = $alignments[$cellIndex] ?? TableCell::ALIGN_DEFAULT;
                                 $headerCell = new TableCell(true, $alignment);
+                                // Preserve cell attributes from original cell
+                                $headerCell->setAttributes($cell->getAttributes());
                                 foreach ($cell->getChildren() as $child) {
                                     $headerCell->appendChild($child);
                                 }
@@ -1964,14 +1971,25 @@ class BlockParser
                 continue;
             }
 
+            // Extract row attributes (|...|{.class})
+            $rowAttributes = $this->tableParser->extractRowAttributes($currentLine);
+
             // Parse regular row
             $row = new TableRow(false);
-            $cells = $this->tableParser->parseTableCells($currentLine);
+            if ($rowAttributes) {
+                $row->setAttributes($rowAttributes);
+            }
 
-            foreach ($cells as $index => $cellContent) {
+            // Parse cells with their attributes
+            $cellsWithAttrs = $this->tableParser->parseTableCellsWithAttributes($currentLine);
+
+            foreach ($cellsWithAttrs as $index => $cellData) {
                 $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
                 $cell = new TableCell(false, $alignment);
-                $this->inlineParser->parse($cell, trim($cellContent), $i);
+                if ($cellData['attributes']) {
+                    $cell->setAttributes($cellData['attributes']);
+                }
+                $this->inlineParser->parse($cell, trim($cellData['content']), $i);
                 $row->appendChild($cell);
             }
 
