@@ -578,7 +578,7 @@ class HtmlToDjot
 
             // Blank line (or whitespace-only line) ends definition list context
             if (trim($line) === '') {
-                $result[] = '';  // Normalize to empty string
+                $result[] = ''; // Normalize to empty string
 
                 continue;
             }
