@@ -204,6 +204,38 @@ class ProfileTest extends TestCase
         $this->assertStringContainsString('<table>', $html);
     }
 
+    public function testArticleProfileAllowsFiguresAndCaptions(): void
+    {
+        $converter = new DjotConverter(profile: Profile::article());
+        $djot = <<<'DJOT'
+![Sunset](sunset.jpg)
+^ A beautiful sunset over the ocean.
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('<figure>', $html);
+        $this->assertStringContainsString('<figcaption>', $html);
+        $this->assertStringContainsString('A beautiful sunset', $html);
+        $this->assertFalse($converter->hasProfileViolations());
+    }
+
+    public function testArticleProfileAllowsBlockquoteCaptions(): void
+    {
+        $converter = new DjotConverter(profile: Profile::article());
+        $djot = <<<'DJOT'
+> Be the change you wish to see in the world.
+^ Mahatma Gandhi
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('<figure>', $html);
+        $this->assertStringContainsString('<blockquote>', $html);
+        $this->assertStringContainsString('<figcaption>', $html);
+        $this->assertStringContainsString('Mahatma Gandhi', $html);
+    }
+
     public function testArticleProfileStripsRawHtml(): void
     {
         $converter = new DjotConverter(profile: Profile::article());
