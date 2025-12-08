@@ -368,7 +368,7 @@ HTML;
 
     public function testNoLeadingWhitespaceOnParagraphs(): void
     {
-        $html = "  <p>  Text with surrounding whitespace  </p>  ";
+        $html = '  <p>  Text with surrounding whitespace  </p>  ';
         $result = $this->converter->convert($html);
 
         // Should not have leading whitespace
@@ -377,7 +377,7 @@ HTML;
 
     public function testNoLeadingWhitespaceOnHeadings(): void
     {
-        $html = "<h1>  Heading  </h1><p>  Text  </p>";
+        $html = '<h1>  Heading  </h1><p>  Text  </p>';
         $result = $this->converter->convert($html);
 
         $this->assertStringStartsWith('# Heading', $result);
