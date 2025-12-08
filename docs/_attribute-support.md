@@ -42,22 +42,24 @@ All block-level elements receive attributes from a standalone `{...}` on the pre
 
 ### Attribute Placement Rule: **After the Element (Suffix)**
 
-All inline elements receive attributes immediately following the closing delimiter.
+Inline elements receive attributes immediately following the closing delimiter.
 
 | Element | Syntax | HTML Output | Status |
 |---------|--------|-------------|--------|
 | Link | `[text](url){.external}` | `<a href="url" class="external">` | ✓ |
 | Image | `![alt](src){.photo}` | `<img src="src" class="photo">` | ✓ |
 | Span | `[text]{.note}` | `<span class="note">` | ✓ |
-| Emphasis | `_text_{.highlight}` | `<em class="highlight">` | Not yet |
-| Strong | `*text*{.important}` | `<strong class="important">` | Not yet |
-| Code Span | `` `code`{.lang-js} `` | `<code class="lang-js">` | Not yet |
-| Superscript | `{^text^}{.ref}` | `<sup class="ref">` | Not yet |
-| Subscript | `{~text~}{.chemical}` | `<sub class="chemical">` | Not yet |
-| Insert | `{+text+}{.added}` | `<ins class="added">` | Not yet |
-| Delete | `{-text-}{.removed}` | `<del class="removed">` | Not yet |
-| Highlight | `{=text=}{.match}` | `<mark class="match">` | Not yet |
-| Symbol | `:emoji:{.large}` | `<span class="symbol large">` | Not yet |
+| Emphasis | `_text_{.highlight}` | `<em class="highlight">` | No |
+| Strong | `*text*{.important}` | `<strong class="important">` | No |
+| Code Span | `` `code`{.lang-js} `` | `<code class="lang-js">` | No |
+| Superscript | `{^text^}{.ref}` | `<sup class="ref">` | No |
+| Subscript | `{~text~}{.chemical}` | `<sub class="chemical">` | No |
+| Insert | `{+text+}{.added}` | `<ins class="added">` | No |
+| Delete | `{-text-}{.removed}` | `<del class="removed">` | No |
+| Highlight | `{=text=}{.match}` | `<mark class="match">` | No |
+| Symbol | `:emoji:{.large}` | `<span class="symbol large">` | No |
+
+If needed, one can always wrap with a "span": `[...]{...}`.
 
 ---
 
@@ -210,16 +212,16 @@ The general rule follows Djot conventions:
 | Link | Yes | Suffix | `[](url){}` |
 | Image | Yes | Suffix | `![](url){}` |
 | Span | Yes | Suffix | `[text]{}` |
-| Emphasis | Not yet | Suffix | `_..._{}` |
-| Strong | Not yet | Suffix | `*...*{}` |
-| CodeSpan | Not yet | Suffix | `` `...`{} `` |
-| Superscript | Not yet | Suffix | `{^...^}{}` |
-| Subscript | Not yet | Suffix | `{~...~}{}` |
-| Insert | Not yet | Suffix | `{+...+}{}` |
-| Delete | Not yet | Suffix | `{-...-}{}` |
-| Highlight | Not yet | Suffix | `{=...=}{}` |
-| Symbol | Not yet | Suffix | `:name:{}` |
-| FootnoteRef | Not yet | Suffix | `[^ref]{}` |
+| Emphasis | No | Suffix | `_..._{}` |
+| Strong | No | Suffix | `*...*{}` |
+| CodeSpan | No | Suffix | `` `...`{} `` |
+| Superscript | No | Suffix | `{^...^}{}` |
+| Subscript | No | Suffix | `{~...~}{}` |
+| Insert | No | Suffix | `{+...+}{}` |
+| Delete | No | Suffix | `{-...-}{}` |
+| Highlight | No | Suffix | `{=...=}{}` |
+| Symbol | No | Suffix | `:name:{}` |
+| FootnoteRef | No | Suffix | `[^ref]{}` |
 | **Special** ||||
 | Comment | No | N/A | Not rendered |
 | RawBlock | Yes | Preceding line | Format-specific |
