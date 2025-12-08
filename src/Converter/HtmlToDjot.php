@@ -414,9 +414,11 @@ class HtmlToDjot
 
         // Check if we have consecutive dt elements (multiple terms)
         $hasConsecutiveDt = false;
-        for ($i = 0; $i < count($elements) - 1; $i++) {
+        $elementCount = count($elements);
+        for ($i = 0; $i < $elementCount - 1; $i++) {
             if ($elements[$i]['tag'] === 'dt' && $elements[$i + 1]['tag'] === 'dt') {
                 $hasConsecutiveDt = true;
+
                 break;
             }
         }
@@ -425,7 +427,7 @@ class HtmlToDjot
         $prevWasDt = false;
         foreach ($elements as $elem) {
             $tag = $elem['tag'];
-            /** @var DOMElement $elemNode */
+            /** @var \DOMElement $elemNode */
             $elemNode = $elem['node'];
 
             if ($tag === 'dt') {

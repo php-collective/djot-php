@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Converter;
 
 use Djot\Converter\HtmlToDjot;
+use Djot\DjotConverter;
 use PHPUnit\Framework\TestCase;
 
 class HtmlToDjotTest extends TestCase
@@ -274,7 +275,7 @@ HTML;
         $this->assertStringContainsString(': A pigment', $djot);
 
         // Roundtrip should be lossless
-        $djotConverter = new \Djot\DjotConverter();
+        $djotConverter = new DjotConverter();
         $roundtrip = $djotConverter->convert($djot);
 
         $this->assertSame(2, substr_count($roundtrip, '<dt>'));

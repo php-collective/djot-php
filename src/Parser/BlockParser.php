@@ -1794,6 +1794,7 @@ class BlockParser
 
                         continue;
                     }
+
                     // Otherwise it's a new term - break to outer loop
                     break;
                 }
@@ -1833,6 +1834,7 @@ class BlockParser
      * Trim leading and trailing blank lines from an array
      *
      * @param array<string> $lines
+     *
      * @return array<string>
      */
     protected function trimBlankLines(array $lines): array
