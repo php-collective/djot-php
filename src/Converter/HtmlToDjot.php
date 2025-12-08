@@ -15,6 +15,10 @@ use RuntimeException;
  *
  * Useful for importing HTML content from CMS systems, WYSIWYG editors,
  * or web scraping into Djot format.
+ *
+ * Key Djot requirements handled:
+ * - Blank lines required around block elements (headings, code blocks, lists)
+ * - Nested lists require blank line before the nested portion
  */
 class HtmlToDjot
 {
@@ -95,19 +99,19 @@ class HtmlToDjot
             'html', 'body', 'div', 'article', 'section', 'main', 'header', 'footer', 'nav', 'aside' => $this->processBlock($node),
             'p' => $this->processParagraph($node),
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6' => $this->processHeading($node),
-            'strong', 'b' => '*' . $this->processChildren($node) . '*',
-            'em', 'i' => '_' . $this->processChildren($node) . '_',
-            'u', 'ins' => '{+' . $this->processChildren($node) . '+}',
-            's', 'strike', 'del' => '{-' . $this->processChildren($node) . '-}',
-            'mark' => '{=' . $this->processChildren($node) . '=}',
-            'sup' => '^' . $this->processChildren($node) . '^',
-            'sub' => '~' . $this->processChildren($node) . '~',
+            'strong', 'b' => $this->processInlineFormatting($node, '*', '*'),
+            'em', 'i' => $this->processInlineFormatting($node, '_', '_'),
+            'u', 'ins' => $this->processInlineFormatting($node, '{+', '+}'),
+            's', 'strike', 'del' => $this->processInlineFormatting($node, '{-', '-}'),
+            'mark' => $this->processInlineFormatting($node, '{=', '=}'),
+            'sup' => $this->processInlineFormatting($node, '^', '^'),
+            'sub' => $this->processInlineFormatting($node, '~', '~'),
             'code' => $this->processCode($node),
             'pre' => $this->processPreBlock($node),
             'a' => $this->processLink($node),
             'img' => $this->processImage($node),
             'br' => $this->inPre ? "\n" : "\\\n",
-            'hr' => "\n---\n\n",
+            'hr' => "\n\n---\n\n",
             'blockquote' => $this->processBlockquote($node),
             'ul', 'ol' => $this->processList($node),
             'li' => $this->processListItem($node),
@@ -140,7 +144,7 @@ class HtmlToDjot
             $content .= $result;
         }
 
-        return $content;
+        return trim($content);
     }
 
     protected function processParagraph(DOMElement $node): string
@@ -160,6 +164,16 @@ class HtmlToDjot
         $prefix = str_repeat('#', $level) . ' ';
 
         return $prefix . $content . "\n\n";
+    }
+
+    protected function processInlineFormatting(DOMElement $node, string $open, string $close): string
+    {
+        $content = trim($this->processChildren($node));
+        if ($content === '') {
+            return '';
+        }
+
+        return $open . $content . $close;
     }
 
     protected function processCode(DOMElement $node): string
@@ -208,7 +222,7 @@ class HtmlToDjot
 
         $this->inPre = false;
 
-        return $backticks . $language . "\n" . rtrim($content) . "\n" . $backticks . "\n\n";
+        return "\n" . $backticks . $language . "\n" . rtrim($content) . "\n" . $backticks . "\n\n";
     }
 
     protected function processLink(DOMElement $node): string
@@ -254,7 +268,7 @@ class HtmlToDjot
             }
         }
 
-        return implode("\n", $quoted) . "\n\n";
+        return "\n" . implode("\n", $quoted) . "\n\n";
     }
 
     protected function processList(DOMElement $node): string
@@ -269,15 +283,38 @@ class HtmlToDjot
             $counter = (int)$node->getAttribute('start');
         }
 
+        // Add leading newline for top-level lists to ensure blank line before
+        if ($this->listDepth === 1) {
+            $output .= "\n";
+        }
+
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement && strtolower($child->tagName) === 'li') {
                 $indent = str_repeat('  ', $this->listDepth - 1);
                 $prefix = $isOrdered ? $counter . '. ' : '- ';
 
-                $content = trim($this->processChildren($child));
+                // Process list item content, separating text from nested lists
+                $textContent = '';
+                $nestedContent = '';
 
-                // Handle multi-line content
-                $lines = explode("\n", $content);
+                foreach ($child->childNodes as $liChild) {
+                    if ($liChild instanceof DOMElement) {
+                        $childTag = strtolower($liChild->tagName);
+                        if ($childTag === 'ul' || $childTag === 'ol') {
+                            // Process nested list separately
+                            $nestedContent .= $this->processNode($liChild);
+                        } else {
+                            $textContent .= $this->processNode($liChild);
+                        }
+                    } else {
+                        $textContent .= $this->processNode($liChild);
+                    }
+                }
+
+                $textContent = trim($textContent);
+
+                // Handle multi-line text content
+                $lines = explode("\n", $textContent);
                 $firstLine = array_shift($lines);
                 $output .= $indent . $prefix . $firstLine . "\n";
 
@@ -290,12 +327,18 @@ class HtmlToDjot
                     }
                 }
 
+                // Add nested list content with blank line before it (required by Djot)
+                if ($nestedContent !== '') {
+                    $output .= "\n" . $nestedContent;
+                }
+
                 $counter++;
             }
         }
 
         $this->listDepth--;
 
+        // Add trailing newline for top-level lists
         return $output . ($this->listDepth === 0 ? "\n" : '');
     }
 
@@ -341,7 +384,7 @@ class HtmlToDjot
             }
         }
 
-        $output = '';
+        $output = "\n";
 
         if ($headerRow !== null) {
             $output .= $headerRow . "\n";
@@ -356,7 +399,7 @@ class HtmlToDjot
 
     protected function processDefinitionList(DOMElement $node): string
     {
-        $output = '';
+        $output = "\n";
 
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement) {
@@ -399,7 +442,7 @@ class HtmlToDjot
 
     protected function processFigure(DOMElement $node): string
     {
-        $output = '';
+        $output = "\n";
 
         // Find img and figcaption
         $img = $node->getElementsByTagName('img')->item(0);
@@ -418,8 +461,38 @@ class HtmlToDjot
 
     protected function cleanup(string $djot): string
     {
-        // Normalize multiple blank lines
+        // Normalize multiple blank lines to max 2
         $djot = preg_replace("/\n{3,}/", "\n\n", $djot) ?? $djot;
+
+        // Remove leading whitespace from lines (except in code blocks)
+        $lines = explode("\n", $djot);
+        $inCodeBlock = false;
+        $result = [];
+
+        foreach ($lines as $line) {
+            // Track code blocks
+            if (str_starts_with(trim($line), '```')) {
+                $inCodeBlock = !$inCodeBlock;
+                $result[] = $line;
+
+                continue;
+            }
+
+            if ($inCodeBlock) {
+                $result[] = $line;
+            } else {
+                // Preserve indentation for list items, trim other leading whitespace
+                if (preg_match('/^(\s*)([-*+]|\d+\.)\s/', $line, $m)) {
+                    // It's a list item - preserve indentation
+                    $result[] = $line;
+                } else {
+                    // Regular line - trim leading whitespace
+                    $result[] = ltrim($line);
+                }
+            }
+        }
+
+        $djot = implode("\n", $result);
 
         // Remove leading/trailing whitespace
         $djot = trim($djot);

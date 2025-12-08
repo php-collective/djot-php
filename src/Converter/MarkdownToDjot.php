@@ -11,6 +11,11 @@ use RuntimeException;
  *
  * This performs a source-to-source transformation, not parsing.
  * It handles common Markdown patterns and converts them to their Djot equivalents.
+ *
+ * Key differences from Markdown that this converter handles:
+ * - Blank lines are required around block elements (headings, code fences, lists)
+ * - Nested lists require a blank line before the nested portion
+ * - Emphasis uses _ (not *), strong uses * (not **)
  */
 class MarkdownToDjot
 {
@@ -23,13 +28,24 @@ class MarkdownToDjot
         $result = [];
         $inCodeBlock = false;
         $codeFence = '';
+        $prevLineType = 'blank';
+        $prevIndent = 0;
 
-        foreach ($lines as $line) {
+        $lineCount = count($lines);
+        for ($i = 0; $i < $lineCount; $i++) {
+            $line = $lines[$i];
+            $trimmed = trim($line);
+
             // Track code blocks to avoid converting inside them
             if (!$inCodeBlock && preg_match('/^(`{3,}|~{3,})/', $line, $matches)) {
+                // Ensure blank line before code fence
+                if ($prevLineType !== 'blank' && count($result) > 0) {
+                    $result[] = '';
+                }
                 $inCodeBlock = true;
                 $codeFence = $matches[1][0]; // First char of fence
                 $result[] = $line;
+                $prevLineType = 'code_fence';
 
                 continue;
             }
@@ -39,18 +55,91 @@ class MarkdownToDjot
                 if (preg_match('/^(' . $codeFence . '{3,})\s*$/', $line)) {
                     $inCodeBlock = false;
                     $codeFence = '';
+                    $result[] = $line;
+                    // Ensure blank line after code fence if next line is non-blank
+                    if ($i + 1 < $lineCount && trim($lines[$i + 1]) !== '') {
+                        $result[] = '';
+                    }
+                    $prevLineType = 'code_fence';
+                } else {
+                    $result[] = $line;
+                    $prevLineType = 'code';
                 }
-                $result[] = $line;
 
                 continue;
+            }
+
+            // Detect line type and indentation
+            $isBlank = $trimmed === '';
+            $isHeading = (bool)preg_match('/^#{1,6}\s/', $trimmed);
+            $currentIndent = strlen($line) - strlen(ltrim($line));
+            $isList = (bool)preg_match('/^[-*+]\s|^\d+\.\s/', $trimmed);
+            $isBlockquote = str_starts_with($trimmed, '>');
+            $isNestedContent = $currentIndent > $prevIndent && $prevLineType === 'list';
+
+            if ($isBlank) {
+                $result[] = $line;
+                $prevLineType = 'blank';
+                $prevIndent = 0;
+
+                continue;
+            }
+
+            // Add blank line before heading if previous wasn't blank/heading
+            if ($isHeading && $prevLineType !== 'blank' && $prevLineType !== 'heading') {
+                $result[] = '';
+            }
+
+            // Add blank line before blockquote if previous was regular text
+            if ($isBlockquote && $prevLineType === 'text') {
+                $result[] = '';
+            }
+
+            // Add blank line before top-level list if previous was regular text
+            if ($isList && $currentIndent === 0 && $prevLineType === 'text') {
+                $result[] = '';
+            }
+
+            // Add blank line before nested list content to enable nesting in Djot
+            if ($isList && $isNestedContent) {
+                $result[] = '';
             }
 
             // Convert inline formatting
             $line = $this->convertInlineFormatting($line);
             $result[] = $line;
+
+            // After heading, add blank line if next line is non-blank and not a heading
+            if ($isHeading && $i + 1 < $lineCount) {
+                $nextTrimmed = trim($lines[$i + 1]);
+                if ($nextTrimmed !== '' && !preg_match('/^#{1,6}\s/', $nextTrimmed)) {
+                    $result[] = '';
+                }
+            }
+
+            // Update prev line type
+            if ($isHeading) {
+                $prevLineType = 'heading';
+            } elseif ($isList) {
+                $prevLineType = 'list';
+            } elseif ($isBlockquote) {
+                $prevLineType = 'blockquote';
+            } else {
+                $prevLineType = 'text';
+            }
+
+            // Track indentation for nested list detection
+            if ($isList) {
+                $prevIndent = $currentIndent;
+            }
         }
 
-        return implode("\n", $result);
+        $output = implode("\n", $result);
+
+        // Clean up excessive blank lines (more than 2 consecutive)
+        $output = preg_replace('/\n{3,}/', "\n\n", $output) ?? $output;
+
+        return $output;
     }
 
     /**
@@ -129,13 +218,11 @@ class MarkdownToDjot
         // Convert ==highlight== to {=highlight=} (Djot highlight, GFM extension)
         $line = preg_replace('/==([^=]+)==/', '{=$1=}', $line) ?? $line;
 
-        // Convert ^superscript^ to {^superscript^} (some Markdown extensions)
-        // Only if not already in Djot format
-        $line = preg_replace('/(?<!\{)\^([^^]+)\^(?!\})/', '{^$1^}', $line) ?? $line;
+        // Convert ^superscript^ to ^superscript^ (already valid Djot, just ensure not double-wrapped)
+        // No conversion needed - bare form is valid Djot
 
-        // Convert ~subscript~ to {~subscript~} (some Markdown extensions)
-        // Only single tildes, not double (strikethrough)
-        $line = preg_replace('/(?<![~{])~([^~}]+)~(?![~}])/', '{~$1~}', $line) ?? $line;
+        // Convert ~subscript~ - already valid Djot bare form
+        // No conversion needed - bare form is valid Djot
 
         // Convert HTML tags to Djot equivalents (for round-trip support)
         // These run AFTER Markdown extension conversions to avoid double-processing
@@ -148,6 +235,9 @@ class MarkdownToDjot
 
         // <del>text</del> → {-text-} (alternative to ~~)
         $line = preg_replace('/<del>([^<]+)<\/del>/i', '{-$1-}', $line) ?? $line;
+
+        // <s>text</s> → {-text-} (HTML5 strikethrough)
+        $line = preg_replace('/<s>([^<]+)<\/s>/i', '{-$1-}', $line) ?? $line;
 
         // <sup>text</sup> → ^text^
         $line = preg_replace('/<sup>([^<]+)<\/sup>/i', '^$1^', $line) ?? $line;
