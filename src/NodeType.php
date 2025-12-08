@@ -105,6 +105,16 @@ final class NodeType
      */
     public const COMMENT = 'comment';
 
+    /**
+     * @var string
+     */
+    public const FIGURE = 'figure';
+
+    /**
+     * @var string
+     */
+    public const CAPTION = 'caption';
+
     // Inline types
     /**
      * @var string
@@ -221,6 +231,8 @@ final class NodeType
             self::SECTION,
             self::LINE_BLOCK,
             self::COMMENT,
+            self::FIGURE,
+            self::CAPTION,
         ];
     }
 
