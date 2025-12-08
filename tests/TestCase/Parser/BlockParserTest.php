@@ -171,6 +171,7 @@ class BlockParserTest extends TestCase
         foreach ($children as $child) {
             if ($child->getType() === 'definition_description') {
                 $dd = $child;
+
                 break;
             }
         }
@@ -194,6 +195,7 @@ class BlockParserTest extends TestCase
         foreach ($children as $child) {
             if ($child->getType() === 'definition_description') {
                 $dd = $child;
+
                 break;
             }
         }

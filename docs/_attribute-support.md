@@ -1,6 +1,7 @@
 # Attribute Support in djot-php
 
-This document details attribute support for all Djot elements in djot-php. We maintain **100% attribute coverage** across all supported node types.
+This document details attribute support for all Djot elements in djot-php.
+We maintain **100% attribute coverage** across all supported node types.
 
 ---
 

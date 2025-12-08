@@ -1829,8 +1829,10 @@ class BlockParser
                         $defAttributes = AttributeParser::parse($attrMatch[1]);
                         array_pop($defLines);
                         // Remove any trailing blank lines before the attribute
-                        while ($defLines !== [] && $defLines[count($defLines) - 1] === '') {
+                        $defLineCount = count($defLines);
+                        while ($defLineCount > 0 && $defLines[$defLineCount - 1] === '') {
                             array_pop($defLines);
+                            $defLineCount--;
                         }
                     }
 
