@@ -161,9 +161,11 @@ $djot = $converter->convert($html);
 | `<hr>` | `---` |
 | `<br>` | `\` (hard break) |
 | `<table>` | Djot table syntax |
+| `<table>` + `<caption>` | Table with `^ caption` |
 | `<dl>`, `<dt>`, `<dd>` | Definition list |
 | `<span class="x">` | `[text]{.x}` |
-| `<figure>` + `<figcaption>` | Image with caption |
+| `<figure>` + `<img>` + `<figcaption>` | Image with `^ caption` |
+| `<figure>` + `<blockquote>` + `<figcaption>` | Block quote with `^ caption` |
 
 **File Operations:**
 

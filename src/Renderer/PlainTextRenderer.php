@@ -228,10 +228,10 @@ class PlainTextRenderer implements RendererInterface
             }
         }
 
-        if ($node->hasCaptionChildren()) {
-            foreach ($node->getCaptionChildren() as $child) {
-                $text .= $this->renderNode($child);
-            }
+        if ($node->hasCaption()) {
+            /** @var \Djot\Node\Block\Caption $caption */
+            $caption = $node->getCaption();
+            $text .= $this->renderChildren($caption);
             $text = rtrim($text) . "\n";
         }
 

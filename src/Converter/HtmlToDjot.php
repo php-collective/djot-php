@@ -132,6 +132,7 @@ class HtmlToDjot
             'span' => $this->processSpan($node),
             'figure' => $this->processFigure($node),
             'figcaption' => '', // Handled by figure
+            'caption' => '', // Handled by table
             'thead', 'tbody', 'tfoot', 'tr', 'th', 'td' => $this->processChildren($node), // Handled by table
             'script', 'style', 'noscript' => '', // Skip these
             default => $this->processChildren($node),
@@ -391,6 +392,13 @@ class HtmlToDjot
         $headerRow = null;
         $headerRowAttrs = '';
         $columnCount = 0;
+        $captionText = '';
+
+        // Find caption element if present
+        $captionElement = $node->getElementsByTagName('caption')->item(0);
+        if ($captionElement instanceof DOMElement) {
+            $captionText = trim($this->processChildren($captionElement));
+        }
 
         // Find all rows
         $trElements = $node->getElementsByTagName('tr');
@@ -447,9 +455,14 @@ class HtmlToDjot
             $output .= '| ' . implode(' | ', $separator) . ' |' . "\n";
         }
 
-        $output .= implode("\n", $rows) . "\n\n";
+        $output .= implode("\n", $rows) . "\n";
 
-        return $output;
+        // Add caption after table
+        if ($captionText !== '') {
+            $output .= '^ ' . $captionText . "\n";
+        }
+
+        return $output . "\n";
     }
 
     protected function processDefinitionList(DOMElement $node): string
@@ -519,16 +532,21 @@ class HtmlToDjot
     {
         $output = "\n";
 
-        // Find img and figcaption
+        // Find img, blockquote, and figcaption
         $img = $node->getElementsByTagName('img')->item(0);
+        $blockquote = $node->getElementsByTagName('blockquote')->item(0);
         $caption = $node->getElementsByTagName('figcaption')->item(0);
 
         if ($img instanceof DOMElement) {
-            $output .= $this->processImage($img);
+            $output .= $this->processImage($img) . "\n";
+        } elseif ($blockquote instanceof DOMElement) {
+            $output .= $this->processBlockquote($blockquote);
+            // Remove the trailing blank line since caption follows immediately
+            $output = rtrim($output) . "\n";
         }
 
         if ($caption instanceof DOMElement) {
-            $output .= "\n^ " . trim($this->processChildren($caption));
+            $output .= '^ ' . trim($this->processChildren($caption));
         }
 
         return $output . "\n\n";

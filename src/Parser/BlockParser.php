@@ -7,12 +7,14 @@ namespace Djot\Parser;
 use Djot\Exception\ParseException;
 use Djot\Exception\ParseWarning;
 use Djot\Node\Block\BlockQuote;
+use Djot\Node\Block\Caption;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Comment;
 use Djot\Node\Block\DefinitionDescription;
 use Djot\Node\Block\DefinitionList;
 use Djot\Node\Block\DefinitionTerm;
 use Djot\Node\Block\Div;
+use Djot\Node\Block\Figure;
 use Djot\Node\Block\Footnote;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\LineBlock;
@@ -26,6 +28,7 @@ use Djot\Node\Block\TableRow;
 use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\HardBreak;
+use Djot\Node\Inline\Image;
 use Djot\Node\Node;
 use Djot\Parser\Block\FencedBlockParser;
 use Djot\Parser\Block\ListParser;
@@ -560,6 +563,7 @@ class BlockParser
             // Try to match block elements in order of precedence
             // Fenced comment must come before thematic break (%%% vs ---)
             // Comment and raw block must come before code block since ``` =format is a special case
+            // Caption must come before paragraph to catch `^ caption text`
             $consumed = $this->tryParseFencedComment($parent, $lines, $i)
                 ?? $this->tryParseComment($parent, $lines, $i)
                 ?? $this->tryParseRawBlock($parent, $lines, $i)
@@ -574,6 +578,7 @@ class BlockParser
                 ?? $this->tryParseTable($parent, $lines, $i)
                 ?? $this->tryParseFootnoteDefinition($lines, $i)
                 ?? $this->tryParseReferenceDefinition($lines, $i)
+                ?? $this->tryParseCaption($parent, $lines, $i)
                 ?? $this->tryParseParagraph($parent, $lines, $i);
 
             $i += $consumed;
@@ -2068,45 +2073,7 @@ class BlockParser
         $this->applyPendingAttributes($table);
         $parent->appendChild($table);
 
-        // Check for caption: ^ Caption text (can have blank line before it)
-        $captionStart = $i;
-        if ($captionStart < $count && IndentationHelper::isBlankLine($lines[$captionStart])) {
-            $captionStart++;
-        }
-
-        // Table caption: ^ followed by space(s), not tab (syntax delimiter)
-        if ($captionStart < $count && preg_match('/^\^ +(.+)$/', $lines[$captionStart], $captionMatch)) {
-            $captionLines = [$captionMatch[1]];
-            $captionStart++;
-
-            // Caption can continue on non-blank lines that don't start a new block
-            while ($captionStart < $count) {
-                $nextLine = $lines[$captionStart];
-                if (IndentationHelper::isBlankLine($nextLine)) {
-                    break;
-                }
-                // Stop at block-level elements
-                if ($this->startsNewBlock($nextLine)) {
-                    break;
-                }
-                // Stop at new table or caption
-                if (preg_match('/^\|/', $nextLine) || preg_match('/^\^/', $nextLine)) {
-                    break;
-                }
-                $captionLines[] = $nextLine;
-                $captionStart++;
-            }
-
-            // Join with newlines and parse inline content into a temporary container
-            $captionContent = implode("\n", $captionLines);
-            $captionContainer = new Paragraph();
-            $this->inlineParser->parse($captionContainer, $captionContent, $start);
-            // Transfer children to table's caption
-            foreach ($captionContainer->getChildren() as $child) {
-                $table->addCaptionChild($child);
-            }
-            $i = $captionStart;
-        }
+        // Caption parsing is now handled by tryParseCaption
 
         return $i - $start;
     }
@@ -2230,6 +2197,130 @@ class BlockParser
         return $i - $start;
     }
 
+    /**
+     * Try to parse a caption line (^ caption text).
+     *
+     * Captions apply to the immediately preceding block:
+     * - Table → adds <caption> element
+     * - Paragraph with single Image → wraps in <figure> with <figcaption>
+     * - BlockQuote → wraps in <figure> with <figcaption>
+     *
+     * @param \Djot\Node\Node $parent
+     * @param array<string> $lines
+     * @param int $start
+     */
+    protected function tryParseCaption(Node $parent, array $lines, int $start): ?int
+    {
+        $line = $lines[$start];
+
+        // Caption syntax: `^ caption text` (caret followed by space)
+        if (!preg_match('/^\^ (.*)$/', $line, $matches)) {
+            return null;
+        }
+
+        $captionLines = [$matches[1]];
+        $i = $start + 1;
+        $count = count($lines);
+
+        // Caption can continue on non-blank lines that don't start a new block
+        while ($i < $count) {
+            $nextLine = $lines[$i];
+            if (IndentationHelper::isBlankLine($nextLine)) {
+                break;
+            }
+            // Stop at block-level elements
+            if ($this->startsNewBlock($nextLine)) {
+                break;
+            }
+            // Stop at new table
+            if (preg_match('/^\|/', $nextLine)) {
+                break;
+            }
+            $captionLines[] = $nextLine;
+            $i++;
+        }
+
+        $captionText = implode("\n", $captionLines);
+
+        // Get the last child to attach the caption to
+        $children = $parent->getChildren();
+        if (!$children) {
+            // No preceding block to attach caption to - treat as regular paragraph
+            return null;
+        }
+
+        $lastChild = $children[count($children) - 1];
+
+        $linesConsumed = $i - $start;
+
+        // Handle Table - add caption directly to table
+        if ($lastChild instanceof Table) {
+            $caption = new Caption();
+            $this->inlineParser->parse($caption, $captionText, $start);
+            $lastChild->setCaption($caption);
+
+            return $linesConsumed;
+        }
+
+        // Handle BlockQuote - wrap in figure
+        if ($lastChild instanceof BlockQuote) {
+            $figure = new Figure();
+
+            // Transfer attributes from blockquote to figure
+            foreach ($lastChild->getAttributes() as $key => $value) {
+                $figure->setAttribute($key, $value);
+                $lastChild->removeAttribute($key);
+            }
+
+            // Create caption
+            $caption = new Caption();
+            $this->inlineParser->parse($caption, $captionText, $start);
+
+            // Build figure: blockquote + caption
+            $figure->appendChild($lastChild);
+            $figure->appendChild($caption);
+
+            // Replace blockquote with figure in parent
+            $parent->replaceChild(count($children) - 1, $figure);
+
+            return $linesConsumed;
+        }
+
+        // Handle Paragraph containing only an Image - wrap in figure
+        if ($lastChild instanceof Paragraph) {
+            $paragraphChildren = $lastChild->getChildren();
+            if (count($paragraphChildren) === 1 && $paragraphChildren[0] instanceof Image) {
+                $image = $paragraphChildren[0];
+
+                $figure = new Figure();
+
+                // Transfer attributes from image to figure
+                foreach ($image->getAttributes() as $key => $value) {
+                    if ($key !== 'src' && $key !== 'alt' && $key !== 'title') {
+                        $figure->setAttribute($key, $value);
+                        $image->removeAttribute($key);
+                    }
+                }
+
+                // Create caption
+                $caption = new Caption();
+                $this->inlineParser->parse($caption, $captionText, $start);
+
+                // Build figure: image + caption
+                $figure->appendChild($image);
+                $figure->appendChild($caption);
+
+                // Replace paragraph with figure in parent
+                $parent->replaceChild(count($children) - 1, $figure);
+
+                return $linesConsumed;
+            }
+        }
+
+        // No valid preceding block for caption - treat as regular paragraph
+        return null;
+    }
+
     protected function appendToLastParagraph(Node $parent, string $content, int $line): void
     {
         $children = $parent->getChildren();
@@ -2242,6 +2333,11 @@ class BlockParser
 
     protected function startsNewBlock(string $line): bool
     {
+        // Caption `^ text` can always interrupt paragraphs (special case for figure captions)
+        if (preg_match('/^\^ /', $line)) {
+            return true;
+        }
+
         // In significantNewlines mode, block elements can interrupt paragraphs
         if ($this->significantNewlines) {
             return $this->startsNewBlockSignificant($line);

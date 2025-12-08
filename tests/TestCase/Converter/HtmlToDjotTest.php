@@ -295,6 +295,64 @@ HTML;
         $this->assertStringContainsString('^ A photo', $result);
     }
 
+    public function testFigureWithBlockquote(): void
+    {
+        $html = '<figure><blockquote>A profound quote</blockquote><figcaption>The Author</figcaption></figure>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('> A profound quote', $result);
+        $this->assertStringContainsString('^ The Author', $result);
+    }
+
+    public function testTableWithCaption(): void
+    {
+        $html = <<<'HTML'
+<table>
+<caption>Monthly Sales Data</caption>
+<thead><tr><th>Month</th><th>Sales</th></tr></thead>
+<tbody><tr><td>Jan</td><td>100</td></tr></tbody>
+</table>
+HTML;
+
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('| Month | Sales |', $result);
+        $this->assertStringContainsString('^ Monthly Sales Data', $result);
+    }
+
+    public function testCaptionRoundtrip(): void
+    {
+        // Test table caption roundtrip
+        $html = '<table><caption>Table Title</caption><tr><th>A</th></tr><tr><td>1</td></tr></table>';
+        $djot = $this->converter->convert($html);
+        $this->assertStringContainsString('^ Table Title', $djot);
+
+        // Convert back to HTML
+        $djotConverter = new DjotConverter();
+        $htmlBack = $djotConverter->convert($djot);
+        $this->assertStringContainsString('<caption>Table Title</caption>', $htmlBack);
+
+        // Test figure/image caption roundtrip
+        $html = '<figure><img src="test.jpg" alt="Test"><figcaption>Image Caption</figcaption></figure>';
+        $djot = $this->converter->convert($html);
+        $this->assertStringContainsString('^ Image Caption', $djot);
+
+        $htmlBack = $djotConverter->convert($djot);
+        $this->assertStringContainsString('<figure>', $htmlBack);
+        $this->assertStringContainsString('<figcaption>Image Caption</figcaption>', $htmlBack);
+
+        // Test blockquote caption roundtrip
+        $html = '<figure><blockquote>Quote text</blockquote><figcaption>Source</figcaption></figure>';
+        $djot = $this->converter->convert($html);
+        $this->assertStringContainsString('> Quote text', $djot);
+        $this->assertStringContainsString('^ Source', $djot);
+
+        $htmlBack = $djotConverter->convert($djot);
+        $this->assertStringContainsString('<figure>', $htmlBack);
+        $this->assertStringContainsString('<blockquote>', $htmlBack);
+        $this->assertStringContainsString('<figcaption>Source</figcaption>', $htmlBack);
+    }
+
     // ==================== Complex Examples ====================
 
     public function testComplexDocument(): void
