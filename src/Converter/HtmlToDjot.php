@@ -99,13 +99,13 @@ class HtmlToDjot
             'html', 'body', 'div', 'article', 'section', 'main', 'header', 'footer', 'nav', 'aside' => $this->processBlock($node),
             'p' => $this->processParagraph($node),
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6' => $this->processHeading($node),
-            'strong', 'b' => '*' . $this->processChildren($node) . '*',
-            'em', 'i' => '_' . $this->processChildren($node) . '_',
-            'u', 'ins' => '{+' . $this->processChildren($node) . '+}',
-            's', 'strike', 'del' => '{-' . $this->processChildren($node) . '-}',
-            'mark' => '{=' . $this->processChildren($node) . '=}',
-            'sup' => '^' . $this->processChildren($node) . '^',
-            'sub' => '~' . $this->processChildren($node) . '~',
+            'strong', 'b' => $this->processInlineFormatting($node, '*', '*'),
+            'em', 'i' => $this->processInlineFormatting($node, '_', '_'),
+            'u', 'ins' => $this->processInlineFormatting($node, '{+', '+}'),
+            's', 'strike', 'del' => $this->processInlineFormatting($node, '{-', '-}'),
+            'mark' => $this->processInlineFormatting($node, '{=', '=}'),
+            'sup' => $this->processInlineFormatting($node, '^', '^'),
+            'sub' => $this->processInlineFormatting($node, '~', '~'),
             'code' => $this->processCode($node),
             'pre' => $this->processPreBlock($node),
             'a' => $this->processLink($node),
@@ -164,6 +164,16 @@ class HtmlToDjot
         $prefix = str_repeat('#', $level) . ' ';
 
         return $prefix . $content . "\n\n";
+    }
+
+    protected function processInlineFormatting(DOMElement $node, string $open, string $close): string
+    {
+        $content = trim($this->processChildren($node));
+        if ($content === '') {
+            return '';
+        }
+
+        return $open . $content . $close;
     }
 
     protected function processCode(DOMElement $node): string
