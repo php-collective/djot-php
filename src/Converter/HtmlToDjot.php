@@ -400,28 +400,84 @@ class HtmlToDjot
     protected function processDefinitionList(DOMElement $node): string
     {
         $output = "\n";
-        $lastWasTerm = false;
 
+        // Collect dt/dd elements to analyze structure
+        $elements = [];
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement) {
                 $tag = strtolower($child->tagName);
-                if ($tag === 'dt') {
-                    // Term: `: term` format
-                    $output .= ': ' . trim($this->processChildren($child)) . "\n";
-                    $lastWasTerm = true;
-                } elseif ($tag === 'dd') {
-                    // Definition: indented content after blank line
-                    if ($lastWasTerm) {
-                        $output .= "\n";
-                    }
-                    $content = trim($this->processChildren($child));
-                    // Indent definition content
-                    $lines = explode("\n", $content);
-                    foreach ($lines as $line) {
-                        $output .= '  ' . $line . "\n";
-                    }
-                    $lastWasTerm = false;
+                if ($tag === 'dt' || $tag === 'dd') {
+                    $elements[] = ['tag' => $tag, 'node' => $child];
                 }
+            }
+        }
+
+        // Check if we have consecutive dt elements (multiple terms)
+        $hasConsecutiveDt = false;
+        for ($i = 0; $i < count($elements) - 1; $i++) {
+            if ($elements[$i]['tag'] === 'dt' && $elements[$i + 1]['tag'] === 'dt') {
+                $hasConsecutiveDt = true;
+                break;
+            }
+        }
+
+        // Process elements
+        $prevWasDt = false;
+        foreach ($elements as $elem) {
+            $tag = $elem['tag'];
+            /** @var DOMElement $elemNode */
+            $elemNode = $elem['node'];
+
+            if ($tag === 'dt') {
+                $term = trim($this->processChildren($elemNode));
+                if ($hasConsecutiveDt) {
+                    // Multiple terms format: `: term`
+                    $output .= ': ' . $term . "\n";
+                } else {
+                    // Standard format: `term` on its own line
+                    $output .= $term . "\n";
+                }
+                $prevWasDt = true;
+            } elseif ($tag === 'dd') {
+                $content = trim($this->processChildren($elemNode));
+                $lines = explode("\n", $content);
+
+                if ($hasConsecutiveDt) {
+                    // Multiple terms format with multiple definitions
+                    if ($prevWasDt) {
+                        // First definition: blank line then indented content
+                        $output .= "\n";
+                        foreach ($lines as $line) {
+                            if (trim($line) !== '') {
+                                $output .= '  ' . $line . "\n";
+                            }
+                        }
+                    } else {
+                        // Additional definitions: use `: definition` syntax
+                        $output .= "\n";
+                        $firstLine = array_shift($lines);
+                        $output .= ': ' . $firstLine . "\n";
+
+                        // Continuation lines are indented
+                        foreach ($lines as $line) {
+                            if (trim($line) !== '') {
+                                $output .= '  ' . $line . "\n";
+                            }
+                        }
+                    }
+                } else {
+                    // Standard format: `: definition`
+                    $firstLine = array_shift($lines);
+                    $output .= ': ' . $firstLine . "\n";
+
+                    // Continuation lines are indented
+                    foreach ($lines as $line) {
+                        if (trim($line) !== '') {
+                            $output .= '  ' . $line . "\n";
+                        }
+                    }
+                }
+                $prevWasDt = false;
             }
         }
 

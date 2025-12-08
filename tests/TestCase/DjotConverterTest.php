@@ -449,6 +449,24 @@ DJOT;
         $this->assertStringContainsString('<dd>', $result);
     }
 
+    public function testDefinitionListMultipleTermsMultipleDefinitions(): void
+    {
+        // Multiple terms with multiple definitions
+        $djot = ": color\n: colour\n\n  The visual property.\n\n: A pigment or paint.";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dl>', $result);
+        // Two terms
+        $this->assertSame(2, substr_count($result, '<dt>'));
+        $this->assertStringContainsString('<dt>color</dt>', $result);
+        $this->assertStringContainsString('<dt>colour</dt>', $result);
+        // Two definitions
+        $this->assertSame(2, substr_count($result, '<dd>'));
+        $this->assertStringContainsString('The visual property.', $result);
+        $this->assertStringContainsString('A pigment or paint.', $result);
+    }
+
     public function testBlockAttributes(): void
     {
         $djot = "{.warning}\n# Important Notice";

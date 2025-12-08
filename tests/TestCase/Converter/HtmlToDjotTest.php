@@ -234,9 +234,9 @@ HTML;
         $html = '<dl><dt>Term</dt><dd>Definition</dd></dl>';
         $result = $this->converter->convert($html);
 
-        // Djot format: `: term` for term, indented content for definition
-        $this->assertStringContainsString(': Term', $result);
-        $this->assertStringContainsString('  Definition', $result);
+        // Single term: standard format (term on own line, `: definition`)
+        $this->assertStringContainsString("Term\n", $result);
+        $this->assertStringContainsString(': Definition', $result);
     }
 
     public function testDefinitionListMultipleTerms(): void
@@ -244,10 +244,41 @@ HTML;
         $html = '<dl><dt>color</dt><dt>colour</dt><dd>The visual property.</dd></dl>';
         $result = $this->converter->convert($html);
 
-        // Multiple terms share one definition
+        // Multiple terms share one definition - uses `: term` format
         $this->assertStringContainsString(': color', $result);
         $this->assertStringContainsString(': colour', $result);
         $this->assertStringContainsString('  The visual property.', $result);
+    }
+
+    public function testDefinitionListMultipleDefinitions(): void
+    {
+        $html = '<dl><dt>Term</dt><dd>First</dd><dd>Second</dd></dl>';
+        $result = $this->converter->convert($html);
+
+        // Single term with multiple dd - uses `: definition` for each
+        $this->assertStringContainsString("Term\n", $result);
+        $this->assertStringContainsString(': First', $result);
+        $this->assertStringContainsString(': Second', $result);
+    }
+
+    public function testDefinitionListMultipleTermsMultipleDefinitionsRoundtrip(): void
+    {
+        // Most complex case: multiple dt + multiple dd
+        $html = '<dl><dt>color</dt><dt>colour</dt><dd>Visual property</dd><dd>A pigment</dd></dl>';
+        $djot = $this->converter->convert($html);
+
+        // Verify format
+        $this->assertStringContainsString(': color', $djot);
+        $this->assertStringContainsString(': colour', $djot);
+        $this->assertStringContainsString('Visual property', $djot);
+        $this->assertStringContainsString(': A pigment', $djot);
+
+        // Roundtrip should be lossless
+        $djotConverter = new \Djot\DjotConverter();
+        $roundtrip = $djotConverter->convert($djot);
+
+        $this->assertSame(2, substr_count($roundtrip, '<dt>'));
+        $this->assertSame(2, substr_count($roundtrip, '<dd>'));
     }
 
     // ==================== Spans with Attributes ====================

@@ -1727,7 +1727,12 @@ class BlockParser
             }
 
             // Now collect definition content (after blank line, 2-space indent)
+            // Multiple definitions can follow with `: definition` syntax after a blank line
+            // but ONLY when there were multiple terms (this distinguishes from new term)
             $defLines = [];
+            $hasDefinition = false;
+            $allowMultipleDefinitions = count($terms) > 1;
+            $inBlankRun = false;
 
             // If term started with code fence, add it to definition content
             if ($codeFenceInfo !== null) {
@@ -1740,12 +1745,56 @@ class BlockParser
                 if (IndentationHelper::isBlankLine($defLine)) {
                     $defLines[] = '';
                     $i++;
+                    $inBlankRun = true;
 
                     continue;
                 }
 
-                // Check for next term (space is syntax delimiter, not tab)
-                if (preg_match('/^: +/', $defLine)) {
+                // Check for `: line` - could be new term or additional definition
+                if (preg_match('/^: +(.*)$/', $defLine, $addDefMatch)) {
+                    // Treat as additional definition only if:
+                    // 1. Multiple terms were defined (allows multiple dd), AND
+                    // 2. We already have definition content, AND
+                    // 3. We just came from a blank line
+                    $cleanDefLines = $this->trimBlankLines($defLines);
+                    if ($allowMultipleDefinitions && $cleanDefLines !== [] && $inBlankRun) {
+                        // Save current content as first definition
+                        $def = new DefinitionDescription();
+                        $this->parseBlocks($def, $cleanDefLines, 0);
+                        $defList->appendChild($def);
+                        $defLines = [];
+                        $hasDefinition = true;
+
+                        // Start new definition from `: definition` line
+                        $defLines[] = $addDefMatch[1];
+                        $i++;
+                        $inBlankRun = false;
+
+                        // Collect continuation lines for this definition
+                        while ($i < $count) {
+                            $contLine = $lines[$i];
+                            if (IndentationHelper::isBlankLine($contLine)) {
+                                $defLines[] = '';
+                                $i++;
+                                $inBlankRun = true;
+
+                                continue;
+                            }
+                            if (preg_match('/^  (.*)$/', $contLine, $contMatch)) {
+                                $defLines[] = $contMatch[1];
+                                $i++;
+                                $inBlankRun = false;
+                            } elseif (preg_match('/^: +/', $contLine) && $inBlankRun) {
+                                // Another `: definition` line after blank - continue outer loop
+                                break;
+                            } else {
+                                break;
+                            }
+                        }
+
+                        continue;
+                    }
+                    // Otherwise it's a new term - break to outer loop
                     break;
                 }
 
@@ -1753,27 +1802,21 @@ class BlockParser
                 if (preg_match('/^  (.*)$/', $defLine, $defMatch)) {
                     $defLines[] = $defMatch[1];
                     $i++;
+                    $inBlankRun = false;
                 } else {
                     break;
                 }
             }
 
-            // Create definition node
-            $def = new DefinitionDescription();
-            if ($defLines !== []) {
-                // Remove leading blank lines
-                while ($defLines !== [] && $defLines[0] === '') {
-                    array_shift($defLines);
+            // Create final definition node
+            if ($defLines !== [] || !$hasDefinition) {
+                $def = new DefinitionDescription();
+                $cleanDefLines = $this->trimBlankLines($defLines);
+                if ($cleanDefLines !== []) {
+                    $this->parseBlocks($def, $cleanDefLines, 0);
                 }
-                // Remove trailing blank lines
-                $defLineCount = count($defLines);
-                while ($defLineCount > 0 && $defLines[$defLineCount - 1] === '') {
-                    array_pop($defLines);
-                    $defLineCount--;
-                }
-                $this->parseBlocks($def, $defLines, 0);
+                $defList->appendChild($def);
             }
-            $defList->appendChild($def);
         }
 
         if (count($defList->getChildren()) === 0) {
@@ -1784,6 +1827,28 @@ class BlockParser
         $parent->appendChild($defList);
 
         return $i - $start;
+    }
+
+    /**
+     * Trim leading and trailing blank lines from an array
+     *
+     * @param array<string> $lines
+     * @return array<string>
+     */
+    protected function trimBlankLines(array $lines): array
+    {
+        // Remove leading blank lines
+        while ($lines !== [] && $lines[0] === '') {
+            array_shift($lines);
+        }
+        // Remove trailing blank lines
+        $count = count($lines);
+        while ($count > 0 && $lines[$count - 1] === '') {
+            array_pop($lines);
+            $count--;
+        }
+
+        return $lines;
     }
 
     /**

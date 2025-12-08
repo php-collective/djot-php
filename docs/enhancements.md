@@ -364,18 +364,14 @@ This fenced syntax is consistent with code fences (`` ``` ``) and div fences (`:
 
 ---
 
-### Multiple Definition Terms
+### Multiple Definition Terms and Definitions
 
 **Status:** Implemented in djot-php
 
-Multiple terms can share a single definition in definition lists:
+Multiple terms can share definitions in definition lists, and multiple definitions can be provided for shared terms:
 
+**Multiple terms, single definition:**
 ```djot
-: CLI
-: Command Line Interface
-
-  A text-based interface for interacting with computers.
-
 : color
 : colour
 
@@ -385,11 +381,6 @@ Multiple terms can share a single definition in definition lists:
 **Output:**
 ```html
 <dl>
-<dt>CLI</dt>
-<dt>Command Line Interface</dt>
-<dd>
-<p>A text-based interface for interacting with computers.</p>
-</dd>
 <dt>color</dt>
 <dt>colour</dt>
 <dd>
@@ -398,11 +389,38 @@ Multiple terms can share a single definition in definition lists:
 </dl>
 ```
 
+**Multiple terms, multiple definitions:**
+```djot
+: color
+: colour
+
+  The visual property of objects.
+
+: A pigment or paint.
+```
+
+**Output:**
+```html
+<dl>
+<dt>color</dt>
+<dt>colour</dt>
+<dd>
+<p>The visual property of objects.</p>
+</dd>
+<dd>
+<p>A pigment or paint.</p>
+</dd>
+</dl>
+```
+
 **Rules:**
 - Consecutive `: term` lines are grouped as multiple terms
 - Blank lines between terms are allowed
-- Definition follows after blank line with indentation
+- First definition follows after blank line with indentation
+- Additional definitions use `: definition` syntax after a blank line
 - Common in dictionaries for synonyms, abbreviations, and alternate spellings
+
+**Lossless HTML roundtrip:** The `HtmlToDjot` converter preserves this structure, enabling lossless conversion of HTML definition lists with multiple `<dt>` and `<dd>` elements.
 
 ---
 
@@ -438,7 +456,7 @@ vendor/bin/phpunit
 |---------------------------|------------------------------------------------|------------|
 | List item attributes      | [#262](https://github.com/jgm/djot/pull/262)   | Open PR    |
 | Boolean attribute shorthand | [#257](https://github.com/jgm/djot/issues/257) | Open       |
-| Multiple definition terms | -                                              | djot-php   |
+| Multiple definition terms/definitions | -                                    | djot-php   |
 | Fenced comment blocks     | [#67](https://github.com/jgm/djot/issues/67)   | Open       |
 
 ### Optional Modes
