@@ -383,4 +383,103 @@ DJOT;
         $cell = $cells2[1];
         $this->assertSame('d', $cell->getAttribute('class'));
     }
+
+    /**
+     * Test that inline formatting is not mistaken for cell attributes.
+     *
+     * {=highlight=}, {+insert+}, {-delete-} etc should be rendered as inline
+     * formatting, not stripped as attributes.
+     */
+    public function testInlineFormattingNotMistakenForAttributes(): void
+    {
+        $djot = <<<'DJOT'
+| Syntax            | Result          |
+| :---------------- | :-------------- |
+| `{=Highlighted=}` | {=Highlighted=} |
+| `{+Inserted+}`    | {+Inserted+}    |
+| `{-Deleted-}`     | {-Deleted-}     |
+DJOT;
+
+        $html = $this->converter->convert($djot);
+
+        // Inline formatting should render as proper HTML elements
+        $this->assertStringContainsString('<mark>Highlighted</mark>', $html);
+        $this->assertStringContainsString('<ins>Inserted</ins>', $html);
+        $this->assertStringContainsString('<del>Deleted</del>', $html);
+    }
+
+    /**
+     * Test that inline formatting with space after pipe is preserved.
+     */
+    public function testInlineFormattingWithLeadingSpace(): void
+    {
+        $djot = <<<'DJOT'
+| Normal text | {=marked=} text |
+|-------------|-----------------|
+| {+added+}   | {-removed-}     |
+DJOT;
+
+        $html = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<mark>marked</mark>', $html);
+        $this->assertStringContainsString('<ins>added</ins>', $html);
+        $this->assertStringContainsString('<del>removed</del>', $html);
+    }
+
+    /**
+     * Test subscript and superscript in table cells.
+     */
+    public function testSubscriptSuperscriptInTableCells(): void
+    {
+        $djot = <<<'DJOT'
+| Formula | Result   |
+|---------|----------|
+| E=mc^2^ | E=mc^2^  |
+| H~2~O   | H~2~O    |
+DJOT;
+
+        $html = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<sup>2</sup>', $html);
+        $this->assertStringContainsString('<sub>2</sub>', $html);
+    }
+
+    /**
+     * Test that actual cell attributes still work alongside inline formatting.
+     */
+    public function testCellAttributesWithInlineFormatting(): void
+    {
+        $djot = <<<'DJOT'
+|{.highlight} {=marked=} text | normal |
+|-----|------|
+| a   | b    |
+DJOT;
+
+        $html = $this->converter->convert($djot);
+
+        // Cell should have class attribute AND contain marked text
+        $this->assertStringContainsString('class="highlight"', $html);
+        $this->assertStringContainsString('<mark>marked</mark>', $html);
+    }
+
+    /**
+     * Test braced quotes in table cells are not mistaken for attributes.
+     */
+    public function testBracedQuotesInTableCells(): void
+    {
+        $djot = <<<'DJOT'
+| Quote type | Example |
+|------------|---------|
+| Single     | {''}    |
+| Double     | {""}    |
+DJOT;
+
+        $html = $this->converter->convert($djot);
+
+        // Should contain curly quotes, not be stripped
+        $this->assertStringContainsString("\u{2018}", $html); // Left single quote
+        $this->assertStringContainsString("\u{2019}", $html); // Right single quote
+        $this->assertStringContainsString("\u{201C}", $html); // Left double quote
+        $this->assertStringContainsString("\u{201D}", $html); // Right double quote
+    }
 }

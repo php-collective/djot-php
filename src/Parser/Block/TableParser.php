@@ -217,15 +217,18 @@ class TableParser
             $content = $cellContent;
 
             // Check for cell attribute at start: {.class} content
-            // Must be at the very start (after optional whitespace)
-            $trimmed = ltrim($cellContent);
-            if (preg_match('/^\{([^{}]+)\}\s*/', $trimmed, $matches)) {
-                $attributes = AttributeParser::parse($matches[1]);
-                // Remove the attribute from content
-                $content = substr($trimmed, strlen($matches[0]));
-                // Preserve any leading whitespace that was before the attribute
-                $leadingSpace = substr($cellContent, 0, strlen($cellContent) - strlen($trimmed));
-                $content = $leadingSpace . $content;
+            // Attribute must be immediately at start (no leading whitespace)
+            // to distinguish from inline formatting like {=highlight=}
+            // Also exclude inline markers: {=...=}, {+...+}, {-...-}, etc.
+            if (preg_match('/^\{([^{}]+)\}\s*/', $cellContent, $matches)) {
+                $inner = $matches[1];
+                // Only treat as attribute if it's NOT an inline formatting marker
+                // Inline markers have same char at start and end: =text=, +text+, -text-, etc.
+                if (!$this->isInlineMarker($inner)) {
+                    $attributes = AttributeParser::parse($inner);
+                    // Remove the attribute from content
+                    $content = substr($cellContent, strlen($matches[0]));
+                }
             }
 
             $result[] = [
@@ -235,6 +238,36 @@ class TableParser
         }
 
         return $result;
+    }
+
+    /**
+     * Check if content inside {...} is an inline formatting marker.
+     *
+     * Inline markers: =text=, +text+, -text-, ~text~, ^text^, _text_, *text*
+     * Also quote markers: ', ", '', ""
+     *
+     * @param string $inner The content inside {...}
+     *
+     * @return bool True if it's an inline marker (not an attribute)
+     */
+    protected function isInlineMarker(string $inner): bool
+    {
+        // Quote markers: ' or " (any number)
+        if (preg_match('/^[\'"]+$/', $inner)) {
+            return true;
+        }
+
+        // Inline formatting: marker at start and end (=text=, +text+, -text-, ~text~, ^text^)
+        if (strlen($inner) >= 3) {
+            $firstChar = $inner[0];
+            $lastChar = $inner[strlen($inner) - 1];
+            $inlineMarkers = ['=', '+', '-', '~', '^', '_', '*'];
+            if (in_array($firstChar, $inlineMarkers, true) && $firstChar === $lastChar) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
