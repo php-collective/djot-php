@@ -1409,7 +1409,10 @@ class BlockParser
                     // Collect all indented content at this new level
                     $subLines = [];
                     $subIndent = $currentIndent;
+                    // Track the maximum content indent we've seen (for detecting drop-back to marker level)
+                    $maxContentIndent = $currentIndent;
                     $sawBlankLine = false;
+                    $brokeForParentContent = false;
                     while ($i < $count) {
                         $subLine = $lines[$i];
                         if (IndentationHelper::isBlankLine($subLine)) {
@@ -1420,29 +1423,50 @@ class BlockParser
                             continue;
                         }
                         $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
+
+                        // If we've seen content at a higher indent level (actual nested content),
+                        // and now we're back at the marker level (subIndent) after a blank line,
+                        // this content belongs to the parent level - break to let parent handle it
+                        if ($lineIndent === $subIndent && $maxContentIndent > $subIndent && $sawBlankLine) {
+                            // Set flags so parent loop handles this as continuation content
+                            $lastItemHadBlankAfter = true;
+                            $brokeForParentContent = true;
+
+                            break;
+                        }
+
                         // Check if line has at least the subIndent level
                         if ($lineIndent >= $subIndent) {
+                            // Track the highest content indent seen
+                            if ($lineIndent > $maxContentIndent) {
+                                $maxContentIndent = $lineIndent;
+                            }
                             // Remove subIndent worth of indentation (handling tabs)
                             $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $subIndent);
                             $sawBlankLine = false;
                             $i++;
-                        } elseif ($lineIndent >= $baseIndent) {
-                            // Check if it's a same-level list item (at base indent)
+                        } elseif ($lineIndent === $baseIndent) {
+                            // Line is at base indent - check if it starts a new block or list item
                             $trimmedLine = ltrim($subLine);
                             $itemInfo = $this->listParser->parseListItemMarker($trimmedLine);
                             $sameStyle = !isset($listInfo['style']) || !isset($itemInfo['style']) || $itemInfo['style'] === $listInfo['style'];
-                            if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle && $lineIndent === $baseIndent) {
+                            if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle) {
                                 break;
                             }
                             // Content at base indent that's not a matching list marker
-                            // Check if it's a block starter - if so, end list
-                            if ($this->startsNewBlock($trimmedLine)) {
+                            // Check if it's a block element - if so, end list content collection
+                            // Use isBlockElementStart() which detects blocks regardless of mode
+                            if ($this->isBlockElementStart($trimmedLine) || $this->startsNewBlock($trimmedLine)) {
                                 break;
                             }
-                            // Otherwise it's lazy continuation - include in nested content
+                            // Otherwise it's lazy continuation at base level - include in nested content
                             $subLines[] = $trimmedLine;
                             $sawBlankLine = false;
                             $i++;
+                        } elseif ($lineIndent > $baseIndent) {
+                            // Line is at intermediate indent (between base and nested content)
+                            // This content belongs to a parent list level, not current nested content
+                            break;
                         } else {
                             // End of list
                             break;
@@ -1461,7 +1485,10 @@ class BlockParser
                     // In djot, blank lines within nested content don't make the parent list loose
                     // The list is only loose if there's a blank line directly after item content
                     // (before nested content starts), which is already handled elsewhere
-                    $lastItemHadBlankAfter = false;
+                    // Only reset if we didn't break to handle content at parent level
+                    if (!$brokeForParentContent) {
+                        $lastItemHadBlankAfter = false;
+                    }
 
                     continue;
                 }
@@ -2387,6 +2414,76 @@ class BlockParser
 
         // Thematic breaks
         if (preg_match('/^(\*\s*\*\s*\*|\-\s*\-\s*\-)/', $line)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if line starts a block element that should terminate list content collection.
+     *
+     * This is different from startsNewBlock() which is about paragraph interruption.
+     * Block elements at column 0 (or less than list indent) should always break out
+     * of list content collection, regardless of significantNewlines mode.
+     *
+     * @param string $line The trimmed line to check
+     */
+    protected function isBlockElementStart(string $line): bool
+    {
+        // Headings
+        if (preg_match('/^#{1,6}(?: |$)/', $line)) {
+            return true;
+        }
+
+        // Code fences (``` or ~~~)
+        if (preg_match('/^[`~]{3,}/', $line)) {
+            return true;
+        }
+
+        // Fenced divs (::: but not definition list :)
+        if (preg_match('/^:{3,}/', $line)) {
+            return true;
+        }
+
+        // Comment fences (%%%)
+        if (preg_match('/^%{3,}/', $line)) {
+            return true;
+        }
+
+        // Thematic breaks (---, ***, ___)
+        if (preg_match('/^([-*_])[ \t]*\1[ \t]*\1/', $line)) {
+            return true;
+        }
+
+        // Block quotes
+        if (preg_match('/^>/', $line)) {
+            return true;
+        }
+
+        // Tables (starting with |)
+        if (preg_match('/^\|/', $line)) {
+            return true;
+        }
+
+        // Definition list terms (: followed by space or content)
+        if (preg_match('/^: /', $line)) {
+            return true;
+        }
+
+        // List markers - these indicate a new list at this level
+        // Bullet lists: -, *, + followed by space
+        if (preg_match('/^[-*+] /', $line)) {
+            return true;
+        }
+
+        // Ordered lists: digit(s) or letter followed by . or ) and space
+        if (preg_match('/^(\d+|[a-zA-Z])[.)] /', $line)) {
+            return true;
+        }
+
+        // Task lists: - [ ] or - [x]
+        if (preg_match('/^- \[[xX ]\] /', $line)) {
             return true;
         }
 
