@@ -632,6 +632,7 @@ vendor/bin/phpunit
 | Definition list attributes | [#323](https://github.com/jgm/djot/issues/323) | Open       |
 | Fenced comment blocks     | [#67](https://github.com/jgm/djot/issues/67)   | Open       |
 | Captions (image/table/blockquote) | [djot-php#37](https://github.com/php-collective/djot-php/issues/37) | djot-php |
+| Abbreviations (PHP MD Extra) | -                                           | djot-php   |
 
 ### Optional Modes
 
@@ -640,6 +641,43 @@ vendor/bin/phpunit
 | Significant newlines  | [#161](https://github.com/jgm/djot/issues/161) | djot-php (opt-in) |
 
 These enhancements may be adopted into the official spec. We track upstream discussions and adjust our implementation accordingly.
+
+---
+
+## Abbreviations (PHP Markdown Extra Style)
+
+**Status:** djot-php extension
+
+Abbreviation definitions using PHP Markdown Extra syntax for automatic `<abbr>` tag wrapping:
+
+```djot
+The HTML specification is maintained by the W3C.
+
+*[HTML]: Hyper Text Markup Language
+*[W3C]: World Wide Web Consortium
+```
+
+**Output:**
+```html
+<p>The <abbr title="Hyper Text Markup Language">HTML</abbr> specification
+is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
+```
+
+**Features:**
+- Definitions can appear anywhere in the document
+- Case-sensitive matching (HTML ≠ html)
+- Word-boundary aware (HTML won't match HTMLElement or XHTML)
+- Multi-line definitions supported with indentation
+- Works alongside the inline span approach (`[HTML]{abbr="..."}`) from the [cookbook](cookbook.md#abbreviations)
+
+**Multi-line definition example:**
+```djot
+*[HTML]: Hyper Text Markup Language,
+  the standard markup language for documents
+  designed to be displayed in a web browser
+```
+
+This is an extension feature not part of the djot spec, inspired by [PHP Markdown Extra](https://michelf.ca/projects/php-markdown/extra/#abbr).
 
 ---
 
