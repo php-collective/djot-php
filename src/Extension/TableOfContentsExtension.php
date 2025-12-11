@@ -38,7 +38,7 @@ use Djot\Node\Node;
  *     maxLevel: 3, // Up to h3
  *     listType: 'ol', // Use ordered list
  *     position: 'top', // Auto-insert at 'top', 'bottom', or null for manual
- *     separator: "<hr>\n", // Separator between TOC and content (default)
+ *     separator: "<hr>\n", // Optional separator between TOC and content
  * );
  * ```
  */
@@ -65,7 +65,7 @@ class TableOfContentsExtension implements ExtensionInterface
         protected string $listType = 'ul',
         protected string $cssClass = 'toc',
         protected ?string $position = null,
-        protected string $separator = "<hr>\n",
+        protected string $separator = '',
     ) {
     }
 

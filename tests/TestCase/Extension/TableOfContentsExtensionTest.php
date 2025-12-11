@@ -217,15 +217,14 @@ DJOT;
 
         $html = $converter->convert("## First\n\nContent.\n\n## Second");
 
-        // TOC should appear before content with separator
+        // TOC should appear before content
         $tocPos = strpos($html, '<nav class="toc">');
-        $hrPos = strpos($html, '<hr>');
         $contentPos = strpos($html, '<section');
         $this->assertNotFalse($tocPos);
-        $this->assertNotFalse($hrPos);
         $this->assertNotFalse($contentPos);
-        $this->assertLessThan($hrPos, $tocPos);
-        $this->assertLessThan($contentPos, $hrPos);
+        $this->assertLessThan($contentPos, $tocPos);
+        // Default: no separator
+        $this->assertStringNotContainsString('<hr>', $html);
     }
 
     public function testPositionBottom(): void
@@ -235,15 +234,14 @@ DJOT;
 
         $html = $converter->convert("## First\n\nContent.\n\n## Second");
 
-        // TOC should appear after content with separator
+        // TOC should appear after content
         $tocPos = strpos($html, '<nav class="toc">');
-        $hrPos = strrpos($html, '<hr>');
         $contentPos = strrpos($html, '</section>');
         $this->assertNotFalse($tocPos);
-        $this->assertNotFalse($hrPos);
         $this->assertNotFalse($contentPos);
-        $this->assertGreaterThan($contentPos, $hrPos);
-        $this->assertGreaterThan($hrPos, $tocPos);
+        $this->assertGreaterThan($contentPos, $tocPos);
+        // Default: no separator
+        $this->assertStringNotContainsString('<hr>', $html);
     }
 
     public function testCustomSeparator(): void
@@ -251,26 +249,18 @@ DJOT;
         $converter = new DjotConverter();
         $converter->addExtension(new TableOfContentsExtension(
             position: 'top',
-            separator: '<div class="toc-separator"></div>',
+            separator: '<hr>',
         ));
 
         $html = $converter->convert("## First\n\nContent.");
 
-        $this->assertStringContainsString('<div class="toc-separator"></div>', $html);
-        $this->assertStringNotContainsString('<hr>', $html);
-    }
-
-    public function testEmptySeparator(): void
-    {
-        $converter = new DjotConverter();
-        $converter->addExtension(new TableOfContentsExtension(
-            position: 'top',
-            separator: '',
-        ));
-
-        $html = $converter->convert("## First\n\nContent.");
-
-        $this->assertStringNotContainsString('<hr>', $html);
+        // Separator should appear between TOC and content
+        $tocPos = strpos($html, '</nav>');
+        $hrPos = strpos($html, '<hr>');
+        $contentPos = strpos($html, '<section');
+        $this->assertNotFalse($hrPos);
+        $this->assertLessThan($hrPos, $tocPos);
+        $this->assertLessThan($contentPos, $hrPos);
     }
 
     public function testPositionNullForManualPlacement(): void
