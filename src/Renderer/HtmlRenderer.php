@@ -26,6 +26,7 @@ use Djot\Node\Block\TableCell;
 use Djot\Node\Block\TableRow;
 use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
+use Djot\Node\Inline\Abbreviation;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
@@ -416,6 +417,7 @@ class HtmlRenderer implements RendererInterface
             $node instanceof Subscript => $this->renderSubscript($node),
             $node instanceof Insert => $this->renderInsert($node),
             $node instanceof Delete => $this->renderDelete($node),
+            $node instanceof Abbreviation => $this->renderAbbreviation($node),
             default => $this->renderChildren($node),
         };
     }
@@ -779,6 +781,15 @@ class HtmlRenderer implements RendererInterface
         $attrs = $this->renderAttributes($node);
 
         return '<del' . $attrs . '>' . $this->renderChildren($node) . '</del>';
+    }
+
+    protected function renderAbbreviation(Abbreviation $node): string
+    {
+        $attrs = $this->renderAttributes($node);
+        $title = $node->getTitle();
+
+        return '<abbr title="' . $this->escapeAttribute($title) . '"' . $attrs . '>'
+            . $this->renderChildren($node) . '</abbr>';
     }
 
     protected function renderAttributes(Node $node): string

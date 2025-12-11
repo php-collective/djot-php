@@ -883,6 +883,37 @@ Line two<br>
 Line three</p>
 ```
 
+## Abbreviations (Extension)
+
+Abbreviations allow you to define terms that will automatically be wrapped in `<abbr>` tags with their definitions. This is an extension feature inspired by PHP Markdown Extra.
+
+**Input:**
+```djot
+The HTML specification is maintained by the W3C.
+
+*[HTML]: Hyper Text Markup Language
+*[W3C]: World Wide Web Consortium
+```
+
+**Output:**
+```html
+<p>The <abbr title="Hyper Text Markup Language">HTML</abbr> specification is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
+```
+
+Abbreviation definitions can appear anywhere in the document and will be applied to all matching text. Matching is:
+- Case-sensitive (HTML ≠ html)
+- Word-boundary aware (HTML won't match HTMLElement)
+
+Definitions can span multiple lines if continuation lines are indented:
+
+```djot
+*[HTML]: Hyper Text Markup Language,
+  the standard markup language for documents
+  designed to be displayed in a web browser
+```
+
+**Note:** This feature works alongside the inline span approach documented in the [cookbook](cookbook.md#abbreviations). The definition-based approach automatically applies to all matching text, while the inline `[HTML]{abbr="..."}` approach allows overriding specific occurrences.
+
 ## Escaping
 
 Use backslash to escape special characters.

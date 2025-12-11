@@ -60,6 +60,13 @@ class BlockParser
     protected array $footnotes = [];
 
     /**
+     * Abbreviation definitions: maps abbreviation text to its definition
+     *
+     * @var array<string, string>
+     */
+    protected array $abbreviations = [];
+
+    /**
      * Pending block attributes to apply to next block
      *
      * @var array<string, mixed>
@@ -291,15 +298,17 @@ class BlockParser
     {
         $this->references = [];
         $this->footnotes = [];
+        $this->abbreviations = [];
         $this->pendingAttributes = [];
         $this->warnings = [];
         $this->lineOffset = 0;
         $document = new Document();
         $lines = $this->splitLines($input);
 
-        // First pass: extract reference definitions, footnotes, and heading references
+        // First pass: extract reference definitions, footnotes, abbreviations, and heading references
         $this->extractReferences($lines);
         $this->extractFootnotes($lines);
+        $this->extractAbbreviations($lines);
         $this->extractHeadingReferences($lines);
 
         // Second pass: parse blocks
@@ -450,6 +459,62 @@ class BlockParser
     }
 
     /**
+     * Extract abbreviation definitions from the document
+     *
+     * Syntax: *[ABBR]: Full Definition Text
+     *
+     * This is an extension feature inspired by PHP Markdown Extra.
+     *
+     * @param array<string> $lines
+     */
+    protected function extractAbbreviations(array $lines): void
+    {
+        $i = 0;
+        $count = count($lines);
+
+        while ($i < $count) {
+            $line = $lines[$i];
+
+            // Match abbreviation definition: *[abbr]: definition
+            if (preg_match('/^\*\[([^\]]+)\]:\s*(.*)$/', $line, $matches)) {
+                $abbr = $matches[1];
+                $definition = trim($matches[2]);
+
+                // Collect continuation lines (indented)
+                $j = $i + 1;
+                while ($j < $count) {
+                    $nextLine = $lines[$j];
+                    if (IndentationHelper::isBlankLine($nextLine)) {
+                        break;
+                    }
+                    // Check if next line starts a new abbreviation definition
+                    if (preg_match('/^\*\[([^\]]+)\]:/', $nextLine)) {
+                        break;
+                    }
+                    if ($this->startsNewBlock($nextLine)) {
+                        break;
+                    }
+                    // Continuation line (indented)
+                    if (preg_match('/^\s+(.+)$/', $nextLine, $contMatch)) {
+                        $definition .= ' ' . $contMatch[1];
+                        $j++;
+                    } else {
+                        break;
+                    }
+                }
+
+                // Store the abbreviation (case-sensitive)
+                $this->abbreviations[$abbr] = $definition;
+                $i = $j;
+
+                continue;
+            }
+
+            $i++;
+        }
+    }
+
+    /**
      * Extract heading IDs as implicit reference definitions
      * This allows [Heading][] style links to headings
      *
@@ -578,6 +643,7 @@ class BlockParser
                 ?? $this->tryParseTable($parent, $lines, $i)
                 ?? $this->tryParseFootnoteDefinition($lines, $i)
                 ?? $this->tryParseReferenceDefinition($lines, $i)
+                ?? $this->tryParseAbbreviationDefinition($lines, $i)
                 ?? $this->tryParseCaption($parent, $lines, $i)
                 ?? $this->tryParseParagraph($parent, $lines, $i);
 
@@ -2183,6 +2249,47 @@ class BlockParser
     }
 
     /**
+     * Skip abbreviation definitions (already extracted in first pass)
+     *
+     * @param array<string> $lines
+     * @param int $start
+     */
+    protected function tryParseAbbreviationDefinition(array $lines, int $start): ?int
+    {
+        $line = $lines[$start];
+
+        // Match abbreviation definition: *[abbr]: definition
+        if (!preg_match('/^\*\[([^\]]+)\]:\s*/', $line)) {
+            return null;
+        }
+
+        // Collect continuation lines
+        $i = $start + 1;
+        $count = count($lines);
+
+        while ($i < $count) {
+            $nextLine = $lines[$i];
+            if (IndentationHelper::isBlankLine($nextLine)) {
+                break;
+            }
+            // Check if next line starts a new abbreviation definition
+            if (preg_match('/^\*\[([^\]]+)\]:/', $nextLine)) {
+                break;
+            }
+            if ($this->startsNewBlock($nextLine)) {
+                break;
+            }
+            if (preg_match('/^\s+(.+)$/', $nextLine)) {
+                $i++;
+            } else {
+                break;
+            }
+        }
+
+        return $i - $start;
+    }
+
+    /**
      * @param \Djot\Node\Node $parent
      * @param array<string> $lines
      * @param int $start
@@ -2553,6 +2660,24 @@ class BlockParser
     public function hasFootnote(string $label): bool
     {
         return isset($this->footnotes[$label]);
+    }
+
+    /**
+     * Get all abbreviation definitions
+     *
+     * @return array<string, string> Map of abbreviation text to definition
+     */
+    public function getAbbreviations(): array
+    {
+        return $this->abbreviations;
+    }
+
+    /**
+     * Get the definition for a specific abbreviation
+     */
+    public function getAbbreviation(string $abbr): ?string
+    {
+        return $this->abbreviations[$abbr] ?? null;
     }
 
     /**
