@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot;
 
 use Closure;
+use Djot\Extension\ExtensionInterface;
 use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
@@ -29,6 +30,13 @@ class DjotConverter
     protected ?Profile $profile = null;
 
     protected ?ProfileFilter $profileFilter = null;
+
+    /**
+     * Registered extensions
+     *
+     * @var array<\Djot\Extension\ExtensionInterface>
+     */
+    protected array $extensions = [];
 
     /**
      * @param bool $xhtml Whether to use XHTML-compatible output
@@ -255,6 +263,37 @@ class DjotConverter
     public function getParser(): BlockParser
     {
         return $this->parser;
+    }
+
+    /**
+     * Register an extension
+     *
+     * Extensions can add custom inline/block patterns and render event listeners.
+     *
+     * Example:
+     * ```php
+     * $converter->addExtension(new ExternalLinksExtension());
+     * $converter->addExtension(new MentionsExtension(
+     *     userUrlTemplate: 'https://github.com/{username}',
+     * ));
+     * ```
+     */
+    public function addExtension(ExtensionInterface $extension): self
+    {
+        $this->extensions[] = $extension;
+        $extension->register($this);
+
+        return $this;
+    }
+
+    /**
+     * Get all registered extensions
+     *
+     * @return array<\Djot\Extension\ExtensionInterface>
+     */
+    public function getExtensions(): array
+    {
+        return $this->extensions;
     }
 
     /**
