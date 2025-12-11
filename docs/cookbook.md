@@ -28,7 +28,25 @@ Common recipes and customizations for djot-php.
 
 ## External Links
 
+> **Tip:** Use the built-in [ExternalLinksExtension](extensions.md#externallinksextension) for common cases.
+
 Open external links in a new tab with security attributes:
+
+```php
+use Djot\Extension\ExternalLinksExtension;
+
+$converter = new DjotConverter();
+$converter->addExtension(new ExternalLinksExtension());
+
+echo $converter->convert('[External](https://example.com) and [internal](/page)');
+```
+
+Output:
+```html
+<p><a href="https://example.com" target="_blank" rel="noopener noreferrer">External</a> and <a href="/page">internal</a></p>
+```
+
+For more control (custom logic, different attributes), use the event system directly:
 
 ```php
 use Djot\DjotConverter;
@@ -45,19 +63,11 @@ $converter->on('render.link', function (RenderEvent $event): void {
 
     $href = $link->getDestination();
 
-    // Check if external link
-    if (str_starts_with($href, 'http://') || str_starts_with($href, 'https://')) {
-        $link->setAttribute('target', '_blank');
-        $link->setAttribute('rel', 'noopener noreferrer');
+    // Custom logic: only external links to specific domains
+    if (str_contains($href, 'untrusted-domain.com')) {
+        $link->setAttribute('rel', 'nofollow noopener');
     }
 });
-
-echo $converter->convert('[External](https://example.com) and [internal](/page)');
-```
-
-Output:
-```html
-<p><a href="https://example.com" target="_blank" rel="noopener noreferrer">External</a> and <a href="/page">internal</a></p>
 ```
 
 ## Custom Emoji/Symbols
@@ -185,65 +195,44 @@ $converter->on('render.code_block', function (RenderEvent $event): void {
 
 ## Table of Contents Generation
 
+> **Tip:** Use the built-in [TableOfContentsExtension](extensions.md#tableofcontentsextension) for common cases.
+
 Generate a table of contents from headings:
 
 ```php
-use Djot\Parser\BlockParser;
-use Djot\Renderer\HtmlRenderer;
-use Djot\Node\Block\Heading;
+use Djot\DjotConverter;
+use Djot\Extension\TableOfContentsExtension;
 
-function generateToc(string $djot): array
-{
-    $parser = new BlockParser();
-    $document = $parser->parse($djot);
+$converter = new DjotConverter();
+$tocExtension = new TableOfContentsExtension(
+    minLevel: 2,      // Skip h1
+    maxLevel: 3,      // Only h2 and h3
+    position: 'top',  // Auto-insert at top of output
+);
+$converter->addExtension($tocExtension);
 
-    $toc = [];
-    foreach ($document->getChildren() as $node) {
-        if ($node instanceof Heading) {
-            $text = '';
-            foreach ($node->getChildren() as $child) {
-                if (method_exists($child, 'getContent')) {
-                    $text .= $child->getContent();
-                }
-            }
+$html = $converter->convert($djot);
+```
 
-            $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $text));
-            $slug = trim($slug, '-');
+For manual placement:
 
-            $toc[] = [
-                'level' => $node->getLevel(),
-                'text' => $text,
-                'slug' => $slug,
-            ];
-        }
-    }
+```php
+$tocExtension = new TableOfContentsExtension();
+$converter->addExtension($tocExtension);
 
-    return $toc;
-}
+$html = $converter->convert($djot);
+$toc = $tocExtension->getTocHtml();
 
-function renderTocHtml(array $toc): string
-{
-    $html = '<nav class="toc"><ul>';
-    foreach ($toc as $item) {
-        $indent = str_repeat('  ', $item['level'] - 1);
-        $html .= $indent . '<li><a href="#' . $item['slug'] . '">' . htmlspecialchars($item['text']) . '</a></li>';
-    }
-    $html .= '</ul></nav>';
+// Place TOC wherever you want
+echo $toc;
+echo $html;
+```
 
-    return $html;
-}
+For fully custom TOC rendering, access the raw data:
 
-$djot = <<<'DJOT'
-# Introduction
-## Getting Started
-## Installation
-# Usage
-## Basic Example
-## Advanced Features
-DJOT;
-
-$toc = generateToc($djot);
-echo renderTocHtml($toc);
+```php
+$tocData = $tocExtension->getToc();
+// Returns: [['level' => 2, 'text' => 'Getting Started', 'id' => 'Getting-Started'], ...]
 ```
 
 ## Image Processing
@@ -347,46 +336,39 @@ echo $converter->convert($djot);
 
 ## Heading Anchors
 
+> **Tip:** Use the built-in [HeadingPermalinksExtension](extensions.md#headingpermalinksextension) for clickable permalink anchors.
+
 Add anchor links to headings:
 
 ```php
 use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Block\Heading;
-use Djot\Renderer\HtmlRenderer;
+use Djot\Extension\HeadingPermalinksExtension;
 
 $converter = new DjotConverter();
-
-$converter->on('render.heading', function (RenderEvent $event): void {
-    $heading = $event->getNode();
-    if (!$heading instanceof Heading) {
-        return;
-    }
-
-    // Extract text content for slug
-    $text = '';
-    foreach ($heading->getChildren() as $child) {
-        if (method_exists($child, 'getContent')) {
-            $text .= $child->getContent();
-        }
-    }
-
-    $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $text));
-    $slug = trim($slug, '-');
-
-    // Set ID for anchor
-    $heading->setAttribute('id', $slug);
-
-    // Note: To add the anchor link inside, you'd need to render children manually
-    // This example just adds the ID attribute
-});
+$converter->addExtension(new HeadingPermalinksExtension(
+    symbol: '#',         // Or '¶', '🔗', etc.
+    position: 'after',   // 'before' or 'after'
+    cssClass: 'anchor',
+));
 
 echo $converter->convert('## Getting Started');
 ```
 
 Output:
 ```html
-<h2 id="getting-started">Getting Started</h2>
+<section id="Getting-Started">
+<h2>Getting Started <span class="permalink-wrapper"><a href="#Getting-Started" class="anchor" aria-label="Permalink">#</a></span></h2>
+</section>
+```
+
+For custom anchor logic without the permalink link, use events:
+
+```php
+$converter->on('render.heading', function (RenderEvent $event): void {
+    $heading = $event->getNode();
+    // Custom ID generation logic
+    $heading->setAttribute('id', 'custom-' . uniqid());
+});
 ```
 
 ## Link Validation
@@ -474,28 +456,31 @@ $converter->on('render.raw_inline', function (RenderEvent $event) use ($allowedT
 
 ## Lazy Loading Images
 
+> **Tip:** Use the built-in [DefaultAttributesExtension](extensions.md#defaultattributesextension) for this.
+
 Add native lazy loading to all images:
 
 ```php
 use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Inline\Image;
+use Djot\Extension\DefaultAttributesExtension;
 
 $converter = new DjotConverter();
+$converter->addExtension(new DefaultAttributesExtension([
+    'image' => ['loading' => 'lazy', 'decoding' => 'async'],
+]));
+```
 
+For more complex logic (e.g., different attributes based on image source), use events:
+
+```php
 $converter->on('render.image', function (RenderEvent $event): void {
     $image = $event->getNode();
-    if (!$image instanceof Image) {
-        return;
+    $src = $image->getDestination();
+
+    // Only lazy load external images
+    if (str_starts_with($src, 'http')) {
+        $image->setAttribute('loading', 'lazy');
     }
-
-    // Add lazy loading attributes
-    $image->setAttribute('loading', 'lazy');
-    $image->setAttribute('decoding', 'async');
-
-    // Add dimensions if known (prevents layout shift)
-    // $image->setAttribute('width', '800');
-    // $image->setAttribute('height', '600');
 });
 ```
 
@@ -1126,29 +1111,40 @@ Extend Djot with custom inline syntax by registering patterns on the InlineParse
 
 ### @Mentions
 
+> **Tip:** Use the built-in [MentionsExtension](extensions.md#mentionsextension) for common cases.
+
 Convert `@username` to profile links:
 
 ```php
 use Djot\DjotConverter;
-use Djot\Node\Inline\Link;
-use Djot\Node\Inline\Text;
+use Djot\Extension\MentionsExtension;
 
 $converter = new DjotConverter();
-$parser = $converter->getParser()->getInlineParser();
-
-$parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function ($match, $groups, $p) {
-    $username = $groups[1];
-    $link = new Link('https://example.com/users/' . $username);
-    $link->appendChild(new Text('@' . $username));
-    return $link;
-});
+$converter->addExtension(new MentionsExtension(
+    urlTemplate: '/users/{username}',
+    cssClass: 'mention',
+));
 
 echo $converter->convert('Hello @john_doe, meet @jane_smith!');
 ```
 
 Output:
 ```html
-<p>Hello <a href="https://example.com/users/john_doe">@john_doe</a>, meet <a href="https://example.com/users/jane_smith">@jane_smith</a>!</p>
+<p>Hello <a href="/users/john_doe" class="mention">@john_doe</a>, meet <a href="/users/jane_smith" class="mention">@jane_smith</a>!</p>
+```
+
+For custom mention logic, use inline patterns directly:
+
+```php
+$parser = $converter->getParser()->getInlineParser();
+
+$parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function ($match, $groups) {
+    $username = $groups[1];
+    // Custom logic: lookup user, validate, etc.
+    $link = new Link('/profile/' . strtolower($username));
+    $link->appendChild(new Text('@' . $username));
+    return $link;
+});
 ```
 
 ### Wiki Links
