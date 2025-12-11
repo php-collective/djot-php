@@ -7,6 +7,7 @@ This directory contains detailed documentation for djot-php.
 - [Why Djot?](why-djot.md) - Comparison with Markdown, migration guide
 - [Syntax Reference](syntax.md) - Complete Djot syntax guide
 - [API Reference](api.md) - Classes and methods
+- [Extensions](extensions.md) - Built-in extensions for common features
 - [Profiles](profiles.md) - Feature restriction for different contexts
 - [Cookbook](cookbook.md) - Common customizations and recipes
 - [PlainText Cookbook](cookbook-plaintext.md) - PlainTextRenderer customizations

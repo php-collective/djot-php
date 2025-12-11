@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot;
 
 use Closure;
+use Djot\Extension\ExtensionInterface;
 use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
@@ -29,6 +30,20 @@ class DjotConverter
     protected ?Profile $profile = null;
 
     protected ?ProfileFilter $profileFilter = null;
+
+    /**
+     * Registered extensions
+     *
+     * @var array<\Djot\Extension\ExtensionInterface>
+     */
+    protected array $extensions = [];
+
+    /**
+     * Output transformers (called after rendering)
+     *
+     * @var array<\Closure(string): string>
+     */
+    protected array $outputTransformers = [];
 
     /**
      * @param bool $xhtml Whether to use XHTML-compatible output
@@ -158,7 +173,14 @@ class DjotConverter
             $document = $this->profileFilter->filter($document, $this->profile);
         }
 
-        return $this->render($document);
+        $html = $this->render($document);
+
+        // Apply output transformers
+        foreach ($this->outputTransformers as $transformer) {
+            $html = $transformer($html);
+        }
+
+        return $html;
     }
 
     /**
@@ -168,7 +190,14 @@ class DjotConverter
     {
         $document = $this->parseFile($path);
 
-        return $this->render($document);
+        $html = $this->render($document);
+
+        // Apply output transformers
+        foreach ($this->outputTransformers as $transformer) {
+            $html = $transformer($html);
+        }
+
+        return $html;
     }
 
     /**
@@ -255,6 +284,52 @@ class DjotConverter
     public function getParser(): BlockParser
     {
         return $this->parser;
+    }
+
+    /**
+     * Register an extension
+     *
+     * Extensions can add custom inline/block patterns and render event listeners.
+     *
+     * Example:
+     * ```php
+     * $converter->addExtension(new ExternalLinksExtension());
+     * $converter->addExtension(new MentionsExtension(
+     *     userUrlTemplate: 'https://github.com/{username}',
+     * ));
+     * ```
+     */
+    public function addExtension(ExtensionInterface $extension): self
+    {
+        $this->extensions[] = $extension;
+        $extension->register($this);
+
+        return $this;
+    }
+
+    /**
+     * Get all registered extensions
+     *
+     * @return array<\Djot\Extension\ExtensionInterface>
+     */
+    public function getExtensions(): array
+    {
+        return $this->extensions;
+    }
+
+    /**
+     * Add an output transformer
+     *
+     * Output transformers are called after rendering, allowing extensions
+     * to modify the final HTML output (e.g., prepend/append content).
+     *
+     * @param \Closure(string): string $transformer
+     */
+    public function addOutputTransformer(Closure $transformer): self
+    {
+        $this->outputTransformers[] = $transformer;
+
+        return $this;
     }
 
     /**
