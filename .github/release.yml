@@ -1,0 +1,13 @@
+changelog:
+  categories:
+    - title: "Fixes"
+      labels:
+        - bug
+        - fix
+        - bugfix
+    - title: "Improvements"
+      labels:
+        - enhancement
+        - feature
+        - improvement
+        - "*"
