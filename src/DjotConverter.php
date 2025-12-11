@@ -39,6 +39,13 @@ class DjotConverter
     protected array $extensions = [];
 
     /**
+     * Output transformers (called after rendering)
+     *
+     * @var array<\Closure(string): string>
+     */
+    protected array $outputTransformers = [];
+
+    /**
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
      * @param bool $strict Whether to throw exceptions on parse errors
@@ -166,7 +173,14 @@ class DjotConverter
             $document = $this->profileFilter->filter($document, $this->profile);
         }
 
-        return $this->render($document);
+        $html = $this->render($document);
+
+        // Apply output transformers
+        foreach ($this->outputTransformers as $transformer) {
+            $html = $transformer($html);
+        }
+
+        return $html;
     }
 
     /**
@@ -176,7 +190,14 @@ class DjotConverter
     {
         $document = $this->parseFile($path);
 
-        return $this->render($document);
+        $html = $this->render($document);
+
+        // Apply output transformers
+        foreach ($this->outputTransformers as $transformer) {
+            $html = $transformer($html);
+        }
+
+        return $html;
     }
 
     /**
@@ -294,6 +315,21 @@ class DjotConverter
     public function getExtensions(): array
     {
         return $this->extensions;
+    }
+
+    /**
+     * Add an output transformer
+     *
+     * Output transformers are called after rendering, allowing extensions
+     * to modify the final HTML output (e.g., prepend/append content).
+     *
+     * @param \Closure(string): string $transformer
+     */
+    public function addOutputTransformer(Closure $transformer): self
+    {
+        $this->outputTransformers[] = $transformer;
+
+        return $this;
     }
 
     /**

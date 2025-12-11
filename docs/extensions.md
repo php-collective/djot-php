@@ -156,7 +156,25 @@ $tocExtension = new TableOfContentsExtension(
     maxLevel: 4,       // Up to h4
     listType: 'ol',    // 'ul' or 'ol'
     cssClass: 'toc',   // CSS class for nav element
+    position: 'top',   // 'top', 'bottom', or null for manual placement
 );
+```
+
+**Auto-insertion:**
+
+```php
+// TOC automatically inserted at top of output
+$converter->addExtension(new TableOfContentsExtension(position: 'top'));
+$html = $converter->convert($djot); // TOC is included in $html
+
+// Or at the bottom
+$converter->addExtension(new TableOfContentsExtension(position: 'bottom'));
+
+// Default: manual placement (position: null)
+$tocExtension = new TableOfContentsExtension();
+$converter->addExtension($tocExtension);
+$html = $converter->convert($djot);
+$toc = $tocExtension->getTocHtml(); // Place wherever you want
 ```
 
 **Example TOC output:**

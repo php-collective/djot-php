@@ -209,4 +209,50 @@ DJOT;
         $this->assertStringContainsString('Chapter 1', $html);
         $this->assertStringContainsString('Section 1.1', $html);
     }
+
+    public function testPositionTop(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TableOfContentsExtension(position: 'top'));
+
+        $html = $converter->convert("## First\n\nContent.\n\n## Second");
+
+        // TOC should appear before content
+        $tocPos = strpos($html, '<nav class="toc">');
+        $contentPos = strpos($html, '<section');
+        $this->assertNotFalse($tocPos);
+        $this->assertNotFalse($contentPos);
+        $this->assertLessThan($contentPos, $tocPos);
+    }
+
+    public function testPositionBottom(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TableOfContentsExtension(position: 'bottom'));
+
+        $html = $converter->convert("## First\n\nContent.\n\n## Second");
+
+        // TOC should appear after content
+        $tocPos = strpos($html, '<nav class="toc">');
+        $contentPos = strrpos($html, '</section>');
+        $this->assertNotFalse($tocPos);
+        $this->assertNotFalse($contentPos);
+        $this->assertGreaterThan($contentPos, $tocPos);
+    }
+
+    public function testPositionNullForManualPlacement(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension(position: null);
+        $converter->addExtension($tocExtension);
+
+        $html = $converter->convert("## First\n\nContent.");
+
+        // TOC should NOT be auto-inserted
+        $this->assertStringNotContainsString('<nav class="toc">', $html);
+
+        // But should be available via getTocHtml()
+        $tocHtml = $tocExtension->getTocHtml();
+        $this->assertStringContainsString('<nav class="toc">', $tocHtml);
+    }
 }

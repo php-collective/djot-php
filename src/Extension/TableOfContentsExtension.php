@@ -37,6 +37,7 @@ use Djot\Node\Node;
  *     minLevel: 2, // Start from h2
  *     maxLevel: 3, // Up to h3
  *     listType: 'ol', // Use ordered list
+ *     position: 'top', // Auto-insert at 'top', 'bottom', or null for manual
  * );
  * ```
  */
@@ -54,12 +55,14 @@ class TableOfContentsExtension implements ExtensionInterface
      * @param int $maxLevel Maximum heading level to include (1-6)
      * @param string $listType HTML list type: 'ul' or 'ol'
      * @param string $cssClass CSS class for the TOC container
+     * @param string|null $position Auto-insert position: 'top', 'bottom', or null for manual placement
      */
     public function __construct(
         protected int $minLevel = 1,
         protected int $maxLevel = 6,
         protected string $listType = 'ul',
         protected string $cssClass = 'toc',
+        protected ?string $position = null,
     ) {
     }
 
@@ -90,6 +93,22 @@ class TableOfContentsExtension implements ExtensionInterface
                 'id' => $id,
             ];
         });
+
+        // Auto-insert TOC if position is specified
+        if ($this->position !== null) {
+            $converter->addOutputTransformer(function (string $html): string {
+                $tocHtml = $this->getTocHtml();
+                if ($tocHtml === '') {
+                    return $html;
+                }
+
+                return match ($this->position) {
+                    'top' => $tocHtml . $html,
+                    'bottom' => $html . $tocHtml,
+                    default => $html,
+                };
+            });
+        }
     }
 
     /**
