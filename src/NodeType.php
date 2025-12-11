@@ -207,6 +207,11 @@ final class NodeType
     public const MATH = 'math';
 
     /**
+     * @var string
+     */
+    public const ABBREVIATION = 'abbreviation';
+
+    /**
      * @return list<string>
      */
     public static function allBlockTypes(): array
@@ -260,6 +265,7 @@ final class NodeType
             self::DELETE,
             self::SYMBOL,
             self::MATH,
+            self::ABBREVIATION,
         ];
     }
 }
