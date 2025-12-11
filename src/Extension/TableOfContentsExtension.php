@@ -152,7 +152,7 @@ class TableOfContentsExtension implements ExtensionInterface
     }
 
     /**
-     * Generate ID for a heading (matching renderer logic)
+     * Generate ID for a heading (matches HtmlRenderer::getSectionId() behavior)
      */
     protected function generateId(Heading $heading, string $text): string
     {
@@ -162,13 +162,19 @@ class TableOfContentsExtension implements ExtensionInterface
             return $id;
         }
 
-        // Generate from text (simplified - matches HtmlRenderer behavior)
+        // Generate from text - match HtmlRenderer::getSectionId() behavior:
+        // 1. Strip # characters entirely
+        // 2. Trim whitespace
+        // 3. Replace whitespace sequences with single dashes
         if ($text === '') {
             return '';
         }
 
-        // Replace spaces with hyphens
-        return str_replace(' ', '-', $text);
+        $id = str_replace('#', '', $text);
+        $id = trim($id);
+        $id = preg_replace('/[\s]+/', '-', $id) ?? $id;
+
+        return $id;
     }
 
     /**

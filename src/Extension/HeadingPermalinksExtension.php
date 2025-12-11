@@ -74,6 +74,11 @@ class HeadingPermalinksExtension implements ExtensionInterface
             if ($id === null || $id === '') {
                 // Generate ID from heading text (matching renderer logic)
                 $id = $this->generateIdFromNode($node);
+                // Set it explicitly so the renderer uses this ID, not one generated
+                // from the modified heading content (which would include the permalink symbol)
+                if ($id !== '') {
+                    $node->setAttribute('id', $id);
+                }
             }
 
             if ($id === '') {
@@ -106,7 +111,7 @@ class HeadingPermalinksExtension implements ExtensionInterface
     }
 
     /**
-     * Generate a slug from heading content (simplified version)
+     * Generate a slug from heading content (matches HtmlRenderer behavior)
      */
     protected function generateIdFromNode(Heading $node): string
     {
@@ -115,8 +120,15 @@ class HeadingPermalinksExtension implements ExtensionInterface
             return '';
         }
 
-        // Simple slug generation - matches HtmlRenderer behavior
-        return $text;
+        // Match HtmlRenderer::getSectionId() behavior:
+        // 1. Strip # characters entirely
+        // 2. Trim whitespace
+        // 3. Replace whitespace sequences with single dashes
+        $id = str_replace('#', '', $text);
+        $id = trim($id);
+        $id = preg_replace('/[\s]+/', '-', $id) ?? $id;
+
+        return $id;
     }
 
     /**
