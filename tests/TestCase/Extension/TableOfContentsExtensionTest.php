@@ -217,12 +217,15 @@ DJOT;
 
         $html = $converter->convert("## First\n\nContent.\n\n## Second");
 
-        // TOC should appear before content
+        // TOC should appear before content with separator
         $tocPos = strpos($html, '<nav class="toc">');
+        $hrPos = strpos($html, '<hr>');
         $contentPos = strpos($html, '<section');
         $this->assertNotFalse($tocPos);
+        $this->assertNotFalse($hrPos);
         $this->assertNotFalse($contentPos);
-        $this->assertLessThan($contentPos, $tocPos);
+        $this->assertLessThan($hrPos, $tocPos);
+        $this->assertLessThan($contentPos, $hrPos);
     }
 
     public function testPositionBottom(): void
@@ -232,12 +235,42 @@ DJOT;
 
         $html = $converter->convert("## First\n\nContent.\n\n## Second");
 
-        // TOC should appear after content
+        // TOC should appear after content with separator
         $tocPos = strpos($html, '<nav class="toc">');
+        $hrPos = strrpos($html, '<hr>');
         $contentPos = strrpos($html, '</section>');
         $this->assertNotFalse($tocPos);
+        $this->assertNotFalse($hrPos);
         $this->assertNotFalse($contentPos);
-        $this->assertGreaterThan($contentPos, $tocPos);
+        $this->assertGreaterThan($contentPos, $hrPos);
+        $this->assertGreaterThan($hrPos, $tocPos);
+    }
+
+    public function testCustomSeparator(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TableOfContentsExtension(
+            position: 'top',
+            separator: '<div class="toc-separator"></div>',
+        ));
+
+        $html = $converter->convert("## First\n\nContent.");
+
+        $this->assertStringContainsString('<div class="toc-separator"></div>', $html);
+        $this->assertStringNotContainsString('<hr>', $html);
+    }
+
+    public function testEmptySeparator(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TableOfContentsExtension(
+            position: 'top',
+            separator: '',
+        ));
+
+        $html = $converter->convert("## First\n\nContent.");
+
+        $this->assertStringNotContainsString('<hr>', $html);
     }
 
     public function testPositionNullForManualPlacement(): void

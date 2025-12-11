@@ -157,18 +157,31 @@ $tocExtension = new TableOfContentsExtension(
     listType: 'ol',    // 'ul' or 'ol'
     cssClass: 'toc',   // CSS class for nav element
     position: 'top',   // 'top', 'bottom', or null for manual placement
+    separator: "<hr>\n", // HTML between TOC and content (default)
 );
 ```
 
 **Auto-insertion:**
 
 ```php
-// TOC automatically inserted at top of output
+// TOC automatically inserted at top of output (with <hr> separator)
 $converter->addExtension(new TableOfContentsExtension(position: 'top'));
 $html = $converter->convert($djot); // TOC is included in $html
 
 // Or at the bottom
 $converter->addExtension(new TableOfContentsExtension(position: 'bottom'));
+
+// Custom separator
+$converter->addExtension(new TableOfContentsExtension(
+    position: 'top',
+    separator: '<div class="divider"></div>',
+));
+
+// No separator
+$converter->addExtension(new TableOfContentsExtension(
+    position: 'top',
+    separator: '',
+));
 
 // Default: manual placement (position: null)
 $tocExtension = new TableOfContentsExtension();

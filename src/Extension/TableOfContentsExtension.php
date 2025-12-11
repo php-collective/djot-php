@@ -38,6 +38,7 @@ use Djot\Node\Node;
  *     maxLevel: 3, // Up to h3
  *     listType: 'ol', // Use ordered list
  *     position: 'top', // Auto-insert at 'top', 'bottom', or null for manual
+ *     separator: "<hr>\n", // Separator between TOC and content (default)
  * );
  * ```
  */
@@ -56,6 +57,7 @@ class TableOfContentsExtension implements ExtensionInterface
      * @param string $listType HTML list type: 'ul' or 'ol'
      * @param string $cssClass CSS class for the TOC container
      * @param string|null $position Auto-insert position: 'top', 'bottom', or null for manual placement
+     * @param string $separator HTML separator between TOC and content (when position is set)
      */
     public function __construct(
         protected int $minLevel = 1,
@@ -63,6 +65,7 @@ class TableOfContentsExtension implements ExtensionInterface
         protected string $listType = 'ul',
         protected string $cssClass = 'toc',
         protected ?string $position = null,
+        protected string $separator = "<hr>\n",
     ) {
     }
 
@@ -103,8 +106,8 @@ class TableOfContentsExtension implements ExtensionInterface
                 }
 
                 return match ($this->position) {
-                    'top' => $tocHtml . $html,
-                    'bottom' => $html . $tocHtml,
+                    'top' => $tocHtml . $this->separator . $html,
+                    'bottom' => $html . $this->separator . $tocHtml,
                     default => $html,
                 };
             });
