@@ -6,11 +6,12 @@ Extensions provide a clean way to bundle related customizations together. Each e
 
 | Extension | Description |
 |-----------|-------------|
+| [AutolinkExtension](#autolinkextension) | Auto-links bare URLs and email addresses |
+| [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
 | [TableOfContentsExtension](#tableofcontentsextension) | Generates a table of contents from headings |
-| [AutolinkExtension](#autolinkextension) | Auto-links bare URLs and email addresses |
 
 ## Basic Usage
 
@@ -236,6 +237,61 @@ Visit https://example.com or email user@example.com for help.
 **Output:**
 ```html
 <p>Visit <a href="https://example.com">https://example.com</a> or email <a href="mailto:user@example.com">user@example.com</a> for help.</p>
+```
+
+## DefaultAttributesExtension
+
+Adds default attributes to elements by type. Useful for adding CSS classes, lazy loading, or other common attributes.
+
+```php
+use Djot\Extension\DefaultAttributesExtension;
+
+$converter->addExtension(new DefaultAttributesExtension([
+    'image' => ['loading' => 'lazy', 'decoding' => 'async'],
+    'table' => ['class' => 'table table-striped'],
+    'link' => ['class' => 'link'],
+    'code_block' => ['class' => 'highlight'],
+]));
+```
+
+**Behavior:**
+- Default attributes are only applied if the element doesn't already have that attribute
+- Classes are merged (both default and existing classes are kept)
+
+**Supported element types (use snake_case):**
+
+| Block Elements | Inline Elements |
+|----------------|-----------------|
+| paragraph | link |
+| heading | image |
+| code_block | emphasis |
+| block_quote | strong |
+| list | code |
+| list_item | span |
+| table | subscript |
+| table_cell | superscript |
+| div | footnote |
+| thematic_break | footnote_ref |
+
+**Common use cases:**
+
+```php
+// Lazy loading images
+$converter->addExtension(new DefaultAttributesExtension([
+    'image' => ['loading' => 'lazy'],
+]));
+
+// Bootstrap tables
+$converter->addExtension(new DefaultAttributesExtension([
+    'table' => ['class' => 'table table-bordered'],
+]));
+
+// Tailwind prose styling
+$converter->addExtension(new DefaultAttributesExtension([
+    'paragraph' => ['class' => 'mb-4'],
+    'heading' => ['class' => 'font-bold'],
+    'block_quote' => ['class' => 'border-l-4 pl-4 italic'],
+]));
 ```
 
 ## Creating Custom Extensions
