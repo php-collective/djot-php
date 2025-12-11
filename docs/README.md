@@ -264,26 +264,39 @@ Output:
 <p>Ellipsis…</p>
 ```
 
+## Extensions
+
+Use built-in extensions for common features:
+
+```php
+use Djot\DjotConverter;
+use Djot\Extension\ExternalLinksExtension;
+use Djot\Extension\TableOfContentsExtension;
+use Djot\Extension\MentionsExtension;
+
+$converter = new DjotConverter();
+$toc = new TableOfContentsExtension(position: 'top');
+
+$converter
+    ->addExtension(new ExternalLinksExtension())
+    ->addExtension(new MentionsExtension())
+    ->addExtension($toc);
+
+echo $converter->convert('Visit [Example](https://example.com) or ask @admin!');
+// External links get target="_blank", @mentions become profile links
+```
+
+See [Extensions](extensions.md) for all available extensions.
+
 ## Event System
 
-Customize rendering by listening to events:
+For custom rendering logic, listen to events:
 
 ```php
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 
 $converter = new DjotConverter();
-
-// Add target="_blank" to external links
-$converter->on('render.link', function (RenderEvent $event): void {
-    $link = $event->getNode();
-    $href = $link->getDestination();
-
-    if (str_starts_with($href, 'http')) {
-        $link->setAttribute('target', '_blank');
-        $link->setAttribute('rel', 'noopener noreferrer');
-    }
-});
 
 // Custom emoji rendering
 $converter->on('render.symbol', function (RenderEvent $event): void {
@@ -297,8 +310,8 @@ $converter->on('render.symbol', function (RenderEvent $event): void {
     $event->setHtml($emoji);
 });
 
-echo $converter->convert('[Example](https://example.com) I :heart: this!');
-// Output: <p><a href="https://example.com" target="_blank" rel="noopener noreferrer">Example</a> I ❤️ this!</p>
+echo $converter->convert('I :heart: this!');
+// Output: <p>I ❤️ this!</p>
 ```
 
 ## XHTML Mode
@@ -353,25 +366,28 @@ $html = $converter->render($document);
 
 ## Custom Syntax Patterns
 
+> **Tip:** For @mentions, use the built-in [MentionsExtension](extensions.md#mentionsextension).
+
 Extend Djot with custom inline and block patterns:
 
 ```php
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Text;
 
-// Add @mention support
+// Add #hashtag support
 $parser = $converter->getParser()->getInlineParser();
-$parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function ($match, $groups, $p) {
-    $link = new Link('/users/' . $groups[1]);
-    $link->appendChild(new Text('@' . $groups[1]));
+$parser->addInlinePattern('/#([a-zA-Z0-9_]+)/', function ($match, $groups) {
+    $tag = $groups[1];
+    $link = new Link('/tags/' . $tag);
+    $link->appendChild(new Text('#' . $tag));
     return $link;
 });
 
-echo $converter->convert('Hello @john!');
-// Output: <p>Hello <a href="/users/john">@john</a>!</p>
+echo $converter->convert('Check out #php and #djot!');
+// Output: <p>Check out <a href="/tags/php">#php</a> and <a href="/tags/djot">#djot</a>!</p>
 ```
 
-See the [Cookbook](cookbook.md) for more examples including wiki links, hashtags, admonitions, and custom block patterns.
+See the [Cookbook](cookbook.md) for more examples including wiki links, admonitions, and custom block patterns.
 
 ## Security Considerations
 

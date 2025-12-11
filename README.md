@@ -33,6 +33,7 @@ $html = $converter->convert('Hello *world*!');
 - **Advanced**: Footnotes, math expressions, symbols, block attributes, raw HTML blocks, comments
 - **Smart typography**: Curly quotes, en/em dashes, ellipsis
 - **Multiple renderers**: HTML, plain text, Markdown output
+- **Extensions**: Built-in extensions for external links, TOC, heading permalinks, @mentions, autolinks, default attributes
 - **Extensible**: Custom inline/block patterns, render events
 - **File support**: Parse and convert files directly
 
@@ -40,17 +41,17 @@ $html = $converter->convert('Hello *world*!');
 
 ```php
 use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
+use Djot\Extension\ExternalLinksExtension;
+use Djot\Extension\DefaultAttributesExtension;
 
 $converter = new DjotConverter();
 
-// Customize link rendering
-$converter->on('render.link', function (RenderEvent $event): void {
-    $link = $event->getNode();
-    if (str_starts_with($link->getDestination(), 'http')) {
-        $link->setAttribute('target', '_blank');
-    }
-});
+// Add extensions for common features
+$converter
+    ->addExtension(new ExternalLinksExtension())
+    ->addExtension(new DefaultAttributesExtension([
+        'table' => ['class' => 'table'],
+    ]));
 
 $djot = <<<'DJOT'
 # Welcome
@@ -75,8 +76,8 @@ Output:
 
 ```html
 <h1>Welcome</h1>
-<p>This is <em>emphasized</em> and <strong>strong</strong> text with a <a href="https://example.com" target="_blank">link</a>.</p>
-<table>
+<p>This is <em>emphasized</em> and <strong>strong</strong> text with a <a href="https://example.com" target="_blank" rel="noopener noreferrer">link</a>.</p>
+<table class="table">
 <thead>
 <tr><th>Name</th><th>Role</th></tr>
 </thead>
@@ -101,6 +102,7 @@ https://sandbox.dereuromark.de/sandbox/djot
 - [Examples](docs/README.md) - Comprehensive usage examples
 - [Syntax Reference](docs/syntax.md) - Complete Djot syntax guide
 - [API Reference](docs/api.md) - Classes and methods
+- [Extensions](docs/extensions.md) - Built-in extensions for common features
 - [Profiles](docs/profiles.md) - Feature restriction for different contexts
 - [Converters](docs/converters.md) - Markdown/BBCode to Djot conversion
 - [Cookbook](docs/cookbook.md) - Common customizations and recipes
