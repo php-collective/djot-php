@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Parser;
 
+use Djot\Node\Inline\Abbreviation;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
@@ -423,8 +424,60 @@ class InlineParser
 
     protected function flushText(Node $parent, string $text): void
     {
-        if ($text !== '') {
+        if ($text === '') {
+            return;
+        }
+
+        // Check if there are any abbreviations to process
+        $abbreviations = $this->blockParser->getAbbreviations();
+        if ($abbreviations === []) {
             $parent->appendChild(new Text($text));
+
+            return;
+        }
+
+        // Process abbreviations in the text
+        $this->flushTextWithAbbreviations($parent, $text, $abbreviations);
+    }
+
+    /**
+     * Flush text while replacing abbreviations with Abbreviation nodes
+     *
+     * @param \Djot\Node\Node $parent
+     * @param string $text
+     * @param array<string, string> $abbreviations
+     */
+    protected function flushTextWithAbbreviations(Node $parent, string $text, array $abbreviations): void
+    {
+        // Sort abbreviations by length (longest first) to match longer abbreviations first
+        $abbrKeys = array_keys($abbreviations);
+        usort($abbrKeys, fn ($a, $b) => strlen($b) - strlen($a));
+
+        // Build a regex pattern that matches any abbreviation at word boundaries
+        // We need to escape special regex characters in abbreviation keys
+        $escapedKeys = array_map(fn ($key) => preg_quote($key, '/'), $abbrKeys);
+        $pattern = '/\b(' . implode('|', $escapedKeys) . ')\b/u';
+
+        // Split text by abbreviation matches, keeping the delimiters
+        $parts = preg_split($pattern, $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+
+        if ($parts === false) {
+            // Fallback: just output as plain text
+            $parent->appendChild(new Text($text));
+
+            return;
+        }
+
+        foreach ($parts as $part) {
+            if (isset($abbreviations[$part])) {
+                // This is an abbreviation match
+                $abbr = new Abbreviation($abbreviations[$part]);
+                $abbr->appendChild(new Text($part));
+                $parent->appendChild($abbr);
+            } else {
+                // Regular text
+                $parent->appendChild(new Text($part));
+            }
         }
     }
 
