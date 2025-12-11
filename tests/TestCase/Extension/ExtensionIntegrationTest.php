@@ -208,12 +208,12 @@ DJOT;
         $this->assertCount(2, $tocExtension->getToc());
 
         // Second conversion - TOC accumulates without clear()
-        $converter->convert("# Second Doc");
+        $converter->convert('# Second Doc');
         $this->assertCount(3, $tocExtension->getToc());
 
         // After clear(), start fresh
         $tocExtension->clear();
-        $converter->convert("# Third Doc");
+        $converter->convert('# Third Doc');
         $this->assertCount(1, $tocExtension->getToc());
     }
 

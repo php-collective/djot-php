@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Extension;
 
 use Djot\DjotConverter;
-use Djot\Extension\AbbreviationExtension;
 use Djot\Extension\ExternalLinksExtension;
-use Djot\Extension\ExtensionInterface;
-use Djot\Extension\HeadingPermalinksExtension;
 use Djot\Extension\MentionsExtension;
 use PHPUnit\Framework\TestCase;
 
