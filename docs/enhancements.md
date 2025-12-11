@@ -623,16 +623,16 @@ vendor/bin/phpunit
 
 ### Language Features
 
-| Feature                   | Upstream PR/Issue                              | Status     |
-|---------------------------|------------------------------------------------|------------|
-| List item attributes      | [#262](https://github.com/jgm/djot/pull/262)   | Open PR    |
-| Table row/cell attributes | [#250](https://github.com/jgm/djot/issues/250) | Open       |
-| Boolean attribute shorthand | [#257](https://github.com/jgm/djot/issues/257) | Open       |
-| Multiple definition terms | -                                              | djot-php   |
-| Definition list attributes | [#323](https://github.com/jgm/djot/issues/323) | Open       |
-| Fenced comment blocks     | [#67](https://github.com/jgm/djot/issues/67)   | Open       |
-| Captions (image/table/blockquote) | [djot-php#37](https://github.com/php-collective/djot-php/issues/37) | djot-php |
-| Abbreviations (PHP MD Extra) | -                                           | djot-php   |
+| Feature                   | Upstream PR/Issue                                                   | Status     |
+|---------------------------|---------------------------------------------------------------------|------------|
+| List item attributes      | [djot:262](https://github.com/jgm/djot/pull/262)                    | Open PR    |
+| Table row/cell attributes | [djot:250](https://github.com/jgm/djot/issues/250)                  | Open       |
+| Boolean attribute shorthand | [djot:257](https://github.com/jgm/djot/issues/257)                  | Open       |
+| Multiple definition terms | [djot:128](https://github.com/jgm/djot/issues/128)                  | djot-php   |
+| Definition list attributes | [djot:323](https://github.com/jgm/djot/issues/323)                  | Open       |
+| Fenced comment blocks     | [djot:67](https://github.com/jgm/djot/issues/67)                    | Open       |
+| Captions (image/table/blockquote) | [#37](https://github.com/php-collective/djot-php/issues/37) | djot-php |
+| Abbreviations (PHP MD Extra) | [djot:51](https://github.com/jgm/djot/issues/51)                    | djot-php   |
 
 ### Optional Modes
 
