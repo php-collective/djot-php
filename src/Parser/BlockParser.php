@@ -800,7 +800,7 @@ class BlockParser
         $info = $fenceInfo['info'];
         $indentLen = strlen($fenceInfo['indent']);
 
-        $content = '';
+        $contentLines = [];
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
@@ -819,9 +819,10 @@ class BlockParser
             // Remove indent from content lines (up to the same amount as opening fence)
             $currentLine = $this->fencedBlockParser->removeIndent($currentLine, $indentLen);
 
-            $content .= $currentLine . "\n";
+            $contentLines[] = $currentLine;
             $i++;
         }
+        $content = implode("\n", $contentLines);
 
         // If not closed and using backticks, check if this should be inline code
         if (!$closed && $fenceChar === '`') {
@@ -864,7 +865,7 @@ class BlockParser
             return null;
         }
 
-        $content = '';
+        $contentLines = [];
         $i = $start;
         $count = count($lines);
         $inComment = false;
@@ -882,29 +883,30 @@ class BlockParser
                     // Check if closing is on same line
                     $closePos = strpos($afterOpen, '%}');
                     if ($closePos !== false) {
-                        $content .= substr($afterOpen, 0, $closePos);
+                        $contentLines[] = substr($afterOpen, 0, $closePos);
                         $i++;
                         $closed = true;
 
                         break;
                     }
-                    $content .= $afterOpen . "\n";
+                    $contentLines[] = $afterOpen;
                 }
             } else {
                 // Look for closing %}
                 $closePos = strpos($currentLine, '%}');
                 if ($closePos !== false) {
-                    $content .= substr($currentLine, 0, $closePos);
+                    $contentLines[] = substr($currentLine, 0, $closePos);
                     $i++;
                     $closed = true;
 
                     break;
                 }
-                $content .= $currentLine . "\n";
+                $contentLines[] = $currentLine;
             }
 
             $i++;
         }
+        $content = implode("\n", $contentLines);
 
         if (!$closed) {
             $this->addWarning('Unclosed comment', $start, 1, true);
@@ -994,7 +996,7 @@ class BlockParser
         $fenceLength = $rawInfo['length'];
         $format = $rawInfo['format'];
 
-        $content = '';
+        $contentLines = [];
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
@@ -1010,7 +1012,7 @@ class BlockParser
                 break;
             }
 
-            $content .= $currentLine . "\n";
+            $contentLines[] = $currentLine;
             $i++;
         }
 
@@ -1018,7 +1020,7 @@ class BlockParser
             $this->addWarning('Unclosed raw block', $start, 1, true);
         }
 
-        $rawBlock = new RawBlock(trim($content, "\n"), $format);
+        $rawBlock = new RawBlock(implode("\n", $contentLines), $format);
         $this->applyPendingAttributes($rawBlock);
         $parent->appendChild($rawBlock);
 
@@ -1910,31 +1912,31 @@ class BlockParser
                 $def = new DefinitionDescription();
                 $defAttributes = [];
                 if ($defLines !== []) {
-                    // Remove leading blank lines
-                    while ($defLines !== [] && $defLines[0] === '') {
-                        array_shift($defLines);
+                    // Skip leading blank lines using index (avoid O(n) array_shift)
+                    $defStart = 0;
+                    $defLineCount = count($defLines);
+                    while ($defStart < $defLineCount && $defLines[$defStart] === '') {
+                        $defStart++;
                     }
                     // Remove trailing blank lines (but preserve potential attribute line)
-                    $defLineCount = count($defLines);
-                    while ($defLineCount > 1 && $defLines[$defLineCount - 1] === '') {
-                        array_pop($defLines);
-                        $defLineCount--;
+                    $defEnd = $defLineCount;
+                    while ($defEnd > $defStart + 1 && $defLines[$defEnd - 1] === '') {
+                        $defEnd--;
                     }
 
                     // Check if last line is a standalone attribute block for the dd
-                    $defLineCount = count($defLines);
-                    if ($defLineCount > 0 && preg_match('/^\{([^{}]+)\}\s*$/', $defLines[$defLineCount - 1], $attrMatch)) {
+                    if ($defEnd > $defStart && preg_match('/^\{([^{}]+)\}\s*$/', $defLines[$defEnd - 1], $attrMatch)) {
                         $defAttributes = AttributeParser::parse($attrMatch[1]);
-                        array_pop($defLines);
+                        $defEnd--;
                         // Remove any trailing blank lines before the attribute
-                        $defLineCount = count($defLines);
-                        while ($defLineCount > 0 && $defLines[$defLineCount - 1] === '') {
-                            array_pop($defLines);
-                            $defLineCount--;
+                        while ($defEnd > $defStart && $defLines[$defEnd - 1] === '') {
+                            $defEnd--;
                         }
                     }
 
-                    $this->parseBlocks($def, $defLines, 0);
+                    if ($defEnd > $defStart) {
+                        $this->parseBlocks($def, array_slice($defLines, $defStart, $defEnd - $defStart), 0);
+                    }
                 }
                 // Apply definition attributes
                 if ($defAttributes !== []) {
@@ -1971,12 +1973,15 @@ class BlockParser
         $blocks = [];
         $current = [];
 
-        // Remove leading blank lines
-        while ($lines !== [] && $lines[0] === '') {
-            array_shift($lines);
+        // Skip leading blank lines using index (avoid O(n) array_shift)
+        $start = 0;
+        $count = count($lines);
+        while ($start < $count && $lines[$start] === '') {
+            $start++;
         }
 
-        foreach ($lines as $line) {
+        for ($i = $start; $i < $count; $i++) {
+            $line = $lines[$i];
             if ($line === '') {
                 if ($current !== []) {
                     $blocks[] = $current;

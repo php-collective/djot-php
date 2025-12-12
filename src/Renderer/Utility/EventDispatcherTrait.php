@@ -52,6 +52,14 @@ trait EventDispatcherTrait
     }
 
     /**
+     * Check if there are any listeners registered for any render event
+     */
+    protected function hasAnyListeners(): bool
+    {
+        return $this->listeners !== [];
+    }
+
+    /**
      * Dispatch an event to all registered listeners
      *
      * Calls each listener for the given event in registration order.
