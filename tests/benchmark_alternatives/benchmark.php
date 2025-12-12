@@ -27,6 +27,16 @@ use Composer\InstalledVersions;
 use Djot\DjotConverter;
 use League\CommonMark\CommonMarkConverter;
 use League\CommonMark\GithubFlavoredMarkdownConverter;
+use League\CommonMark\Environment\Environment;
+use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
+use League\CommonMark\Extension\GithubFlavoredMarkdownExtension;
+use League\CommonMark\Extension\Footnote\FootnoteExtension;
+use League\CommonMark\Extension\SmartPunct\SmartPunctExtension;
+use League\CommonMark\Extension\Strikethrough\StrikethroughExtension;
+use League\CommonMark\Extension\Table\TableExtension;
+use League\CommonMark\Extension\TaskList\TaskListExtension;
+use League\CommonMark\Extension\Autolink\AutolinkExtension;
+use League\CommonMark\MarkdownConverter;
 use Michelf\Markdown;
 use Michelf\MarkdownExtra;
 
@@ -54,7 +64,8 @@ $warmup = (int)($options['warmup'] ?? 5);
 $jsonOutput = isset($options['json']);
 
 // Generate test content in both Djot and Markdown formats
-function generateDjotContent(int $paragraphs): string
+// Extended version includes tables, footnotes, strikethrough, task lists
+function generateDjotContent(int $paragraphs, bool $extended = false): string
 {
     $content = "# Performance Test Document\n\n";
 
@@ -91,12 +102,42 @@ function generateDjotContent(int $paragraphs): string
             $content .= "> This is a blockquote with *emphasis*.\n";
             $content .= "> Second line of the quote.\n\n";
         }
+
+        // Extended features (tables, footnotes, strikethrough, task lists)
+        if ($extended) {
+            // Tables every 25 paragraphs
+            if ($i % 25 === 12) {
+                $content .= "| Column A | Column B | Column C |\n";
+                $content .= "|----------|----------|----------|\n";
+                $content .= "| Data {$i}a | Data {$i}b | Data {$i}c |\n";
+                $content .= "| *bold* | _italic_ | `code` |\n";
+                $content .= "| More | Data | Here |\n\n";
+            }
+
+            // Footnotes every 30 paragraphs (Djot syntax)
+            if ($i % 30 === 18) {
+                $content .= "This paragraph has a footnote[^note{$i}].\n\n";
+                $content .= "[^note{$i}]: This is the footnote content for paragraph {$i}.\n\n";
+            }
+
+            // Strikethrough every 35 paragraphs (Djot uses {-deleted-})
+            if ($i % 35 === 22) {
+                $content .= "This text has {-deleted content-} and {+inserted content+}.\n\n";
+            }
+
+            // Task lists every 40 paragraphs
+            if ($i % 40 === 28) {
+                $content .= "- [x] Completed task {$i}\n";
+                $content .= "- [ ] Pending task\n";
+                $content .= "- [x] Another done\n\n";
+            }
+        }
     }
 
     return $content;
 }
 
-function generateMarkdownContent(int $paragraphs): string
+function generateMarkdownContent(int $paragraphs, bool $extended = false): string
 {
     $content = "# Performance Test Document\n\n";
 
@@ -132,6 +173,36 @@ function generateMarkdownContent(int $paragraphs): string
         if ($i % 20 === 15) {
             $content .= "> This is a blockquote with *emphasis*.\n";
             $content .= "> Second line of the quote.\n\n";
+        }
+
+        // Extended features (tables, footnotes, strikethrough, task lists)
+        if ($extended) {
+            // Tables every 25 paragraphs
+            if ($i % 25 === 12) {
+                $content .= "| Column A | Column B | Column C |\n";
+                $content .= "|----------|----------|----------|\n";
+                $content .= "| Data {$i}a | Data {$i}b | Data {$i}c |\n";
+                $content .= "| **bold** | *italic* | `code` |\n";
+                $content .= "| More | Data | Here |\n\n";
+            }
+
+            // Footnotes every 30 paragraphs (Markdown syntax)
+            if ($i % 30 === 18) {
+                $content .= "This paragraph has a footnote[^note{$i}].\n\n";
+                $content .= "[^note{$i}]: This is the footnote content for paragraph {$i}.\n\n";
+            }
+
+            // Strikethrough every 35 paragraphs (GFM uses ~~text~~)
+            if ($i % 35 === 22) {
+                $content .= "This text has ~~deleted content~~ in it.\n\n";
+            }
+
+            // Task lists every 40 paragraphs
+            if ($i % 40 === 28) {
+                $content .= "- [x] Completed task {$i}\n";
+                $content .= "- [ ] Pending task\n";
+                $content .= "- [x] Another done\n\n";
+            }
         }
     }
 
@@ -220,6 +291,15 @@ $fixtures = [
 $djot = new DjotConverter();
 $commonmark = new CommonMarkConverter();
 $gfm = new GithubFlavoredMarkdownConverter();
+
+// CommonMark with all extensions (full feature parity attempt)
+$cmFullEnv = new Environment();
+$cmFullEnv->addExtension(new CommonMarkCoreExtension());
+$cmFullEnv->addExtension(new GithubFlavoredMarkdownExtension());
+$cmFullEnv->addExtension(new FootnoteExtension());
+$cmFullEnv->addExtension(new SmartPunctExtension());
+$cmFull = new MarkdownConverter($cmFullEnv);
+
 $parsedown = new Parsedown();
 $parsedownExtra = class_exists(ParsedownExtra::class) ? new ParsedownExtra() : null;
 $michelfMarkdown = new Markdown();
@@ -243,6 +323,12 @@ $parsers = [
         'version' => InstalledVersions::getPrettyVersion('league/commonmark') ?? 'unknown',
         'type' => 'markdown',
         'parser' => fn ($content) => $gfm->convert($content)->getContent(),
+    ],
+    'cm-full' => [
+        'name' => 'league/commonmark (Full)',
+        'version' => InstalledVersions::getPrettyVersion('league/commonmark') ?? 'unknown',
+        'type' => 'markdown-extended',
+        'parser' => fn ($content) => $cmFull->convert($content)->getContent(),
     ],
     'parsedown' => [
         'name' => 'erusev/parsedown',
@@ -311,11 +397,13 @@ if (!$jsonOutput) {
 
 // Run benchmarks for each fixture size
 foreach ($fixtures as $fixtureName => $fixtureConfig) {
-    $djotContent = generateDjotContent($fixtureConfig['paragraphs']);
-    $markdownContent = generateMarkdownContent($fixtureConfig['paragraphs']);
+    $djotContent = generateDjotContent($fixtureConfig['paragraphs'], true);
+    $markdownContent = generateMarkdownContent($fixtureConfig['paragraphs'], false);
+    $markdownExtContent = generateMarkdownContent($fixtureConfig['paragraphs'], true);
 
     $djotSize = strlen($djotContent);
     $mdSize = strlen($markdownContent);
+    $mdExtSize = strlen($markdownExtContent);
 
     if (!$jsonOutput) {
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
@@ -336,8 +424,17 @@ foreach ($fixtures as $fixtureName => $fixtureConfig) {
     $fixtureResults = [];
 
     foreach ($parsers as $key => $parser) {
-        $content = $parser['type'] === 'djot' ? $djotContent : $markdownContent;
-        $size = $parser['type'] === 'djot' ? $djotSize : $mdSize;
+        // Select content based on parser type
+        if ($parser['type'] === 'djot') {
+            $content = $djotContent;
+            $size = $djotSize;
+        } elseif ($parser['type'] === 'markdown-extended') {
+            $content = $markdownExtContent;
+            $size = $mdExtSize;
+        } else {
+            $content = $markdownContent;
+            $size = $mdSize;
+        }
 
         $stats = benchmark(fn () => ($parser['parser'])($content), $iterations, $warmup);
         $throughput = $size / ($stats['mean'] / 1000); // bytes per second
