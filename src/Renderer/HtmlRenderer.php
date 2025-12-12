@@ -101,8 +101,67 @@ class HtmlRenderer implements RendererInterface
      */
     protected array $collectedFootnotes = [];
 
+    /**
+     * Dispatch table mapping node class names to render method names
+     *
+     * @var array<class-string<\Djot\Node\Node>, string>
+     */
+    protected array $nodeRenderers = [];
+
     public function __construct(protected bool $xhtml = false)
     {
+        $this->initNodeRenderers();
+    }
+
+    /**
+     * Initialize the node renderer dispatch table
+     *
+     * Maps node class names to render method names for O(1) lookup.
+     */
+    protected function initNodeRenderers(): void
+    {
+        $this->nodeRenderers = [
+            Document::class => 'renderChildren',
+            Paragraph::class => 'renderParagraph',
+            Heading::class => 'renderHeading',
+            CodeBlock::class => 'renderCodeBlock',
+            Comment::class => '',
+            RawBlock::class => 'renderRawBlock',
+            BlockQuote::class => 'renderBlockQuote',
+            DefinitionList::class => 'renderDefinitionList',
+            DefinitionTerm::class => 'renderDefinitionTerm',
+            DefinitionDescription::class => 'renderDefinitionDescription',
+            ListBlock::class => 'renderList',
+            ListItem::class => 'renderListItem',
+            ThematicBreak::class => 'renderThematicBreak',
+            Div::class => 'renderDiv',
+            Figure::class => 'renderFigure',
+            Caption::class => 'renderCaption',
+            Table::class => 'renderTable',
+            TableRow::class => 'renderTableRow',
+            TableCell::class => 'renderTableCell',
+            LineBlock::class => 'renderLineBlock',
+            Footnote::class => 'renderFootnote',
+            Text::class => 'renderText',
+            Emphasis::class => 'renderEmphasis',
+            Strong::class => 'renderStrong',
+            Link::class => 'renderLink',
+            Image::class => 'renderImage',
+            Code::class => 'renderCode',
+            RawInline::class => 'renderRawInline',
+            Math::class => 'renderMath',
+            Symbol::class => 'renderSymbol',
+            FootnoteRef::class => 'renderFootnoteRef',
+            SoftBreak::class => 'renderSoftBreak',
+            HardBreak::class => 'renderHardBreak',
+            Span::class => 'renderSpan',
+            Highlight::class => 'renderHighlight',
+            Superscript::class => 'renderSuperscript',
+            Subscript::class => 'renderSubscript',
+            Insert::class => 'renderInsert',
+            Delete::class => 'renderDelete',
+            Abbreviation::class => 'renderAbbreviation',
+        ];
     }
 
     /**
@@ -362,64 +421,36 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderNode(Node $node): string
     {
-        // Dispatch render event
-        $eventName = 'render.' . $node->getType();
-        $event = new RenderEvent($node);
+        // Only dispatch events if listeners are registered (avoid object allocation)
+        if ($this->hasAnyListeners()) {
+            $eventName = 'render.' . $node->getType();
+            $event = new RenderEvent($node);
 
-        // Call specific listeners
-        $this->dispatchEvent($eventName, $event);
+            // Call specific listeners
+            $this->dispatchEvent($eventName, $event);
 
-        // Call wildcard listeners
-        $this->dispatchEvent('render.*', $event);
+            // Call wildcard listeners
+            $this->dispatchEvent('render.*', $event);
 
-        // If listener provided custom HTML, use it
-        if ($event->isDefaultPrevented()) {
-            return $event->getHtml() ?? '';
+            // If listener provided custom HTML, use it
+            if ($event->isDefaultPrevented()) {
+                return $event->getHtml() ?? '';
+            }
         }
 
-        return match (true) {
-            $node instanceof Document => $this->renderChildren($node),
-            $node instanceof Paragraph => $this->renderParagraph($node),
-            $node instanceof Heading => $this->renderHeading($node),
-            $node instanceof CodeBlock => $this->renderCodeBlock($node),
-            $node instanceof Comment => '', // Comments are stripped from output
-            $node instanceof RawBlock => $this->renderRawBlock($node),
-            $node instanceof BlockQuote => $this->renderBlockQuote($node),
-            $node instanceof DefinitionList => $this->renderDefinitionList($node),
-            $node instanceof DefinitionTerm => $this->renderDefinitionTerm($node),
-            $node instanceof DefinitionDescription => $this->renderDefinitionDescription($node),
-            $node instanceof ListBlock => $this->renderList($node),
-            $node instanceof ListItem => $this->renderListItem($node),
-            $node instanceof ThematicBreak => $this->renderThematicBreak($node),
-            $node instanceof Div => $this->renderDiv($node),
-            $node instanceof Figure => $this->renderFigure($node),
-            $node instanceof Caption => $this->renderCaption($node),
-            $node instanceof Table => $this->renderTable($node),
-            $node instanceof TableRow => $this->renderTableRow($node),
-            $node instanceof TableCell => $this->renderTableCell($node),
-            $node instanceof LineBlock => $this->renderLineBlock($node),
-            $node instanceof Footnote => $this->renderFootnote($node),
-            $node instanceof Text => $this->renderText($node),
-            $node instanceof Emphasis => $this->renderEmphasis($node),
-            $node instanceof Strong => $this->renderStrong($node),
-            $node instanceof Link => $this->renderLink($node),
-            $node instanceof Image => $this->renderImage($node),
-            $node instanceof Code => $this->renderCode($node),
-            $node instanceof RawInline => $this->renderRawInline($node),
-            $node instanceof Math => $this->renderMath($node),
-            $node instanceof Symbol => $this->renderSymbol($node),
-            $node instanceof FootnoteRef => $this->renderFootnoteRef($node),
-            $node instanceof SoftBreak => $this->renderSoftBreak(),
-            $node instanceof HardBreak => $this->renderHardBreak(),
-            $node instanceof Span => $this->renderSpan($node),
-            $node instanceof Highlight => $this->renderHighlight($node),
-            $node instanceof Superscript => $this->renderSuperscript($node),
-            $node instanceof Subscript => $this->renderSubscript($node),
-            $node instanceof Insert => $this->renderInsert($node),
-            $node instanceof Delete => $this->renderDelete($node),
-            $node instanceof Abbreviation => $this->renderAbbreviation($node),
-            default => $this->renderChildren($node),
-        };
+        // Use dispatch table for O(1) lookup instead of instanceof chain
+        $class = $node::class;
+        if (isset($this->nodeRenderers[$class])) {
+            $method = $this->nodeRenderers[$class];
+            if ($method === '') {
+                return ''; // Comment nodes
+            }
+
+            /** @var string */
+            return $this->$method($node);
+        }
+
+        return $this->renderChildren($node);
     }
 
     protected function renderChildren(Node $node): string

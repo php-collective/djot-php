@@ -1910,31 +1910,31 @@ class BlockParser
                 $def = new DefinitionDescription();
                 $defAttributes = [];
                 if ($defLines !== []) {
-                    // Remove leading blank lines
-                    while ($defLines !== [] && $defLines[0] === '') {
-                        array_shift($defLines);
+                    // Skip leading blank lines using index (avoid O(n) array_shift)
+                    $defStart = 0;
+                    $defLineCount = count($defLines);
+                    while ($defStart < $defLineCount && $defLines[$defStart] === '') {
+                        $defStart++;
                     }
                     // Remove trailing blank lines (but preserve potential attribute line)
-                    $defLineCount = count($defLines);
-                    while ($defLineCount > 1 && $defLines[$defLineCount - 1] === '') {
-                        array_pop($defLines);
-                        $defLineCount--;
+                    $defEnd = $defLineCount;
+                    while ($defEnd > $defStart + 1 && $defLines[$defEnd - 1] === '') {
+                        $defEnd--;
                     }
 
                     // Check if last line is a standalone attribute block for the dd
-                    $defLineCount = count($defLines);
-                    if ($defLineCount > 0 && preg_match('/^\{([^{}]+)\}\s*$/', $defLines[$defLineCount - 1], $attrMatch)) {
+                    if ($defEnd > $defStart && preg_match('/^\{([^{}]+)\}\s*$/', $defLines[$defEnd - 1], $attrMatch)) {
                         $defAttributes = AttributeParser::parse($attrMatch[1]);
-                        array_pop($defLines);
+                        $defEnd--;
                         // Remove any trailing blank lines before the attribute
-                        $defLineCount = count($defLines);
-                        while ($defLineCount > 0 && $defLines[$defLineCount - 1] === '') {
-                            array_pop($defLines);
-                            $defLineCount--;
+                        while ($defEnd > $defStart && $defLines[$defEnd - 1] === '') {
+                            $defEnd--;
                         }
                     }
 
-                    $this->parseBlocks($def, $defLines, 0);
+                    if ($defEnd > $defStart) {
+                        $this->parseBlocks($def, array_slice($defLines, $defStart, $defEnd - $defStart), 0);
+                    }
                 }
                 // Apply definition attributes
                 if ($defAttributes !== []) {
@@ -1971,12 +1971,15 @@ class BlockParser
         $blocks = [];
         $current = [];
 
-        // Remove leading blank lines
-        while ($lines !== [] && $lines[0] === '') {
-            array_shift($lines);
+        // Skip leading blank lines using index (avoid O(n) array_shift)
+        $start = 0;
+        $count = count($lines);
+        while ($start < $count && $lines[$start] === '') {
+            $start++;
         }
 
-        foreach ($lines as $line) {
+        for ($i = $start; $i < $count; $i++) {
+            $line = $lines[$i];
             if ($line === '') {
                 if ($current !== []) {
                     $blocks[] = $current;

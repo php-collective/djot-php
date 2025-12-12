@@ -52,6 +52,18 @@ class InlineParser
      */
     protected array $customPatterns = [];
 
+    /**
+     * Cached abbreviation regex pattern (built once per document)
+     */
+    protected ?string $abbreviationPattern = null;
+
+    /**
+     * Cached abbreviation keys for the current pattern
+     *
+     * @var array<string, string>|null
+     */
+    protected ?array $cachedAbbreviations = null;
+
     public function __construct(protected BlockParser $blockParser)
     {
     }
@@ -449,16 +461,23 @@ class InlineParser
      */
     protected function flushTextWithAbbreviations(Node $parent, string $text, array $abbreviations): void
     {
-        // Sort abbreviations by length (longest first) to match longer abbreviations first
-        $abbrKeys = array_keys($abbreviations);
-        usort($abbrKeys, fn ($a, $b) => strlen($b) - strlen($a));
+        // Cache the regex pattern for abbreviations (built once per document)
+        if ($this->cachedAbbreviations !== $abbreviations) {
+            // Sort abbreviations by length (longest first) to match longer abbreviations first
+            $abbrKeys = array_keys($abbreviations);
+            usort($abbrKeys, fn ($a, $b) => strlen($b) - strlen($a));
 
-        // Build a regex pattern that matches any abbreviation at word boundaries
-        // We need to escape special regex characters in abbreviation keys
-        $escapedKeys = array_map(fn ($key) => preg_quote($key, '/'), $abbrKeys);
-        $pattern = '/\b(' . implode('|', $escapedKeys) . ')\b/u';
+            // Build a regex pattern that matches any abbreviation at word boundaries
+            // We need to escape special regex characters in abbreviation keys
+            $escapedKeys = array_map(fn ($key) => preg_quote($key, '/'), $abbrKeys);
+            $this->abbreviationPattern = '/\b(' . implode('|', $escapedKeys) . ')\b/u';
+            $this->cachedAbbreviations = $abbreviations;
+        }
 
         // Split text by abbreviation matches, keeping the delimiters
+        // Pattern is guaranteed to be set at this point
+        /** @var string $pattern */
+        $pattern = $this->abbreviationPattern;
         $parts = preg_split($pattern, $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
 
         if ($parts === false) {
