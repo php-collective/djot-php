@@ -1,0 +1,497 @@
+{
+    "meta": {
+        "php_version": "8.4.15",
+        "iterations": 50,
+        "warmup": 5,
+        "timestamp": "2025-12-12T06:04:27+00:00",
+        "system": "Linux marknb 6.8.0-88-generic #89-Ubuntu SMP PREEMPT_DYNAMIC Sat Oct 11 01:02:46 UTC 2025 x86_64"
+    },
+    "libraries": {
+        "djot-php": {
+            "name": "djot-php",
+            "version": "dev",
+            "type": "djot"
+        },
+        "commonmark": {
+            "name": "league\/commonmark",
+            "version": "2.8.0",
+            "type": "markdown"
+        },
+        "gfm": {
+            "name": "league\/commonmark (GFM)",
+            "version": "2.8.0",
+            "type": "markdown"
+        },
+        "parsedown": {
+            "name": "erusev\/parsedown",
+            "version": "1.7.4",
+            "type": "markdown"
+        },
+        "michelf": {
+            "name": "michelf\/php-markdown",
+            "version": "2.0.0",
+            "type": "markdown"
+        },
+        "michelf-extra": {
+            "name": "michelf\/php-markdown (Extra)",
+            "version": "2.0.0",
+            "type": "markdown"
+        }
+    },
+    "benchmarks": {
+        "tiny": {
+            "config": {
+                "paragraphs": 10,
+                "label": "~1 KB"
+            },
+            "djot_size": 1345,
+            "markdown_size": 1367,
+            "results": {
+                "djot-php": {
+                    "input_size": 1345,
+                    "stats": {
+                        "min": 0.467617,
+                        "max": 0.748004,
+                        "mean": 0.51170662,
+                        "median": 0.4991015,
+                        "p95": 0.587482,
+                        "stddev": 0.044668637096248257
+                    },
+                    "throughput_bps": 2628459.252686627
+                },
+                "commonmark": {
+                    "input_size": 1367,
+                    "stats": {
+                        "min": 0.701827,
+                        "max": 1.642781,
+                        "mean": 0.8845158399999998,
+                        "median": 0.806057,
+                        "p95": 1.325005,
+                        "stddev": 0.21168308148936
+                    },
+                    "throughput_bps": 1545478.2584786727
+                },
+                "gfm": {
+                    "input_size": 1367,
+                    "stats": {
+                        "min": 0.718658,
+                        "max": 1.906165,
+                        "mean": 0.8432378599999999,
+                        "median": 0.7769875,
+                        "p95": 1.143956,
+                        "stddev": 0.20401789241432744
+                    },
+                    "throughput_bps": 1621132.1441378358
+                },
+                "parsedown": {
+                    "input_size": 1367,
+                    "stats": {
+                        "min": 0.075893,
+                        "max": 0.094587,
+                        "mean": 0.07871206000000001,
+                        "median": 0.0774905,
+                        "p95": 0.085801,
+                        "stddev": 0.0038045251971722265
+                    },
+                    "throughput_bps": 17367097.24024501
+                },
+                "michelf": {
+                    "input_size": 1367,
+                    "stats": {
+                        "min": 0.237256,
+                        "max": 0.549721,
+                        "mean": 0.28315696,
+                        "median": 0.2477045,
+                        "p95": 0.474039,
+                        "stddev": 0.07582732709738
+                    },
+                    "throughput_bps": 4827711.104116953
+                },
+                "michelf-extra": {
+                    "input_size": 1367,
+                    "stats": {
+                        "min": 0.289894,
+                        "max": 0.683663,
+                        "mean": 0.32008384,
+                        "median": 0.3036845,
+                        "p95": 0.347141,
+                        "stddev": 0.06682051415037762
+                    },
+                    "throughput_bps": 4270756.061911779
+                }
+            }
+        },
+        "small": {
+            "config": {
+                "paragraphs": 50,
+                "label": "~5 KB"
+            },
+            "djot_size": 6930,
+            "markdown_size": 7040,
+            "results": {
+                "djot-php": {
+                    "input_size": 6930,
+                    "stats": {
+                        "min": 2.448212,
+                        "max": 5.527628,
+                        "mean": 3.0078529199999995,
+                        "median": 2.803203,
+                        "p95": 5.241311,
+                        "stddev": 0.7105067540607855
+                    },
+                    "throughput_bps": 2303969.0384860975
+                },
+                "commonmark": {
+                    "input_size": 7040,
+                    "stats": {
+                        "min": 3.526364,
+                        "max": 6.878251,
+                        "mean": 4.5108812600000014,
+                        "median": 4.309048,
+                        "p95": 6.470637,
+                        "stddev": 0.8691932988157915
+                    },
+                    "throughput_bps": 1560670.6526342921
+                },
+                "gfm": {
+                    "input_size": 7040,
+                    "stats": {
+                        "min": 3.821438,
+                        "max": 6.139436,
+                        "mean": 4.496076399999999,
+                        "median": 4.3134855000000005,
+                        "p95": 5.445705,
+                        "stddev": 0.5550351554698759
+                    },
+                    "throughput_bps": 1565809.6913121853
+                },
+                "parsedown": {
+                    "input_size": 7040,
+                    "stats": {
+                        "min": 0.400591,
+                        "max": 0.565651,
+                        "mean": 0.43754022,
+                        "median": 0.429596,
+                        "p95": 0.503314,
+                        "stddev": 0.034623564032282284
+                    },
+                    "throughput_bps": 16089949.399394644
+                },
+                "michelf": {
+                    "input_size": 7040,
+                    "stats": {
+                        "min": 1.255755,
+                        "max": 2.635614,
+                        "mean": 1.5162665799999997,
+                        "median": 1.350378,
+                        "p95": 2.251754,
+                        "stddev": 0.371126031801349
+                    },
+                    "throughput_bps": 4642983.0300685
+                },
+                "michelf-extra": {
+                    "input_size": 7040,
+                    "stats": {
+                        "min": 1.503921,
+                        "max": 2.389733,
+                        "mean": 1.6257614200000001,
+                        "median": 1.6083115000000001,
+                        "p95": 1.767425,
+                        "stddev": 0.13373546751323404
+                    },
+                    "throughput_bps": 4330278.670286074
+                }
+            }
+        },
+        "medium": {
+            "config": {
+                "paragraphs": 200,
+                "label": "~20 KB"
+            },
+            "djot_size": 27945,
+            "markdown_size": 28385,
+            "results": {
+                "djot-php": {
+                    "input_size": 27945,
+                    "stats": {
+                        "min": 10.739675,
+                        "max": 18.778422,
+                        "mean": 12.455149519999999,
+                        "median": 11.794713000000002,
+                        "p95": 15.402019,
+                        "stddev": 1.606671373214494
+                    },
+                    "throughput_bps": 2243650.303444932
+                },
+                "commonmark": {
+                    "input_size": 28385,
+                    "stats": {
+                        "min": 15.581566,
+                        "max": 19.85935,
+                        "mean": 16.85994086,
+                        "median": 16.611754,
+                        "p95": 18.626318,
+                        "stddev": 0.9306571876910317
+                    },
+                    "throughput_bps": 1683576.4867564312
+                },
+                "gfm": {
+                    "input_size": 28385,
+                    "stats": {
+                        "min": 15.383174,
+                        "max": 25.450487,
+                        "mean": 17.371776980000003,
+                        "median": 16.910664500000003,
+                        "p95": 19.867505,
+                        "stddev": 1.797774525927151
+                    },
+                    "throughput_bps": 1633972.1625875947
+                },
+                "parsedown": {
+                    "input_size": 28385,
+                    "stats": {
+                        "min": 1.587558,
+                        "max": 2.473851,
+                        "mean": 1.7675319800000002,
+                        "median": 1.7140149999999998,
+                        "p95": 2.181151,
+                        "stddev": 0.18402645062826245
+                    },
+                    "throughput_bps": 16059115.377363637
+                },
+                "michelf": {
+                    "input_size": 28385,
+                    "stats": {
+                        "min": 4.975733,
+                        "max": 5.653254,
+                        "mean": 5.182307660000001,
+                        "median": 5.156862,
+                        "p95": 5.441506,
+                        "stddev": 0.1412455714417357
+                    },
+                    "throughput_bps": 5477289.628921798
+                },
+                "michelf-extra": {
+                    "input_size": 28385,
+                    "stats": {
+                        "min": 5.964939,
+                        "max": 6.965705,
+                        "mean": 6.2090410600000006,
+                        "median": 6.1571385,
+                        "p95": 6.696931,
+                        "stddev": 0.19458422324456368
+                    },
+                    "throughput_bps": 4571559.39632327
+                }
+            }
+        },
+        "large": {
+            "config": {
+                "paragraphs": 500,
+                "label": "~50 KB"
+            },
+            "djot_size": 70045,
+            "markdown_size": 71145,
+            "results": {
+                "djot-php": {
+                    "input_size": 70045,
+                    "stats": {
+                        "min": 27.82972,
+                        "max": 37.187663,
+                        "mean": 30.485784959999997,
+                        "median": 30.035597,
+                        "p95": 33.164797,
+                        "stddev": 1.7450871618111108
+                    },
+                    "throughput_bps": 2297628.225479683
+                },
+                "commonmark": {
+                    "input_size": 71145,
+                    "stats": {
+                        "min": 41.732116,
+                        "max": 55.732517,
+                        "mean": 46.33868914,
+                        "median": 45.708986,
+                        "p95": 54.050522,
+                        "stddev": 2.951568207229762
+                    },
+                    "throughput_bps": 1535326.1242469407
+                },
+                "gfm": {
+                    "input_size": 71145,
+                    "stats": {
+                        "min": 40.920534,
+                        "max": 66.388144,
+                        "mean": 52.037241060000014,
+                        "median": 51.505153,
+                        "p95": 63.744294,
+                        "stddev": 6.343791980119462
+                    },
+                    "throughput_bps": 1367193.9278634766
+                },
+                "parsedown": {
+                    "input_size": 71145,
+                    "stats": {
+                        "min": 4.04662,
+                        "max": 5.761276,
+                        "mean": 4.46752284,
+                        "median": 4.347885,
+                        "p95": 5.582981,
+                        "stddev": 0.4307648181889055
+                    },
+                    "throughput_bps": 15924932.57404365
+                },
+                "michelf": {
+                    "input_size": 71145,
+                    "stats": {
+                        "min": 12.939671,
+                        "max": 14.743424,
+                        "mean": 13.52540472,
+                        "median": 13.431428499999999,
+                        "p95": 14.319669,
+                        "stddev": 0.4301390446161655
+                    },
+                    "throughput_bps": 5260101.377580072
+                },
+                "michelf-extra": {
+                    "input_size": 71145,
+                    "stats": {
+                        "min": 15.904031,
+                        "max": 19.150962,
+                        "mean": 16.63514076,
+                        "median": 16.528347,
+                        "p95": 17.484255,
+                        "stddev": 0.5362007054485215
+                    },
+                    "throughput_bps": 4276789.780527231
+                }
+            }
+        },
+        "huge": {
+            "config": {
+                "paragraphs": 1000,
+                "label": "~100 KB"
+            },
+            "djot_size": 140192,
+            "markdown_size": 142392,
+            "results": {
+                "djot-php": {
+                    "input_size": 140192,
+                    "stats": {
+                        "min": 61.500566,
+                        "max": 80.358217,
+                        "mean": 66.03735785999999,
+                        "median": 65.4175835,
+                        "p95": 72.647785,
+                        "stddev": 3.391336764706446
+                    },
+                    "throughput_bps": 2122919.5798113057
+                },
+                "commonmark": {
+                    "input_size": 142392,
+                    "stats": {
+                        "min": 87.34867,
+                        "max": 108.74411,
+                        "mean": 95.16466518000001,
+                        "median": 94.3544695,
+                        "p95": 103.549216,
+                        "stddev": 4.895085739502803
+                    },
+                    "throughput_bps": 1496269.6472548025
+                },
+                "gfm": {
+                    "input_size": 142392,
+                    "stats": {
+                        "min": 87.822097,
+                        "max": 109.485631,
+                        "mean": 94.84270183999998,
+                        "median": 94.3739515,
+                        "p95": 102.287139,
+                        "stddev": 4.392991090700314
+                    },
+                    "throughput_bps": 1501349.0467639344
+                },
+                "parsedown": {
+                    "input_size": 142392,
+                    "stats": {
+                        "min": 8.269621,
+                        "max": 11.120729,
+                        "mean": 8.963748080000002,
+                        "median": 8.860254000000001,
+                        "p95": 10.606795,
+                        "stddev": 0.5438510790729478
+                    },
+                    "throughput_bps": 15885319.258102128
+                },
+                "michelf": {
+                    "input_size": 142392,
+                    "stats": {
+                        "min": 26.367497,
+                        "max": 33.897281,
+                        "mean": 27.818503959999997,
+                        "median": 27.206515500000002,
+                        "p95": 31.055961,
+                        "stddev": 1.601645086185119
+                    },
+                    "throughput_bps": 5118607.391854871
+                },
+                "michelf-extra": {
+                    "input_size": 142392,
+                    "stats": {
+                        "min": 33.660877,
+                        "max": 45.731038,
+                        "mean": 36.56656426000001,
+                        "median": 35.348122000000004,
+                        "p95": 43.401838,
+                        "stddev": 3.1404749505403244
+                    },
+                    "throughput_bps": 3894049.191702759
+                }
+            }
+        }
+    },
+    "memory": {
+        "djot-php": {
+            "memory_before": 25165824,
+            "memory_after": 25165824,
+            "memory_delta": 0,
+            "memory_peak": 25165824,
+            "output_size": 40796
+        },
+        "commonmark": {
+            "memory_before": 25165824,
+            "memory_after": 25165824,
+            "memory_delta": 0,
+            "memory_peak": 25165824,
+            "output_size": 40303
+        },
+        "gfm": {
+            "memory_before": 25165824,
+            "memory_after": 25165824,
+            "memory_delta": 0,
+            "memory_peak": 25165824,
+            "output_size": 40303
+        },
+        "parsedown": {
+            "memory_before": 25165824,
+            "memory_after": 25165824,
+            "memory_delta": 0,
+            "memory_peak": 25165824,
+            "output_size": 40269
+        },
+        "michelf": {
+            "memory_before": 25165824,
+            "memory_after": 25165824,
+            "memory_delta": 0,
+            "memory_peak": 25165824,
+            "output_size": 40310
+        },
+        "michelf-extra": {
+            "memory_before": 25165824,
+            "memory_after": 25165824,
+            "memory_delta": 0,
+            "memory_peak": 25165824,
+            "output_size": 40479
+        }
+    }
+}

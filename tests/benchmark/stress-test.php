@@ -6,7 +6,7 @@
  * Pushes the parser to its limits with extreme cases.
  *
  * Usage:
- *   php tests/performance/stress-test.php [--scenario=all] [--json]
+ *   php tests/benchmark/stress-test.php [--scenario=all] [--json]
  */
 
 declare(strict_types=1);
