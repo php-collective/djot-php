@@ -399,17 +399,12 @@ class HtmlRenderer implements RendererInterface
             $attrs = $this->safeMode->filterAttributes($attrs);
         }
 
-        // Sort attributes: id first, then others in source order
-        uksort($attrs, function (string $a, string $b): int {
-            if ($a === 'id') {
-                return -1;
-            }
-            if ($b === 'id') {
-                return 1;
-            }
-
-            return 0;
-        });
+        // Put id first if present (faster than uksort)
+        if (isset($attrs['id'])) {
+            $id = $attrs['id'];
+            unset($attrs['id']);
+            $attrs = ['id' => $id] + $attrs;
+        }
 
         $html = '';
         foreach ($attrs as $key => $value) {
@@ -835,17 +830,12 @@ class HtmlRenderer implements RendererInterface
             $attrs = $this->safeMode->filterAttributes($attrs);
         }
 
-        // Sort attributes: id first, then others in source order
-        uksort($attrs, function (string $a, string $b): int {
-            if ($a === 'id') {
-                return -1;
-            }
-            if ($b === 'id') {
-                return 1;
-            }
-
-            return 0; // preserve order for other attributes
-        });
+        // Put id first if present (faster than uksort)
+        if (isset($attrs['id'])) {
+            $id = $attrs['id'];
+            unset($attrs['id']);
+            $attrs = ['id' => $id] + $attrs;
+        }
 
         $html = '';
         foreach ($attrs as $key => $value) {

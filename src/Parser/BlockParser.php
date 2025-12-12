@@ -2470,8 +2470,14 @@ class BlockParser
 
     protected function startsNewBlock(string $line): bool
     {
+        // Quick check: empty lines don't start blocks
+        if ($line === '' || !isset($line[0])) {
+            return false;
+        }
+
         // Caption `^ text` can always interrupt paragraphs (special case for figure captions)
-        if (preg_match('/^\^ /', $line)) {
+        // Quick first-char check before regex
+        if ($line[0] === '^' && isset($line[1]) && $line[1] === ' ') {
             return true;
         }
 
@@ -2497,37 +2503,43 @@ class BlockParser
      */
     protected function startsNewBlockSignificant(string $line): bool
     {
-        // Headings, unordered lists, tables (same as standard)
-        if (preg_match('/^(#{1,6}\s|[-*+]\s|\|)/', $line)) {
-            return true;
-        }
+        // Use first-char switch to avoid unnecessary regex checks
+        $first = $line[0];
 
-        // Block quotes
-        if (preg_match('/^>\s?/', $line)) {
-            return true;
-        }
+        switch ($first) {
+            case '#':
+                // Headings: #{1,6}\s
+                return preg_match('/^#{1,6}\s/', $line) === 1;
+            case '-':
+            case '*':
+            case '+':
+                // Unordered lists or thematic breaks
+                if (isset($line[1]) && $line[1] === ' ') {
+                    return true; // Unordered list
+                }
 
-        // Ordered lists (digit or letter followed by . or ))
-        if (preg_match('/^(\d+|[a-zA-Z])[.)]\s/', $line)) {
-            return true;
-        }
+                // Thematic breaks: *\s*\*\s*\* or -\s*-\s*-
+                return preg_match('/^(\*\s*\*\s*\*|-\s*-\s*-)/', $line) === 1;
+            case '|':
+                // Tables
+                return true;
+            case '>':
+                // Block quotes
+                return true;
+            case '`':
+                // Code fences: `{3,}
+                return isset($line[1], $line[2]) && $line[1] === '`' && $line[2] === '`';
+            case ':':
+                // Fenced divs: :{3,}
+                return isset($line[1], $line[2]) && $line[1] === ':' && $line[2] === ':';
+            default:
+                // Ordered lists: digit or letter followed by . or )
+                if (ctype_digit($first) || ctype_alpha($first)) {
+                    return preg_match('/^(\d+|[a-zA-Z])[.)]\s/', $line) === 1;
+                }
 
-        // Code fences (with or without info string)
-        if (preg_match('/^`{3,}/', $line)) {
-            return true;
+                return false;
         }
-
-        // Fenced divs
-        if (preg_match('/^:{3,}/', $line)) {
-            return true;
-        }
-
-        // Thematic breaks
-        if (preg_match('/^(\*\s*\*\s*\*|\-\s*\-\s*\-)/', $line)) {
-            return true;
-        }
-
-        return false;
     }
 
     /**

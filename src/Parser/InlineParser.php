@@ -1564,12 +1564,8 @@ class InlineParser
      */
     protected function parseFootnoteRef(string $text, int $pos): ?array
     {
-        // Match [^label]
-        if (!preg_match('/\[\^([^\]]+)\]/', $text, $matches, 0, $pos)) {
-            return null;
-        }
-
-        if (strpos($text, $matches[0], $pos) !== $pos) {
+        // Match [^label] - \G anchors at offset position, avoiding extra strpos check
+        if (!preg_match('/\G\[\^([^\]]+)\]/', $text, $matches, 0, $pos)) {
             return null;
         }
 
@@ -1645,12 +1641,8 @@ class InlineParser
      */
     protected function parseSymbol(string $text, int $pos): ?array
     {
-        // Match :word:
-        if (!preg_match('/:([a-zA-Z_][a-zA-Z0-9_-]*):/', $text, $matches, 0, $pos)) {
-            return null;
-        }
-
-        if (strpos($text, $matches[0], $pos) !== $pos) {
+        // Match :word: - \G anchors at offset position, avoiding extra strpos check
+        if (!preg_match('/\G:([a-zA-Z_][a-zA-Z0-9_-]*):/', $text, $matches, 0, $pos)) {
             return null;
         }
 
