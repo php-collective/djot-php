@@ -16,10 +16,7 @@
     "require-dev": {
         "php-collective/code-sniffer": "dev-master",
         "phpstan/phpstan": "^2.1.32",
-        "phpunit/phpunit": "^11.0 || ^12.0",
-        "league/commonmark": "^2.8",
-        "erusev/parsedown": "^1.7",
-        "michelf/php-markdown": "^2.0"
+        "phpunit/phpunit": "^11.0 || ^12.0"
     },
     "autoload": {
         "psr-4": {

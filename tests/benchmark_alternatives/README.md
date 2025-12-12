@@ -5,11 +5,12 @@ Compares djot-php against popular PHP Markdown parsers.
 ## Quick Start
 
 ```bash
-# Install required libraries first
-composer require --dev league/commonmark erusev/parsedown michelf/php-markdown
+# Install dependencies (isolated from main project)
+cd tests/benchmark_alternatives
+composer install
 
 # Run benchmark
-php tests/benchmark_alternatives/benchmark.php
+php benchmark.php
 ```
 
 ## Libraries Compared

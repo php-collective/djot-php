@@ -14,29 +14,21 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../vendor/autoload.php';
-
-// Check for required libraries
-$missingLibs = [];
-if (!class_exists(\League\CommonMark\CommonMarkConverter::class)) {
-    $missingLibs[] = 'league/commonmark';
-}
-if (!class_exists(\Parsedown::class)) {
-    $missingLibs[] = 'erusev/parsedown';
-}
-if (!class_exists(\Michelf\Markdown::class)) {
-    $missingLibs[] = 'michelf/php-markdown';
-}
-
-if ($missingLibs) {
-    echo "Missing required libraries. Install with:\n";
-    echo "composer require --dev " . implode(' ', $missingLibs) . "\n";
+// Use local vendor if available (isolated dependencies), otherwise fall back to main project
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+} else {
+    echo "Dependencies not installed. Run:\n";
+    echo "  cd tests/benchmark_alternatives && composer install\n";
     exit(1);
 }
 
+use Composer\InstalledVersions;
 use Djot\DjotConverter;
 use League\CommonMark\CommonMarkConverter;
 use League\CommonMark\GithubFlavoredMarkdownConverter;
+use Michelf\Markdown;
+use Michelf\MarkdownExtra;
 
 // Parse CLI arguments
 $options = getopt('', ['iterations:', 'warmup:', 'json', 'help']);
@@ -69,7 +61,7 @@ function generateDjotContent(int $paragraphs): string
     for ($i = 0; $i < $paragraphs; $i++) {
         // Headings
         if ($i % 20 === 0) {
-            $content .= "## Section " . (int)($i / 20 + 1) . "\n\n";
+            $content .= '## Section ' . (int)($i / 20 + 1) . "\n\n";
         }
 
         // Regular paragraph with inline formatting
@@ -111,7 +103,7 @@ function generateMarkdownContent(int $paragraphs): string
     for ($i = 0; $i < $paragraphs; $i++) {
         // Headings
         if ($i % 20 === 0) {
-            $content .= "## Section " . (int)($i / 20 + 1) . "\n\n";
+            $content .= '## Section ' . (int)($i / 20 + 1) . "\n\n";
         }
 
         // Regular paragraph with inline formatting (Markdown uses ** for bold)
@@ -186,7 +178,7 @@ function calculateStdDev(array $values): float
     }
 
     $mean = array_sum($values) / $count;
-    $variance = array_sum(array_map(fn($x) => pow($x - $mean, 2), $values)) / ($count - 1);
+    $variance = array_sum(array_map(fn ($x) => pow($x - $mean, 2), $values)) / ($count - 1);
 
     return sqrt($variance);
 }
@@ -228,56 +220,56 @@ $fixtures = [
 $djot = new DjotConverter();
 $commonmark = new CommonMarkConverter();
 $gfm = new GithubFlavoredMarkdownConverter();
-$parsedown = new \Parsedown();
-$parsedownExtra = class_exists(\ParsedownExtra::class) ? new \ParsedownExtra() : null;
-$michelfMarkdown = new \Michelf\Markdown();
-$michelfExtra = new \Michelf\MarkdownExtra();
+$parsedown = new Parsedown();
+$parsedownExtra = class_exists(ParsedownExtra::class) ? new ParsedownExtra() : null;
+$michelfMarkdown = new Markdown();
+$michelfExtra = new MarkdownExtra();
 
 $parsers = [
     'djot-php' => [
         'name' => 'djot-php',
         'version' => 'dev',
         'type' => 'djot',
-        'parser' => fn($content) => $djot->convert($content),
+        'parser' => fn ($content) => $djot->convert($content),
     ],
     'commonmark' => [
         'name' => 'league/commonmark',
-        'version' => \Composer\InstalledVersions::getPrettyVersion('league/commonmark') ?? 'unknown',
+        'version' => InstalledVersions::getPrettyVersion('league/commonmark') ?? 'unknown',
         'type' => 'markdown',
-        'parser' => fn($content) => $commonmark->convert($content)->getContent(),
+        'parser' => fn ($content) => $commonmark->convert($content)->getContent(),
     ],
     'gfm' => [
         'name' => 'league/commonmark (GFM)',
-        'version' => \Composer\InstalledVersions::getPrettyVersion('league/commonmark') ?? 'unknown',
+        'version' => InstalledVersions::getPrettyVersion('league/commonmark') ?? 'unknown',
         'type' => 'markdown',
-        'parser' => fn($content) => $gfm->convert($content)->getContent(),
+        'parser' => fn ($content) => $gfm->convert($content)->getContent(),
     ],
     'parsedown' => [
         'name' => 'erusev/parsedown',
-        'version' => \Composer\InstalledVersions::getPrettyVersion('erusev/parsedown') ?? 'unknown',
+        'version' => InstalledVersions::getPrettyVersion('erusev/parsedown') ?? 'unknown',
         'type' => 'markdown',
-        'parser' => fn($content) => $parsedown->text($content),
+        'parser' => fn ($content) => $parsedown->text($content),
     ],
     'michelf' => [
         'name' => 'michelf/php-markdown',
-        'version' => \Composer\InstalledVersions::getPrettyVersion('michelf/php-markdown') ?? 'unknown',
+        'version' => InstalledVersions::getPrettyVersion('michelf/php-markdown') ?? 'unknown',
         'type' => 'markdown',
-        'parser' => fn($content) => $michelfMarkdown->transform($content),
+        'parser' => fn ($content) => $michelfMarkdown->transform($content),
     ],
     'michelf-extra' => [
         'name' => 'michelf/php-markdown (Extra)',
-        'version' => \Composer\InstalledVersions::getPrettyVersion('michelf/php-markdown') ?? 'unknown',
+        'version' => InstalledVersions::getPrettyVersion('michelf/php-markdown') ?? 'unknown',
         'type' => 'markdown',
-        'parser' => fn($content) => $michelfExtra->transform($content),
+        'parser' => fn ($content) => $michelfExtra->transform($content),
     ],
 ];
 
 if ($parsedownExtra) {
     $parsers['parsedown-extra'] = [
         'name' => 'erusev/parsedown-extra',
-        'version' => \Composer\InstalledVersions::getPrettyVersion('erusev/parsedown-extra') ?? 'unknown',
+        'version' => InstalledVersions::getPrettyVersion('erusev/parsedown-extra') ?? 'unknown',
         'type' => 'markdown',
-        'parser' => fn($content) => $parsedownExtra->text($content),
+        'parser' => fn ($content) => $parsedownExtra->text($content),
     ];
 }
 
@@ -306,9 +298,9 @@ if (!$jsonOutput) {
     echo "╔══════════════════════════════════════════════════════════════════════════════╗\n";
     echo "║              PHP Markup Libraries Performance Comparison                     ║\n";
     echo "╚══════════════════════════════════════════════════════════════════════════════╝\n\n";
-    echo "PHP Version: " . PHP_VERSION . "\n";
+    echo 'PHP Version: ' . PHP_VERSION . "\n";
     echo "Iterations: {$iterations}, Warmup: {$warmup}\n";
-    echo "Date: " . date('Y-m-d H:i:s') . "\n\n";
+    echo 'Date: ' . date('Y-m-d H:i:s') . "\n\n";
 
     echo "Libraries tested:\n";
     foreach ($parsers as $key => $parser) {
@@ -328,7 +320,7 @@ foreach ($fixtures as $fixtureName => $fixtureConfig) {
     if (!$jsonOutput) {
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
         echo "  Fixture: {$fixtureName} ({$fixtureConfig['label']})\n";
-        echo "  Djot input: " . formatSize($djotSize) . ", Markdown input: " . formatSize($mdSize) . "\n";
+        echo '  Djot input: ' . formatSize($djotSize) . ', Markdown input: ' . formatSize($mdSize) . "\n";
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
         printf(
             "  %-28s %12s %12s %12s %12s\n",
@@ -338,7 +330,7 @@ foreach ($fixtures as $fixtureName => $fixtureConfig) {
             'P95',
             'Throughput',
         );
-        echo "  " . str_repeat('─', 76) . "\n";
+        echo '  ' . str_repeat('─', 76) . "\n";
     }
 
     $fixtureResults = [];
@@ -347,7 +339,7 @@ foreach ($fixtures as $fixtureName => $fixtureConfig) {
         $content = $parser['type'] === 'djot' ? $djotContent : $markdownContent;
         $size = $parser['type'] === 'djot' ? $djotSize : $mdSize;
 
-        $stats = benchmark(fn() => ($parser['parser'])($content), $iterations, $warmup);
+        $stats = benchmark(fn () => ($parser['parser'])($content), $iterations, $warmup);
         $throughput = $size / ($stats['mean'] / 1000); // bytes per second
 
         $fixtureResults[$key] = [
@@ -390,10 +382,10 @@ if (!$jsonOutput) {
     $djotMean = $mediumResults['djot-php']['stats']['mean'];
 
     printf("  %-28s %12s %15s\n", 'Library', 'Mean Time', 'vs djot-php');
-    echo "  " . str_repeat('─', 58) . "\n";
+    echo '  ' . str_repeat('─', 58) . "\n";
 
     // Sort by mean time
-    uasort($mediumResults, fn($a, $b) => $a['stats']['mean'] <=> $b['stats']['mean']);
+    uasort($mediumResults, fn ($a, $b) => $a['stats']['mean'] <=> $b['stats']['mean']);
 
     foreach ($mediumResults as $key => $result) {
         $mean = $result['stats']['mean'];
@@ -425,7 +417,7 @@ if (!$jsonOutput) {
     echo "╚══════════════════════════════════════════════════════════════════════════════╝\n\n";
 
     printf("  %-28s %15s %15s\n", 'Library', 'Peak Memory', 'Memory Delta');
-    echo "  " . str_repeat('─', 60) . "\n";
+    echo '  ' . str_repeat('─', 60) . "\n";
 }
 
 $memoryResults = [];
