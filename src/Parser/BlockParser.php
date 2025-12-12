@@ -800,7 +800,7 @@ class BlockParser
         $info = $fenceInfo['info'];
         $indentLen = strlen($fenceInfo['indent']);
 
-        $contentLines = [];
+        $content = '';
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
@@ -819,10 +819,9 @@ class BlockParser
             // Remove indent from content lines (up to the same amount as opening fence)
             $currentLine = $this->fencedBlockParser->removeIndent($currentLine, $indentLen);
 
-            $contentLines[] = $currentLine;
+            $content .= $currentLine . "\n";
             $i++;
         }
-        $content = implode("\n", $contentLines);
 
         // If not closed and using backticks, check if this should be inline code
         if (!$closed && $fenceChar === '`') {
@@ -865,7 +864,7 @@ class BlockParser
             return null;
         }
 
-        $contentLines = [];
+        $content = '';
         $i = $start;
         $count = count($lines);
         $inComment = false;
@@ -883,30 +882,29 @@ class BlockParser
                     // Check if closing is on same line
                     $closePos = strpos($afterOpen, '%}');
                     if ($closePos !== false) {
-                        $contentLines[] = substr($afterOpen, 0, $closePos);
+                        $content .= substr($afterOpen, 0, $closePos);
                         $i++;
                         $closed = true;
 
                         break;
                     }
-                    $contentLines[] = $afterOpen;
+                    $content .= $afterOpen . "\n";
                 }
             } else {
                 // Look for closing %}
                 $closePos = strpos($currentLine, '%}');
                 if ($closePos !== false) {
-                    $contentLines[] = substr($currentLine, 0, $closePos);
+                    $content .= substr($currentLine, 0, $closePos);
                     $i++;
                     $closed = true;
 
                     break;
                 }
-                $contentLines[] = $currentLine;
+                $content .= $currentLine . "\n";
             }
 
             $i++;
         }
-        $content = implode("\n", $contentLines);
 
         if (!$closed) {
             $this->addWarning('Unclosed comment', $start, 1, true);
@@ -996,7 +994,7 @@ class BlockParser
         $fenceLength = $rawInfo['length'];
         $format = $rawInfo['format'];
 
-        $contentLines = [];
+        $content = '';
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
@@ -1012,7 +1010,7 @@ class BlockParser
                 break;
             }
 
-            $contentLines[] = $currentLine;
+            $content .= $currentLine . "\n";
             $i++;
         }
 
@@ -1020,7 +1018,7 @@ class BlockParser
             $this->addWarning('Unclosed raw block', $start, 1, true);
         }
 
-        $rawBlock = new RawBlock(implode("\n", $contentLines), $format);
+        $rawBlock = new RawBlock(trim($content, "\n"), $format);
         $this->applyPendingAttributes($rawBlock);
         $parent->appendChild($rawBlock);
 
