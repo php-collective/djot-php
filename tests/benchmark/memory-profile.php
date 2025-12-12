@@ -6,7 +6,7 @@
  * Detailed memory analysis for the djot parser and renderer.
  *
  * Usage:
- *   php tests/performance/memory-profile.php [--detailed] [--json]
+ *   php tests/benchmark/memory-profile.php [--detailed] [--json]
  */
 
 declare(strict_types=1);

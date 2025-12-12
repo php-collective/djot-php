@@ -6,7 +6,7 @@
  * Generates beautiful HTML reports from benchmark results.
  *
  * Usage:
- *   php tests/performance/generate-report.php [results.json] [--output=report.html]
+ *   php tests/benchmark/generate-report.php [results.json] [--output=report.html]
  */
 
 declare(strict_types=1);

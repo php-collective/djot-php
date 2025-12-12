@@ -160,19 +160,19 @@ All stress tests pass successfully:
 
 ```bash
 # Quick PHP benchmark
-php tests/performance/benchmark.php
+php tests/benchmark/benchmark.php
 
 # Full benchmark with cross-language comparison
-./tests/performance/run-all.sh --compare
+./tests/benchmark/run-all.sh --compare
 
 # Memory profiling
-php tests/performance/memory-profile.php --detailed
+php tests/benchmark/memory-profile.php --detailed
 
 # Stress testing
-php tests/performance/stress-test.php
+php tests/benchmark/stress-test.php
 
 # Generate HTML report
-php tests/performance/generate-report.php
+php tests/benchmark/generate-report.php
 ```
 
 ## Key Takeaways

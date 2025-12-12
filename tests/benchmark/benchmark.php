@@ -7,7 +7,7 @@
  * and complexity levels.
  *
  * Usage:
- *   php tests/performance/benchmark.php [--iterations=100] [--warmup=10] [--json]
+ *   php tests/benchmark/benchmark.php [--iterations=100] [--warmup=10] [--json]
  */
 
 declare(strict_types=1);

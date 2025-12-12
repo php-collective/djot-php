@@ -6,13 +6,13 @@ Comprehensive performance benchmarking suite for djot-php, including cross-langu
 
 ```bash
 # Run PHP benchmarks only
-php tests/performance/benchmark.php
+php tests/benchmark/benchmark.php
 
 # Run with cross-language comparison
-./tests/performance/run-all.sh --compare
+./tests/benchmark/run-all.sh --compare
 
 # Quick benchmark (fewer iterations)
-./tests/performance/run-all.sh --quick
+./tests/benchmark/run-all.sh --quick
 ```
 
 ## Benchmark Scripts
@@ -45,27 +45,27 @@ php tests/performance/benchmark.php
 ### Basic PHP Benchmark
 
 ```bash
-php tests/performance/benchmark.php --iterations=100 --warmup=10
-php tests/performance/benchmark.php --json > results.json
+php tests/benchmark/benchmark.php --iterations=100 --warmup=10
+php tests/benchmark/benchmark.php --json > results.json
 ```
 
 ### Memory Profiling
 
 ```bash
-php tests/performance/memory-profile.php
-php tests/performance/memory-profile.php --detailed
-php tests/performance/memory-profile.php --json
+php tests/benchmark/memory-profile.php
+php tests/benchmark/memory-profile.php --detailed
+php tests/benchmark/memory-profile.php --json
 ```
 
 ### Stress Testing
 
 ```bash
 # Run all stress tests
-php tests/performance/stress-test.php
+php tests/benchmark/stress-test.php
 
 # Run specific scenario
-php tests/performance/stress-test.php --scenario=pathological
-php tests/performance/stress-test.php --scenario=deep_nesting
+php tests/benchmark/stress-test.php --scenario=pathological
+php tests/benchmark/stress-test.php --scenario=deep_nesting
 ```
 
 Available scenarios:
@@ -83,7 +83,7 @@ Available scenarios:
 
 ```bash
 # Install JavaScript dependencies
-cd tests/performance && npm install
+cd tests/benchmark && npm install
 
 # Run JavaScript benchmark
 node benchmark-js.mjs
@@ -102,10 +102,10 @@ node compare-languages.mjs
 
 ```bash
 # Generate from latest results
-php tests/performance/generate-report.php
+php tests/benchmark/generate-report.php
 
 # Generate from specific results file
-php tests/performance/generate-report.php results/benchmark-*.json
+php tests/benchmark/generate-report.php results/benchmark-*.json
 ```
 
 ## Output Formats
@@ -174,8 +174,8 @@ Add to your CI pipeline:
 ```yaml
 - name: Run performance benchmarks
   run: |
-    php tests/performance/benchmark.php --iterations=50 --json > benchmark.json
-    php tests/performance/stress-test.php
+    php tests/benchmark/benchmark.php --iterations=50 --json > benchmark.json
+    php tests/benchmark/stress-test.php
 ```
 
 ## Requirements
