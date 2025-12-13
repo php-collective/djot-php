@@ -2533,9 +2533,10 @@ class BlockParser
                 // Fenced divs: :{3,}
                 return isset($line[1], $line[2]) && $line[1] === ':' && $line[2] === ':';
             default:
-                // Ordered lists: digit or letter followed by . or )
-                if (ctype_digit($first) || ctype_alpha($first)) {
-                    return preg_match('/^(\d+|[a-zA-Z])[.)]\s/', $line) === 1;
+                // Only 1. or 1) can interrupt paragraphs (CommonMark rule)
+                // Prevents "1985. That year..." from becoming a list
+                if ($first === '1') {
+                    return preg_match('/^1[.)]\s/', $line) === 1;
                 }
 
                 return false;
