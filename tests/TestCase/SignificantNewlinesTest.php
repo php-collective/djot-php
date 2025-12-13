@@ -291,4 +291,52 @@ DJOT;
         $this->assertInstanceOf(Paragraph::class, $children[0]);
         $this->assertInstanceOf(Heading::class, $children[1]);
     }
+
+    // ==================== CommonMark Ordered List Rule ====================
+
+    public function testOnlyOneCanInterruptParagraph(): void
+    {
+        // Only "1." can interrupt a paragraph (CommonMark rule)
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Steps:\n1. First step");
+
+        $children = $doc->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+    }
+
+    public function testYearDoesNotBecomeList(): void
+    {
+        // "1985." should NOT interrupt - prevents years becoming lists
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("My favorite year was\n1985. It was great.");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
+    public function testHighNumberedListDoesNotInterrupt(): void
+    {
+        // "5." should NOT interrupt paragraphs
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Continue from step\n5. Do this thing");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
+    public function testHighNumberedListAfterBlankLine(): void
+    {
+        // With blank line, any number can start a list
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Continue from step\n\n5. Do this thing");
+
+        $children = $doc->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+    }
 }
