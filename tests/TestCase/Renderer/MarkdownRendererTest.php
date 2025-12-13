@@ -277,14 +277,15 @@ class MarkdownRendererTest extends TestCase
 
     public function testDefinitionListMultipleTermsMultipleDefinitions(): void
     {
-        $djot = ": color\n: colour\n\n  The visual property.\n\n  Used in design.";
+        // Use `: +` continuation marker to create multiple dd elements
+        $djot = ": color\n: colour\n\n  The visual property.\n\n: +\n\n  Used in design.";
         $document = $this->converter->parse($djot);
         $result = $this->renderer->render($document);
 
         // Multiple terms
         $this->assertStringContainsString('**color**', $result);
         $this->assertStringContainsString('**colour**', $result);
-        // Multiple definitions
+        // Multiple definitions (created via `: +` marker)
         $this->assertSame(2, substr_count($result, ': '));
         $this->assertStringContainsString('The visual property.', $result);
         $this->assertStringContainsString('Used in design.', $result);

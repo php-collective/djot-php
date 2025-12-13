@@ -1776,6 +1776,11 @@ class BlockParser
 
                 $termContent = $termMatch[1];
 
+                // Check for continuation marker `: +` - not a new term, breaks term collection
+                if ($termContent === '+') {
+                    break;
+                }
+
                 // Special case: if term starts with code fence, term is empty and fence is part of definition
                 $termStartsWithCodeFence = preg_match('/^(`{3,}|~{3,})/', $termContent, $fenceMatch);
 
@@ -1847,9 +1852,9 @@ class BlockParser
             }
 
             // Now collect definition content (after blank line, 2-space indent)
-            // When multiple terms share definitions, each paragraph block becomes a separate dd
+            // Use `: +` marker to create additional dd elements for the same term
             $defLines = [];
-            $multipleTerms = count($terms) > 1;
+            $allDefBlocks = [];
 
             // If term started with code fence, add it to definition content
             if ($codeFenceInfo !== null) {
@@ -1861,6 +1866,17 @@ class BlockParser
 
                 if (IndentationHelper::isBlankLine($defLine)) {
                     $defLines[] = '';
+                    $i++;
+
+                    continue;
+                }
+
+                // Check for continuation marker `: +` - creates new dd for same term
+                if ($defLine === ': +') {
+                    if ($defLines !== []) {
+                        $allDefBlocks[] = $defLines;
+                        $defLines = [];
+                    }
                     $i++;
 
                     continue;
@@ -1880,13 +1896,24 @@ class BlockParser
                 }
             }
 
+            // Add final block
+            if ($defLines !== []) {
+                $allDefBlocks[] = $defLines;
+            }
+
             // Create definition node(s)
-            if ($multipleTerms && $defLines !== []) {
-                // Split by blank lines - each block becomes a separate dd
-                $blocks = $this->splitByBlankLines($defLines);
-                foreach ($blocks as $block) {
+            if ($allDefBlocks !== []) {
+                foreach ($allDefBlocks as $block) {
                     $def = new DefinitionDescription();
                     $defAttributes = [];
+
+                    // Skip leading/trailing blank lines
+                    while ($block !== [] && $block[0] === '') {
+                        array_shift($block);
+                    }
+                    while ($block !== [] && end($block) === '') {
+                        array_pop($block);
+                    }
 
                     // Check if last line is a standalone attribute block for the dd
                     $blockCount = count($block);
@@ -1895,7 +1922,9 @@ class BlockParser
                         array_pop($block);
                     }
 
-                    $this->parseBlocks($def, $block, 0);
+                    if ($block !== []) {
+                        $this->parseBlocks($def, $block, 0);
+                    }
 
                     // Apply definition attributes
                     if ($defAttributes !== []) {
@@ -1906,43 +1935,8 @@ class BlockParser
                     $defList->appendChild($def);
                 }
             } else {
-                // Single term: all content goes in one dd
-                $def = new DefinitionDescription();
-                $defAttributes = [];
-                if ($defLines !== []) {
-                    // Skip leading blank lines using index (avoid O(n) array_shift)
-                    $defStart = 0;
-                    $defLineCount = count($defLines);
-                    while ($defStart < $defLineCount && $defLines[$defStart] === '') {
-                        $defStart++;
-                    }
-                    // Remove trailing blank lines (but preserve potential attribute line)
-                    $defEnd = $defLineCount;
-                    while ($defEnd > $defStart + 1 && $defLines[$defEnd - 1] === '') {
-                        $defEnd--;
-                    }
-
-                    // Check if last line is a standalone attribute block for the dd
-                    if ($defEnd > $defStart && preg_match('/^\{([^{}]+)\}\s*$/', $defLines[$defEnd - 1], $attrMatch)) {
-                        $defAttributes = AttributeParser::parse($attrMatch[1]);
-                        $defEnd--;
-                        // Remove any trailing blank lines before the attribute
-                        while ($defEnd > $defStart && $defLines[$defEnd - 1] === '') {
-                            $defEnd--;
-                        }
-                    }
-
-                    if ($defEnd > $defStart) {
-                        $this->parseBlocks($def, array_slice($defLines, $defStart, $defEnd - $defStart), 0);
-                    }
-                }
-                // Apply definition attributes
-                if ($defAttributes !== []) {
-                    foreach ($defAttributes as $key => $value) {
-                        $def->setAttribute($key, $value);
-                    }
-                }
-                $defList->appendChild($def);
+                // Term with no definition content - create empty dd
+                $defList->appendChild(new DefinitionDescription());
             }
         }
 

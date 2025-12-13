@@ -204,6 +204,50 @@ class BlockParserTest extends TestCase
         $this->assertNull($dd->getAttribute('class'));
     }
 
+    public function testParseDefinitionListBlankLineKeepsSameDd(): void
+    {
+        // Blank lines within definition content create paragraphs in same dd (spec behavior)
+        $djot = ": Term\n\n  First paragraph\n\n  Second paragraph";
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        // Should have: dt + dd = 2 children (one dd with multiple paragraphs)
+        $children = $dl->getChildren();
+        $dds = array_filter($children, fn ($c) => $c->getType() === 'definition_description');
+        $this->assertCount(1, $dds);
+    }
+
+    public function testParseDefinitionListContinuationMarker(): void
+    {
+        // `: +` marker creates additional dd for same term
+        $djot = ": Term\n\n  First definition\n\n: +\n\n  Second definition";
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        // Should have: dt + dd + dd = 3 children
+        $children = $dl->getChildren();
+        $dds = array_filter($children, fn ($c) => $c->getType() === 'definition_description');
+        $this->assertCount(2, $dds);
+    }
+
+    public function testParseDefinitionListEmptyDd(): void
+    {
+        // Term with no definition content should still create empty dd
+        $djot = ': Term';
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        $children = $dl->getChildren();
+        $dds = array_filter($children, fn ($c) => $c->getType() === 'definition_description');
+        $this->assertCount(1, $dds);
+    }
+
     public function testParseThematicBreak(): void
     {
         $doc = $this->parser->parse('---');
