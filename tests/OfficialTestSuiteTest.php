@@ -32,6 +32,8 @@ class OfficialTestSuiteTest extends TestCase
      * Tests to skip due to intentional spec deviations
      *
      * Format: 'filename_index' => 'reason for deviation'
+     *
+     * @var array<string, string>
      */
     protected const INTENTIONAL_DEVIATIONS = [
         // We split definition content by blank lines into separate <dd> elements
