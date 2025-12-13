@@ -204,6 +204,35 @@ class BlockParserTest extends TestCase
         $this->assertNull($dd->getAttribute('class'));
     }
 
+    public function testParseDefinitionListBlankLineSplitsDd(): void
+    {
+        // Blank lines within definition content create separate dd elements
+        $djot = ": Term\n\n  First paragraph\n\n  Second paragraph";
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        // Should have: dt + dd + dd = 3 children
+        $children = $dl->getChildren();
+        $dds = array_filter($children, fn ($c) => $c->getType() === 'definition_description');
+        $this->assertCount(2, $dds);
+    }
+
+    public function testParseDefinitionListEmptyDd(): void
+    {
+        // Term with no definition content should still create empty dd
+        $djot = ': Term';
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        $children = $dl->getChildren();
+        $dds = array_filter($children, fn ($c) => $c->getType() === 'definition_description');
+        $this->assertCount(1, $dds);
+    }
+
     public function testParseThematicBreak(): void
     {
         $doc = $this->parser->parse('---');
