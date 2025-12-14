@@ -1,0 +1,11 @@
+[Link text](https://example.com)
+
+![Alt text](image.png)
+
+[ref]: https://example.com
+
+A [reference link][ref].
+
+[^note]: This is a footnote.
+
+See footnote[^note].

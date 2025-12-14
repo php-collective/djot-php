@@ -1,0 +1,115 @@
+# Djot syntax dictionary for fuzzing
+# Emphasis and strong
+"_"
+"*"
+"__"
+"**"
+"_*"
+"*_"
+
+# Links and images
+"["
+"]"
+"("
+")"
+"[link](url)"
+"![alt](url)"
+"[^"
+"]:"
+
+# Code
+"`"
+"``"
+"```"
+"````"
+"~~~"
+"~~~~"
+
+# Headers
+"#"
+"##"
+"###"
+"####"
+"#####"
+"######"
+
+# Lists
+"-"
+"+"
+"1."
+"2."
+"- [ ]"
+"- [x]"
+":"
+"  "
+
+# Block elements
+">"
+"---"
+"***"
+":::"
+"{."
+"}"
+"{#"
+"{-"
+"{+"
+
+# Escapes and special
+"\\"
+"&"
+"&amp;"
+"&lt;"
+"&gt;"
+"&#"
+"&#x"
+
+# Attributes
+"{.class}"
+"{#id}"
+"{key=value}"
+
+# Tables
+"|"
+"|-"
+"|:"
+":|"
+":--:"
+
+# Math
+"$"
+"$$"
+
+# Footnotes
+"[^note]"
+"[^1]"
+
+# Smart punctuation
+"--"
+"..."
+"'"
+
+# Superscript/subscript
+"^"
+"~"
+
+# Highlighting
+"{="
+"=}"
+"+}"
+"-}"
+
+# Whitespace (using hex escapes)
+"\x0a\x0a"
+"\x0d\x0a"
+"\x09"
+"   "
+"    "
+
+# Nested structures
+"[[["
+"]]]"
+"((("
+")))"
+
+# Simple space
+" "

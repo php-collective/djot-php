@@ -1,0 +1,9 @@
+- Item 1
+- Item 2
+  - Nested item
+  - Another nested
+- Item 3
+
+1. First
+2. Second
+3. Third
