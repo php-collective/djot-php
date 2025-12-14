@@ -11,7 +11,7 @@ class ReferenceDefinition
 {
     /**
      * @param string $url
-     * @param array<string, mixed> $attributes
+     * @param array<string, string> $attributes
      */
     public function __construct(
         public readonly string $url,

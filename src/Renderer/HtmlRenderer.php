@@ -309,7 +309,8 @@ class HtmlRenderer implements RendererInterface
     {
         // If heading has explicit id attribute, use it
         if ($node->hasAttribute('id')) {
-            $id = (string)$node->getAttribute('id');
+            $idAttr = $node->getAttribute('id');
+            $id = is_string($idAttr) ? $idAttr : '';
             // Track explicit IDs so auto-generated IDs don't conflict
             if (!isset($this->usedIds[$id])) {
                 $this->usedIds[$id] = 0;
@@ -355,8 +356,9 @@ class HtmlRenderer implements RendererInterface
     protected function trackIdFromNode(Node $node): void
     {
         if ($node->hasAttribute('id')) {
-            $id = (string)$node->getAttribute('id');
-            if (!isset($this->usedIds[$id])) {
+            $idAttr = $node->getAttribute('id');
+            $id = is_string($idAttr) ? $idAttr : '';
+            if ($id !== '' && !isset($this->usedIds[$id])) {
                 $this->usedIds[$id] = 0;
             }
         }

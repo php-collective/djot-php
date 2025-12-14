@@ -741,7 +741,7 @@ class InlineParser
                         if ($key === 'class') {
                             $link->addClass((string)$value);
                         } else {
-                            $link->setAttribute($key, $value);
+                            $link->setAttribute($key, (string)$value);
                         }
                     }
 

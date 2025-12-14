@@ -69,7 +69,7 @@ class BlockParser
     /**
      * Pending block attributes to apply to next block
      *
-     * @var array<string, mixed>
+     * @var array<string, string>
      */
     protected array $pendingAttributes = [];
 
@@ -1421,12 +1421,21 @@ class BlockParser
         // Get the base indentation of this list
         $baseIndent = IndentationHelper::getLeadingSpaces($line);
 
+        /** @var string $listType */
+        $listType = $listInfo['type'];
+        /** @var int $listStart */
+        $listStart = $listInfo['start'] ?? 1;
+        /** @var string|null $listMarker */
+        $listMarker = $listInfo['marker'] ?? null;
+        /** @var string|null $listStyle */
+        $listStyle = $listInfo['style'] ?? null;
+
         $list = new ListBlock(
-            $listInfo['type'],
-            $listInfo['start'] ?? 1,
+            $listType,
+            $listStart,
             true, // Start as tight
-            $listInfo['marker'],
-            $listInfo['style'] ?? null,
+            $listMarker,
+            $listStyle,
         );
 
         // Save and clear pending attributes - they apply to the list, not inner content
@@ -1584,10 +1593,14 @@ class BlockParser
                 $list->setTight(false);
             }
 
-            $listItem = new ListItem($itemInfo['taskMarker'] ?? null);
+            /** @var string|null $taskMarker */
+            $taskMarker = $itemInfo['taskMarker'] ?? null;
+            $listItem = new ListItem($taskMarker);
+            /** @var string $itemContent */
             $itemContent = $itemInfo['content'];
 
             // Collect item content lines (without blank line = tight continuation)
+            /** @var array<string> $itemLines */
             $itemLines = [$itemContent];
             $i++;
             $lastItemHadBlankAfter = false;
