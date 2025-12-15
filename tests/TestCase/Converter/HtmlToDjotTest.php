@@ -253,14 +253,16 @@ HTML;
 
     public function testDefinitionListMultipleDefinitions(): void
     {
-        // Multiple dd elements under multiple terms become separate indented paragraphs
+        // Multiple dd elements use `: +` continuation marker
         $html = '<dl><dt>color</dt><dt>colour</dt><dd>The visual property.</dd><dd>Used in design.</dd></dl>';
         $result = $this->converter->convert($html);
 
         $this->assertStringContainsString(': color', $result);
         $this->assertStringContainsString(': colour', $result);
-        // Each dd becomes a separate indented block separated by blank line
-        $this->assertStringContainsString("  The visual property.\n\n  Used in design.", $result);
+        // First dd is indented content
+        $this->assertStringContainsString('  The visual property.', $result);
+        // Second dd uses continuation marker
+        $this->assertStringContainsString(": +\n\n  Used in design.", $result);
     }
 
     // ==================== Spans with Attributes ====================

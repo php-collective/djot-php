@@ -488,8 +488,11 @@ class HtmlToDjot
                     $ddCount = 0;
                 } elseif ($tag === 'dd') {
                     // Definition: indented content after blank line
-                    if ($lastWasTerm || $ddCount > 0) {
+                    if ($lastWasTerm) {
                         $output .= "\n";
+                    } elseif ($ddCount > 0) {
+                        // Multiple dd elements for same term - use continuation marker
+                        $output .= ": +\n\n";
                     }
                     $content = trim($this->processChildren($child));
                     // Indent definition content

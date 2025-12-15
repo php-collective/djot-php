@@ -28,6 +28,17 @@ use function count;
 #[Group('official')]
 class OfficialTestSuiteTest extends TestCase
 {
+    /**
+     * Tests to skip due to intentional spec deviations
+     *
+     * Format: 'filename_index' => 'reason for deviation'
+     *
+     * @var array<string, string>
+     */
+    protected const INTENTIONAL_DEVIATIONS = [
+        // Currently no intentional deviations
+    ];
+
     protected DjotConverter $converter;
 
     protected function setUp(): void
@@ -135,6 +146,12 @@ class OfficialTestSuiteTest extends TestCase
     #[DataProvider('officialTestProvider')]
     public function testOfficialSuite(string $input, string $expected, string $file, int $index): void
     {
+        $testName = basename($file, '.test') . '_' . $index;
+
+        if (isset(self::INTENTIONAL_DEVIATIONS[$testName])) {
+            $this->markTestSkipped('Intentional deviation: ' . self::INTENTIONAL_DEVIATIONS[$testName]);
+        }
+
         $result = $this->converter->convert($input);
 
         // Normalize whitespace for comparison

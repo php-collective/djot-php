@@ -555,8 +555,8 @@ DJOT;
 
     public function testDefinitionListMultipleTermsMultipleDefinitions(): void
     {
-        // When multiple terms share definitions, each paragraph block becomes a separate dd
-        $djot = ": color\n: colour\n\n  The visual property of objects.\n\n  Used in art and design.";
+        // Use `: +` continuation marker to create multiple dd elements
+        $djot = ": color\n: colour\n\n  The visual property of objects.\n\n: +\n\n  Used in art and design.";
 
         $result = $this->converter->convert($djot);
 
@@ -564,7 +564,7 @@ DJOT;
         $this->assertStringContainsString('<dt>colour</dt>', $result);
         $this->assertStringContainsString('The visual property', $result);
         $this->assertStringContainsString('Used in art and design', $result);
-        // Multiple terms with blank-line-separated paragraphs = multiple dd elements
+        // `: +` marker creates second dd element
         $this->assertSame(2, substr_count($result, '<dd>'));
     }
 
@@ -601,7 +601,8 @@ DJOT;
     public function testDefinitionListAllAttributes(): void
     {
         // DD attributes come AFTER content (consistent with list items)
-        $djot = "{.vocabulary}\n: color\n{.american}\n: colour\n{.british}\n\n  The visual property.\n  {.primary}\n\n  Used in design.\n  {.secondary}";
+        // Use `: +` continuation marker to create multiple dd elements with separate attributes
+        $djot = "{.vocabulary}\n: color\n{.american}\n: colour\n{.british}\n\n  The visual property.\n  {.primary}\n\n: +\n\n  Used in design.\n  {.secondary}";
 
         $result = $this->converter->convert($djot);
 
