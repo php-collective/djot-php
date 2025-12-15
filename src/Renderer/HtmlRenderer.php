@@ -83,6 +83,11 @@ class HtmlRenderer implements RendererInterface
     protected int $sectionCounter = 0;
 
     /**
+     * Tab width for code blocks (null = preserve tabs, integer = convert to spaces)
+     */
+    protected ?int $codeBlockTabWidth = null;
+
+    /**
      * Maps footnote labels to their assigned numbers (order of first reference)
      *
      * @var array<string, int>
@@ -211,6 +216,30 @@ class HtmlRenderer implements RendererInterface
     public function getSoftBreakMode(): SoftBreakMode
     {
         return $this->softBreakMode;
+    }
+
+    /**
+     * Set tab width for code blocks
+     *
+     * When set, tabs in code blocks and inline code are converted to spaces.
+     * This ensures consistent display across all browsers and contexts
+     * (email clients, RSS readers, etc.) without relying on CSS tab-size.
+     *
+     * @param int|null $width Number of spaces per tab (null to preserve tabs)
+     */
+    public function setCodeBlockTabWidth(?int $width): self
+    {
+        $this->codeBlockTabWidth = $width;
+
+        return $this;
+    }
+
+    /**
+     * Get the current code block tab width
+     */
+    public function getCodeBlockTabWidth(): ?int
+    {
+        return $this->codeBlockTabWidth;
     }
 
     public function render(Document $document): string
@@ -506,6 +535,12 @@ class HtmlRenderer implements RendererInterface
         $attrs = $this->renderAttributes($node);
 
         $code = $this->escape($node->getContent());
+
+        // Convert tabs to spaces if configured
+        if ($this->codeBlockTabWidth !== null) {
+            $code = str_replace("\t", str_repeat(' ', $this->codeBlockTabWidth), $code);
+        }
+
         // Add trailing newline inside code block (official djot behavior)
         if ($code !== '' && !str_ends_with($code, "\n")) {
             $code .= "\n";
@@ -751,8 +786,14 @@ class HtmlRenderer implements RendererInterface
     protected function renderCode(Code $node): string
     {
         $attrs = $this->renderAttributes($node);
+        $content = $this->escape($node->getContent());
 
-        return '<code' . $attrs . '>' . $this->escape($node->getContent()) . '</code>';
+        // Convert tabs to spaces if configured
+        if ($this->codeBlockTabWidth !== null) {
+            $content = str_replace("\t", str_repeat(' ', $this->codeBlockTabWidth), $content);
+        }
+
+        return '<code' . $attrs . '>' . $content . '</code>';
     }
 
     protected function renderSoftBreak(): string

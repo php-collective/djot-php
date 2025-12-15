@@ -543,6 +543,33 @@ $renderer = new HtmlRenderer(xhtml: false);
 $html = $renderer->render($document);
 ```
 
+**Configuration:**
+
+```php
+// Convert tabs in code blocks to spaces (default: null = preserve tabs)
+$renderer->setCodeBlockTabWidth(4);
+
+// Customize soft break rendering
+$renderer->setSoftBreakMode(SoftBreakMode::Space);
+
+// Enable safe mode for user-generated content
+$renderer->setSafeMode(SafeMode::defaults());
+```
+
+#### Tab Width in Code Blocks
+
+By default, tabs in code blocks are preserved as-is. This can lead to inconsistent display since browsers default to 8-space tabs, and CSS `tab-size` isn't supported in all contexts (email clients, RSS readers, etc.).
+
+```php
+// Convert tabs to 4 spaces in code blocks and inline code
+$renderer->setCodeBlockTabWidth(4);
+
+// Preserve tabs (default)
+$renderer->setCodeBlockTabWidth(null);
+```
+
+This affects both fenced code blocks (`<pre><code>`) and inline code (`<code>`).
+
 ### PlainTextRenderer
 
 Renders an AST Document to plain text (useful for search indexing, SEO, email fallbacks).

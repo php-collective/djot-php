@@ -289,4 +289,73 @@ class HtmlRendererTest extends TestCase
 
         $this->assertSame("<p><strong><em>bold and italic</em></strong></p>\n", $result);
     }
+
+    public function testCodeBlockTabWidthDefault(): void
+    {
+        $doc = new Document();
+        $codeBlock = new CodeBlock("if (true) {\n\treturn;\n}");
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        // Default: tabs are preserved
+        $this->assertStringContainsString("\t", $result);
+    }
+
+    public function testCodeBlockTabWidthConvertsToSpaces(): void
+    {
+        $this->renderer->setCodeBlockTabWidth(4);
+
+        $doc = new Document();
+        $codeBlock = new CodeBlock("if (true) {\n\treturn;\n}");
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        // Tabs converted to 4 spaces
+        $this->assertStringNotContainsString("\t", $result);
+        $this->assertStringContainsString('    return;', $result);
+    }
+
+    public function testCodeBlockTabWidthMultipleTabs(): void
+    {
+        $this->renderer->setCodeBlockTabWidth(2);
+
+        $doc = new Document();
+        $codeBlock = new CodeBlock("\t\tindented");
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        // Two tabs = 4 spaces (2 spaces each)
+        $this->assertStringContainsString('    indented', $result);
+    }
+
+    public function testInlineCodeTabWidthConvertsToSpaces(): void
+    {
+        $this->renderer->setCodeBlockTabWidth(4);
+
+        $doc = new Document();
+        $para = new Paragraph();
+        $code = new Code("a\tb");
+        $para->appendChild($code);
+        $doc->appendChild($para);
+
+        $result = $this->renderer->render($doc);
+
+        // Tabs converted in inline code too
+        $this->assertStringNotContainsString("\t", $result);
+        $this->assertStringContainsString('a    b', $result);
+    }
+
+    public function testGetCodeBlockTabWidth(): void
+    {
+        $this->assertNull($this->renderer->getCodeBlockTabWidth());
+
+        $this->renderer->setCodeBlockTabWidth(4);
+        $this->assertSame(4, $this->renderer->getCodeBlockTabWidth());
+
+        $this->renderer->setCodeBlockTabWidth(null);
+        $this->assertNull($this->renderer->getCodeBlockTabWidth());
+    }
 }
