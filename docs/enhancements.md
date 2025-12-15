@@ -5,6 +5,29 @@ This document tracks djot-php enhancements that go beyond the current [djot spec
 These are fixes or improvements for edge cases not explicitly covered by the spec.
 They are either on the way to get incorporated upstream - or may be incorporated into future spec versions.
 
+## Table of Contents
+
+- [Tab Indentation Support](#tab-indentation-support)
+- [Multiple Footnote References](#multiple-footnote-references)
+- [Section ID Excludes Footnote Markers](#section-id-excludes-footnote-markers)
+- [Symbol Parsing in Time Formats](#symbol-parsing-in-time-formats)
+- [Em/En Dash with Unmatched Braces](#emen-dash-with-unmatched-braces)
+- [Optional Modes](#optional-modes)
+  - [Significant Newlines Mode](#significant-newlines-mode)
+- [Language Features Beyond Spec](#language-features-beyond-spec)
+  - [List Item Attributes](#list-item-attributes)
+  - [Table Row and Cell Attributes](#table-row-and-cell-attributes)
+  - [Boolean Attribute Shorthand](#boolean-attribute-shorthand)
+  - [Fenced Comment Blocks](#fenced-comment-blocks)
+  - [Multiple Definition Terms](#multiple-definition-terms)
+  - [Multiple Definition Definitions](#multiple-definition-definitions---continuation)
+  - [Definition List Element Attributes](#definition-list-element-attributes)
+  - [Captions for Images, Tables, and Block Quotes](#captions-for-images-tables-and-block-quotes)
+- [Abbreviations (PHP Markdown Extra Style)](#abbreviations-php-markdown-extra-style)
+- [Testing](#testing)
+- [Upstream Tracking](#upstream-tracking)
+- [Reporting Issues](#reporting-issues)
+
 ---
 
 ## Tab Indentation Support
@@ -477,6 +500,64 @@ Multiple terms can share definitions in definition lists:
 
 ---
 
+### Multiple Definition Definitions (`: +` Continuation)
+
+**Related:** [php-collective/djot-php#49](https://github.com/php-collective/djot-php/pull/49)
+
+**Status:** Implemented in djot-php
+
+HTML definition lists support multiple `<dd>` elements per term. While blank lines within definition content create paragraphs in the same `<dd>`, the `: +` continuation marker explicitly creates additional `<dd>` elements:
+
+```djot
+: term
+
+  First definition.
+
+: +
+
+  Second definition (separate dd element).
+
+: +
+
+  Third definition.
+```
+
+**Output:**
+```html
+<dl>
+<dt>term</dt>
+<dd>
+<p>First definition.</p>
+</dd>
+<dd>
+<p>Second definition (separate dd element).</p>
+</dd>
+<dd>
+<p>Third definition.</p>
+</dd>
+</dl>
+```
+
+**Comparison with blank lines:**
+
+```djot
+: term
+
+  First paragraph.
+
+  Second paragraph (same dd).
+```
+
+Produces a single `<dd>` with two paragraphs, while `: +` creates distinct `<dd>` elements.
+
+**Features:**
+- Uses `: +` marker to start a new definition for the same term
+- Full roundtrip support in HtmlToDjot converter
+- Works with definition list attributes
+- Maintains compatibility with existing blank-line paragraph behavior
+
+---
+
 ### Definition List Element Attributes
 
 **Related:** [jgm/djot#323](https://github.com/jgm/djot/issues/323)
@@ -629,6 +710,7 @@ vendor/bin/phpunit
 | Table row/cell attributes         | [djot:250](https://github.com/jgm/djot/issues/250)                  | Open       |
 | Boolean attribute shorthand       | [djot:257](https://github.com/jgm/djot/issues/257)                  | Open       |
 | Multiple definition terms         | [djot:128](https://github.com/jgm/djot/issues/128)                  | djot-php   |
+| Multiple definition definitions   | [#49](https://github.com/php-collective/djot-php/pull/49)           | djot-php   |
 | Definition list attributes        | [djot:323](https://github.com/jgm/djot/issues/323)                  | Open       |
 | Fenced comment blocks             | [djot:67](https://github.com/jgm/djot/issues/67)                    | Open       |
 | Captions (image/table/blockquote) | [#37](https://github.com/php-collective/djot-php/issues/37) | djot-php |
