@@ -1,0 +1,224 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Djot CLI - Convert djot files to HTML
+ *
+ * Usage:
+ *   djot [options] [input-file]
+ *   cat file.djot | djot [options]
+ *
+ * Options:
+ *   -o, --output FILE Write output to FILE instead of stdout
+ *   -x, --xhtml Use XHTML-compatible output
+ *   -s, --safe Enable safe mode (sanitize HTML)
+ *   -w, --warnings Show parse warnings on stderr
+ *   --strict Exit with error if warnings are generated
+ *   -h, --help Show this help message
+ *   -v, --version Show version information
+ */
+
+// Find autoloader
+$autoloadPaths = [
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+];
+
+$autoloaderFound = false;
+foreach ($autoloadPaths as $autoloadPath) {
+    if (file_exists($autoloadPath)) {
+        require $autoloadPath;
+        $autoloaderFound = true;
+
+        break;
+    }
+}
+
+if (!$autoloaderFound) {
+    fwrite(STDERR, "Error: Could not find Composer autoloader.\n");
+    fwrite(STDERR, "Please run 'composer install' first.\n");
+    exit(1);
+}
+
+use Djot\DjotConverter;
+
+/**
+ * Parse command line arguments
+ *
+ * @param array<int, string> $argv
+ * @return array{options: array<string, bool|string>, input: ?string}
+ */
+function parseArgs(array $argv): array
+{
+    $options = [
+        'output' => null,
+        'xhtml' => false,
+        'safe' => false,
+        'warnings' => false,
+        'strict' => false,
+        'help' => false,
+        'version' => false,
+    ];
+    $input = null;
+
+    $argc = count($argv);
+    for ($i = 1; $i < $argc; $i++) {
+        $arg = $argv[$i];
+
+        if ($arg === '-h' || $arg === '--help') {
+            $options['help'] = true;
+        } elseif ($arg === '-v' || $arg === '--version') {
+            $options['version'] = true;
+        } elseif ($arg === '-x' || $arg === '--xhtml') {
+            $options['xhtml'] = true;
+        } elseif ($arg === '-s' || $arg === '--safe') {
+            $options['safe'] = true;
+        } elseif ($arg === '-w' || $arg === '--warnings') {
+            $options['warnings'] = true;
+        } elseif ($arg === '--strict') {
+            $options['strict'] = true;
+            $options['warnings'] = true;
+        } elseif ($arg === '-o' || $arg === '--output') {
+            if (!isset($argv[$i + 1])) {
+                fwrite(STDERR, "Error: --output requires a filename\n");
+                exit(1);
+            }
+            $options['output'] = $argv[++$i];
+        } elseif (str_starts_with($arg, '-')) {
+            fwrite(STDERR, "Error: Unknown option: $arg\n");
+            fwrite(STDERR, "Try 'djot --help' for more information.\n");
+            exit(1);
+        } else {
+            if ($input !== null) {
+                fwrite(STDERR, "Error: Multiple input files specified\n");
+                exit(1);
+            }
+            $input = $arg;
+        }
+    }
+
+    return ['options' => $options, 'input' => $input];
+}
+
+function showHelp(): void
+{
+    echo <<<'HELP'
+Djot - Convert djot markup to HTML
+
+Usage:
+  djot [options] [input-file]
+  cat file.djot | djot [options]
+
+Arguments:
+  input-file          Input djot file (reads from stdin if not specified)
+
+Options:
+  -o, --output FILE   Write output to FILE instead of stdout
+  -x, --xhtml         Use XHTML-compatible output (self-closing tags)
+  -s, --safe          Enable safe mode (sanitize dangerous HTML)
+  -w, --warnings      Show parse warnings on stderr
+  --strict            Exit with error code 1 if warnings are generated
+  -h, --help          Show this help message
+  -v, --version       Show version information
+
+Examples:
+  djot document.djot                    Convert file to stdout
+  djot document.djot -o document.html   Convert file to output file
+  djot -s untrusted.djot                Convert with safe mode enabled
+  echo '*hello*' | djot                 Convert from stdin
+  djot --warnings doc.djot 2>warn.txt   Save warnings to file
+
+HELP;
+}
+
+function showVersion(): void
+{
+    $composerJson = __DIR__ . '/../composer.json';
+    $version = 'unknown';
+
+    if (file_exists($composerJson)) {
+        $data = json_decode(file_get_contents($composerJson), true);
+        $version = $data['version'] ?? 'dev';
+    }
+
+    echo "djot-php version $version\n";
+}
+
+// Main
+$parsed = parseArgs($argv);
+$options = $parsed['options'];
+$inputFile = $parsed['input'];
+
+if ($options['help']) {
+    showHelp();
+    exit(0);
+}
+
+if ($options['version']) {
+    showVersion();
+    exit(0);
+}
+
+// Read input
+if ($inputFile !== null) {
+    if (!file_exists($inputFile)) {
+        fwrite(STDERR, "Error: File not found: $inputFile\n");
+        exit(1);
+    }
+    if (!is_readable($inputFile)) {
+        fwrite(STDERR, "Error: Cannot read file: $inputFile\n");
+        exit(1);
+    }
+    $input = file_get_contents($inputFile);
+    if ($input === false) {
+        fwrite(STDERR, "Error: Failed to read file: $inputFile\n");
+        exit(1);
+    }
+} else {
+    // Read from stdin
+    if (posix_isatty(STDIN)) {
+        fwrite(STDERR, "Reading from stdin... (Ctrl+D to end, Ctrl+C to cancel)\n");
+    }
+    $input = stream_get_contents(STDIN);
+    if ($input === false) {
+        fwrite(STDERR, "Error: Failed to read from stdin\n");
+        exit(1);
+    }
+}
+
+// Create converter
+$converter = new DjotConverter(
+    xhtml: $options['xhtml'],
+    warnings: $options['warnings'] || $options['strict'],
+    safeMode: $options['safe'] ? true : null,
+);
+
+// Convert
+$output = $converter->convert($input);
+
+// Handle warnings
+$exitCode = 0;
+if ($options['warnings'] || $options['strict']) {
+    $warnings = $converter->getWarnings();
+    foreach ($warnings as $warning) {
+        fwrite(STDERR, "Warning: $warning\n");
+    }
+    if ($options['strict'] && count($warnings) > 0) {
+        $exitCode = 1;
+    }
+}
+
+// Write output
+if ($options['output'] !== null) {
+    $result = file_put_contents($options['output'], $output);
+    if ($result === false) {
+        fwrite(STDERR, "Error: Failed to write to: {$options['output']}\n");
+        exit(1);
+    }
+} else {
+    echo $output;
+}
+
+exit($exitCode);

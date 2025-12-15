@@ -45,5 +45,8 @@
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
-    }
+    },
+    "bin": [
+        "bin/djot"
+    ]
 }
