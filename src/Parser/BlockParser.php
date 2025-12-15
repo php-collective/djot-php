@@ -69,7 +69,7 @@ class BlockParser
     /**
      * Pending block attributes to apply to next block
      *
-     * @var array<string, mixed>
+     * @var array<string, string>
      */
     protected array $pendingAttributes = [];
 
@@ -89,6 +89,14 @@ class BlockParser
      * @var array<\Djot\Exception\ParseWarning>
      */
     protected array $warnings = [];
+
+    /**
+     * References that have been used (for validation)
+     * Only populated when collectWarnings is true
+     *
+     * @var array<string, int> Maps reference label to line where used
+     */
+    protected array $usedReferences = [];
 
     /**
      * Current line offset for nested parsing (0-indexed internally, 1-indexed for errors)
@@ -280,8 +288,14 @@ class BlockParser
      *
      * @throws \Djot\Exception\ParseException In strict mode for errors
      */
-    protected function addWarning(string $message, int $line, int $column = 1, bool $isError = false): void
-    {
+    protected function addWarning(
+        string $message,
+        int $line,
+        int $column = 1,
+        bool $isError = false,
+        ?string $category = null,
+        ?string $suggestion = null,
+    ): void {
         // Convert from 0-indexed to 1-indexed for user-facing messages
         $line = $line + $this->lineOffset + 1;
 
@@ -290,7 +304,7 @@ class BlockParser
         }
 
         if ($this->collectWarnings) {
-            $this->warnings[] = new ParseWarning($message, $line, $column);
+            $this->warnings[] = new ParseWarning($message, $line, $column, $category, $suggestion);
         }
     }
 
@@ -301,6 +315,7 @@ class BlockParser
         $this->abbreviations = [];
         $this->pendingAttributes = [];
         $this->warnings = [];
+        $this->usedReferences = [];
         $this->lineOffset = 0;
         $document = new Document();
         $lines = $this->splitLines($input);
@@ -317,6 +332,11 @@ class BlockParser
         // Append footnotes section if any
         foreach ($this->footnotes as $footnote) {
             $document->appendChild($footnote);
+        }
+
+        // Validate references if warnings are enabled
+        if ($this->collectWarnings) {
+            $this->validateReferences();
         }
 
         return $document;
@@ -372,7 +392,7 @@ class BlockParser
                     }
                 }
 
-                $this->references[$label] = new ReferenceDefinition($url, $pendingAttrs);
+                $this->references[$label] = new ReferenceDefinition($url, $pendingAttrs, $i);
                 $pendingAttrs = [];
                 $i = $j;
 
@@ -578,7 +598,7 @@ class BlockParser
                 // Use normalized heading text as the label (for [Heading][] style links)
                 $label = preg_replace('/\s+/', ' ', trim($headingText)) ?? $headingText;
                 if (!isset($this->references[$label])) {
-                    $this->references[$label] = new ReferenceDefinition('#' . $id, []);
+                    $this->references[$label] = new ReferenceDefinition('#' . $id, [], $i);
                 }
             } else {
                 // Non-heading, non-attribute line - clear pending ID
@@ -1421,12 +1441,21 @@ class BlockParser
         // Get the base indentation of this list
         $baseIndent = IndentationHelper::getLeadingSpaces($line);
 
+        /** @var string $listType */
+        $listType = $listInfo['type'];
+        /** @var int $listStart */
+        $listStart = $listInfo['start'] ?? 1;
+        /** @var string|null $listMarker */
+        $listMarker = $listInfo['marker'] ?? null;
+        /** @var string|null $listStyle */
+        $listStyle = $listInfo['style'] ?? null;
+
         $list = new ListBlock(
-            $listInfo['type'],
-            $listInfo['start'] ?? 1,
+            $listType,
+            $listStart,
             true, // Start as tight
-            $listInfo['marker'],
-            $listInfo['style'] ?? null,
+            $listMarker,
+            $listStyle,
         );
 
         // Save and clear pending attributes - they apply to the list, not inner content
@@ -1584,10 +1613,14 @@ class BlockParser
                 $list->setTight(false);
             }
 
-            $listItem = new ListItem($itemInfo['taskMarker'] ?? null);
+            /** @var string|null $taskMarker */
+            $taskMarker = $itemInfo['taskMarker'] ?? null;
+            $listItem = new ListItem($taskMarker);
+            /** @var string $itemContent */
             $itemContent = $itemInfo['content'];
 
             // Collect item content lines (without blank line = tight continuation)
+            /** @var array<string> $itemLines */
             $itemLines = [$itemContent];
             $i++;
             $lastItemHadBlankAfter = false;
@@ -2662,9 +2695,48 @@ class BlockParser
         return explode("\n", str_replace(["\r\n", "\r"], "\n", $input));
     }
 
+    /**
+     * Validate reference definitions vs usage
+     * Generates warnings for unused references.
+     * Note: Undefined references are warned about inline during parsing.
+     */
+    protected function validateReferences(): void
+    {
+        // Check for unused reference definitions (defined but never used)
+        // Skip heading auto-references (URLs start with #)
+        // Skip footnote definitions (labels start with ^)
+        foreach ($this->references as $label => $def) {
+            if (
+                !isset($this->usedReferences[$label])
+                && !str_starts_with($def->url, '#')
+                && !str_starts_with($label, '^')
+            ) {
+                $this->addWarning(
+                    "Reference '{$label}' defined but never used",
+                    $def->line,
+                    1,
+                    false,
+                    'reference',
+                    null,
+                );
+            }
+        }
+    }
+
     public function getReference(string $label): ?ReferenceDefinition
     {
         return $this->references[$label] ?? null;
+    }
+
+    /**
+     * Mark a reference as used (for validation warnings)
+     * Only tracks when collectWarnings is enabled.
+     */
+    public function markReferenceUsed(string $label, int $line): void
+    {
+        if ($this->collectWarnings && !isset($this->usedReferences[$label])) {
+            $this->usedReferences[$label] = $line;
+        }
     }
 
     public function hasFootnote(string $label): bool
@@ -2695,7 +2767,14 @@ class BlockParser
      */
     public function addUndefinedReferenceWarning(string $ref, int $line, int $column): void
     {
-        $this->addWarning("Undefined reference '{$ref}'", $line, $column, false);
+        $this->addWarning(
+            "Undefined reference '{$ref}'",
+            $line,
+            $column,
+            false,
+            'reference',
+            "Define with [{$ref}]: url or use inline link",
+        );
     }
 
     /**

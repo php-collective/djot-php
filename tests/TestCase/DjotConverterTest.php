@@ -2569,4 +2569,105 @@ DJOT;
         $this->assertStringContainsString('href="#fnref1"', $result);
         $this->assertStringNotContainsString('<sup>1</sup></a> <a', $result);
     }
+
+    public function testWarningCategory(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][ref]');
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertSame('reference', $warnings[0]->getCategory());
+    }
+
+    public function testWarningSuggestion(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][myref]');
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertNotNull($warnings[0]->getSuggestion());
+        $this->assertStringContainsString('[myref]:', $warnings[0]->getSuggestion());
+    }
+
+    public function testWarningToArrayIncludesNewFields(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][ref]');
+
+        $warnings = $converter->getWarnings();
+        $array = $warnings[0]->toArray();
+
+        $this->assertArrayHasKey('category', $array);
+        $this->assertArrayHasKey('suggestion', $array);
+        $this->assertSame('reference', $array['category']);
+    }
+
+    public function testWarningToStringIncludesCategory(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][ref]');
+
+        $warnings = $converter->getWarnings();
+        $string = (string)$warnings[0];
+
+        $this->assertStringContainsString('[reference]', $string);
+    }
+
+    public function testUnusedReferenceWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("Some text.\n\n[unused]: https://example.com");
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString("Reference 'unused' defined but never used", $warnings[0]->getMessage());
+        $this->assertSame('reference', $warnings[0]->getCategory());
+    }
+
+    public function testNoUnusedWarningForUsedReference(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[Link text][myref]\n\n[myref]: https://example.com");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testNoUnusedWarningForHeadingAutoReferences(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        // Heading creates auto-reference but we don't warn if unused
+        $converter->convert("# My Heading\n\nSome text without link.");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testMultipleReferenceWarningTypes(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $djot = <<<'DJOT'
+[Link][undefined]
+
+[unused]: https://example.com
+DJOT;
+        $converter->convert($djot);
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(2, $warnings);
+
+        $messages = array_map(fn ($w) => $w->getMessage(), $warnings);
+        $undefinedFound = false;
+        $unusedFound = false;
+        foreach ($messages as $msg) {
+            if (str_contains($msg, 'Undefined')) {
+                $undefinedFound = true;
+            }
+            if (str_contains($msg, 'never used')) {
+                $unusedFound = true;
+            }
+        }
+        $this->assertTrue($undefinedFound, 'Expected undefined reference warning');
+        $this->assertTrue($unusedFound, 'Expected unused reference warning');
+    }
 }

@@ -1,0 +1,6 @@
+{.class #id key=value}
+# Header with attributes
+
+Paragraph{.special}
+
+[Link]{target=_blank}(https://example.com)

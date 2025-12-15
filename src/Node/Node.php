@@ -17,7 +17,7 @@ abstract class Node
     protected array $children = [];
 
     /**
-     * @var array<string, mixed>
+     * @var array<string, string>
      */
     protected array $attributes = [];
 
@@ -129,24 +129,36 @@ abstract class Node
         return $child;
     }
 
+    /**
+     * @param string $key
+     * @param string $value
+     *
+     * @return void
+     */
     public function setAttribute(string $key, mixed $value): void
     {
         $this->attributes[$key] = $value;
     }
 
+    /**
+     * @return string|int|null
+     */
     public function getAttribute(string $key): mixed
     {
         return $this->attributes[$key] ?? null;
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, string>
      */
     public function getAttributes(): array
     {
         return $this->attributes;
     }
 
+    /**
+     * @param array<string, string> $attributes
+     */
     public function setAttributes(array $attributes): void
     {
         $this->attributes = array_merge($this->attributes, $attributes);

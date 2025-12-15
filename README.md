@@ -4,7 +4,7 @@
 [![codecov](https://img.shields.io/codecov/c/github/php-collective/djot-php?style=flat-square)](https://codecov.io/gh/php-collective/djot-php)
 [![Latest Stable Version](https://img.shields.io/packagist/v/php-collective/djot?style=flat-square)](https://packagist.org/packages/php-collective/djot)
 [![Total Downloads](https://img.shields.io/packagist/dt/php-collective/djot?style=flat-square)](https://packagist.org/packages/php-collective/djot)
-[![PHPStan](https://img.shields.io/badge/PHPStan-level%208-brightgreen.svg?style=flat-square)](https://phpstan.org/)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level%209-brightgreen.svg?style=flat-square)](https://phpstan.org/)
 [![PHP Version](https://img.shields.io/badge/php-%3E%3D8.2-8892BF.svg?style=flat-square)](https://php.net)
 [![Software License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 

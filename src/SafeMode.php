@@ -269,9 +269,9 @@ class SafeMode
     /**
      * Filter attributes, removing unsafe ones
      *
-     * @param array<string, mixed> $attributes
+     * @param array<string, string> $attributes
      *
-     * @return array<string, mixed>
+     * @return array<string, string>
      */
     public function filterAttributes(array $attributes): array
     {

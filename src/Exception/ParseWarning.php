@@ -13,6 +13,8 @@ class ParseWarning
         protected string $message,
         protected int $line,
         protected int $column = 1,
+        protected ?string $category = null,
+        protected ?string $suggestion = null,
     ) {
     }
 
@@ -31,8 +33,18 @@ class ParseWarning
         return $this->column;
     }
 
+    public function getCategory(): ?string
+    {
+        return $this->category;
+    }
+
+    public function getSuggestion(): ?string
+    {
+        return $this->suggestion;
+    }
+
     /**
-     * @return array{message: string, line: int, column: int}
+     * @return array{message: string, line: int, column: int, category: string|null, suggestion: string|null}
      */
     public function toArray(): array
     {
@@ -40,11 +52,18 @@ class ParseWarning
             'message' => $this->message,
             'line' => $this->line,
             'column' => $this->column,
+            'category' => $this->category,
+            'suggestion' => $this->suggestion,
         ];
     }
 
     public function __toString(): string
     {
-        return sprintf('%s at line %d, column %d', $this->message, $this->line, $this->column);
+        $str = sprintf('%s at line %d, column %d', $this->message, $this->line, $this->column);
+        if ($this->category !== null) {
+            $str = "[{$this->category}] " . $str;
+        }
+
+        return $str;
     }
 }

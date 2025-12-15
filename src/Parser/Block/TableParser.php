@@ -68,7 +68,7 @@ class TableParser
      *
      * @param string $line The line to process
      *
-     * @return array<string, mixed> Parsed attributes or empty array
+     * @return array<string, string> Parsed attributes or empty array
      */
     public function extractRowAttributes(string $line): array
     {
@@ -205,7 +205,7 @@ class TableParser
      *
      * @param string $line The table row line
      *
-     * @return array<array{content: string, attributes: array<string, mixed>}> Array of cell data
+     * @return array<array{content: string, attributes: array<string, string>}> Array of cell data
      */
     public function parseTableCellsWithAttributes(string $line): array
     {

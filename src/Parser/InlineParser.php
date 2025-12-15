@@ -733,6 +733,9 @@ class InlineParser
 
                 $refDef = $this->blockParser->getReference($ref);
                 if ($refDef !== null) {
+                    // Track reference usage for validation
+                    $this->blockParser->markReferenceUsed($ref, $this->currentLine);
+
                     $link = new Link($refDef->url);
                     $this->parseInlines($link, $linkText);
 
@@ -741,7 +744,7 @@ class InlineParser
                         if ($key === 'class') {
                             $link->addClass((string)$value);
                         } else {
-                            $link->setAttribute($key, $value);
+                            $link->setAttribute($key, (string)$value);
                         }
                     }
 
