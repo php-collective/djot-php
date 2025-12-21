@@ -160,8 +160,8 @@ class BbcodeToDjot
         $i = 0;
 
         while ($i < $length) {
-            // Check for opening quote tag
-            if (preg_match('/\[quote(?:=([^\]]*))?\]/i', $text, $matches, 0, $i) && strpos($text, $matches[0], $i) === $i) {
+            // Check for opening quote tag - matches [quote], [quote=...], or [quote ...]
+            if (preg_match('/\[quote(?:[= ]([^\]]*))?\]/i', $text, $matches, 0, $i) && strpos($text, $matches[0], $i) === $i) {
                 $author = $matches[1] ?? null;
                 $tagLength = strlen($matches[0]);
                 $i += $tagLength;
@@ -172,7 +172,7 @@ class BbcodeToDjot
 
                 while ($i < $length) {
                     // Check for nested opening quote
-                    if (preg_match('/\[quote(?:=[^\]]*)?\]/i', $text, $m, 0, $i) && strpos($text, $m[0], $i) === $i) {
+                    if (preg_match('/\[quote(?:[= ][^\]]*)?\]/i', $text, $m, 0, $i) && strpos($text, $m[0], $i) === $i) {
                         $depth++;
                         $i += strlen($m[0]);
 
@@ -237,47 +237,68 @@ class BbcodeToDjot
     }
 
     /**
-     * Parse BBCode quote attribution and format as "name (datetime)" or just "name".
+     * Parse BBCode quote attribution and format as "name (datetime) #id".
      *
      * Handles formats like:
      * - username
      * - username date="2024-01-01"
-     * - username time="12:00"
-     * - username date="2024-01-01" time="12:00"
+     * - "9" name="user" date="2024-01-01 12:30"
+     * - id="9" name="user" date="2024-01-01"
      */
     protected function formatAttribution(string $attribution): string
     {
         $attribution = trim($attribution);
+        $remaining = $attribution;
 
-        // Extract date/time attributes
-        $datetime = '';
-        $name = $attribution;
+        $id = null;
+        $name = null;
+        $datetime = null;
 
-        // Match date="..." or time="..." patterns
-        if (preg_match_all('/\b(date|time)=["\']?([^"\'>\s]+)["\']?/i', $attribution, $matches, PREG_SET_ORDER)) {
-            $parts = [];
-            foreach ($matches as $match) {
-                $parts[strtolower($match[1])] = $match[2];
-                // Remove this attribute from the name
-                $name = str_replace($match[0], '', $name);
-            }
-
-            if (isset($parts['date']) && isset($parts['time'])) {
-                $datetime = $parts['date'] . ' ' . $parts['time'];
-            } elseif (isset($parts['date'])) {
-                $datetime = $parts['date'];
-            } elseif (isset($parts['time'])) {
-                $datetime = $parts['time'];
-            }
+        // Extract id="..." or bare "..." at start (post/message ID)
+        if (preg_match('/^["\'](\d+)["\']/', $remaining, $m)) {
+            $id = $m[1];
+            $remaining = trim(substr($remaining, strlen($m[0])));
+        } elseif (preg_match('/\bid=["\']?(\d+)["\']?/i', $remaining, $m)) {
+            $id = $m[1];
+            $remaining = str_replace($m[0], '', $remaining);
         }
 
-        $name = trim($name);
-
-        if ($datetime !== '') {
-            return $name . ' (' . $datetime . ')';
+        // Extract name="..."
+        if (preg_match('/\bname=["\']([^"\']+)["\']/i', $remaining, $m)) {
+            $name = $m[1];
+            $remaining = str_replace($m[0], '', $remaining);
         }
 
-        return $name;
+        // Extract date="..." (may include time)
+        if (preg_match('/\bdate=["\']([^"\']+)["\']/i', $remaining, $m)) {
+            $datetime = $m[1];
+            $remaining = str_replace($m[0], '', $remaining);
+        }
+
+        // Extract time="..." separately if present
+        if (preg_match('/\btime=["\']([^"\']+)["\']/i', $remaining, $m)) {
+            $datetime = $datetime !== null ? $datetime . ' ' . $m[1] : $m[1];
+            $remaining = str_replace($m[0], '', $remaining);
+        }
+
+        // If no name attribute found, use remaining text as name
+        $remaining = trim($remaining);
+        if ($name === null && $remaining !== '') {
+            $name = $remaining;
+        }
+
+        // Build output: name (datetime) #id
+        $output = $name ?? '';
+
+        if ($datetime !== null) {
+            $output .= ' (' . $datetime . ')';
+        }
+
+        if ($id !== null) {
+            $output .= ' #' . $id;
+        }
+
+        return trim($output);
     }
 
     protected function convertLists(string $text): string

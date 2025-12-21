@@ -219,11 +219,23 @@ class BbcodeToDjotTest extends TestCase
         $this->assertStringContainsString('^ username (2024-01-01)', $result);
         $this->assertStringContainsString('Content', $result);
 
-        // With date and time
+        // With date and time as separate attributes
         $bbcode = '[quote=username date="2024-01-01" time="12:30"]Content[/quote]';
         $result = $this->converter->convert($bbcode);
 
         $this->assertStringContainsString('^ username (2024-01-01 12:30)', $result);
+
+        // Full forum format with ID, name, and datetime
+        $bbcode = '[quote="9" name="superadmin" date="2025-12-06 18:35:26"]Content[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('^ superadmin (2025-12-06 18:35:26) #9', $result);
+
+        // With id= attribute instead of bare value
+        $bbcode = '[quote id="42" name="admin" date="2024-01-01"]Content[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('^ admin (2024-01-01) #42', $result);
     }
 
     // ==================== Lists ====================
