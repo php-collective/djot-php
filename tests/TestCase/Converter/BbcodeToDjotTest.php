@@ -142,8 +142,100 @@ class BbcodeToDjotTest extends TestCase
     public function testQuoteWithAuthor(): void
     {
         $result = $this->converter->convert('[quote=John]This is quoted[/quote]');
-        $this->assertStringContainsString('> *John wrote:*', $result);
         $this->assertStringContainsString('> This is quoted', $result);
+        $this->assertStringContainsString('^ John', $result);
+    }
+
+    public function testNestedQuotes(): void
+    {
+        $bbcode = '[quote=Outer]First level[quote=Inner]Second level[/quote][/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        // Both quote authors should be present
+        $this->assertStringContainsString('^ Outer', $result);
+        $this->assertStringContainsString('^ Inner', $result);
+        $this->assertStringContainsString('First level', $result);
+        $this->assertStringContainsString('Second level', $result);
+        // No unprocessed BBCode tags should remain
+        $this->assertStringNotContainsString('[quote', $result);
+        $this->assertStringNotContainsString('[/quote]', $result);
+    }
+
+    public function testDeeplyNestedQuotes(): void
+    {
+        $bbcode = '[quote=A]Level 1[quote=B]Level 2[quote=C]Level 3[/quote][/quote][/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('^ A', $result);
+        $this->assertStringContainsString('^ B', $result);
+        $this->assertStringContainsString('^ C', $result);
+        $this->assertStringContainsString('Level 1', $result);
+        $this->assertStringContainsString('Level 2', $result);
+        $this->assertStringContainsString('Level 3', $result);
+        $this->assertStringNotContainsString('[quote', $result);
+        $this->assertStringNotContainsString('[/quote]', $result);
+    }
+
+    public function testNestedQuotesWithoutAuthor(): void
+    {
+        $bbcode = '[quote]Outer[quote]Inner[/quote][/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('> Outer', $result);
+        $this->assertStringContainsString('> Inner', $result);
+        $this->assertStringNotContainsString('[quote', $result);
+        $this->assertStringNotContainsString('[/quote]', $result);
+    }
+
+    public function testNestedQuotesWithTextBetween(): void
+    {
+        $bbcode = 'Before [quote=User]Quote content[/quote] After';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('Before', $result);
+        $this->assertStringContainsString('After', $result);
+        $this->assertStringContainsString('^ User', $result);
+        $this->assertStringContainsString('Quote content', $result);
+    }
+
+    public function testMultipleQuotesAtSameLevel(): void
+    {
+        $bbcode = '[quote=A]First[/quote] text [quote=B]Second[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('^ A', $result);
+        $this->assertStringContainsString('^ B', $result);
+        $this->assertStringContainsString('First', $result);
+        $this->assertStringContainsString('Second', $result);
+        $this->assertStringContainsString('text', $result);
+    }
+
+    public function testQuoteWithComplexAttributes(): void
+    {
+        // Forum-style quote with date attribute
+        $bbcode = '[quote=username date="2024-01-01"]Content[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('^ username (2024-01-01)', $result);
+        $this->assertStringContainsString('Content', $result);
+
+        // With date and time as separate attributes
+        $bbcode = '[quote=username date="2024-01-01" time="12:30"]Content[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('^ username (2024-01-01 12:30)', $result);
+
+        // Full forum format with ID, name, and datetime
+        $bbcode = '[quote="9" name="superadmin" date="2025-12-06 18:35:26"]Content[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('^ superadmin (2025-12-06 18:35:26) #9', $result);
+
+        // With id= attribute instead of bare value
+        $bbcode = '[quote id="42" name="admin" date="2024-01-01"]Content[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('^ admin (2024-01-01) #42', $result);
     }
 
     // ==================== Lists ====================
@@ -237,7 +329,7 @@ BBCODE;
         $this->assertStringContainsString('*Welcome to the Forum!*', $result);
         $this->assertStringContainsString('_important_', $result);
         $this->assertStringContainsString('- Read the rules', $result);
-        $this->assertStringContainsString('> *Admin wrote:*', $result);
+        $this->assertStringContainsString('^ Admin', $result);
         $this->assertStringContainsString('[our website](https://example.com)', $result);
     }
 
