@@ -146,6 +146,80 @@ class BbcodeToDjotTest extends TestCase
         $this->assertStringContainsString('> This is quoted', $result);
     }
 
+    public function testNestedQuotes(): void
+    {
+        $bbcode = '[quote=Outer]First level[quote=Inner]Second level[/quote][/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        // Both quote authors should be present
+        $this->assertStringContainsString('> *Outer wrote:*', $result);
+        $this->assertStringContainsString('> *Inner wrote:*', $result);
+        $this->assertStringContainsString('First level', $result);
+        $this->assertStringContainsString('Second level', $result);
+        // No unprocessed BBCode tags should remain
+        $this->assertStringNotContainsString('[quote', $result);
+        $this->assertStringNotContainsString('[/quote]', $result);
+    }
+
+    public function testDeeplyNestedQuotes(): void
+    {
+        $bbcode = '[quote=A]Level 1[quote=B]Level 2[quote=C]Level 3[/quote][/quote][/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('> *A wrote:*', $result);
+        $this->assertStringContainsString('> *B wrote:*', $result);
+        $this->assertStringContainsString('> *C wrote:*', $result);
+        $this->assertStringContainsString('Level 1', $result);
+        $this->assertStringContainsString('Level 2', $result);
+        $this->assertStringContainsString('Level 3', $result);
+        $this->assertStringNotContainsString('[quote', $result);
+        $this->assertStringNotContainsString('[/quote]', $result);
+    }
+
+    public function testNestedQuotesWithoutAuthor(): void
+    {
+        $bbcode = '[quote]Outer[quote]Inner[/quote][/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('> Outer', $result);
+        $this->assertStringContainsString('> Inner', $result);
+        $this->assertStringNotContainsString('[quote', $result);
+        $this->assertStringNotContainsString('[/quote]', $result);
+    }
+
+    public function testNestedQuotesWithTextBetween(): void
+    {
+        $bbcode = 'Before [quote=User]Quote content[/quote] After';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('Before', $result);
+        $this->assertStringContainsString('After', $result);
+        $this->assertStringContainsString('> *User wrote:*', $result);
+        $this->assertStringContainsString('Quote content', $result);
+    }
+
+    public function testMultipleQuotesAtSameLevel(): void
+    {
+        $bbcode = '[quote=A]First[/quote] text [quote=B]Second[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('> *A wrote:*', $result);
+        $this->assertStringContainsString('> *B wrote:*', $result);
+        $this->assertStringContainsString('First', $result);
+        $this->assertStringContainsString('Second', $result);
+        $this->assertStringContainsString('text', $result);
+    }
+
+    public function testQuoteWithComplexAttributes(): void
+    {
+        // Forum-style quote with multiple attributes in value
+        $bbcode = '[quote=username date="2024-01-01"]Content[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('> *username date="2024-01-01" wrote:*', $result);
+        $this->assertStringContainsString('Content', $result);
+    }
+
     // ==================== Lists ====================
 
     public function testUnorderedList(): void

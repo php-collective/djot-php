@@ -143,34 +143,97 @@ class BbcodeToDjot
 
     protected function convertQuotes(string $text): string
     {
-        // [quote=author]...[/quote] -> > **author wrote:**\n> ...
-        $text = preg_replace_callback(
-            '/\[quote=([^\]]+)\](.*?)\[\/quote\]/is',
-            function ($m) {
-                $author = trim($m[1]);
-                $content = trim($m[2]);
-                $lines = explode("\n", $content);
-                $quoted = array_map(fn ($line) => '> ' . $line, $lines);
+        // Use depth tracking to handle nested quotes properly
+        return $this->parseQuotesWithDepth($text);
+    }
 
-                return "> *{$author} wrote:*\n" . implode("\n", $quoted) . "\n\n";
-            },
-            $text,
-        ) ?? $text;
+    /**
+     * Parse BBCode quotes with proper nesting support.
+     *
+     * Uses depth tracking to correctly match opening and closing tags,
+     * then recursively processes nested quotes.
+     */
+    protected function parseQuotesWithDepth(string $text): string
+    {
+        $result = '';
+        $length = strlen($text);
+        $i = 0;
 
-        // [quote]...[/quote] -> > ...
-        $text = preg_replace_callback(
-            '/\[quote\](.*?)\[\/quote\]/is',
-            function ($m) {
-                $content = trim($m[1]);
-                $lines = explode("\n", $content);
-                $quoted = array_map(fn ($line) => '> ' . $line, $lines);
+        while ($i < $length) {
+            // Check for opening quote tag
+            if (preg_match('/\[quote(?:=([^\]]*))?\]/i', $text, $matches, 0, $i) && strpos($text, $matches[0], $i) === $i) {
+                $author = $matches[1] ?? null;
+                $tagLength = strlen($matches[0]);
+                $i += $tagLength;
 
-                return implode("\n", $quoted) . "\n\n";
-            },
-            $text,
-        ) ?? $text;
+                // Find the matching closing tag by tracking depth
+                $depth = 1;
+                $contentStart = $i;
 
-        return $text;
+                while ($i < $length && $depth > 0) {
+                    // Check for nested opening quote
+                    if (preg_match('/\[quote(?:=[^\]]*)?\]/i', $text, $m, 0, $i) && strpos($text, $m[0], $i) === $i) {
+                        $depth++;
+                        $i += strlen($m[0]);
+
+                        continue;
+                    }
+
+                    // Check for closing quote
+                    if (preg_match('/\[\/quote\]/i', $text, $m, 0, $i) && strpos($text, $m[0], $i) === $i) {
+                        $depth--;
+                        if ($depth === 0) {
+                            // Extract content and convert to Djot blockquote
+                            $content = substr($text, $contentStart, $i - $contentStart);
+                            $i += strlen($m[0]);
+
+                            // Recursively process nested quotes in content
+                            $content = $this->parseQuotesWithDepth($content);
+
+                            // Convert to Djot blockquote format
+                            $result .= $this->formatAsBlockquote($content, $author);
+
+                            continue 2; // Continue outer loop
+                        }
+                        $i += strlen($m[0]);
+
+                        continue;
+                    }
+
+                    $i++;
+                }
+
+                // If we exit without finding closing tag, treat remaining as content
+                if ($depth > 0) {
+                    $content = substr($text, $contentStart);
+                    $result .= $this->formatAsBlockquote($content, $author);
+                }
+
+                continue;
+            }
+
+            // Regular character, add to result
+            $result .= $text[$i];
+            $i++;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Format content as a Djot blockquote.
+     */
+    protected function formatAsBlockquote(string $content, ?string $author): string
+    {
+        $content = trim($content);
+        $lines = explode("\n", $content);
+        $quoted = array_map(fn ($line) => '> ' . $line, $lines);
+
+        if ($author !== null && $author !== '') {
+            return '> *' . trim($author) . " wrote:*\n" . implode("\n", $quoted) . "\n\n";
+        }
+
+        return implode("\n", $quoted) . "\n\n";
     }
 
     protected function convertLists(string $text): string
