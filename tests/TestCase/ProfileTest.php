@@ -284,6 +284,183 @@ DJOT;
         $this->assertFalse($converter->hasProfileViolations());
     }
 
+    // ==================== Excerpt Profile Tests ====================
+
+    public function testExcerptProfileStripsBlockquotes(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+        $html = $converter->convert("> This is a quote\n\nThis is my text.");
+
+        $this->assertStringNotContainsString('<blockquote>', $html);
+        $this->assertStringNotContainsString('This is a quote', $html);
+        $this->assertStringContainsString('This is my text.', $html);
+    }
+
+    public function testExcerptProfileStripsCodeBlocks(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+        $html = $converter->convert("```\ncode here\n```\n\nRegular text.");
+
+        $this->assertStringNotContainsString('<pre>', $html);
+        $this->assertStringNotContainsString('code here', $html);
+        $this->assertStringContainsString('Regular text.', $html);
+    }
+
+    public function testExcerptProfileStripsImages(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+        $html = $converter->convert('![alt text](image.jpg)');
+
+        $this->assertStringNotContainsString('<img', $html);
+        $this->assertStringNotContainsString('alt text', $html);
+    }
+
+    public function testExcerptProfileStripsTables(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+        $html = $converter->convert("| A | B |\n|---|---|\n| 1 | 2 |");
+
+        $this->assertStringNotContainsString('<table>', $html);
+    }
+
+    public function testExcerptProfileKeepsBasicText(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+        $html = $converter->convert('This is *bold* and _italic_ text.');
+
+        $this->assertStringContainsString('bold', $html);
+        $this->assertStringContainsString('italic', $html);
+        $this->assertStringContainsString('This is', $html);
+    }
+
+    public function testExcerptProfileKeepsHeadings(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+        $html = $converter->convert("# Heading\n\nParagraph text");
+
+        // Headings are allowed in excerpts (stripped to plain text later)
+        $this->assertStringContainsString('Heading', $html);
+        $this->assertStringContainsString('Paragraph text', $html);
+    }
+
+    public function testExcerptProfileKeepsLinks(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+        $html = $converter->convert('Check out [this link](https://example.com).');
+
+        // Links are kept (text remains after strip_tags)
+        $this->assertStringContainsString('this link', $html);
+        $this->assertStringContainsString('Check out', $html);
+    }
+
+    public function testExcerptProfileKeepsLists(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+        $html = $converter->convert("- Item 1\n- Item 2");
+
+        // Lists are allowed
+        $this->assertStringContainsString('Item 1', $html);
+        $this->assertStringContainsString('Item 2', $html);
+    }
+
+    public function testExcerptProfileUseCaseSearchSnippet(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+
+        // Forum post with quote and user's response
+        $content = <<<'DJOT'
+> Previous poster wrote:
+> This is what they said before.
+
+I think the answer is quite simple. You need to check the configuration file and ensure the settings are correct.
+
+![screenshot](debug.png)
+
+```
+config.php
+```
+DJOT;
+
+        $html = $converter->convert($content);
+        $text = trim(strip_tags($html));
+
+        // Quote content should be stripped
+        $this->assertStringNotContainsString('Previous poster wrote', $text);
+        $this->assertStringNotContainsString('This is what they said before', $text);
+
+        // User's actual text should be present
+        $this->assertStringContainsString('I think the answer is quite simple', $text);
+
+        // Code and images should be stripped
+        $this->assertStringNotContainsString('config.php', $text);
+        $this->assertStringNotContainsString('screenshot', $text);
+    }
+
+    public function testExcerptProfileUseCaseOpenGraph(): void
+    {
+        $converter = new DjotConverter(profile: Profile::excerpt());
+
+        // Blog post excerpt for Open Graph meta description
+        $content = <<<'DJOT'
+# 10 Tips for Better PHP Code
+
+> "Clean code is not written by following a set of rules." — Robert C. Martin
+
+In this article, I'll share practical tips that will help you write cleaner, more maintainable PHP code.
+
+| Tip | Difficulty |
+|-----|------------|
+| 1   | Easy       |
+
+![feature image](header.jpg)
+DJOT;
+
+        $html = $converter->convert($content);
+        $text = preg_replace('/\s+/', ' ', trim(strip_tags($html)));
+
+        // Should have meaningful content for OG description
+        $this->assertStringContainsString('10 Tips for Better PHP Code', $text);
+        $this->assertStringContainsString("practical tips", $text);
+
+        // Should not contain quoted content
+        $this->assertStringNotContainsString('Robert C. Martin', $text);
+
+        // Should not contain table content
+        $this->assertStringNotContainsString('Difficulty', $text);
+
+        // Can be truncated for OG description
+        $excerpt = mb_substr($text, 0, 160);
+        $this->assertLessThanOrEqual(160, strlen($excerpt));
+    }
+
+    public function testExcerptProfileName(): void
+    {
+        $this->assertEquals('excerpt', Profile::excerpt()->getName());
+    }
+
+    public function testExcerptProfileDescription(): void
+    {
+        $this->assertNotEmpty(Profile::excerpt()->getDescription());
+        $this->assertStringContainsString('excerpt', strtolower(Profile::excerpt()->getDescription()));
+    }
+
+    public function testExcerptProfileReasonDisallowed(): void
+    {
+        $profile = Profile::excerpt();
+
+        // Check reasons for disallowed types
+        $reason = $profile->getReasonDisallowed(NodeType::BLOCKQUOTE);
+        $this->assertNotNull($reason);
+        $this->assertStringContainsString('excerpt', strtolower($reason));
+
+        $reason = $profile->getReasonDisallowed(NodeType::CODE_BLOCK);
+        $this->assertNotNull($reason);
+
+        // Should return null for allowed types
+        $this->assertNull($profile->getReasonDisallowed(NodeType::PARAGRAPH));
+        $this->assertNull($profile->getReasonDisallowed(NodeType::STRONG));
+    }
+
     // ==================== Custom Profile Tests ====================
 
     public function testCustomProfileWithAllowlist(): void
@@ -373,6 +550,7 @@ DJOT;
         $this->assertEquals('article', Profile::article()->getName());
         $this->assertEquals('comment', Profile::comment()->getName());
         $this->assertEquals('minimal', Profile::minimal()->getName());
+        $this->assertEquals('excerpt', Profile::excerpt()->getName());
     }
 
     public function testProfileDescription(): void
@@ -381,6 +559,7 @@ DJOT;
         $this->assertNotEmpty(Profile::article()->getDescription());
         $this->assertNotEmpty(Profile::comment()->getDescription());
         $this->assertNotEmpty(Profile::minimal()->getDescription());
+        $this->assertNotEmpty(Profile::excerpt()->getDescription());
     }
 
     public function testReasonDisallowed(): void

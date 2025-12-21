@@ -240,6 +240,78 @@ class Profile
     }
 
     /**
+     * Create an excerpt profile for generating plain text previews
+     *
+     * Designed for generating short text snippets from content, such as:
+     * - Search result snippets
+     * - Social media previews (Open Graph descriptions)
+     * - Email subject lines from content
+     * - RSS feed summaries
+     * - Forum/comment thread previews
+     *
+     * Strips elements that don't belong in excerpts:
+     * - Blockquotes: Quoted content isn't the author's original text
+     * - Code blocks: Technical details not suitable for previews
+     * - Images: Can't be represented in plain text
+     * - Tables: Complex structure doesn't translate to excerpts
+     * - Footnotes: Reference material not needed in previews
+     * - Raw HTML: Security and doesn't render as text
+     *
+     * Keeps basic text and inline formatting, which will render as
+     * plain text when combined with strip_tags().
+     *
+     * Example usage:
+     * ```php
+     * $converter = new DjotConverter(profile: Profile::excerpt());
+     * $html = $converter->convert($djot);
+     * $text = trim(strip_tags($html));
+     * $excerpt = mb_substr($text, 0, 160) . '...';
+     * ```
+     */
+    public static function excerpt(): self
+    {
+        $profile = new self();
+        $profile->name = 'excerpt';
+        $profile->description = 'Plain text excerpts. Strips quotes, code, images, tables.';
+        $profile
+            ->denyBlock([
+                NodeType::BLOCKQUOTE,
+                NodeType::CODE_BLOCK,
+                NodeType::TABLE,
+                NodeType::FOOTNOTE,
+                NodeType::RAW_BLOCK,
+                NodeType::DIV,
+                NodeType::SECTION,
+                NodeType::THEMATIC_BREAK,
+                NodeType::LINE_BLOCK,
+            ])
+            ->denyInline([
+                NodeType::IMAGE,
+                NodeType::RAW_INLINE,
+                NodeType::FOOTNOTE_REF,
+                NodeType::MATH,
+                NodeType::SYMBOL,
+            ])
+            ->onDisallowed(self::ACTION_STRIP);
+
+        $profile->featureReasons = [
+            NodeType::BLOCKQUOTE => 'Quoted content is excluded from excerpts as it represents others\' text.',
+            NodeType::CODE_BLOCK => 'Code blocks are excluded from excerpts for readability.',
+            NodeType::TABLE => 'Tables are too complex for plain text excerpts.',
+            NodeType::IMAGE => 'Images cannot be represented in plain text excerpts.',
+            NodeType::FOOTNOTE => 'Footnotes are reference material not needed in excerpts.',
+            NodeType::FOOTNOTE_REF => 'Footnote references are not needed in excerpts.',
+            NodeType::RAW_BLOCK => 'Raw HTML is excluded for security and text extraction.',
+            NodeType::RAW_INLINE => 'Raw HTML is excluded for security and text extraction.',
+            NodeType::MATH => 'Math notation is excluded from plain text excerpts.',
+            NodeType::SYMBOL => 'Symbols are excluded from excerpts.',
+            'default' => 'This element type is not suitable for plain text excerpts.',
+        ];
+
+        return $profile;
+    }
+
+    /**
      * Get the profile name
      */
     public function getName(): string
