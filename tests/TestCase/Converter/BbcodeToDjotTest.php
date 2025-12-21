@@ -212,12 +212,18 @@ class BbcodeToDjotTest extends TestCase
 
     public function testQuoteWithComplexAttributes(): void
     {
-        // Forum-style quote with multiple attributes in value
+        // Forum-style quote with date attribute
         $bbcode = '[quote=username date="2024-01-01"]Content[/quote]';
         $result = $this->converter->convert($bbcode);
 
-        $this->assertStringContainsString('^ username date="2024-01-01"', $result);
+        $this->assertStringContainsString('^ username (2024-01-01)', $result);
         $this->assertStringContainsString('Content', $result);
+
+        // With date and time
+        $bbcode = '[quote=username date="2024-01-01" time="12:30"]Content[/quote]';
+        $result = $this->converter->convert($bbcode);
+
+        $this->assertStringContainsString('^ username (2024-01-01 12:30)', $result);
     }
 
     // ==================== Lists ====================

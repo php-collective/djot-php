@@ -230,10 +230,54 @@ class BbcodeToDjot
         $output = implode("\n", $quoted) . "\n";
 
         if ($author !== null && $author !== '') {
-            $output .= '^ ' . trim($author) . "\n";
+            $output .= '^ ' . $this->formatAttribution($author) . "\n";
         }
 
         return $output . "\n";
+    }
+
+    /**
+     * Parse BBCode quote attribution and format as "name (datetime)" or just "name".
+     *
+     * Handles formats like:
+     * - username
+     * - username date="2024-01-01"
+     * - username time="12:00"
+     * - username date="2024-01-01" time="12:00"
+     */
+    protected function formatAttribution(string $attribution): string
+    {
+        $attribution = trim($attribution);
+
+        // Extract date/time attributes
+        $datetime = '';
+        $name = $attribution;
+
+        // Match date="..." or time="..." patterns
+        if (preg_match_all('/\b(date|time)=["\']?([^"\'>\s]+)["\']?/i', $attribution, $matches, PREG_SET_ORDER)) {
+            $parts = [];
+            foreach ($matches as $match) {
+                $parts[strtolower($match[1])] = $match[2];
+                // Remove this attribute from the name
+                $name = str_replace($match[0], '', $name);
+            }
+
+            if (isset($parts['date']) && isset($parts['time'])) {
+                $datetime = $parts['date'] . ' ' . $parts['time'];
+            } elseif (isset($parts['date'])) {
+                $datetime = $parts['date'];
+            } elseif (isset($parts['time'])) {
+                $datetime = $parts['time'];
+            }
+        }
+
+        $name = trim($name);
+
+        if ($datetime !== '') {
+            return $name . ' (' . $datetime . ')';
+        }
+
+        return $name;
     }
 
     protected function convertLists(string $text): string
