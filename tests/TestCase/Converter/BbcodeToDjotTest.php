@@ -142,8 +142,8 @@ class BbcodeToDjotTest extends TestCase
     public function testQuoteWithAuthor(): void
     {
         $result = $this->converter->convert('[quote=John]This is quoted[/quote]');
-        $this->assertStringContainsString('> *John wrote:*', $result);
         $this->assertStringContainsString('> This is quoted', $result);
+        $this->assertStringContainsString('^ John', $result);
     }
 
     public function testNestedQuotes(): void
@@ -152,8 +152,8 @@ class BbcodeToDjotTest extends TestCase
         $result = $this->converter->convert($bbcode);
 
         // Both quote authors should be present
-        $this->assertStringContainsString('> *Outer wrote:*', $result);
-        $this->assertStringContainsString('> *Inner wrote:*', $result);
+        $this->assertStringContainsString('^ Outer', $result);
+        $this->assertStringContainsString('^ Inner', $result);
         $this->assertStringContainsString('First level', $result);
         $this->assertStringContainsString('Second level', $result);
         // No unprocessed BBCode tags should remain
@@ -166,9 +166,9 @@ class BbcodeToDjotTest extends TestCase
         $bbcode = '[quote=A]Level 1[quote=B]Level 2[quote=C]Level 3[/quote][/quote][/quote]';
         $result = $this->converter->convert($bbcode);
 
-        $this->assertStringContainsString('> *A wrote:*', $result);
-        $this->assertStringContainsString('> *B wrote:*', $result);
-        $this->assertStringContainsString('> *C wrote:*', $result);
+        $this->assertStringContainsString('^ A', $result);
+        $this->assertStringContainsString('^ B', $result);
+        $this->assertStringContainsString('^ C', $result);
         $this->assertStringContainsString('Level 1', $result);
         $this->assertStringContainsString('Level 2', $result);
         $this->assertStringContainsString('Level 3', $result);
@@ -194,7 +194,7 @@ class BbcodeToDjotTest extends TestCase
 
         $this->assertStringContainsString('Before', $result);
         $this->assertStringContainsString('After', $result);
-        $this->assertStringContainsString('> *User wrote:*', $result);
+        $this->assertStringContainsString('^ User', $result);
         $this->assertStringContainsString('Quote content', $result);
     }
 
@@ -203,8 +203,8 @@ class BbcodeToDjotTest extends TestCase
         $bbcode = '[quote=A]First[/quote] text [quote=B]Second[/quote]';
         $result = $this->converter->convert($bbcode);
 
-        $this->assertStringContainsString('> *A wrote:*', $result);
-        $this->assertStringContainsString('> *B wrote:*', $result);
+        $this->assertStringContainsString('^ A', $result);
+        $this->assertStringContainsString('^ B', $result);
         $this->assertStringContainsString('First', $result);
         $this->assertStringContainsString('Second', $result);
         $this->assertStringContainsString('text', $result);
@@ -216,7 +216,7 @@ class BbcodeToDjotTest extends TestCase
         $bbcode = '[quote=username date="2024-01-01"]Content[/quote]';
         $result = $this->converter->convert($bbcode);
 
-        $this->assertStringContainsString('> *username date="2024-01-01" wrote:*', $result);
+        $this->assertStringContainsString('^ username date="2024-01-01"', $result);
         $this->assertStringContainsString('Content', $result);
     }
 
@@ -311,7 +311,7 @@ BBCODE;
         $this->assertStringContainsString('*Welcome to the Forum!*', $result);
         $this->assertStringContainsString('_important_', $result);
         $this->assertStringContainsString('- Read the rules', $result);
-        $this->assertStringContainsString('> *Admin wrote:*', $result);
+        $this->assertStringContainsString('^ Admin', $result);
         $this->assertStringContainsString('[our website](https://example.com)', $result);
     }
 

@@ -170,7 +170,7 @@ class BbcodeToDjot
                 $depth = 1;
                 $contentStart = $i;
 
-                while ($i < $length && $depth > 0) {
+                while ($i < $length) {
                     // Check for nested opening quote
                     if (preg_match('/\[quote(?:=[^\]]*)?\]/i', $text, $m, 0, $i) && strpos($text, $m[0], $i) === $i) {
                         $depth++;
@@ -204,10 +204,8 @@ class BbcodeToDjot
                 }
 
                 // If we exit without finding closing tag, treat remaining as content
-                if ($depth > 0) {
-                    $content = substr($text, $contentStart);
-                    $result .= $this->formatAsBlockquote($content, $author);
-                }
+                $content = substr($text, $contentStart);
+                $result .= $this->formatAsBlockquote($content, $author);
 
                 continue;
             }
@@ -229,11 +227,13 @@ class BbcodeToDjot
         $lines = explode("\n", $content);
         $quoted = array_map(fn ($line) => '> ' . $line, $lines);
 
+        $output = implode("\n", $quoted) . "\n";
+
         if ($author !== null && $author !== '') {
-            return '> *' . trim($author) . " wrote:*\n" . implode("\n", $quoted) . "\n\n";
+            $output .= '^ ' . trim($author) . "\n";
         }
 
-        return implode("\n", $quoted) . "\n\n";
+        return $output . "\n";
     }
 
     protected function convertLists(string $text): string
