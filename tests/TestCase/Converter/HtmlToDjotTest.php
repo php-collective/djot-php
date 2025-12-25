@@ -711,4 +711,37 @@ HTML;
         $this->assertStringContainsString('class="main"', $htmlBack);
         $this->assertStringContainsString('class="intro"', $htmlBack);
     }
+
+    // ==================== Implicit Paragraphs ====================
+
+    public function testInlineElementsAtBlockLevelAsImplicitParagraph(): void
+    {
+        // Inline elements not wrapped in <p> should be treated as implicit paragraphs
+        $html = '<h2>Features</h2><em>sdf</em><ul><li>Item</li></ul>';
+        $result = $this->converter->convert($html);
+
+        // Should have blank line after _sdf_ (implicit paragraph)
+        $this->assertStringContainsString("## Features\n\n_sdf_\n\n", $result);
+        $this->assertStringContainsString('- Item', $result);
+    }
+
+    public function testMixedInlineContentAtBlockLevel(): void
+    {
+        // Multiple inline elements should be grouped into one implicit paragraph
+        $html = '<div>Hello <strong>world</strong> and <em>more</em></div>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("Hello *world* and _more_\n", $result);
+    }
+
+    public function testTextNodeAtBlockLevel(): void
+    {
+        // Plain text at block level should be treated as implicit paragraph
+        $html = '<div>Some text<p>A paragraph</p>More text</div>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString("Some text\n\n", $result);
+        $this->assertStringContainsString("A paragraph\n\n", $result);
+        $this->assertStringContainsString("More text\n", $result);
+    }
 }

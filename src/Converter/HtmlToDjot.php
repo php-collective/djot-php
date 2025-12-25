@@ -149,12 +149,50 @@ class HtmlToDjot
         return $output;
     }
 
+    /**
+     * Block-level elements that should break implicit paragraphs
+     *
+     * @var array<string>
+     */
+    protected array $blockElements = [
+        'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'blockquote',
+        'ul', 'ol', 'li', 'table', 'dl', 'hr', 'div', 'section',
+        'article', 'header', 'footer', 'nav', 'aside', 'figure', 'main',
+    ];
+
     protected function processBlock(DOMNode $node): string
     {
         $content = '';
+        $inlineBuffer = '';
+
         foreach ($node->childNodes as $child) {
-            $result = $this->processNode($child);
-            $content .= $result;
+            $isBlock = false;
+
+            if ($child instanceof DOMElement) {
+                $tagName = strtolower($child->tagName);
+                $isBlock = in_array($tagName, $this->blockElements, true);
+            }
+
+            if ($isBlock) {
+                // Flush any accumulated inline content as an implicit paragraph
+                $inlineText = trim($inlineBuffer);
+                if ($inlineText !== '') {
+                    $content .= $inlineText . "\n\n";
+                }
+                $inlineBuffer = '';
+
+                // Process the block element
+                $content .= $this->processNode($child);
+            } else {
+                // Accumulate inline content
+                $inlineBuffer .= $this->processNode($child);
+            }
+        }
+
+        // Flush any remaining inline content
+        $inlineText = trim($inlineBuffer);
+        if ($inlineText !== '') {
+            $content .= $inlineText . "\n\n";
         }
 
         return trim($content);
