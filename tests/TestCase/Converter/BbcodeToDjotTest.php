@@ -344,4 +344,38 @@ BBCODE;
         // Closing tags are stripped
         $this->assertSame("[unknown]content\n", $this->converter->convert('[unknown]content[/unknown]'));
     }
+
+    // ==================== Block Separation ====================
+
+    public function testListHasBlankLineBefore(): void
+    {
+        // Lists should have blank line before them for proper Djot block separation
+        $result = $this->converter->convert('Some text[list][*]item 1[*]item 2[/list]');
+        $this->assertStringContainsString("Some text\n\n- item 1", $result);
+    }
+
+    public function testOrderedListHasBlankLineBefore(): void
+    {
+        $result = $this->converter->convert('Intro[list=1][*]First[*]Second[/list]');
+        $this->assertStringContainsString("Intro\n\n1. First", $result);
+    }
+
+    public function testCodeBlockHasBlankLinesBefore(): void
+    {
+        $result = $this->converter->convert('Some text[code]echo hello;[/code]More text');
+        $this->assertStringContainsString("Some text\n\n```\n", $result);
+        $this->assertStringContainsString("```\n\nMore text", $result);
+    }
+
+    public function testQuoteHasBlankLineBefore(): void
+    {
+        $result = $this->converter->convert('Some text[quote]A quote[/quote]More text');
+        $this->assertStringContainsString("Some text\n\n> A quote", $result);
+    }
+
+    public function testTableHasBlankLineBefore(): void
+    {
+        $result = $this->converter->convert('Some text[table][tr][td]Cell[/td][/tr][/table]More text');
+        $this->assertStringContainsString("Some text\n\n| Cell |", $result);
+    }
 }

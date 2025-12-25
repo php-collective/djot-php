@@ -123,14 +123,14 @@ class BbcodeToDjot
         // [code=lang]...[/code] -> ```lang\n...\n```
         $text = preg_replace_callback(
             '/\[code=([^\]]+)\](.*?)\[\/code\]/is',
-            fn ($m) => '```' . strtolower($m[1]) . "\n" . trim($m[2]) . "\n```\n",
+            fn ($m) => "\n\n```" . strtolower($m[1]) . "\n" . trim($m[2]) . "\n```\n\n",
             $text,
         ) ?? $text;
 
         // [code]...[/code] -> ```\n...\n```
         $text = preg_replace_callback(
             '/\[code\](.*?)\[\/code\]/is',
-            fn ($m) => "```\n" . trim($m[1]) . "\n```\n",
+            fn ($m) => "\n\n```\n" . trim($m[1]) . "\n```\n\n",
             $text,
         ) ?? $text;
 
@@ -227,7 +227,8 @@ class BbcodeToDjot
         $lines = explode("\n", $content);
         $quoted = array_map(fn ($line) => '> ' . $line, $lines);
 
-        $output = implode("\n", $quoted) . "\n";
+        // Ensure blank line before blockquote for proper Djot block separation
+        $output = "\n\n" . implode("\n", $quoted) . "\n";
 
         if ($author !== null && $author !== '') {
             $output .= '^ ' . $this->formatAttribution($author) . "\n";
@@ -319,7 +320,8 @@ class BbcodeToDjot
                     $content,
                 );
 
-                return $content . "\n";
+                // Ensure blank line before list for proper Djot block separation
+                return "\n\n" . $content . "\n";
             },
             $text,
         ) ?? $text;
@@ -339,7 +341,8 @@ class BbcodeToDjot
                     $content,
                 );
 
-                return $content . "\n";
+                // Ensure blank line before list for proper Djot block separation
+                return "\n\n" . $content . "\n";
             },
             $text,
         ) ?? $text;
@@ -426,7 +429,8 @@ class BbcodeToDjot
                     }
                 }
 
-                return implode("\n", $rows) . "\n\n";
+                // Ensure blank line before table for proper Djot block separation
+                return "\n\n" . implode("\n", $rows) . "\n\n";
             },
             $text,
         ) ?? $text;
