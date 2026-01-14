@@ -2142,7 +2142,13 @@ class BlockParser
                         foreach ($lastRow->getChildren() as $cell) {
                             if ($cell instanceof TableCell) {
                                 $alignment = $alignments[$cellIndex] ?? TableCell::ALIGN_DEFAULT;
-                                $headerCell = new TableCell(true, $alignment);
+                                // Preserve rowspan and colspan from original cell
+                                $headerCell = new TableCell(
+                                    true,
+                                    $alignment,
+                                    $cell->getRowspan(),
+                                    $cell->getColspan(),
+                                );
                                 // Preserve cell attributes from original cell
                                 $headerCell->setAttributes($cell->getAttributes());
                                 foreach ($cell->getChildren() as $child) {
@@ -2164,23 +2170,98 @@ class BlockParser
             // Extract row attributes (|...|{.class})
             $rowAttributes = $this->tableParser->extractRowAttributes($currentLine);
 
+            // Parse cells with their attributes
+            $cellsWithAttrs = $this->tableParser->parseTableCellsWithAttributes($currentLine);
+
+            // Process colspan markers (>) - must process before creating cells
+            // Cells marked with > are merged into the cell to their left
+            $processedCells = [];
+            $colspanAccumulator = 1;
+
+            for ($cellIdx = count($cellsWithAttrs) - 1; $cellIdx >= 0; $cellIdx--) {
+                $cellData = $cellsWithAttrs[$cellIdx];
+                if ($this->tableParser->isColspanMarker($cellData['content'])) {
+                    // This cell is a colspan marker, add to accumulator
+                    $colspanAccumulator++;
+                } else {
+                    // Regular cell, apply accumulated colspan
+                    $cellData['colspan'] = $colspanAccumulator;
+                    array_unshift($processedCells, $cellData);
+                    $colspanAccumulator = 1;
+                }
+            }
+
             // Parse regular row
             $row = new TableRow(false);
             if ($rowAttributes) {
                 $row->setAttributes($rowAttributes);
             }
 
-            // Parse cells with their attributes
-            $cellsWithAttrs = $this->tableParser->parseTableCellsWithAttributes($currentLine);
+            // Store row data for rowspan processing
+            // Track column positions for cells accounting for rowspan markers
+            $rowCellData = [];
+            $colPosition = 0;
 
-            foreach ($cellsWithAttrs as $index => $cellData) {
-                $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
-                $cell = new TableCell(false, $alignment);
-                if ($cellData['attributes']) {
-                    $cell->setAttributes($cellData['attributes']);
+            foreach ($processedCells as $index => $cellData) {
+                $colspan = $cellData['colspan'];
+
+                // Check for rowspan marker
+                if ($this->tableParser->isRowspanMarker($cellData['content'])) {
+                    // Mark this position for rowspan processing
+                    $rowCellData[] = [
+                        'type' => 'rowspan_marker',
+                        'colPosition' => $colPosition,
+                    ];
+                    $colPosition += $colspan;
+                } else {
+                    $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
+                    $cell = new TableCell(false, $alignment, 1, $colspan);
+                    if ($cellData['attributes']) {
+                        $cell->setAttributes($cellData['attributes']);
+                    }
+                    $this->inlineParser->parse($cell, trim($cellData['content']), $i);
+                    $row->appendChild($cell);
+                    $rowCellData[] = [
+                        'type' => 'cell',
+                        'cell' => $cell,
+                        'colPosition' => $colPosition,
+                    ];
+                    $colPosition += $colspan;
                 }
-                $this->inlineParser->parse($cell, trim($cellData['content']), $i);
-                $row->appendChild($cell);
+            }
+
+            // Process rowspan markers - find cells above that should span down
+            // We need to track column positions considering rowspan markers in previous rows
+            $tableChildren = $table->getChildren();
+            $currentRowIndex = count($tableChildren); // Index where current row will be added
+
+            foreach ($rowCellData as $cellInfo) {
+                if ($cellInfo['type'] === 'rowspan_marker') {
+                    $targetCol = $cellInfo['colPosition'];
+
+                    // Look in previous rows for the cell that spans into this column
+                    for ($prevRowIdx = $currentRowIndex - 1; $prevRowIdx >= 0; $prevRowIdx--) {
+                        $prevRow = $tableChildren[$prevRowIdx];
+                        if (!($prevRow instanceof TableRow)) {
+                            continue;
+                        }
+
+                        // Calculate which column position each cell occupies in this row
+                        // considering that some positions may be occupied by rowspans from above
+                        $cellFound = $this->findCellAtColumnForRowspan(
+                            $tableChildren,
+                            $prevRowIdx,
+                            $targetCol,
+                            $currentRowIndex,
+                        );
+
+                        if ($cellFound !== null) {
+                            $cellFound->setRowspan($cellFound->getRowspan() + 1);
+
+                            break;
+                        }
+                    }
+                }
             }
 
             $table->appendChild($row);
@@ -2199,6 +2280,144 @@ class BlockParser
         // Caption parsing is now handled by tryParseCaption
 
         return $i - $start;
+    }
+
+    /**
+     * Find a cell at a specific column position that can span into the target row.
+     *
+     * This method handles the complexity of finding cells when previous rows
+     * may have rowspan markers (missing cells) and rowspans from even earlier rows.
+     *
+     * @param array<\Djot\Node\Node> $tableRows All rows parsed so far
+     * @param int $rowIndex The row index to search in
+     * @param int $targetCol The column position to find
+     * @param int $targetRowIndex The row index we're trying to extend into
+     *
+     * @return \Djot\Node\Block\TableCell|null The cell if found and valid for extension
+     */
+    protected function findCellAtColumnForRowspan(
+        array $tableRows,
+        int $rowIndex,
+        int $targetCol,
+        int $targetRowIndex,
+    ): ?TableCell {
+        $row = $tableRows[$rowIndex];
+        if (!($row instanceof TableRow)) {
+            return null;
+        }
+
+        // Build a map of which columns are occupied by cells from this row
+        // or by rowspans from earlier rows
+        $columnOccupancy = $this->buildColumnOccupancyMap($tableRows, $rowIndex);
+
+        // Find which cell (if any) from this row occupies the target column
+        $cells = $row->getChildren();
+        $cellColPosition = 0;
+
+        foreach ($cells as $cell) {
+            if (!($cell instanceof TableCell)) {
+                continue;
+            }
+
+            // Skip columns that are occupied by rowspans from earlier rows
+            while (isset($columnOccupancy[$cellColPosition]) && $columnOccupancy[$cellColPosition] !== $rowIndex) {
+                $cellColPosition++;
+            }
+
+            $colspan = $cell->getColspan();
+            $rowspan = $cell->getRowspan();
+
+            // Check if this cell covers the target column
+            if ($cellColPosition <= $targetCol && $targetCol < $cellColPosition + $colspan) {
+                // Check if this cell's rowspan already reaches the target row
+                $rowsSpanned = $rowIndex + $rowspan;
+                if ($rowsSpanned >= $targetRowIndex) {
+                    return $cell;
+                }
+            }
+
+            $cellColPosition += $colspan;
+        }
+
+        return null;
+    }
+
+    /**
+     * Build a map of which row's cell occupies each column position.
+     *
+     * @param array<\Djot\Node\Node> $tableRows All rows parsed so far
+     * @param int $upToRowIndex Build occupancy up to this row index
+     *
+     * @return array<int, int> Map of column position => row index that occupies it
+     */
+    protected function buildColumnOccupancyMap(array $tableRows, int $upToRowIndex): array
+    {
+        $occupancy = [];
+
+        for ($rowIdx = 0; $rowIdx <= $upToRowIndex; $rowIdx++) {
+            $row = $tableRows[$rowIdx] ?? null;
+            if (!($row instanceof TableRow)) {
+                continue;
+            }
+
+            $cells = $row->getChildren();
+            $colPos = 0;
+
+            foreach ($cells as $cell) {
+                if (!($cell instanceof TableCell)) {
+                    continue;
+                }
+
+                // Skip columns already occupied by earlier rowspans
+                while (isset($occupancy[$colPos]) && $occupancy[$colPos] + $this->getCellRowspanAt($tableRows, $occupancy[$colPos], $colPos) > $rowIdx) {
+                    $colPos++;
+                }
+
+                $colspan = $cell->getColspan();
+                $rowspan = $cell->getRowspan();
+
+                // Mark columns as occupied by this cell's row
+                for ($c = 0; $c < $colspan; $c++) {
+                    $occupancy[$colPos + $c] = $rowIdx;
+                }
+
+                $colPos += $colspan;
+            }
+        }
+
+        return $occupancy;
+    }
+
+    /**
+     * Get the rowspan of a cell at a specific row and column position.
+     *
+     * @param array<\Djot\Node\Node> $tableRows All rows
+     * @param int $rowIdx Row index
+     * @param int $colPos Column position
+     */
+    protected function getCellRowspanAt(array $tableRows, int $rowIdx, int $colPos): int
+    {
+        $row = $tableRows[$rowIdx] ?? null;
+        if (!($row instanceof TableRow)) {
+            return 1;
+        }
+
+        $cells = $row->getChildren();
+        $currentCol = 0;
+
+        foreach ($cells as $cell) {
+            if (!($cell instanceof TableCell)) {
+                continue;
+            }
+
+            $colspan = $cell->getColspan();
+            if ($currentCol <= $colPos && $colPos < $currentCol + $colspan) {
+                return $cell->getRowspan();
+            }
+            $currentCol += $colspan;
+        }
+
+        return 1;
     }
 
     /**

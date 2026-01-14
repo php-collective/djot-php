@@ -711,6 +711,16 @@ class HtmlRenderer implements RendererInterface
         $tag = $node->isHeader() ? 'th' : 'td';
         $attrs = $this->renderAttributes($node);
 
+        $rowspan = $node->getRowspan();
+        if ($rowspan > 1) {
+            $attrs .= ' rowspan="' . $rowspan . '"';
+        }
+
+        $colspan = $node->getColspan();
+        if ($colspan > 1) {
+            $attrs .= ' colspan="' . $colspan . '"';
+        }
+
         $alignment = $node->getAlignment();
         if ($alignment !== TableCell::ALIGN_DEFAULT) {
             $attrs .= ' style="text-align: ' . $alignment . ';"';

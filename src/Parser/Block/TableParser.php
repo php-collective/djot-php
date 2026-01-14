@@ -316,6 +316,32 @@ class TableParser
     }
 
     /**
+     * Check if a cell contains a rowspan marker (^).
+     * A cell with only ^ (and optional whitespace) indicates it's spanned from the cell above.
+     *
+     * @param string $cellContent The cell content to check
+     *
+     * @return bool True if the cell is a rowspan marker
+     */
+    public function isRowspanMarker(string $cellContent): bool
+    {
+        return trim($cellContent) === '^';
+    }
+
+    /**
+     * Check if a cell contains a colspan marker (>).
+     * A cell with only > (and optional whitespace) indicates it's spanned from the cell to the left.
+     *
+     * @param string $cellContent The cell content to check
+     *
+     * @return bool True if the cell is a colspan marker
+     */
+    public function isColspanMarker(string $cellContent): bool
+    {
+        return trim($cellContent) === '>';
+    }
+
+    /**
      * Check if a line ends with | outside of code spans.
      * Used to verify table row syntax (| `a |` is not a table because final | is in code span).
      *
