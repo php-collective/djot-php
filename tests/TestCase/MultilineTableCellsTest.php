@@ -335,7 +335,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $this->assertInstanceOf(Table::class, $table);
 
@@ -347,11 +347,11 @@ DJOT;
         $dataRow = $rows[1];
         $cells = $dataRow->getChildren();
 
-        /** @var TableCell $cell1 */
+        /** @var \Djot\Node\Block\TableCell $cell1 */
         $cell1 = $cells[0];
         $this->assertSame('Start', $this->getCellText($cell1));
 
-        /** @var TableCell $cell2 */
+        /** @var \Djot\Node\Block\TableCell $cell2 */
         $cell2 = $cells[1];
         $expected = 'Line 1 Line 2 Line 3 Line 4 Line 5 Line 6 Line 7 Line 8 Line 9 Line 10 Line 11 Line 12';
         $this->assertSame($expected, $this->getCellText($cell2));
@@ -371,7 +371,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -384,18 +384,18 @@ DJOT;
 
         $cells = $dataRow->getChildren();
 
-        /** @var TableCell $cellA */
+        /** @var \Djot\Node\Block\TableCell $cellA */
         $cellA = $cells[0];
         $this->assertSame('cell-a', $cellA->getAttribute('class'));
         $this->assertSame('id-a', $cellA->getAttribute('id'));
         $this->assertSame('First', $this->getCellText($cellA));
 
-        /** @var TableCell $cellB */
+        /** @var \Djot\Node\Block\TableCell $cellB */
         $cellB = $cells[1];
         $this->assertSame('cell-b', $cellB->getAttribute('class'));
         $this->assertSame('Second continued B', $this->getCellText($cellB));
 
-        /** @var TableCell $cellC */
+        /** @var \Djot\Node\Block\TableCell $cellC */
         $cellC = $cells[2];
         $this->assertSame('cell-c', $cellC->getAttribute('class'));
         $this->assertSame('Third continued C', $this->getCellText($cellC));
@@ -415,7 +415,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -426,13 +426,13 @@ DJOT;
 
         $cells = $dataRow->getChildren();
 
-        /** @var TableCell $cell1 */
+        /** @var \Djot\Node\Block\TableCell $cell1 */
         $cell1 = $cells[0];
         $this->assertSame('a', $cell1->getAttribute('class'));
         $this->assertSame('b', $cell1->getAttribute('id'));
         $this->assertSame('1', $cell1->getAttribute('data-x'));
 
-        /** @var TableCell $cell2 */
+        /** @var \Djot\Node\Block\TableCell $cell2 */
         $cell2 = $cells[1];
         $this->assertSame('More extra', $this->getCellText($cell2));
     }
@@ -451,7 +451,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -511,7 +511,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -538,7 +538,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -566,7 +566,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -599,7 +599,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -626,7 +626,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -652,7 +652,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -687,7 +687,7 @@ DJOT;
         // Should parse reasonably fast (under 1 second)
         $this->assertLessThan(1.0, $parseTime, 'Parsing large table took too long');
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -715,7 +715,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -749,7 +749,7 @@ DJOT;
 
         $doc = $this->converter->parse($djot);
 
-        /** @var Table $table */
+        /** @var \Djot\Node\Block\Table $table */
         $table = $doc->getChildren()[0];
         $rows = $table->getChildren();
 
@@ -762,7 +762,7 @@ DJOT;
             /** @var \Djot\Node\Block\TableRow $row */
             $row = $rows[$i];
             $cells = $row->getChildren();
-            /** @var TableCell $cellB */
+            /** @var \Djot\Node\Block\TableCell $cellB */
             $cellB = $cells[1];
             $this->assertSame($expectedB[$i - 1], $this->getCellText($cellB), "Row {$i} mismatch");
         }
