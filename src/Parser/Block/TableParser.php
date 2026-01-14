@@ -316,6 +316,79 @@ class TableParser
     }
 
     /**
+     * Check if a line is a continuation row (starts with +).
+     * Continuation rows use + prefix instead of | to signal that the contents
+     * get added to the cells from the previous row.
+     *
+     * Syntax: + cell1 | cell2 | cell3 |
+     *
+     * @param string $line The line to check
+     *
+     * @return bool True if the line is a continuation row
+     */
+    public function isContinuationRow(string $line): bool
+    {
+        // Continuation rows start with + and end with |
+        $trimmed = ltrim($line);
+
+        if (!str_starts_with($trimmed, '+')) {
+            return false;
+        }
+
+        // Must end with | (outside code spans)
+        return $this->lineEndsWithPipeOutsideCodeSpan($trimmed);
+    }
+
+    /**
+     * Parse cells from a continuation row.
+     * Continuation rows start with + instead of |.
+     *
+     * @param string $line The continuation row line (starting with +)
+     *
+     * @return array<string> Array of cell contents
+     */
+    public function parseContinuationCells(string $line): array
+    {
+        $trimmed = ltrim($line);
+
+        // Replace leading + with | for parsing
+        $normalizedLine = '|' . substr($trimmed, 1);
+
+        return $this->parseTableCells($normalizedLine);
+    }
+
+    /**
+     * Merge cell contents from continuation lines.
+     * Each cell's content is joined with a space.
+     *
+     * @param array<string> $baseCells The cells from the base row
+     * @param array<string> $continuationCells The cells from the continuation row
+     *
+     * @return array<string> Merged cell contents
+     */
+    public function mergeCellContents(array $baseCells, array $continuationCells): array
+    {
+        $result = [];
+        $count = max(count($baseCells), count($continuationCells));
+
+        for ($i = 0; $i < $count; $i++) {
+            $base = trim($baseCells[$i] ?? '');
+            $continuation = trim($continuationCells[$i] ?? '');
+
+            if ($base !== '' && $continuation !== '') {
+                // Join with space (like soft breaks in paragraphs)
+                $result[] = $base . ' ' . $continuation;
+            } elseif ($continuation !== '') {
+                $result[] = $continuation;
+            } else {
+                $result[] = $base;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Check if a line ends with | outside of code spans.
      * Used to verify table row syntax (| `a |` is not a table because final | is in code span).
      *

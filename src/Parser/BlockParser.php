@@ -2164,27 +2164,42 @@ class BlockParser
             // Extract row attributes (|...|{.class})
             $rowAttributes = $this->tableParser->extractRowAttributes($currentLine);
 
+            // Parse cells with their attributes
+            $cellsWithAttrs = $this->tableParser->parseTableCellsWithAttributes($currentLine);
+
+            // Store cell contents and attributes for potential merging
+            $mergedCells = array_map(fn ($c) => $c['content'], $cellsWithAttrs);
+            $cellAttributes = array_map(fn ($c) => $c['attributes'], $cellsWithAttrs);
+            $baseLineForRow = $i;
+
+            $i++;
+
+            // Check for continuation rows (lines starting with +)
+            while ($i < $count && $this->tableParser->isContinuationRow($lines[$i])) {
+                $continuationCells = $this->tableParser->parseContinuationCells($lines[$i]);
+                $mergedCells = $this->tableParser->mergeCellContents($mergedCells, $continuationCells);
+                $i++;
+            }
+
             // Parse regular row
             $row = new TableRow(false);
             if ($rowAttributes) {
                 $row->setAttributes($rowAttributes);
             }
 
-            // Parse cells with their attributes
-            $cellsWithAttrs = $this->tableParser->parseTableCellsWithAttributes($currentLine);
-
-            foreach ($cellsWithAttrs as $index => $cellData) {
+            // Create cells with merged content
+            foreach ($mergedCells as $index => $cellContent) {
                 $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
                 $cell = new TableCell(false, $alignment);
-                if ($cellData['attributes']) {
-                    $cell->setAttributes($cellData['attributes']);
+                $attrs = $cellAttributes[$index] ?? [];
+                if ($attrs) {
+                    $cell->setAttributes($attrs);
                 }
-                $this->inlineParser->parse($cell, trim($cellData['content']), $i);
+                $this->inlineParser->parse($cell, trim($cellContent), $baseLineForRow);
                 $row->appendChild($cell);
             }
 
             $table->appendChild($row);
-            $i++;
         }
 
         // A separator-only table is valid (creates empty table)
