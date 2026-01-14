@@ -21,7 +21,8 @@ class TableParser
 {
     /**
      * Check if a line could be a table row.
-     * A line must start with | and end with | (optionally followed by row attributes).
+     * A line must start with | and end with | (optionally followed by row attributes),
+     * or be a continuation row ending with | \.
      *
      * @param string $line The line to check
      *
@@ -37,6 +38,13 @@ class TableParser
         // Strip row attributes if present (|...|{.class})
         $lineWithoutRowAttrs = $this->stripRowAttributes($line);
 
+        // Check for continuation row (ends with | \)
+        if ($this->isRowContinuation($lineWithoutRowAttrs)) {
+            $strippedLine = $this->stripContinuationMarker($lineWithoutRowAttrs);
+
+            return $this->lineEndsWithPipeOutsideCodeSpan($strippedLine);
+        }
+
         // Table rows start and end with |
         if (!preg_match('/^\|.*\|$/', $lineWithoutRowAttrs)) {
             return false;
@@ -48,16 +56,21 @@ class TableParser
 
     /**
      * Strip row attributes from end of line.
+     * Handles both regular rows (|...|{.class}) and continuation rows (|...|{.class} \).
      *
      * @param string $line The line to process
      *
-     * @return string Line without trailing row attributes
+     * @return string Line without trailing row attributes (but keeps continuation marker)
      */
     public function stripRowAttributes(string $line): string
     {
-        // Row attributes appear after final pipe: |...|{.class}
-        if (preg_match('/^(.*\|)\{([^{}]+)\}\s*$/', $line, $matches)) {
-            return $matches[1];
+        // Row attributes appear after final pipe: |...|{.class} or |...|{.class} \
+        // Match attributes optionally followed by continuation marker
+        if (preg_match('/^(.*\|)\{([^{}]+)\}(\s*\\\\)?(\s*)$/', $line, $matches)) {
+            // Return the line without attributes but keep continuation marker if present
+            $continuation = !empty($matches[3]) ? ' \\' : '';
+
+            return $matches[1] . $continuation;
         }
 
         return $line;
@@ -65,6 +78,7 @@ class TableParser
 
     /**
      * Extract row attributes from end of line.
+     * Handles both regular rows (|...|{.class}) and continuation rows (|...|{.class} \).
      *
      * @param string $line The line to process
      *
@@ -72,7 +86,8 @@ class TableParser
      */
     public function extractRowAttributes(string $line): array
     {
-        if (preg_match('/\|\{([^{}]+)\}\s*$/', $line, $matches)) {
+        // Match attributes optionally followed by continuation marker
+        if (preg_match('/\|\{([^{}]+)\}(\s*\\\\)?\s*$/', $line, $matches)) {
             return AttributeParser::parse($matches[1]);
         }
 
@@ -313,6 +328,90 @@ class TableParser
         }
 
         return $inCode;
+    }
+
+    /**
+     * Check if a line is a continuation row (ends with | \).
+     * Row-level continuation: trailing backslash after final pipe continues the entire row.
+     *
+     * @param string $line The line to check
+     *
+     * @return bool True if the line is a continuation row
+     */
+    public function isRowContinuation(string $line): bool
+    {
+        // Row continuation: line ends with | \ (optionally with whitespace)
+        // Must check that the backslash is outside code spans
+        $trimmed = rtrim($line);
+
+        // Must end with backslash
+        if (!str_ends_with($trimmed, '\\')) {
+            return false;
+        }
+
+        // Check for escaped backslash (\\) at end - not a continuation
+        if (str_ends_with($trimmed, '\\\\')) {
+            return false;
+        }
+
+        // Remove the trailing backslash and check if it ends with pipe
+        $withoutBackslash = rtrim(substr($trimmed, 0, -1));
+
+        // Must end with | (after removing backslash)
+        if (!str_ends_with($withoutBackslash, '|')) {
+            return false;
+        }
+
+        // Verify the pipe is outside code spans
+        return $this->lineEndsWithPipeOutsideCodeSpan($withoutBackslash);
+    }
+
+    /**
+     * Strip the continuation marker from a row.
+     *
+     * @param string $line The line to process
+     *
+     * @return string Line without trailing \ marker
+     */
+    public function stripContinuationMarker(string $line): string
+    {
+        $trimmed = rtrim($line);
+        if (str_ends_with($trimmed, '\\') && !str_ends_with($trimmed, '\\\\')) {
+            return rtrim(substr($trimmed, 0, -1));
+        }
+
+        return $line;
+    }
+
+    /**
+     * Merge cell contents from continuation lines.
+     * Each cell's content is joined with a space.
+     *
+     * @param array<string> $baseCells The cells from the base row
+     * @param array<string> $continuationCells The cells from the continuation row
+     *
+     * @return array<string> Merged cell contents
+     */
+    public function mergeCellContents(array $baseCells, array $continuationCells): array
+    {
+        $result = [];
+        $count = max(count($baseCells), count($continuationCells));
+
+        for ($i = 0; $i < $count; $i++) {
+            $base = trim($baseCells[$i] ?? '');
+            $continuation = trim($continuationCells[$i] ?? '');
+
+            if ($base !== '' && $continuation !== '') {
+                // Join with space (like soft breaks in paragraphs)
+                $result[] = $base . ' ' . $continuation;
+            } elseif ($continuation !== '') {
+                $result[] = $continuation;
+            } else {
+                $result[] = $base;
+            }
+        }
+
+        return $result;
     }
 
     /**

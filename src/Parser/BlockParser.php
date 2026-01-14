@@ -2120,7 +2120,10 @@ class BlockParser
             // Strip row attributes for validation (|...|{.class} → |...|)
             $lineWithoutRowAttrs = $this->tableParser->stripRowAttributes($currentLine);
 
-            if (!preg_match('/^\|.*\|$/', $lineWithoutRowAttrs)) {
+            // For validation, also strip continuation marker (| ... | \ → | ... |)
+            $lineForValidation = $this->tableParser->stripContinuationMarker($lineWithoutRowAttrs);
+
+            if (!preg_match('/^\|.*\|$/', $lineForValidation)) {
                 break;
             }
 
@@ -2161,8 +2164,57 @@ class BlockParser
                 continue;
             }
 
-            // Extract row attributes (|...|{.class})
-            $rowAttributes = $this->tableParser->extractRowAttributes($currentLine);
+            // Check for row continuation (| ... | \)
+            // Collect all continuation lines and merge cell contents
+            $rowLines = [$currentLine];
+            $baseLineForRow = $i;
+
+            // Check continuation on line with attributes stripped
+            $lastLineStripped = $this->tableParser->stripRowAttributes($rowLines[count($rowLines) - 1]);
+            while ($this->tableParser->isRowContinuation($lastLineStripped)) {
+                $i++;
+                if ($i >= $count) {
+                    break;
+                }
+                $nextLine = $lines[$i];
+                // Continuation line must also be a valid table row structure
+                $nextWithoutAttrs = $this->tableParser->stripRowAttributes($nextLine);
+                $nextForValidation = $this->tableParser->stripContinuationMarker($nextWithoutAttrs);
+                if (!preg_match('/^\|.*\|$/', $nextForValidation)) {
+                    // Not a valid continuation, back up
+                    $i--;
+
+                    break;
+                }
+                $rowLines[] = $nextLine;
+                // Update for next iteration
+                $lastLineStripped = $nextWithoutAttrs;
+            }
+
+            // Extract row attributes from the first line only (|...|{.class})
+            $firstLine = $this->tableParser->stripContinuationMarker($rowLines[0]);
+            $rowAttributes = $this->tableParser->extractRowAttributes($firstLine);
+
+            // Parse and merge cell contents from all continuation lines
+            $mergedCells = null;
+            $firstLineAttrs = [];
+
+            foreach ($rowLines as $idx => $rowLine) {
+                // Strip continuation marker before parsing
+                $cleanLine = $this->tableParser->stripContinuationMarker($rowLine);
+                $cellsWithAttrs = $this->tableParser->parseTableCellsWithAttributes($cleanLine);
+
+                // Extract just the content strings for merging
+                $cellContents = array_map(fn ($c) => $c['content'], $cellsWithAttrs);
+
+                if ($mergedCells === null) {
+                    $mergedCells = $cellContents;
+                    // Keep attributes from first line only
+                    $firstLineAttrs = array_map(fn ($c) => $c['attributes'], $cellsWithAttrs);
+                } else {
+                    $mergedCells = $this->tableParser->mergeCellContents($mergedCells, $cellContents);
+                }
+            }
 
             // Parse regular row
             $row = new TableRow(false);
@@ -2170,16 +2222,15 @@ class BlockParser
                 $row->setAttributes($rowAttributes);
             }
 
-            // Parse cells with their attributes
-            $cellsWithAttrs = $this->tableParser->parseTableCellsWithAttributes($currentLine);
-
-            foreach ($cellsWithAttrs as $index => $cellData) {
+            // Create cells with merged content
+            foreach ($mergedCells as $index => $cellContent) {
                 $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
                 $cell = new TableCell(false, $alignment);
-                if ($cellData['attributes']) {
-                    $cell->setAttributes($cellData['attributes']);
+                $attrs = $firstLineAttrs[$index] ?? [];
+                if ($attrs) {
+                    $cell->setAttributes($attrs);
                 }
-                $this->inlineParser->parse($cell, trim($cellData['content']), $i);
+                $this->inlineParser->parse($cell, trim($cellContent), $baseLineForRow);
                 $row->appendChild($cell);
             }
 
