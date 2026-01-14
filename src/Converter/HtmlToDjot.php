@@ -108,7 +108,8 @@ class HtmlToDjot
         $tagName = strtolower($node->tagName);
 
         return match ($tagName) {
-            'html', 'body', 'div', 'article', 'section', 'main', 'header', 'footer', 'nav', 'aside' => $this->processBlock($node),
+            'html', 'body', 'div', 'article', 'section', 'main', 'header', 'footer', 'nav', 'aside',
+            'address', 'details', 'dialog', 'fieldset', 'form', 'hgroup', 'menu', 'search' => $this->processBlock($node),
             'p' => $this->processParagraph($node),
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6' => $this->processHeading($node),
             'strong', 'b' => $this->processInlineFormatting($node, '*', '*'),
@@ -158,6 +159,7 @@ class HtmlToDjot
         'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'blockquote',
         'ul', 'ol', 'li', 'table', 'dl', 'hr', 'div', 'section',
         'article', 'header', 'footer', 'nav', 'aside', 'figure', 'main',
+        'address', 'details', 'dialog', 'fieldset', 'form', 'hgroup', 'menu', 'search',
     ];
 
     protected function processBlock(DOMNode $node): string

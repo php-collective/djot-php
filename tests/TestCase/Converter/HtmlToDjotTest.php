@@ -744,4 +744,95 @@ HTML;
         $this->assertStringContainsString("A paragraph\n\n", $result);
         $this->assertStringContainsString("More text\n", $result);
     }
+
+    // ==================== HTML5 Block Elements ====================
+
+    public function testAddressElement(): void
+    {
+        $html = '<address><p>123 Main St</p><p>City, State 12345</p></address>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('123 Main St', $result);
+        $this->assertStringContainsString('City, State 12345', $result);
+    }
+
+    public function testDetailsElement(): void
+    {
+        $html = '<details><summary>Click to expand</summary><p>Hidden content here</p></details>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('Click to expand', $result);
+        $this->assertStringContainsString('Hidden content here', $result);
+    }
+
+    public function testDialogElement(): void
+    {
+        $html = '<dialog open><p>Dialog content</p></dialog>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('Dialog content', $result);
+    }
+
+    public function testFieldsetElement(): void
+    {
+        $html = '<fieldset><legend>Personal Info</legend><p>Form fields here</p></fieldset>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('Personal Info', $result);
+        $this->assertStringContainsString('Form fields here', $result);
+    }
+
+    public function testFormElement(): void
+    {
+        $html = '<form><p>Form content</p></form>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('Form content', $result);
+    }
+
+    public function testHgroupElement(): void
+    {
+        $html = '<hgroup><h1>Main Title</h1><p>Subtitle here</p></hgroup>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('# Main Title', $result);
+        $this->assertStringContainsString('Subtitle here', $result);
+    }
+
+    public function testMenuElement(): void
+    {
+        $html = '<menu><li>Option 1</li><li>Option 2</li></menu>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('Option 1', $result);
+        $this->assertStringContainsString('Option 2', $result);
+    }
+
+    public function testSearchElement(): void
+    {
+        $html = '<search><p>Search form here</p></search>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('Search form here', $result);
+    }
+
+    public function testHtml5BlockElementsBreakImplicitParagraphs(): void
+    {
+        // HTML5 block elements should break implicit paragraphs just like div/section
+        $html = '<div>Text before<details><summary>Summary</summary><p>Details</p></details>Text after</div>';
+        $result = $this->converter->convert($html);
+
+        // Text before and after should be separate implicit paragraphs
+        $this->assertStringContainsString("Text before\n\n", $result);
+        $this->assertStringContainsString("Text after\n", $result);
+    }
+
+    public function testHtml5BlockElementsWithAttributes(): void
+    {
+        $html = '<details class="faq" id="q1"><summary>Question?</summary><p>Answer.</p></details>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('Question?', $result);
+        $this->assertStringContainsString('Answer.', $result);
+    }
 }
