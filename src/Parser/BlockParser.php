@@ -2173,13 +2173,36 @@ class BlockParser
             // Parse cells with their attributes
             $cellsWithAttrs = $this->tableParser->parseTableCellsWithAttributes($currentLine);
 
-            // Process colspan markers (>) - must process before creating cells
-            // Cells marked with > are merged into the cell to their left
+            // Store cell contents and attributes for potential merging
+            $mergedCells = array_map(fn ($c) => $c['content'], $cellsWithAttrs);
+            $cellAttributes = array_map(fn ($c) => $c['attributes'], $cellsWithAttrs);
+            $baseLineForRow = $i;
+
+            $i++;
+
+            // Check for continuation rows (lines starting with +)
+            while ($i < $count && $this->tableParser->isContinuationRow($lines[$i])) {
+                $continuationCells = $this->tableParser->parseContinuationCells($lines[$i]);
+                $mergedCells = $this->tableParser->mergeCellContents($mergedCells, $continuationCells);
+                $i++;
+            }
+
+            // Rebuild cellsWithAttrs with merged content
+            $mergedCellsWithAttrs = [];
+            foreach ($mergedCells as $idx => $content) {
+                $mergedCellsWithAttrs[] = [
+                    'content' => $content,
+                    'attributes' => $cellAttributes[$idx] ?? [],
+                ];
+            }
+
+            // Process colspan markers (<) - must process before creating cells
+            // Cells marked with < are merged into the cell to their left
             $processedCells = [];
             $colspanAccumulator = 1;
 
-            for ($cellIdx = count($cellsWithAttrs) - 1; $cellIdx >= 0; $cellIdx--) {
-                $cellData = $cellsWithAttrs[$cellIdx];
+            for ($cellIdx = count($mergedCellsWithAttrs) - 1; $cellIdx >= 0; $cellIdx--) {
+                $cellData = $mergedCellsWithAttrs[$cellIdx];
                 if ($this->tableParser->isColspanMarker($cellData['content'])) {
                     // This cell is a colspan marker, add to accumulator
                     $colspanAccumulator++;
@@ -2219,7 +2242,7 @@ class BlockParser
                     if ($cellData['attributes']) {
                         $cell->setAttributes($cellData['attributes']);
                     }
-                    $this->inlineParser->parse($cell, trim($cellData['content']), $i);
+                    $this->inlineParser->parse($cell, trim($cellData['content']), $baseLineForRow);
                     $row->appendChild($cell);
                     $rowCellData[] = [
                         'type' => 'cell',
@@ -2265,7 +2288,6 @@ class BlockParser
             }
 
             $table->appendChild($row);
-            $i++;
         }
 
         // A separator-only table is valid (creates empty table)
