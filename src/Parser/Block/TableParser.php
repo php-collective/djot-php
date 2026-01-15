@@ -316,6 +316,129 @@ class TableParser
     }
 
     /**
+     * Parse table cells from a row WITHOUT respecting code spans.
+     *
+     * This is used for look-ahead when checking if continuation rows
+     * can close unclosed code spans. It simply splits on | characters.
+     *
+     * @param string $line The table row line
+     *
+     * @return array<string> Array of cell contents
+     */
+    public function parseTableCellsRaw(string $line): array
+    {
+        // Strip row attributes first
+        $line = $this->stripRowAttributes($line);
+
+        // Must start with | to be a potential table row
+        if (!str_starts_with($line, '|')) {
+            return [];
+        }
+
+        // Remove leading |
+        $line = substr($line, 1);
+
+        // Remove trailing | if present
+        if (str_ends_with($line, '|')) {
+            $line = substr($line, 0, -1);
+        }
+
+        // Simple split on |, handling escaped pipes
+        $cells = [];
+        $currentCell = '';
+        $length = strlen($line);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $line[$i];
+
+            // Check for escaped pipe
+            if ($char === '\\' && $i + 1 < $length && $line[$i + 1] === '|') {
+                $currentCell .= '|';
+                $i++; // Skip the |
+
+                continue;
+            }
+
+            // Cell delimiter
+            if ($char === '|') {
+                $cells[] = $currentCell;
+                $currentCell = '';
+
+                continue;
+            }
+
+            $currentCell .= $char;
+        }
+
+        // Add the last cell
+        $cells[] = $currentCell;
+
+        return $cells;
+    }
+
+    /**
+     * Check if a line looks like a table row but has unclosed code spans.
+     *
+     * This is used to detect rows where a code span starts but continues
+     * into a continuation row.
+     *
+     * @param string $line The line to check
+     *
+     * @return bool True if line looks like a table row but has unclosed code span
+     */
+    public function isPotentialTableRowWithUnclosedCodeSpan(string $line): bool
+    {
+        $trimmed = trim($line);
+        if ($trimmed === '' || $trimmed[0] !== '|') {
+            return false;
+        }
+
+        // Strip row attributes if present
+        $lineWithoutRowAttrs = $this->stripRowAttributes($line);
+
+        // Must start with |
+        if (!str_starts_with($lineWithoutRowAttrs, '|')) {
+            return false;
+        }
+
+        // Check if it has an unclosed code span
+        return $this->hasUnclosedCodeSpan($lineWithoutRowAttrs);
+    }
+
+    /**
+     * Check if combining base content with continuation content results in balanced code spans.
+     *
+     * @param string $baseContent The base cell content
+     * @param string $continuationContent The continuation cell content
+     *
+     * @return bool True if the combined content has balanced code spans
+     */
+    public function combinedContentHasBalancedCodeSpans(string $baseContent, string $continuationContent): bool
+    {
+        $combined = $baseContent . ' ' . $continuationContent;
+
+        return !$this->hasUnclosedCodeSpan($combined);
+    }
+
+    /**
+     * Validate that merged cell contents result in a valid table row.
+     *
+     * @param array<string> $mergedCells The merged cell contents
+     *
+     * @return bool True if all cells have balanced code spans
+     */
+    public function mergedCellsAreValid(array $mergedCells): bool
+    {
+        foreach ($mergedCells as $cell) {
+            if ($this->hasUnclosedCodeSpan($cell)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Check if a cell contains a rowspan marker (^).
      * A cell with only ^ (and optional whitespace) indicates it's spanned from the cell above.
      *
@@ -362,8 +485,37 @@ class TableParser
             return false;
         }
 
-        // Must end with | (outside code spans)
-        return $this->lineEndsWithPipeOutsideCodeSpan($trimmed);
+        // Check for standard case: ends with | outside code spans
+        if ($this->lineEndsWithPipeOutsideCodeSpan($trimmed)) {
+            return true;
+        }
+
+        // Also accept continuation rows that might close a code span from the previous row
+        // These have an "orphan" closing backtick that makes the | look like it's inside a code span
+        return $this->isPotentialContinuationRowWithCodeSpan($trimmed);
+    }
+
+    /**
+     * Check if a line is a potential continuation row that contains code span syntax.
+     *
+     * This handles the case where a continuation row closes a code span started
+     * in the previous row.
+     *
+     * @param string $line The trimmed line (starting with +)
+     *
+     * @return bool True if this looks like a continuation row with code span
+     */
+    protected function isPotentialContinuationRowWithCodeSpan(string $line): bool
+    {
+        // Must start with + and contain |
+        if (!str_starts_with($line, '+') || !str_contains($line, '|')) {
+            return false;
+        }
+
+        // Check if it ends with | (even if inside "code span")
+        $trimmed = rtrim($line);
+
+        return str_ends_with($trimmed, '|');
     }
 
     /**

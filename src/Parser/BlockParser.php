@@ -2102,15 +2102,24 @@ class BlockParser
     protected function tryParseTable(Node $parent, array $lines, int $start): ?int
     {
         $line = $lines[$start];
+        $count = count($lines);
 
         // Use TableParser to check if this is a valid table row
         if (!$this->tableParser->isTableRow($line)) {
-            return null;
+            // Check if it's a potential table row with unclosed code span
+            // that might be closed by continuation rows
+            if (!$this->tableParser->isPotentialTableRowWithUnclosedCodeSpan($line)) {
+                return null;
+            }
+
+            // Look ahead for continuation rows that might close the code span
+            if (!$this->canCloseCodeSpanWithContinuations($lines, $start, $count)) {
+                return null;
+            }
         }
 
         $table = new Table();
         $i = $start;
-        $count = count($lines);
         $alignments = [];
         $headerFound = false;
 
@@ -2532,6 +2541,47 @@ class BlockParser
         foreach ($cellsToRemove as $cellToRemove) {
             $row->removeChild($cellToRemove);
         }
+    }
+
+    /**
+     * Check if a row with unclosed code spans can be closed by continuation rows.
+     *
+     * This looks ahead for continuation rows and checks if merging their content
+     * would result in balanced code spans.
+     *
+     * @param array<string> $lines All lines
+     * @param int $start Starting line index
+     * @param int $count Total line count
+     *
+     * @return bool True if continuation rows can close the code spans
+     */
+    protected function canCloseCodeSpanWithContinuations(array $lines, int $start, int $count): bool
+    {
+        $baseLine = $lines[$start];
+
+        // Parse cells from base row (using raw parsing that ignores code span issues)
+        $baseCells = $this->tableParser->parseTableCellsRaw($baseLine);
+        if ($baseCells === []) {
+            return false;
+        }
+
+        $mergedCells = $baseCells;
+        $i = $start + 1;
+
+        // Look for continuation rows
+        while ($i < $count && $this->tableParser->isContinuationRow($lines[$i])) {
+            $continuationCells = $this->tableParser->parseContinuationCells($lines[$i]);
+            $mergedCells = $this->tableParser->mergeCellContents($mergedCells, $continuationCells);
+            $i++;
+        }
+
+        // Check if we found any continuations and if merged content is valid
+        if ($i === $start + 1) {
+            // No continuation rows found
+            return false;
+        }
+
+        return $this->tableParser->mergedCellsAreValid($mergedCells);
     }
 
     /**
