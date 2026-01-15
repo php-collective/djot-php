@@ -2258,6 +2258,10 @@ class BlockParser
             $tableChildren = $table->getChildren();
             $currentRowIndex = count($tableChildren); // Index where current row will be added
 
+            // Track which cells have already been extended in this row
+            // (multiple ^ markers under a colspan should only extend once)
+            $extendedCells = [];
+
             foreach ($rowCellData as $cellInfo) {
                 if ($cellInfo['type'] === 'rowspan_marker') {
                     $targetCol = $cellInfo['colPosition'];
@@ -2279,13 +2283,23 @@ class BlockParser
                         );
 
                         if ($cellFound !== null) {
-                            $cellFound->setRowspan($cellFound->getRowspan() + 1);
+                            // Only extend each cell once per row (handles multiple ^ under colspan)
+                            $cellId = spl_object_id($cellFound);
+                            if (!isset($extendedCells[$cellId])) {
+                                $cellFound->setRowspan($cellFound->getRowspan() + 1);
+                                $extendedCells[$cellId] = true;
+                            }
 
                             break;
                         }
                     }
                 }
             }
+
+            // Remove cells that overlap with spanning cells from previous rows
+            // This handles the case where a cell has both rowspan and colspan,
+            // and the intersection area contains content that should be dropped
+            $this->removeOverlappingCells($table, $row, $rowCellData, $currentRowIndex);
 
             $table->appendChild($row);
         }
@@ -2440,6 +2454,84 @@ class BlockParser
         }
 
         return 1;
+    }
+
+    /**
+     * Remove cells from a row that overlap with spanning cells from previous rows.
+     *
+     * This handles the edge case where a cell has both rowspan and colspan:
+     * when a rowspan marker extends such a cell, cells in the "intersection"
+     * area of the current row must be removed to avoid invalid overlapping HTML.
+     *
+     * @param \Djot\Node\Block\Table $table The table being built
+     * @param \Djot\Node\Block\TableRow $row The current row
+     * @param array<array{type: string, colPosition: int, cell?: \Djot\Node\Block\TableCell}> $rowCellData Cell data with positions
+     * @param int $currentRowIndex The index where this row will be added
+     */
+    protected function removeOverlappingCells(
+        Table $table,
+        TableRow $row,
+        array $rowCellData,
+        int $currentRowIndex,
+    ): void {
+        $tableChildren = $table->getChildren();
+        if (empty($tableChildren)) {
+            return;
+        }
+
+        // Build a set of column positions that are occupied by spanning cells from previous rows
+        $occupiedColumns = [];
+
+        foreach ($tableChildren as $rowIdx => $prevRow) {
+            if (!($prevRow instanceof TableRow)) {
+                continue;
+            }
+
+            $colPos = 0;
+            foreach ($prevRow->getChildren() as $cell) {
+                if (!($cell instanceof TableCell)) {
+                    continue;
+                }
+
+                // Skip columns occupied by even earlier rowspans
+                while (isset($occupiedColumns[$colPos])) {
+                    $colPos++;
+                }
+
+                $colspan = $cell->getColspan();
+                $rowspan = $cell->getRowspan();
+
+                // Check if this cell's span reaches into the current row
+                if ($rowIdx + $rowspan > $currentRowIndex) {
+                    // Mark all columns covered by this cell as occupied
+                    for ($c = 0; $c < $colspan; $c++) {
+                        $occupiedColumns[$colPos + $c] = true;
+                    }
+                }
+
+                $colPos += $colspan;
+            }
+        }
+
+        if (empty($occupiedColumns)) {
+            return;
+        }
+
+        // Find cells in the current row that are in occupied positions and remove them
+        $cellsToRemove = [];
+        foreach ($rowCellData as $cellInfo) {
+            if ($cellInfo['type'] === 'cell' && isset($cellInfo['cell'])) {
+                $cellColPos = $cellInfo['colPosition'];
+                if (isset($occupiedColumns[$cellColPos])) {
+                    $cellsToRemove[] = $cellInfo['cell'];
+                }
+            }
+        }
+
+        // Remove the overlapping cells from the row
+        foreach ($cellsToRemove as $cellToRemove) {
+            $row->removeChild($cellToRemove);
+        }
     }
 
     /**

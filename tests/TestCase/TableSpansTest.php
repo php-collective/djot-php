@@ -584,4 +584,121 @@ DJOT;
         $cell1 = $cells[0];
         $this->assertSame(1, $cell1->getColspan());
     }
+
+    /**
+     * Test that overlapping cells are removed when rowspan and colspan intersect.
+     *
+     * When a cell has both rowspan and colspan, cells in the "intersection"
+     * area should be dropped to avoid invalid overlapping HTML.
+     *
+     * @see https://github.com/jgm/djot/issues/368 (Omikhleia's Note2)
+     */
+    public function testRowspanColspanIntersectionDropsOverlappingCells(): void
+    {
+        // Cell A has colspan=2, then ^ extends rowspan
+        // Cell B at L2:H2 is inside A's span area and should be dropped
+        $djot = <<<'DJOT'
+|     | H1  | H2  |
+|-----|-----|-----|
+| L1  | A   | <   |
+| L2  | ^   | B   |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // A should have rowspan=2 colspan=2
+        $this->assertStringContainsString('rowspan="2"', $html);
+        $this->assertStringContainsString('colspan="2"', $html);
+
+        // B should NOT be in the output (it's dropped)
+        $this->assertStringNotContainsString('>B<', $html);
+
+        // Verify table structure via DOM
+        /** @var \Djot\Node\Block\Table $table */
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        // Row L2 should only have L2 label cell, not B
+        /** @var \Djot\Node\Block\TableRow $dataRow2 */
+        $dataRow2 = $rows[2];
+        $cells = $dataRow2->getChildren();
+        $this->assertCount(1, $cells); // Only "L2" cell
+    }
+
+    public function testRowspanColspanIntersection3x3(): void
+    {
+        // A has colspan=3 and rowspan=3, all B/C/D/E cells should be dropped
+        $djot = <<<'DJOT'
+|     | H1  | H2  | H3  |
+|-----|-----|-----|-----|
+| L1  | A   | <   | <   |
+| L2  | ^   | B   | C   |
+| L3  | ^   | D   | E   |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // A should have rowspan=3 colspan=3
+        $this->assertStringContainsString('rowspan="3"', $html);
+        $this->assertStringContainsString('colspan="3"', $html);
+
+        // B, C, D, E should NOT be in output
+        $this->assertStringNotContainsString('>B<', $html);
+        $this->assertStringNotContainsString('>C<', $html);
+        $this->assertStringNotContainsString('>D<', $html);
+        $this->assertStringNotContainsString('>E<', $html);
+    }
+
+    public function testRowspanColspanNoIntersectionKeepsCells(): void
+    {
+        // A has colspan=2 but no rowspan into L2
+        // X and B should both be kept
+        $djot = <<<'DJOT'
+|     | H1  | H2  |
+|-----|-----|-----|
+| L1  | A   | <   |
+| L2  | X   | B   |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // A should have colspan=2 but no rowspan
+        $this->assertStringContainsString('colspan="2"', $html);
+        $this->assertStringNotContainsString('rowspan', $html);
+
+        // Both X and B should be in output
+        $this->assertStringContainsString('>X<', $html);
+        $this->assertStringContainsString('>B<', $html);
+    }
+
+    public function testExplicitMarkersFor2x2Block(): void
+    {
+        // When all cells in the 2x2 area have markers, it creates a proper block
+        $djot = <<<'DJOT'
+|     | H1  | H2  |
+|-----|-----|-----|
+| L1  | A   | <   |
+| L2  | ^   | ^   |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // A should have rowspan=2 colspan=2
+        $this->assertStringContainsString('rowspan="2"', $html);
+        $this->assertStringContainsString('colspan="2"', $html);
+
+        // Row L2 should only have L2 label, no other cells
+        /** @var \Djot\Node\Block\Table $table */
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        /** @var \Djot\Node\Block\TableRow $dataRow2 */
+        $dataRow2 = $rows[2];
+        $cells = $dataRow2->getChildren();
+        $this->assertCount(1, $cells); // Only "L2" cell
+    }
 }
