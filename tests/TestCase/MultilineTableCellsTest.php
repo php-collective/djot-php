@@ -613,6 +613,83 @@ DJOT;
     }
 
     /**
+     * Test code span spanning continuation lines.
+     *
+     * This addresses jgm's concern that code spans should work across continuation lines.
+     *
+     * @see https://github.com/jgm/djot/issues/368
+     */
+    public function testCodeSpanAcrossContinuation(): void
+    {
+        $djot = <<<'DJOT'
+| Header | Code                   |
+|--------|------------------------|
+| Row 1  | `function foo() {      |
++        | return true; }`        |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // Code span should be properly closed and rendered
+        $this->assertStringContainsString('<code>function foo() { return true; }</code>', $html);
+        $this->assertStringContainsString('<td>Row 1</td>', $html);
+    }
+
+    public function testCodeSpanWithDoubleBackticksAcrossContinuation(): void
+    {
+        $djot = <<<'DJOT'
+| Name | Code                    |
+|------|-------------------------|
+| Test | ``const x = `template`  |
++      | with backticks``        |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // Double backtick code span should work across lines
+        $this->assertStringContainsString('<code>', $html);
+        $this->assertStringContainsString('template', $html);
+    }
+
+    public function testMultipleCodeSpansInContinuation(): void
+    {
+        $djot = <<<'DJOT'
+| A    | B               | C     |
+|------|-----------------|-------|
+| text | `code1          | other |
++      | continued`      |       |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // First cell should have text, second should have code span
+        $this->assertStringContainsString('<td>text</td>', $html);
+        $this->assertStringContainsString('<code>code1 continued</code>', $html);
+    }
+
+    public function testCodeSpanContinuationWithOtherContent(): void
+    {
+        // jgm's exact example from the issue
+        $djot = <<<'DJOT'
+| aaa | `this is a really long |
++     | code span`             |
+| new | row here               |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // Code span should be merged correctly
+        $this->assertStringContainsString('<code>this is a really long code span</code>', $html);
+        $this->assertStringContainsString('aaa', $html);
+        $this->assertStringContainsString('new', $html);
+        $this->assertStringContainsString('row here', $html);
+    }
+
+    /**
      * Helper to extract text content from a cell.
      */
     protected function getCellTextContent(TableCell $cell): string
