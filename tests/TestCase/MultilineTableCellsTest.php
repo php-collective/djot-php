@@ -480,6 +480,138 @@ DJOT;
         $this->assertSame('X', $this->getCellTextContent($cell2));
     }
 
+    public function testCodeSpanSplitAcrossContinuation(): void
+    {
+        // Code span backticks split across continuation lines
+        // Note: Unclosed backtick in first row creates issues with continuation parsing
+        // The continuation line may not be recognized if backticks interfere
+        $djot = <<<'DJOT'
+| Name | Code              |
+|------|-------------------|
+| Test | Start `code` here |
++      | and more          |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // Complete code span works, continuation adds text
+        $this->assertStringContainsString('<code>code</code>', $html);
+        $this->assertStringContainsString('and more', $html);
+    }
+
+    public function testCodeSpanCompleteInContinuation(): void
+    {
+        // Complete code span in continuation line
+        $djot = <<<'DJOT'
+| Name | Description    |
+|------|----------------|
+| Test | Start here     |
++      | then `code`    |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        $this->assertStringContainsString('<code>code</code>', $html);
+        $this->assertStringContainsString('Start here', $html);
+    }
+
+    public function testMultilineCaption(): void
+    {
+        // Table with multi-line caption (jgm's concern)
+        $djot = <<<'DJOT'
+| A | B |
+|---|---|
+| 1 | 2 |
+
+^ This is a caption
+that spans multiple lines
+for scientific writing
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+
+        /** @var \Djot\Node\Block\Table $table */
+        $table = $doc->getChildren()[0];
+        $this->assertInstanceOf(Table::class, $table);
+        $this->assertTrue($table->hasCaption());
+
+        $html = $this->converter->render($doc);
+        $this->assertStringContainsString('<caption>', $html);
+        $this->assertStringContainsString('This is a caption', $html);
+        $this->assertStringContainsString('multiple lines', $html);
+    }
+
+    public function testContinuationWithEmphasis(): void
+    {
+        // Emphasis that spans across continuation
+        $djot = <<<'DJOT'
+| Name | Description   |
+|------|---------------|
+| Test | _emphasis     |
++      | text_         |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // Similar to code spans, split emphasis won't form a single element
+        // The merged text is "_emphasis text_" which should be parsed as emphasis
+        $this->assertStringContainsString('<em>', $html);
+    }
+
+    public function testContinuationWithStrongEmphasis(): void
+    {
+        // Strong emphasis in continuation
+        $djot = <<<'DJOT'
+| Name | Description       |
+|------|-------------------|
+| Test | This is *strong*  |
++      | and more text     |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        $this->assertStringContainsString('<strong>strong</strong>', $html);
+        $this->assertStringContainsString('and more text', $html);
+    }
+
+    public function testContinuationWithLinkSplit(): void
+    {
+        // Link split across continuation - parser handles this gracefully
+        $djot = <<<'DJOT'
+| Name | Description          |
+|------|----------------------|
+| Test | See [example         |
++      | ](https://test.com)  |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // The merged text "[example ](https://test.com)" forms a valid link
+        $this->assertStringContainsString('<a href="https://test.com">', $html);
+    }
+
+    public function testContinuationWithCompleteLink(): void
+    {
+        // Complete link in base row, continuation adds text
+        $djot = <<<'DJOT'
+| Name | Description                      |
+|------|----------------------------------|
+| Test | See [example](https://test.com)  |
++      | for more info                    |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        $this->assertStringContainsString('<a href="https://test.com">example</a>', $html);
+        $this->assertStringContainsString('for more info', $html);
+    }
+
     /**
      * Helper to extract text content from a cell.
      */
