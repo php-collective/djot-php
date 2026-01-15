@@ -2475,7 +2475,7 @@ class BlockParser
         int $currentRowIndex,
     ): void {
         $tableChildren = $table->getChildren();
-        if (empty($tableChildren)) {
+        if ($tableChildren === []) {
             return;
         }
 
@@ -2513,7 +2513,7 @@ class BlockParser
             }
         }
 
-        if (empty($occupiedColumns)) {
+        if ($occupiedColumns === []) {
             return;
         }
 
