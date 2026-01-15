@@ -180,4 +180,55 @@ DJOT;
         // Data row should have merged email
         $this->assertStringContainsString('email@test @example.com', $html);
     }
+
+    public function testHeaderRowWithContinuation(): void
+    {
+        // Header rows can have continuation before the separator
+        $djot = <<<'DJOT'
+| Header 1     | Header 2 |
++ continued    |          |
+|--------------|----------|
+| Data         | Data     |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        $this->assertStringContainsString('Header 1 continued', $html);
+        $this->assertStringContainsString('<th>', $html);
+    }
+
+    public function testEscapedRowspanMarker(): void
+    {
+        // Backslash-escaped ^ is not treated as rowspan marker
+        $djot = <<<'DJOT'
+| A     | B     |
+|-------|-------|
+| \^    | Data  |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // Should be literal ^ not rowspan
+        $this->assertStringContainsString('^', $html);
+        $this->assertStringNotContainsString('rowspan', $html);
+    }
+
+    public function testEscapedColspanMarker(): void
+    {
+        // Backslash-escaped < is not treated as colspan marker
+        $djot = <<<'DJOT'
+| A     | B     |
+|-------|-------|
+| Data  | \<    |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+        $html = $this->converter->render($doc);
+
+        // Should be literal < (HTML escaped) not colspan
+        $this->assertStringContainsString('&lt;', $html);
+        $this->assertStringNotContainsString('colspan', $html);
+    }
 }
