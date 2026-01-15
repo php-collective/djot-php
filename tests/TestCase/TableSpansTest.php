@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
  * Tests for table colspan and rowspan support.
  *
  * Syntax:
- * - `>` in a cell means it's spanned from the cell to the left (colspan)
+ * - `<` in a cell means it's spanned from the cell to the left (colspan)
  * - `^` in a cell means it's spanned from the cell above (rowspan)
  *
  * @see https://github.com/jgm/djot/issues/368
@@ -30,7 +30,7 @@ class TableSpansTest extends TestCase
     public function testBasicColspan(): void
     {
         $djot = <<<'DJOT'
-| A     | >     |
+| A     | <     |
 |-------|-------|
 | 1     | 2     |
 DJOT;
@@ -59,7 +59,7 @@ DJOT;
     public function testMultipleColspan(): void
     {
         $djot = <<<'DJOT'
-| A     | >     | >     |
+| A     | <     | <     |
 |-------|-------|-------|
 | 1     | 2     | 3     |
 DJOT;
@@ -83,7 +83,7 @@ DJOT;
     public function testColspanInMiddle(): void
     {
         $djot = <<<'DJOT'
-| A | B     | >     | C |
+| A | B     | <     | C |
 |---|-------|-------|---|
 | 1 | 2     | 3     | 4 |
 DJOT;
@@ -175,7 +175,7 @@ DJOT;
     public function testCombinedRowspanAndColspan(): void
     {
         $djot = <<<'DJOT'
-| A     | >     | B |
+| A     | <     | B |
 |-------|-------|---|
 | 1     | 2     | 3 |
 | ^     | 4     | 5 |
@@ -210,7 +210,7 @@ DJOT;
     public function testColspanHtmlOutput(): void
     {
         $djot = <<<'DJOT'
-| Header | >      |
+| Header | <      |
 |--------|--------|
 | A      | B      |
 DJOT;
@@ -240,7 +240,7 @@ DJOT;
     public function testColspanWithAlignment(): void
     {
         $djot = <<<'DJOT'
-| Left   | >      |
+| Left   | <      |
 |:-------|-------:|
 | A      | B      |
 DJOT;
@@ -264,7 +264,7 @@ DJOT;
     public function testColspanWithCellAttributes(): void
     {
         $djot = <<<'DJOT'
-|{.highlight} Span | >     |
+|{.highlight} Span | <     |
 |------------------|-------|
 | A                | B     |
 DJOT;
@@ -311,11 +311,11 @@ DJOT;
 
     public function testNoSpanWithRegularContent(): void
     {
-        // Cells with content other than just > or ^ should not be treated as markers
+        // Cells with content other than just < or ^ should not be treated as markers
         $djot = <<<'DJOT'
 | A   | B   |
 |-----|-----|
-| >x  | y>  |
+| <x  | y<  |
 | ^z  | z^  |
 DJOT;
 
@@ -383,7 +383,7 @@ DJOT;
         $djot = <<<'DJOT'
 | A | B | C |
 |---|---|---|
-| 1 | 2 | > |
+| 1 | 2 | < |
 DJOT;
 
         $doc = $this->converter->parse($djot);
@@ -404,11 +404,11 @@ DJOT;
 
     public function testEscapedMarkers(): void
     {
-        // Test that \^ and \> are not treated as markers
+        // Test that \^ and \< are not treated as markers
         $djot = <<<'DJOT'
 | A  | B  |
 |----|-----|
-| \^ | \> |
+| \^ | \< |
 DJOT;
 
         $doc = $this->converter->parse($djot);
@@ -432,7 +432,7 @@ DJOT;
     public function testFullHtmlOutput(): void
     {
         $djot = <<<'DJOT'
-| A     | >     |
+| A     | <     |
 |-------|-------|
 | 1     | 2     |
 | ^     | 3     |
@@ -457,5 +457,131 @@ DJOT;
 HTML;
 
         $this->assertSame($expected, trim($html));
+    }
+
+    public function testColspanAndRowspanSameCell(): void
+    {
+        // A cell can have both colspan and rowspan
+        $djot = <<<'DJOT'
+| A | < | B |
+|---|---|---|
+| 1 | 2 | 3 |
+| ^ | 4 | 5 |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+
+        /** @var \Djot\Node\Block\Table $table */
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        // Header: "A" has colspan=2
+        /** @var \Djot\Node\Block\TableRow $headerRow */
+        $headerRow = $rows[0];
+        $headerCells = $headerRow->getChildren();
+
+        /** @var \Djot\Node\Block\TableCell $headerA */
+        $headerA = $headerCells[0];
+        $this->assertSame(2, $headerA->getColspan());
+
+        // Data row 1: "1" has rowspan=2
+        /** @var \Djot\Node\Block\TableRow $dataRow1 */
+        $dataRow1 = $rows[1];
+        $dataCells1 = $dataRow1->getChildren();
+
+        /** @var \Djot\Node\Block\TableCell $cell1 */
+        $cell1 = $dataCells1[0];
+        $this->assertSame(2, $cell1->getRowspan());
+        $this->assertSame(1, $cell1->getColspan());
+    }
+
+    public function testMultipleColspanGroups(): void
+    {
+        // Multiple colspan groups in same row
+        $djot = <<<'DJOT'
+| A | < | B | < |
+|---|---|---|---|
+| 1 | 2 | 3 | 4 |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+
+        /** @var \Djot\Node\Block\Table $table */
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        /** @var \Djot\Node\Block\TableRow $headerRow */
+        $headerRow = $rows[0];
+        $headerCells = $headerRow->getChildren();
+        $this->assertCount(2, $headerCells);
+
+        /** @var \Djot\Node\Block\TableCell $cellA */
+        $cellA = $headerCells[0];
+        $this->assertSame(2, $cellA->getColspan());
+
+        /** @var \Djot\Node\Block\TableCell $cellB */
+        $cellB = $headerCells[1];
+        $this->assertSame(2, $cellB->getColspan());
+    }
+
+    public function testRowspanAcrossMultipleColumns(): void
+    {
+        // Rowspan markers in multiple columns
+        $djot = <<<'DJOT'
+| A | B |
+|---|---|
+| 1 | 2 |
+| ^ | ^ |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+
+        /** @var \Djot\Node\Block\Table $table */
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        // First data row: both cells should have rowspan=2
+        /** @var \Djot\Node\Block\TableRow $dataRow1 */
+        $dataRow1 = $rows[1];
+        $cells = $dataRow1->getChildren();
+
+        /** @var \Djot\Node\Block\TableCell $cell1 */
+        $cell1 = $cells[0];
+        $this->assertSame(2, $cell1->getRowspan());
+
+        /** @var \Djot\Node\Block\TableCell $cell2 */
+        $cell2 = $cells[1];
+        $this->assertSame(2, $cell2->getRowspan());
+
+        // Second data row should be empty (both cells are rowspan markers)
+        /** @var \Djot\Node\Block\TableRow $dataRow2 */
+        $dataRow2 = $rows[2];
+        $this->assertCount(0, $dataRow2->getChildren());
+    }
+
+    public function testLiteralLessThanInCell(): void
+    {
+        // A cell with "a < b" comparison should not trigger colspan
+        $djot = <<<'DJOT'
+| Condition | Result |
+|-----------|--------|
+| a < b     | true   |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+
+        /** @var \Djot\Node\Block\Table $table */
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        /** @var \Djot\Node\Block\TableRow $dataRow */
+        $dataRow = $rows[1];
+        $cells = $dataRow->getChildren();
+        $this->assertCount(2, $cells);
+
+        // First cell should contain "a < b"
+        /** @var \Djot\Node\Block\TableCell $cell1 */
+        $cell1 = $cells[0];
+        $this->assertSame(1, $cell1->getColspan());
     }
 }

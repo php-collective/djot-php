@@ -329,8 +329,9 @@ class TableParser
     }
 
     /**
-     * Check if a cell contains a colspan marker (>).
-     * A cell with only > (and optional whitespace) indicates it's spanned from the cell to the left.
+     * Check if a cell contains a colspan marker (<).
+     * A cell with only < (and optional whitespace) indicates it's spanned from the cell to the left.
+     * The < points toward the source cell, consistent with ^ pointing up toward its source.
      *
      * @param string $cellContent The cell content to check
      *
@@ -338,7 +339,7 @@ class TableParser
      */
     public function isColspanMarker(string $cellContent): bool
     {
-        return trim($cellContent) === '>';
+        return trim($cellContent) === '<';
     }
 
     /**
