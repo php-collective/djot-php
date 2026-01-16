@@ -655,19 +655,21 @@ DJOT;
 
     public function testMultipleCodeSpansInContinuation(): void
     {
+        // Test with two code spans in different cells, both closed on same row
         $djot = <<<'DJOT'
-| A    | B               | C     |
-|------|-----------------|-------|
-| text | `code1          | other |
-+      | continued`      |       |
+| A    | B         | C        |
+|------|-----------|----------|
+| text | `code1`   | `code2   |
++      |           | end`     |
 DJOT;
 
         $doc = $this->converter->parse($djot);
         $html = $this->converter->render($doc);
 
-        // First cell should have text, second should have code span
+        // First cell should have text, second should have code span, third has continued code span
         $this->assertStringContainsString('<td>text</td>', $html);
-        $this->assertStringContainsString('<code>code1 continued</code>', $html);
+        $this->assertStringContainsString('<code>code1</code>', $html);
+        $this->assertStringContainsString('<code>code2 end</code>', $html);
     }
 
     public function testCodeSpanContinuationWithOtherContent(): void
