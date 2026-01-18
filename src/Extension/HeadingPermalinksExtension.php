@@ -7,9 +7,12 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\Heading;
+use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Link;
+use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Span;
 use Djot\Node\Inline\Text;
+use Djot\Node\Node;
 
 /**
  * Adds permalink anchors to headings
@@ -132,20 +135,18 @@ class HeadingPermalinksExtension implements ExtensionInterface
     }
 
     /**
-     * Extract plain text from a node and its children
+     * Extract plain text from a node and its children (recursive)
      */
-    protected function getPlainText(Heading $node): string
+    protected function getPlainText(Node $node): string
     {
         $text = '';
         foreach ($node->getChildren() as $child) {
             if ($child instanceof Text) {
                 $text .= $child->getContent();
-            } elseif (method_exists($child, 'getChildren')) {
-                foreach ($child->getChildren() as $grandChild) {
-                    if ($grandChild instanceof Text) {
-                        $text .= $grandChild->getContent();
-                    }
-                }
+            } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
+                $text .= ' ';
+            } elseif ($child instanceof Node) {
+                $text .= $this->getPlainText($child);
             }
         }
 

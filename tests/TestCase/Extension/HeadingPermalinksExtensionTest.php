@@ -121,4 +121,28 @@ class HeadingPermalinksExtensionTest extends TestCase
 
         $this->assertStringContainsString('href="#custom-id"', $html);
     }
+
+    public function testHeadingWithDeeplyNestedFormatting(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension());
+
+        // Deeply nested: emphasis containing strong containing text
+        $html = $converter->convert('# _emphasized *strong* text_');
+
+        // The ID should contain all the text, not just the first level
+        $this->assertStringContainsString('href="#emphasized-strong-text"', $html);
+    }
+
+    public function testHeadingWithLineBreak(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension());
+
+        // Hard break in heading (backslash at end of line)
+        $html = $converter->convert("# Hello\\\nWorld");
+
+        // The break should become a space in the ID
+        $this->assertStringContainsString('href="#Hello-World"', $html);
+    }
 }
