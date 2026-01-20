@@ -2223,22 +2223,18 @@ class BlockParser
                 }
             }
 
-            // Parse regular row
-            $row = new TableRow(false);
-            if ($rowAttributes) {
-                $row->setAttributes($rowAttributes);
-            }
-
             // Store row data for rowspan processing
             // Track column positions for cells accounting for rowspan markers
             $rowCellData = [];
             $colPosition = 0;
+            $rowHasHeaderCell = false;
 
             foreach ($processedCells as $index => $cellData) {
                 $colspan = $cellData['colspan'];
+                $cellContent = $cellData['content'];
 
                 // Check for rowspan marker
-                if ($this->tableParser->isRowspanMarker($cellData['content'])) {
+                if ($this->tableParser->isRowspanMarker($cellContent)) {
                     // Mark this position for rowspan processing
                     $rowCellData[] = [
                         'type' => 'rowspan_marker',
@@ -2246,19 +2242,51 @@ class BlockParser
                     ];
                     $colPosition += $colspan;
                 } else {
+                    $isHeader = false;
                     $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
-                    $cell = new TableCell(false, $alignment, 1, $colspan);
+                    $contentToParse = trim($cellContent);
+
+                    // Check for |= header marker (Creole-style)
+                    if ($this->tableParser->isHeaderMarker($cellContent)) {
+                        $isHeader = true;
+                        $rowHasHeaderCell = true;
+                        $headerData = $this->tableParser->parseHeaderCell($cellContent);
+                        $contentToParse = $headerData['content'];
+
+                        // Header alignment takes precedence if no separator row alignment
+                        if ($headerData['alignment'] !== TableCell::ALIGN_DEFAULT) {
+                            $alignment = $headerData['alignment'];
+                            // Store alignment for propagation to subsequent data cells
+                            if (!isset($alignments[$index])) {
+                                $alignments[$index] = $alignment;
+                            }
+                        }
+                    }
+
+                    $cell = new TableCell($isHeader, $alignment, 1, $colspan);
                     if ($cellData['attributes']) {
                         $cell->setAttributes($cellData['attributes']);
                     }
-                    $this->inlineParser->parse($cell, trim($cellData['content']), $baseLineForRow);
-                    $row->appendChild($cell);
+                    $this->inlineParser->parse($cell, $contentToParse, $baseLineForRow);
                     $rowCellData[] = [
                         'type' => 'cell',
                         'cell' => $cell,
                         'colPosition' => $colPosition,
                     ];
                     $colPosition += $colspan;
+                }
+            }
+
+            // Create the row (mark as header row if any cell has |= syntax)
+            $row = new TableRow($rowHasHeaderCell);
+            if ($rowAttributes) {
+                $row->setAttributes($rowAttributes);
+            }
+
+            // Append cells to the row
+            foreach ($rowCellData as $cellInfo) {
+                if ($cellInfo['type'] === 'cell' && isset($cellInfo['cell'])) {
+                    $row->appendChild($cellInfo['cell']);
                 }
             }
 

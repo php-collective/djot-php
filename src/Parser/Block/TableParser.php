@@ -466,6 +466,52 @@ class TableParser
     }
 
     /**
+     * Check if cell content starts with = (Creole-style header marker).
+     * The = must be directly attached to the pipe: |= Header | is a header,
+     * but | = text | is literal content "= text".
+     *
+     * @param string $cellContent The raw cell content (not trimmed)
+     *
+     * @return bool True if the cell is a header cell
+     */
+    public function isHeaderMarker(string $cellContent): bool
+    {
+        return str_starts_with($cellContent, '=');
+    }
+
+    /**
+     * Parse header cell content and extract alignment.
+     * Supports: |= Header |, |=< Left |, |=> Right |, |=~ Center |
+     *
+     * @param string $cellContent The raw cell content starting with =
+     *
+     * @return array{content: string, alignment: string} Parsed content and alignment
+     */
+    public function parseHeaderCell(string $cellContent): array
+    {
+        // Remove the leading =
+        $afterEquals = substr($cellContent, 1);
+        $alignment = TableCell::ALIGN_DEFAULT;
+
+        // Check for alignment marker (must be directly attached: =< not = <)
+        if (str_starts_with($afterEquals, '<')) {
+            $alignment = TableCell::ALIGN_LEFT;
+            $afterEquals = substr($afterEquals, 1);
+        } elseif (str_starts_with($afterEquals, '>')) {
+            $alignment = TableCell::ALIGN_RIGHT;
+            $afterEquals = substr($afterEquals, 1);
+        } elseif (str_starts_with($afterEquals, '~')) {
+            $alignment = TableCell::ALIGN_CENTER;
+            $afterEquals = substr($afterEquals, 1);
+        }
+
+        return [
+            'content' => trim($afterEquals),
+            'alignment' => $alignment,
+        ];
+    }
+
+    /**
      * Check if a line is a continuation row (starts with +).
      * Continuation rows use + prefix instead of | to signal that the contents
      * get added to the cells from the previous row.

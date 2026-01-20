@@ -706,6 +706,69 @@ Renders the second cell as: `<code>this is a really long code span</code>`
 
 ---
 
+### Creole-style Header Cells (`|=`)
+
+**Related:** [php-collective/djot-php#8](https://github.com/php-collective/djot-php/pull/8)
+
+**Status:** Implemented in djot-php
+
+Mark individual cells as headers using the `|=` prefix (Creole/MediaWiki-style):
+
+```djot
+|= Name |= Age |
+| Alice | 28   |
+| Bob   | 34   |
+```
+
+**Output:**
+```html
+<table>
+<tr><th>Name</th><th>Age</th></tr>
+<tr><td>Alice</td><td>28</td></tr>
+<tr><td>Bob</td><td>34</td></tr>
+</table>
+```
+
+**Key Differences from Separator Row Headers:**
+- No separator row (`|---|`) needed
+- Individual cells can be headers (mix header and data cells in same row)
+- Enables row headers on the left side of tables
+
+**Row Headers Example:**
+
+```djot
+|= Category | Value |
+|= Apples   | 10    |
+|= Oranges  | 20    |
+```
+
+Each row has a header cell on the left and a data cell on the right.
+
+**Inline Alignment:**
+
+Alignment markers attach directly to `|=`:
+
+| Syntax | Alignment |
+|--------|-----------|
+| `\|=< text` | Left |
+| `\|=> text` | Right |
+| `\|=~ text` | Center |
+
+```djot
+|=< Left |=> Right |=~ Center |
+| A      | B       | C        |
+```
+
+Header alignment propagates to data cells below when no separator row is present.
+
+**Compatibility:**
+
+- Markers must be directly attached to pipe: `|= Header` (header), `| = text` (literal)
+- Can coexist with separator rows (separator row alignment takes precedence)
+- Works with colspan (`<`), rowspan (`^`), and multi-line cells (`+`)
+
+---
+
 ### Captions for Images, Tables, and Block Quotes
 
 **Related:** [php-collective/djot-php#37](https://github.com/php-collective/djot-php/issues/37)
@@ -820,6 +883,7 @@ vendor/bin/phpunit
 | Fenced comment blocks             | [djot:67](https://github.com/jgm/djot/issues/67)                    | Open       |
 | Captions (image/table/blockquote) | [#37](https://github.com/php-collective/djot-php/issues/37) | djot-php |
 | Table multi-line/rowspan/colspan  | [djot:368](https://github.com/jgm/djot/issues/368)                  | Open       |
+| Creole-style header cells (`\|=`) | [#8](https://github.com/php-collective/djot-php/pull/8)             | djot-php   |
 | Abbreviations (block, not inline) | [djot:51](https://github.com/jgm/djot/issues/51)                    | djot-php   |
 
 ### Optional Modes
