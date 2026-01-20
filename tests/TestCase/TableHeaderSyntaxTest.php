@@ -259,6 +259,129 @@ class TableHeaderSyntaxTest extends TestCase
         $this->assertStringContainsString('style="text-align: center;"', $html);
     }
 
+    public function testEqualsHeaderWithMultiLineContinuation(): void
+    {
+        // |= header with + continuation row
+        $doc = $this->parser->parse("|= Long Header |= Short |\n+ continued   |        |\n| data         | data   |");
+
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        // Should have 2 rows (header with continuation merged, then data)
+        $this->assertCount(2, $rows);
+
+        // Header row cells
+        $headerCells = $rows[0]->getChildren();
+        $this->assertTrue($headerCells[0]->isHeader());
+
+        // Content should be merged
+        $content = $this->getCellTextContent($headerCells[0]);
+        $this->assertSame('Long Header continued', $content);
+    }
+
+    public function testEqualsHeaderWithCellAttributes(): void
+    {
+        // Cell attributes before = marker: |{.class}= Header |
+        $converter = new DjotConverter();
+        $html = $converter->convert("|{.name}= Name |{.age}= Age |\n| Alice | 28 |");
+
+        $this->assertStringContainsString('<th class="name">Name</th>', $html);
+        $this->assertStringContainsString('<th class="age">Age</th>', $html);
+    }
+
+    public function testEqualsHeaderWithRowspanAndColspan(): void
+    {
+        // |= header spanning multiple rows and columns
+        $doc = $this->parser->parse("|=~ Title | < |\n| A       | B |");
+
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        $headerCells = $rows[0]->getChildren();
+
+        // Title should have colspan=2 and be centered
+        $this->assertCount(1, $headerCells);
+        $this->assertTrue($headerCells[0]->isHeader());
+        $this->assertSame(2, $headerCells[0]->getColspan());
+        $this->assertSame(TableCell::ALIGN_CENTER, $headerCells[0]->getAlignment());
+    }
+
+    public function testEqualsHeaderRowspanIntoDataRows(): void
+    {
+        // Header that spans down into data rows using ^
+        $doc = $this->parser->parse("|= Category |= Item |\n| ^         | Apple |\n| ^         | Banana |");
+
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        // All 3 rows should exist
+        $this->assertCount(3, $rows);
+
+        // First cell should be header with rowspan=3
+        $headerCells = $rows[0]->getChildren();
+        $this->assertTrue($headerCells[0]->isHeader());
+        $this->assertSame(3, $headerCells[0]->getRowspan());
+
+        // Second and third rows should only have one cell each (Apple, Banana)
+        $this->assertCount(1, $rows[1]->getChildren());
+        $this->assertCount(1, $rows[2]->getChildren());
+    }
+
+    public function testContinuationDoesNotCreateNewHeaders(): void
+    {
+        // = in continuation row should be content, not header marker
+        $doc = $this->parser->parse("|= Header |= Header2 |\n+ =cont   | cont     |\n| data    | data     |");
+
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        // Should be 2 rows (header+continuation merged, then data)
+        $this->assertCount(2, $rows);
+
+        // First cell content should include "=cont" as content
+        $headerCells = $rows[0]->getChildren();
+        $content = $this->getCellTextContent($headerCells[0]);
+        $this->assertSame('Header =cont', $content);
+    }
+
+    public function testMultipleHeaderRowsWithDifferentAlignments(): void
+    {
+        // Two header rows with different alignments
+        $doc = $this->parser->parse("|=~ Centered Title | < |\n|=> Right |=< Left |\n| data | data |");
+
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        $this->assertCount(3, $rows);
+
+        // First row: centered header with colspan
+        $row1Cells = $rows[0]->getChildren();
+        $this->assertCount(1, $row1Cells);
+        $this->assertSame(TableCell::ALIGN_CENTER, $row1Cells[0]->getAlignment());
+        $this->assertSame(2, $row1Cells[0]->getColspan());
+
+        // Second row: right and left aligned headers
+        $row2Cells = $rows[1]->getChildren();
+        $this->assertSame(TableCell::ALIGN_RIGHT, $row2Cells[0]->getAlignment());
+        $this->assertSame(TableCell::ALIGN_LEFT, $row2Cells[1]->getAlignment());
+    }
+
+    public function testRowHeaderPattern(): void
+    {
+        // Common pattern: first column as row headers
+        $doc = $this->parser->parse("|= Product | Sales |\n|= Widget | 100 |\n|= Gadget | 200 |");
+
+        $table = $doc->getChildren()[0];
+        $rows = $table->getChildren();
+
+        foreach ($rows as $row) {
+            $cells = $row->getChildren();
+            // First cell is header, second is data
+            $this->assertTrue($cells[0]->isHeader());
+            $this->assertFalse($cells[1]->isHeader());
+        }
+    }
+
     /**
      * Helper to extract text content from a cell.
      */
