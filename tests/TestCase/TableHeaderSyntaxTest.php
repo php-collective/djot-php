@@ -279,14 +279,46 @@ class TableHeaderSyntaxTest extends TestCase
         $this->assertSame('Long Header continued', $content);
     }
 
-    public function testEqualsHeaderWithCellAttributes(): void
+    public function testEqualsHeaderWithAttributes(): void
     {
-        // Cell attributes before = marker: |{.class}= Header |
+        // Attributes after = marker: |={.class} Header |
         $converter = new DjotConverter();
-        $html = $converter->convert("|{.name}= Name |{.age}= Age |\n| Alice | 28 |");
+        $html = $converter->convert("|={.name} Name |={.age} Age |\n| Alice | 28 |");
 
         $this->assertStringContainsString('<th class="name">Name</th>', $html);
         $this->assertStringContainsString('<th class="age">Age</th>', $html);
+    }
+
+    public function testEqualsHeaderWithAlignmentAndAttributes(): void
+    {
+        // Combined: |=<{.class} (alignment then attributes)
+        $converter = new DjotConverter();
+        $html = $converter->convert("|=<{.left} Left |=>{.right} Right |\n| A | B |");
+
+        $this->assertStringContainsString('class="left"', $html);
+        $this->assertStringContainsString('style="text-align: left;"', $html);
+        $this->assertStringContainsString('class="right"', $html);
+        $this->assertStringContainsString('style="text-align: right;"', $html);
+    }
+
+    public function testEqualsHeaderWithComplexAttributes(): void
+    {
+        // Complex attributes: |={#id .class key=val}
+        $converter = new DjotConverter();
+        $html = $converter->convert("|={#header .important data-col=name} Name |\n| Alice |");
+
+        $this->assertStringContainsString('id="header"', $html);
+        $this->assertStringContainsString('class="important"', $html);
+        $this->assertStringContainsString('data-col="name"', $html);
+    }
+
+    public function testOldAttributeSyntaxStillWorks(): void
+    {
+        // Old syntax |{.class}= still works (cell-level attributes)
+        $converter = new DjotConverter();
+        $html = $converter->convert("|{.cell}= Name |\n| Alice |");
+
+        $this->assertStringContainsString('<th class="cell">Name</th>', $html);
     }
 
     public function testEqualsHeaderWithRowspanAndColspan(): void

@@ -480,18 +480,22 @@ class TableParser
     }
 
     /**
-     * Parse header cell content and extract alignment.
-     * Supports: |= Header |, |=< Left |, |=> Right |, |=~ Center |
+     * Parse header cell content and extract alignment and attributes.
+     * Supports: |= Header |, |=< Left |, |=> Right |, |=~ Center |, |={.class} Header |
+     *
+     * Order: |= [alignment] [{attributes}] content |
+     * Examples: |=< Header |, |={.class} Header |, |=>{#id .class} Header |
      *
      * @param string $cellContent The raw cell content starting with =
      *
-     * @return array{content: string, alignment: string} Parsed content and alignment
+     * @return array{content: string, alignment: string, attributes: array<string, string>} Parsed data
      */
     public function parseHeaderCell(string $cellContent): array
     {
         // Remove the leading =
         $afterEquals = substr($cellContent, 1);
         $alignment = TableCell::ALIGN_DEFAULT;
+        $attributes = [];
 
         // Check for alignment marker (must be directly attached: =< not = <)
         if (str_starts_with($afterEquals, '<')) {
@@ -505,9 +509,37 @@ class TableParser
             $afterEquals = substr($afterEquals, 1);
         }
 
+        // Check for attributes after alignment marker: |={.class} or |=<{.class}
+        if (str_starts_with($afterEquals, '{')) {
+            // Find matching closing brace
+            $braceDepth = 0;
+            $endPos = -1;
+            $len = strlen($afterEquals);
+
+            for ($i = 0; $i < $len; $i++) {
+                if ($afterEquals[$i] === '{') {
+                    $braceDepth++;
+                } elseif ($afterEquals[$i] === '}') {
+                    $braceDepth--;
+                    if ($braceDepth === 0) {
+                        $endPos = $i;
+
+                        break;
+                    }
+                }
+            }
+
+            if ($endPos > 0) {
+                $attrStr = substr($afterEquals, 1, $endPos - 1);
+                $attributes = AttributeParser::parse($attrStr);
+                $afterEquals = substr($afterEquals, $endPos + 1);
+            }
+        }
+
         return [
             'content' => trim($afterEquals),
             'alignment' => $alignment,
+            'attributes' => $attributes,
         ];
     }
 

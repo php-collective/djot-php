@@ -2247,11 +2247,13 @@ class BlockParser
                     $contentToParse = trim($cellContent);
 
                     // Check for |= header marker (Creole-style)
+                    $headerAttributes = [];
                     if ($this->tableParser->isHeaderMarker($cellContent)) {
                         $isHeader = true;
                         $rowHasHeaderCell = true;
                         $headerData = $this->tableParser->parseHeaderCell($cellContent);
                         $contentToParse = $headerData['content'];
+                        $headerAttributes = $headerData['attributes'];
 
                         // Header alignment takes precedence if no separator row alignment
                         if ($headerData['alignment'] !== TableCell::ALIGN_DEFAULT) {
@@ -2264,8 +2266,12 @@ class BlockParser
                     }
 
                     $cell = new TableCell($isHeader, $alignment, 1, $colspan);
-                    if ($cellData['attributes']) {
-                        $cell->setAttributes($cellData['attributes']);
+
+                    // Merge cell attributes: header attributes (|={.class}) take precedence,
+                    // then cell attributes (|{.class}=), allowing both syntaxes
+                    $mergedAttributes = array_merge($cellData['attributes'], $headerAttributes);
+                    if ($mergedAttributes) {
+                        $cell->setAttributes($mergedAttributes);
                     }
                     $this->inlineParser->parse($cell, $contentToParse, $baseLineForRow);
                     $rowCellData[] = [

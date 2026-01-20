@@ -761,16 +761,27 @@ Alignment markers attach directly to `|=`:
 
 Header alignment propagates to data cells below when no separator row is present.
 
-**Combining with Cell Attributes:**
+**Combining with Attributes:**
 
-Cell attributes come before the `=` marker:
+Attributes come after the `=` marker (and alignment if present):
 
 ```djot
-|{.name}= Name |{.age}= Age |
+|={.name} Name |={.age} Age |
 | Alice        | 28         |
 ```
 
 Output: `<th class="name">Name</th><th class="age">Age</th>`
+
+Order: `|=` `[alignment]` `[{attributes}]` `content`
+
+```djot
+|=<{.left} Left |=>{#right .highlight} Right |
+| A             | B                          |
+```
+
+Output:
+- `<th class="left" style="text-align: left;">Left</th>`
+- `<th id="right" class="highlight" style="text-align: right;">Right</th>`
 
 **Combining with Colspan/Rowspan:**
 
