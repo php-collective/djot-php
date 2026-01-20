@@ -32,6 +32,8 @@ class TableCell extends BlockNode
     public function __construct(
         protected bool $isHeader = false,
         protected string $alignment = self::ALIGN_DEFAULT,
+        protected int $rowspan = 1,
+        protected int $colspan = 1,
     ) {
     }
 
@@ -43,6 +45,26 @@ class TableCell extends BlockNode
     public function getAlignment(): string
     {
         return $this->alignment;
+    }
+
+    public function getRowspan(): int
+    {
+        return $this->rowspan;
+    }
+
+    public function setRowspan(int $rowspan): void
+    {
+        $this->rowspan = $rowspan;
+    }
+
+    public function getColspan(): int
+    {
+        return $this->colspan;
+    }
+
+    public function setColspan(int $colspan): void
+    {
+        $this->colspan = $colspan;
     }
 
     public function getType(): string

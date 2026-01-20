@@ -22,6 +22,7 @@ They are either on the way to get incorporated upstream - or may be incorporated
   - [Multiple Definition Terms](#multiple-definition-terms)
   - [Multiple Definition Definitions](#multiple-definition-definitions---continuation)
   - [Definition List Element Attributes](#definition-list-element-attributes)
+  - [Table Multi-line Cells, Rowspan, and Colspan](#table-multi-line-cells-rowspan-and-colspan)
   - [Captions for Images, Tables, and Block Quotes](#captions-for-images-tables-and-block-quotes)
 - [Abbreviations (PHP Markdown Extra Style)](#abbreviations-php-markdown-extra-style)
 - [Testing](#testing)
@@ -601,6 +602,110 @@ Attributes can be attached to individual `<dl>`, `<dt>`, and `<dd>` elements:
 
 ---
 
+### Table Multi-line Cells, Rowspan, and Colspan
+
+**Related:** [jgm/djot#368](https://github.com/jgm/djot/issues/368)
+
+**Status:** Implemented in djot-php (PR #67)
+
+Enhanced table features for complex data presentation:
+
+**1. Multi-line Cell Content (continuation rows)**
+
+Uses `+` prefix instead of `|` to signal content continuation:
+
+```djot
+| Name | Description      |
+|------|------------------|
+| Item | Long description |
++      | continued here   |
+```
+
+**Output:**
+```html
+<table>
+<tr><th>Name</th><th>Description</th></tr>
+<tr><td>Item</td><td>Long description continued here</td></tr>
+</table>
+```
+
+Content from continuation rows is merged with space (like soft breaks).
+
+**2. Rowspan Support**
+
+The `^` marker indicates a cell is spanned from above (marker points UP):
+
+```djot
+| Category | Item   |
+|----------|--------|
+| Fruits   | Apple  |
+| ^        | Banana |
+| ^        | Orange |
+```
+
+**Output:**
+```html
+<table>
+<tr><th>Category</th><th>Item</th></tr>
+<tr><td rowspan="3">Fruits</td><td>Apple</td></tr>
+<tr><td>Banana</td></tr>
+<tr><td>Orange</td></tr>
+</table>
+```
+
+Use `\^` for literal `^` content.
+
+**3. Colspan Support**
+
+The `<` marker indicates a cell is spanned from left (marker points LEFT):
+
+```djot
+| Name  | Contact Info | <     |
+|-------|--------------|-------|
+| Alice | alice@ex.com | x5234 |
+```
+
+**Output:**
+```html
+<table>
+<tr><th>Name</th><th colspan="2">Contact Info</th></tr>
+<tr><td>Alice</td><td>alice@ex.com</td><td>x5234</td></tr>
+</table>
+```
+
+Use `\<` for literal `<` content. Content like `a < b` is NOT treated as a colspan marker.
+
+**4. Combined Rowspan + Colspan (2x2 blocks)**
+
+When a cell has both rowspan and colspan, it creates a rectangular block:
+
+```djot
+|     | H1  | H2  |
+|-----|-----|-----|
+| L1  | A   | <   |
+| L2  | ^   | ^   |
+```
+
+This creates a 2x2 block where cell A has `colspan="2" rowspan="2"`.
+
+**5. Code Spans Across Continuation Lines**
+
+Code spans can span across continuation rows:
+
+```djot
+| aaa | `this is a really long |
++     | code span`             |
+```
+
+Renders the second cell as: `<code>this is a really long code span</code>`
+
+**Edge Cases:**
+- Span markers in continuation rows are merged as content (not treated as spans)
+- Multiple `^` under a colspan only extend rowspan once per row
+- If intersection cells contain content instead of markers, that content is dropped
+
+---
+
 ### Captions for Images, Tables, and Block Quotes
 
 **Related:** [php-collective/djot-php#37](https://github.com/php-collective/djot-php/issues/37)
@@ -714,6 +819,7 @@ vendor/bin/phpunit
 | Definition list attributes        | [djot:323](https://github.com/jgm/djot/issues/323)                  | Open       |
 | Fenced comment blocks             | [djot:67](https://github.com/jgm/djot/issues/67)                    | Open       |
 | Captions (image/table/blockquote) | [#37](https://github.com/php-collective/djot-php/issues/37) | djot-php |
+| Table multi-line/rowspan/colspan  | [djot:368](https://github.com/jgm/djot/issues/368)                  | Open       |
 | Abbreviations (block, not inline) | [djot:51](https://github.com/jgm/djot/issues/51)                    | djot-php   |
 
 ### Optional Modes
