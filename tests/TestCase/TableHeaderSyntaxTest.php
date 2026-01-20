@@ -321,6 +321,17 @@ class TableHeaderSyntaxTest extends TestCase
         $this->assertStringContainsString('<th class="cell">Name</th>', $html);
     }
 
+    public function testAlignmentMergesWithExplicitStyle(): void
+    {
+        // Alignment marker + explicit style should merge, not duplicate
+        $converter = new DjotConverter();
+        $html = $converter->convert('|=<{style="color: red"} Red Left |');
+
+        // Should have merged style, not duplicate style attributes
+        $this->assertStringContainsString('style="text-align: left; color: red"', $html);
+        $this->assertSame(1, substr_count($html, 'style='));
+    }
+
     public function testEqualsHeaderWithRowspanAndColspan(): void
     {
         // |= header spanning multiple rows and columns

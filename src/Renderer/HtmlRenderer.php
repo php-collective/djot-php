@@ -709,6 +709,19 @@ class HtmlRenderer implements RendererInterface
     protected function renderTableCell(TableCell $node): string
     {
         $tag = $node->isHeader() ? 'th' : 'td';
+
+        // Handle alignment - merge with existing style attribute if present
+        $alignment = $node->getAlignment();
+        if ($alignment !== TableCell::ALIGN_DEFAULT) {
+            $existingStyle = $node->getAttribute('style');
+            if ($existingStyle !== null) {
+                // Merge: prepend alignment to existing style
+                $node->setAttribute('style', 'text-align: ' . $alignment . '; ' . $existingStyle);
+            } else {
+                $node->setAttribute('style', 'text-align: ' . $alignment . ';');
+            }
+        }
+
         $attrs = $this->renderAttributes($node);
 
         $rowspan = $node->getRowspan();
@@ -719,11 +732,6 @@ class HtmlRenderer implements RendererInterface
         $colspan = $node->getColspan();
         if ($colspan > 1) {
             $attrs .= ' colspan="' . $colspan . '"';
-        }
-
-        $alignment = $node->getAlignment();
-        if ($alignment !== TableCell::ALIGN_DEFAULT) {
-            $attrs .= ' style="text-align: ' . $alignment . ';"';
         }
 
         return '<' . $tag . $attrs . '>' . $this->renderChildren($node) . '</' . $tag . ">\n";
