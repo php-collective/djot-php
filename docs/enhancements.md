@@ -761,7 +761,47 @@ Alignment markers attach directly to `|=`:
 
 Header alignment propagates to data cells below when no separator row is present.
 
-**Compatibility:**
+**Combining with Cell Attributes:**
+
+Cell attributes come before the `=` marker:
+
+```djot
+|{.name}= Name |{.age}= Age |
+| Alice        | 28         |
+```
+
+Output: `<th class="name">Name</th><th class="age">Age</th>`
+
+**Combining with Colspan/Rowspan:**
+
+Headers work with `<` (colspan) and `^` (rowspan) markers:
+
+```djot
+|=~ Report Title | < |
+|= Category |= Items |
+| Fruits    | Apple  |
+| ^         | Banana |
+```
+
+Output:
+- "Report Title" → `<th colspan="2" style="text-align: center;">`
+- "Category" → `<th rowspan="2">` (extended by `^` markers below)
+
+**Combining with Multi-line Cells:**
+
+Continuation rows (`+`) merge content into header cells:
+
+```djot
+|= Long Header Name |= Short |
++ (continued)       |        |
+| data              | data   |
+```
+
+Output: `<th>Long Header Name (continued)</th>`
+
+Note: `=` in continuation rows is treated as content, not a header marker.
+
+**Compatibility Notes:**
 
 - Markers must be directly attached to pipe: `|= Header` (header), `| = text` (literal)
 - Can coexist with separator rows (separator row alignment takes precedence)
