@@ -134,6 +134,22 @@ class HeadingPermalinksExtensionTest extends TestCase
         $this->assertStringContainsString('href="#emphasized-strong-text"', $html);
     }
 
+    public function testDuplicateHeadingsGetUniqueIds(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension());
+
+        $html = $converter->convert("## Summary\n\nFirst section.\n\n## Summary\n\nSecond section.");
+
+        // Both sections should have unique IDs
+        $this->assertStringContainsString('id="Summary"', $html);
+        $this->assertStringContainsString('id="Summary-1"', $html);
+
+        // Permalink links should point to the correct section
+        $this->assertStringContainsString('href="#Summary"', $html);
+        $this->assertStringContainsString('href="#Summary-1"', $html);
+    }
+
     public function testHeadingWithLineBreak(): void
     {
         $converter = new DjotConverter();
