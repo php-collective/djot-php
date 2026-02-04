@@ -41,6 +41,17 @@ class HeadingIdTracker
     protected array $resolvedIds = [];
 
     /**
+     * Cache of plain text per node (keyed by spl_object_id)
+     *
+     * Caching ensures the first caller captures the original text before
+     * any extensions modify the node tree (e.g., HeadingPermalinksExtension
+     * appending a permalink symbol).
+     *
+     * @var array<int, string>
+     */
+    protected array $resolvedTexts = [];
+
+    /**
      * Get the unique ID for a heading node
      *
      * Returns a cached result if this heading has already been resolved.
@@ -88,9 +99,33 @@ class HeadingIdTracker
     }
 
     /**
-     * Get plain text content of a node (for generating heading IDs)
+     * Get plain text content of a node
+     *
+     * For Heading nodes, the result is cached by spl_object_id so that
+     * the original text is preserved even if extensions later modify
+     * the heading's children (e.g., appending a permalink symbol).
      */
     public function getPlainText(Node $node): string
+    {
+        if ($node instanceof Heading) {
+            $objectId = spl_object_id($node);
+            if (isset($this->resolvedTexts[$objectId])) {
+                return $this->resolvedTexts[$objectId];
+            }
+
+            $text = $this->extractPlainText($node);
+            $this->resolvedTexts[$objectId] = $text;
+
+            return $text;
+        }
+
+        return $this->extractPlainText($node);
+    }
+
+    /**
+     * Recursively extract plain text from a node tree
+     */
+    protected function extractPlainText(Node $node): string
     {
         $text = '';
         foreach ($node->getChildren() as $child) {
@@ -99,7 +134,7 @@ class HeadingIdTracker
             } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
                 $text .= ' ';
             } elseif ($child instanceof Node) {
-                $text .= $this->getPlainText($child);
+                $text .= $this->extractPlainText($child);
             }
         }
 
@@ -114,6 +149,7 @@ class HeadingIdTracker
         $this->usedIds = [];
         $this->sectionCounter = 0;
         $this->resolvedIds = [];
+        $this->resolvedTexts = [];
     }
 
     /**

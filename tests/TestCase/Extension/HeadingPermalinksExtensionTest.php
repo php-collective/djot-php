@@ -161,4 +161,63 @@ class HeadingPermalinksExtensionTest extends TestCase
         // The break should become a space in the ID
         $this->assertStringContainsString('href="#Hello-World"', $html);
     }
+
+    public function testShowOnHover(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension(
+            showOnHover: true,
+        ));
+
+        $html = $converter->convert('# Hello World');
+
+        // Wrapper should have hover class
+        $this->assertStringContainsString('class="permalink-wrapper permalink-hover"', $html);
+    }
+
+    public function testShowOnHoverDisabledByDefault(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension());
+
+        $html = $converter->convert('# Hello World');
+
+        $this->assertStringNotContainsString('permalink-hover', $html);
+    }
+
+    public function testCopyToClipboard(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension(
+            copyToClipboard: true,
+        ));
+
+        $html = $converter->convert('# Hello World');
+
+        $this->assertStringContainsString('data-permalink-copy=""', $html);
+    }
+
+    public function testCopyToClipboardDisabledByDefault(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension());
+
+        $html = $converter->convert('# Hello World');
+
+        $this->assertStringNotContainsString('data-permalink-copy', $html);
+    }
+
+    public function testShowOnHoverAndCopyTogether(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension(
+            showOnHover: true,
+            copyToClipboard: true,
+        ));
+
+        $html = $converter->convert('# Hello World');
+
+        $this->assertStringContainsString('permalink-hover', $html);
+        $this->assertStringContainsString('data-permalink-copy=""', $html);
+    }
 }

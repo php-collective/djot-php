@@ -203,4 +203,53 @@ class HeadingIdTrackerTest extends TestCase
 
         $this->assertSame('C-Programming', $id);
     }
+
+    public function testGetPlainTextCachesForHeadings(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('Original'));
+
+        // First call caches the text
+        $text1 = $this->tracker->getPlainText($heading);
+        $this->assertSame('Original', $text1);
+
+        // Modify the heading (simulates HeadingPermalinksExtension appending symbol)
+        $heading->appendChild(new Text(' extra'));
+
+        // Second call returns cached text, not the modified tree
+        $text2 = $this->tracker->getPlainText($heading);
+        $this->assertSame('Original', $text2);
+    }
+
+    public function testGetPlainTextCacheResetsWithReset(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('Before'));
+
+        $this->tracker->getPlainText($heading);
+        $this->tracker->reset();
+
+        // After reset, a new heading gets fresh extraction
+        $heading2 = new Heading(2);
+        $heading2->appendChild(new Text('After'));
+
+        $this->assertSame('After', $this->tracker->getPlainText($heading2));
+    }
+
+    public function testGetIdForHeadingAlsoCachesPlainText(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('Title'));
+
+        // getIdForHeading internally calls getPlainText, which caches
+        $id = $this->tracker->getIdForHeading($heading);
+        $this->assertSame('Title', $id);
+
+        // Modify heading after ID generation
+        $heading->appendChild(new Text(' modified'));
+
+        // Plain text should still return the cached original
+        $text = $this->tracker->getPlainText($heading);
+        $this->assertSame('Title', $text);
+    }
 }

@@ -110,7 +110,7 @@ DJOT;
         $converter = new DjotConverter();
         $tocExtension = new TableOfContentsExtension();
 
-        // TOC should be registered BEFORE HeadingPermalinks to capture clean heading text
+        // Registration order should not matter - HeadingIdTracker caches plain text
         $converter
             ->addExtension($tocExtension)
             ->addExtension(new HeadingPermalinksExtension());
@@ -135,6 +135,38 @@ DJOT;
         $this->assertStringContainsString('href="#Introduction"', $html);
         $tocHtml = $tocExtension->getTocHtml();
         $this->assertStringContainsString('href="#Introduction"', $tocHtml);
+    }
+
+    public function testTocWithHeadingPermalinksReversedOrder(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+
+        // Register HeadingPermalinks BEFORE TOC - should still work correctly
+        $converter
+            ->addExtension(new HeadingPermalinksExtension())
+            ->addExtension($tocExtension);
+
+        $djot = <<<'DJOT'
+# Introduction
+
+## Chapter One
+
+## Chapter Two
+DJOT;
+
+        $html = $converter->convert($djot);
+        $toc = $tocExtension->getToc();
+
+        // TOC should capture clean heading text (not polluted with permalink symbol)
+        $this->assertSame('Introduction', $toc[0]['text']);
+        $this->assertSame('Chapter One', $toc[1]['text']);
+        $this->assertSame('Chapter Two', $toc[2]['text']);
+
+        // IDs should still match between TOC and HTML
+        $tocHtml = $tocExtension->getTocHtml();
+        $this->assertStringContainsString('href="#Introduction"', $tocHtml);
+        $this->assertStringContainsString('href="#Introduction"', $html);
     }
 
     public function testTocAndPermalinksWithDuplicateHeadings(): void
