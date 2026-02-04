@@ -263,6 +263,52 @@ DJOT;
         $this->assertLessThan($contentPos, $hrPos);
     }
 
+    public function testDuplicateHeadingsGetDeduplicatedIds(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+        $converter->addExtension($tocExtension);
+
+        $djot = <<<'DJOT'
+# Introduction
+
+Some text.
+
+## Final Thoughts
+
+More text.
+
+## Final Thoughts
+
+Even more text.
+
+## Final Thoughts
+
+Last bit.
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $toc = $tocExtension->getToc();
+
+        $this->assertCount(4, $toc);
+        $this->assertSame('Introduction', $toc[0]['id']);
+        $this->assertSame('Final-Thoughts', $toc[1]['id']);
+        $this->assertSame('Final-Thoughts-1', $toc[2]['id']);
+        $this->assertSame('Final-Thoughts-2', $toc[3]['id']);
+
+        // Verify the section IDs in the HTML match the TOC IDs
+        $this->assertStringContainsString('id="Final-Thoughts"', $html);
+        $this->assertStringContainsString('id="Final-Thoughts-1"', $html);
+        $this->assertStringContainsString('id="Final-Thoughts-2"', $html);
+
+        // Verify TOC links point to the correct section IDs
+        $tocHtml = $tocExtension->getTocHtml();
+        $this->assertStringContainsString('href="#Final-Thoughts"', $tocHtml);
+        $this->assertStringContainsString('href="#Final-Thoughts-1"', $tocHtml);
+        $this->assertStringContainsString('href="#Final-Thoughts-2"', $tocHtml);
+    }
+
     public function testPositionNullForManualPlacement(): void
     {
         $converter = new DjotConverter();

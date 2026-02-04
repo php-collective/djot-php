@@ -70,17 +70,7 @@ class HtmlRenderer implements RendererInterface
      */
     protected array $footnoteRefCounts = [];
 
-    /**
-     * Tracks used IDs for deduplication
-     *
-     * @var array<string, int>
-     */
-    protected array $usedIds = [];
-
-    /**
-     * Counter for auto-generated section IDs (when heading has no text)
-     */
-    protected int $sectionCounter = 0;
+    protected HeadingIdTracker $headingIdTracker;
 
     /**
      * Tab width for code blocks (null = preserve tabs, integer = convert to spaces)
@@ -115,7 +105,16 @@ class HtmlRenderer implements RendererInterface
 
     public function __construct(protected bool $xhtml = false)
     {
+        $this->headingIdTracker = new HeadingIdTracker();
         $this->initNodeRenderers();
+    }
+
+    /**
+     * Get the heading ID tracker
+     */
+    public function getHeadingIdTracker(): HeadingIdTracker
+    {
+        return $this->headingIdTracker;
     }
 
     /**
@@ -246,8 +245,7 @@ class HtmlRenderer implements RendererInterface
     {
         // Reset state for each render
         $this->footnoteRefCounts = [];
-        $this->usedIds = [];
-        $this->sectionCounter = 0;
+        $this->headingIdTracker->reset();
         $this->footnoteNumbers = [];
         $this->footnoteCounter = 0;
         $this->collectedFootnotes = [];
@@ -336,47 +334,7 @@ class HtmlRenderer implements RendererInterface
      */
     protected function getSectionId(Heading $node): string
     {
-        // If heading has explicit id attribute, use it
-        if ($node->hasAttribute('id')) {
-            $idAttr = $node->getAttribute('id');
-            $id = is_string($idAttr) ? $idAttr : '';
-            // Track explicit IDs so auto-generated IDs don't conflict
-            if (!isset($this->usedIds[$id])) {
-                $this->usedIds[$id] = 0;
-            }
-
-            return $id;
-        }
-
-        // Generate from heading text
-        $headingText = $this->getPlainText($node);
-
-        if ($headingText === '') {
-            // Generate fallback ID
-            $this->sectionCounter++;
-
-            return 's-' . $this->sectionCounter;
-        }
-
-        // Convert to valid ID:
-        // 1. Strip # characters entirely
-        // 2. Trim whitespace
-        // 3. Replace whitespace sequences with single dashes
-        $baseId = str_replace('#', '', $headingText);
-        $baseId = trim($baseId);
-        $baseId = preg_replace('/[\s]+/', '-', $baseId) ?? $baseId;
-
-        // Track and deduplicate
-        if (!isset($this->usedIds[$baseId])) {
-            $this->usedIds[$baseId] = 0;
-
-            return $baseId;
-        }
-
-        // Already used, add suffix (first conflict is -1, second is -2, etc.)
-        $this->usedIds[$baseId]++;
-
-        return $baseId . '-' . $this->usedIds[$baseId];
+        return $this->headingIdTracker->getIdForHeading($node);
     }
 
     /**
@@ -387,9 +345,7 @@ class HtmlRenderer implements RendererInterface
         if ($node->hasAttribute('id')) {
             $idAttr = $node->getAttribute('id');
             $id = is_string($idAttr) ? $idAttr : '';
-            if ($id !== '' && !isset($this->usedIds[$id])) {
-                $this->usedIds[$id] = 0;
-            }
+            $this->headingIdTracker->trackId($id);
         }
     }
 
@@ -515,18 +471,7 @@ class HtmlRenderer implements RendererInterface
      */
     protected function getPlainText(Node $node): string
     {
-        $text = '';
-        foreach ($node->getChildren() as $child) {
-            if ($child instanceof Text) {
-                $text .= $child->getContent();
-            } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
-                $text .= ' ';
-            } elseif ($child instanceof Node) {
-                $text .= $this->getPlainText($child);
-            }
-        }
-
-        return $text;
+        return $this->headingIdTracker->getPlainText($node);
     }
 
     protected function renderCodeBlock(CodeBlock $node): string

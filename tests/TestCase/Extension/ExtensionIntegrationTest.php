@@ -137,6 +137,52 @@ DJOT;
         $this->assertStringContainsString('href="#Introduction"', $tocHtml);
     }
 
+    public function testTocAndPermalinksWithDuplicateHeadings(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+
+        $converter
+            ->addExtension($tocExtension)
+            ->addExtension(new HeadingPermalinksExtension());
+
+        $djot = <<<'DJOT'
+# Introduction
+
+Welcome text.
+
+## Final Thoughts
+
+First thoughts.
+
+## Final Thoughts
+
+Second thoughts.
+DJOT;
+
+        $html = $converter->convert($djot);
+        $toc = $tocExtension->getToc();
+        $tocHtml = $tocExtension->getTocHtml();
+
+        // TOC entries should have deduplicated IDs
+        $this->assertSame('Introduction', $toc[0]['id']);
+        $this->assertSame('Final-Thoughts', $toc[1]['id']);
+        $this->assertSame('Final-Thoughts-1', $toc[2]['id']);
+
+        // Section IDs in HTML should match TOC IDs
+        $this->assertStringContainsString('id="Introduction"', $html);
+        $this->assertStringContainsString('id="Final-Thoughts"', $html);
+        $this->assertStringContainsString('id="Final-Thoughts-1"', $html);
+
+        // Permalink links should match section IDs
+        $this->assertStringContainsString('href="#Final-Thoughts"', $html);
+        $this->assertStringContainsString('href="#Final-Thoughts-1"', $html);
+
+        // TOC links should also match section IDs
+        $this->assertStringContainsString('href="#Final-Thoughts"', $tocHtml);
+        $this->assertStringContainsString('href="#Final-Thoughts-1"', $tocHtml);
+    }
+
     public function testExternalLinksWithInternalHostsExcluded(): void
     {
         $converter = new DjotConverter();
