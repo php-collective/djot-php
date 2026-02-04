@@ -1,7 +1,7 @@
 # Djot PHP
 
 [![CI](https://img.shields.io/github/actions/workflow/status/php-collective/djot-php/ci.yml?branch=master&style=flat-square)](https://github.com/php-collective/djot-php/actions)
-[![codecov](https://img.shields.io/codecov/c/github/php-collective/djot-php?style=flat-square)](https://codecov.io/gh/php-collective/djot-php)
+[![Coverage](https://codecov.io/gh/php-collective/djot-php/branch/master/graph/badge.svg)](https://codecov.io/gh/php-collective/djot-php)
 [![Latest Stable Version](https://img.shields.io/packagist/v/php-collective/djot?style=flat-square)](https://packagist.org/packages/php-collective/djot)
 [![Total Downloads](https://img.shields.io/packagist/dt/php-collective/djot?style=flat-square)](https://packagist.org/packages/php-collective/djot)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level%209-brightgreen.svg?style=flat-square)](https://phpstan.org/)
