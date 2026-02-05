@@ -11,6 +11,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
+| [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
 | [SmartQuotesExtension](#smartquotesextension) | Configures locale-specific smart quote characters |
 | [TableOfContentsExtension](#tableofcontentsextension) | Generates a table of contents from headings |
 
@@ -128,6 +129,89 @@ Thanks @johndoe for the help!
 **Output:**
 ```html
 <p>Thanks <a href="/users/view/johndoe" data-username="johndoe" class="mention">@johndoe</a> for the help!</p>
+```
+
+## SemanticSpanExtension
+
+Converts spans with semantic attributes (`kbd`, `dfn`, `abbr`) into proper HTML5 semantic elements. This is useful for marking up keyboard shortcuts, definitions, and abbreviations.
+
+```php
+use Djot\Extension\SemanticSpanExtension;
+
+$converter->addExtension(new SemanticSpanExtension());
+```
+
+**Supported attributes:**
+
+| Attribute | HTML Element | Usage |
+|-----------|--------------|-------|
+| `kbd` | `<kbd>` | Keyboard input/shortcuts |
+| `dfn` | `<dfn>` | Definition of a term |
+| `abbr` | `<abbr>` | Abbreviation with title |
+
+**Keyboard shortcuts:**
+
+```djot
+Press [Ctrl+C]{kbd} to copy and [Ctrl+V]{kbd} to paste.
+```
+
+```html
+<p>Press <kbd>Ctrl+C</kbd> to copy and <kbd>Ctrl+V</kbd> to paste.</p>
+```
+
+**Definitions:**
+
+```djot
+A [variable]{dfn} is a named storage location.
+
+The [API]{dfn="Application Programming Interface"} provides access to the system.
+```
+
+```html
+<p>A <dfn>variable</dfn> is a named storage location.</p>
+<p>The <dfn title="Application Programming Interface">API</dfn> provides access to the system.</p>
+```
+
+**Abbreviations:**
+
+```djot
+The [HTML]{abbr="HyperText Markup Language"} standard defines web content structure.
+```
+
+```html
+<p>The <abbr title="HyperText Markup Language">HTML</abbr> standard defines web content structure.</p>
+```
+
+**Combining attributes:**
+
+Attributes can be combined. The nesting order is: `dfn` wraps `kbd` wraps `abbr`.
+
+```djot
+[CSS]{dfn abbr="Cascading Style Sheets"}
+```
+
+```html
+<dfn><abbr title="Cascading Style Sheets">CSS</abbr></dfn>
+```
+
+**Preserving other attributes:**
+
+Other attributes (classes, IDs) are preserved in an outer span:
+
+```djot
+[Ctrl+S]{kbd .shortcut #save-shortcut}
+```
+
+```html
+<span class="shortcut" id="save-shortcut"><kbd>Ctrl+S</kbd></span>
+```
+
+**Note:** This extension provides manual control via attributes. For automatic abbreviation expansion (define once, apply everywhere), use the built-in abbreviation definition syntax instead:
+
+```djot
+*[HTML]: HyperText Markup Language
+
+The HTML specification defines...
 ```
 
 ## SmartQuotesExtension

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Event;
 
+use Closure;
 use Djot\Node\Node;
 
 /**
@@ -19,6 +20,18 @@ class RenderEvent
     protected ?string $html = null;
 
     protected bool $preventDefault = false;
+
+    /**
+     * Callback to render children (lazily invoked)
+     *
+     * @var \Closure(): string|null
+     */
+    protected ?Closure $childrenRenderer = null;
+
+    /**
+     * Cached children HTML
+     */
+    protected ?string $childrenHtml = null;
 
     public function __construct(protected Node $node)
     {
@@ -63,5 +76,32 @@ class RenderEvent
     public function preventDefault(): void
     {
         $this->preventDefault = true;
+    }
+
+    /**
+     * Set the callback for rendering children HTML
+     *
+     * @param \Closure(): string $renderer
+     */
+    public function setChildrenRenderer(Closure $renderer): void
+    {
+        $this->childrenRenderer = $renderer;
+    }
+
+    /**
+     * Get the rendered HTML of the node's children
+     *
+     * This method lazily renders children on first call and caches the result.
+     * Useful when you want to wrap children in a different element.
+     */
+    public function getChildrenHtml(): string
+    {
+        if ($this->childrenHtml === null) {
+            $this->childrenHtml = $this->childrenRenderer !== null
+                ? ($this->childrenRenderer)()
+                : '';
+        }
+
+        return $this->childrenHtml;
     }
 }
