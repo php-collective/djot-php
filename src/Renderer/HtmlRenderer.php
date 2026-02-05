@@ -408,6 +408,9 @@ class HtmlRenderer implements RendererInterface
             $eventName = 'render.' . $node->getType();
             $event = new RenderEvent($node);
 
+            // Provide lazy children renderer for extensions that need to wrap children
+            $event->setChildrenRenderer(fn (): string => $this->renderChildren($node));
+
             // Call specific listeners
             $this->dispatchEvent($eventName, $event);
 
