@@ -68,8 +68,11 @@ class InlineParser
      * Smart quote characters (configurable via SmartQuotesExtension for locale support)
      */
     protected string $openDoubleQuote = "\u{201C}";
+
     protected string $closeDoubleQuote = "\u{201D}";
+
     protected string $openSingleQuote = "\u{2018}";
+
     protected string $closeSingleQuote = "\u{2019}";
 
     /**

@@ -164,7 +164,7 @@ class SmartQuotesExtensionTest extends TestCase
         $converter = new DjotConverter();
         $converter->addExtension(new SmartQuotesExtension(locale: 'de'));
 
-        $html = $converter->convert("{" . "'" . "} test");
+        $html = $converter->convert('{' . "'" . '} test');
 
         // {'} is always U+2019 (apostrophe), even with non-English locale
         $this->assertStringContainsString("\u{2019}", $html);

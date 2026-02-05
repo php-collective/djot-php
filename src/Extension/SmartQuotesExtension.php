@@ -65,8 +65,11 @@ class SmartQuotesExtension implements ExtensionInterface
     ];
 
     protected string $openDoubleQuote;
+
     protected string $closeDoubleQuote;
+
     protected string $openSingleQuote;
+
     protected string $closeSingleQuote;
 
     /**
