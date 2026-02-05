@@ -11,6 +11,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
+| [SmartQuotesExtension](#smartquotesextension) | Configures locale-specific smart quote characters |
 | [TableOfContentsExtension](#tableofcontentsextension) | Generates a table of contents from headings |
 
 ## Basic Usage
@@ -127,6 +128,66 @@ Thanks @johndoe for the help!
 **Output:**
 ```html
 <p>Thanks <a href="/users/view/johndoe" data-username="johndoe" class="mention">@johndoe</a> for the help!</p>
+```
+
+## SmartQuotesExtension
+
+Configures locale-specific smart quote characters. By default, the parser produces English-style typographic quotes (`"…"` `'…'`). This extension lets you change them per locale while keeping apostrophes as `'` (U+2019) regardless of locale.
+
+```php
+use Djot\Extension\SmartQuotesExtension;
+
+// German: „…" ‚…'
+$converter->addExtension(new SmartQuotesExtension(locale: 'de'));
+
+// French: «…» ‹…›
+$converter->addExtension(new SmartQuotesExtension(locale: 'fr'));
+
+// Swiss German: «…» ‹…›
+$converter->addExtension(new SmartQuotesExtension(locale: 'de-CH'));
+
+// Explicit characters (override any locale)
+$converter->addExtension(new SmartQuotesExtension(
+    openDoubleQuote: "\u{00AB}",
+    closeDoubleQuote: "\u{00BB}",
+    openSingleQuote: "\u{2039}",
+    closeSingleQuote: "\u{203A}",
+));
+
+// Mix: locale with partial overrides
+$converter->addExtension(new SmartQuotesExtension(
+    locale: 'de',
+    openDoubleQuote: "\u{00AB}",  // Override just double quotes
+    closeDoubleQuote: "\u{00BB}",
+));
+```
+
+**Input (with `locale: 'de'`):**
+```djot
+"Hallo," sagte sie. 'Es ist ein schöner Tag.'
+
+Er antwortete: "Ich glaub's nicht."
+```
+
+**Output:**
+```html
+<p>„Hallo," sagte sie. ‚Es ist ein schöner Tag.'</p>
+<p>Er antwortete: „Ich glaub's nicht."</p>
+```
+
+Note that the apostrophe in `glaub's` stays as `'` (U+2019) — apostrophes are language-independent.
+
+**Supported locales:** `en`, `de`, `de-CH`, `fr`, `pl`, `ru`, `ja`, `zh`, `sv`, `da`, `fi`, `cs`, `hu`, `it`, `es`, `pt`, `nl`, `nb`, `nn`, `uk`
+
+**Locale resolution:** exact match → language-only fallback (e.g., `de-AT` → `de`) → English defaults. Underscore format is also accepted (e.g., `fr_FR` → `fr`).
+
+**Static helpers:**
+
+```php
+SmartQuotesExtension::getSupportedLocales();    // ['en', 'de', 'de-CH', ...]
+SmartQuotesExtension::isLocaleSupported('de');   // true
+SmartQuotesExtension::isLocaleSupported('de-AT'); // true (falls back to 'de')
+SmartQuotesExtension::isLocaleSupported('xx');    // false
 ```
 
 ## TableOfContentsExtension
