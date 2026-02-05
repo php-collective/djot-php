@@ -23,8 +23,6 @@ class RenderEvent
 
     /**
      * Callback to render children (lazily invoked)
-     *
-     * @var \Closure|null
      */
     protected ?Closure $childrenRenderer = null;
 
@@ -102,6 +100,6 @@ class RenderEvent
                 : '';
         }
 
-        return $this->childrenHtml;
+        return (string)$this->childrenHtml;
     }
 }
