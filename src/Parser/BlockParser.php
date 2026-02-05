@@ -2922,6 +2922,12 @@ class BlockParser
             return true;
         }
 
+        // Fenced comments `%%%` can always interrupt paragraphs
+        // Comments should be invisible and not require extra formatting
+        if ($line[0] === '%' && isset($line[1], $line[2]) && $line[1] === '%' && $line[2] === '%') {
+            return true;
+        }
+
         // In significantNewlines mode, block elements can interrupt paragraphs
         if ($this->significantNewlines) {
             return $this->startsNewBlockSignificant($line);
@@ -2973,6 +2979,9 @@ class BlockParser
             case ':':
                 // Fenced divs: :{3,}
                 return isset($line[1], $line[2]) && $line[1] === ':' && $line[2] === ':';
+            case '%':
+                // Fenced comments: %{3,}
+                return isset($line[1], $line[2]) && $line[1] === '%' && $line[2] === '%';
             default:
                 // Only 1. or 1) can interrupt paragraphs (CommonMark rule)
                 // Prevents "1985. That year..." from becoming a list

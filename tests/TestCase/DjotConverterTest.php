@@ -683,6 +683,51 @@ DJOT;
         $this->assertStringNotContainsString('still', $result);
     }
 
+    public function testFencedCommentBreaksParagraphContinuity(): void
+    {
+        // Fenced comments are block-level elements that break paragraph continuity
+        // Text before and after becomes two separate paragraphs
+        $djot = "Lorem ipsum\n\n%%%\ncomment\n%%%\n\ndolor sit amet";
+
+        $result = $this->converter->convert($djot);
+
+        // Should produce two separate paragraphs
+        $this->assertStringContainsString('<p>Lorem ipsum</p>', $result);
+        $this->assertStringContainsString('<p>dolor sit amet</p>', $result);
+        $this->assertStringNotContainsString('comment', $result);
+
+        // Should NOT be a single paragraph
+        $this->assertStringNotContainsString('Lorem ipsum dolor', $result);
+    }
+
+    public function testFencedCommentInterruptsParagraph(): void
+    {
+        // Fenced comments can interrupt paragraphs without requiring blank lines
+        // This makes comments truly "invisible" from a formatting perspective
+        $djot = "Lorem ipsum\n%%%\ncomment\n%%%\ndolor sit amet";
+
+        $result = $this->converter->convert($djot);
+
+        // Should produce two separate paragraphs with comment stripped
+        $this->assertStringContainsString('<p>Lorem ipsum</p>', $result);
+        $this->assertStringContainsString('<p>dolor sit amet</p>', $result);
+        $this->assertStringNotContainsString('comment', $result);
+        $this->assertStringNotContainsString('%%%', $result);
+    }
+
+    public function testFencedCommentWithBlankLinesAlsoWorks(): void
+    {
+        // Also works with blank lines (traditional block element style)
+        $djot = "Lorem ipsum\n\n%%%\ncomment\n%%%\n\ndolor sit amet";
+
+        $result = $this->converter->convert($djot);
+
+        // Comment should be recognized and stripped
+        $this->assertStringContainsString('<p>Lorem ipsum</p>', $result);
+        $this->assertStringContainsString('<p>dolor sit amet</p>', $result);
+        $this->assertStringNotContainsString('comment', $result);
+    }
+
     // Edge cases from official Djot test suite
 
     public function testEmphasisIntraword(): void
