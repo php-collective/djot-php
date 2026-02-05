@@ -688,6 +688,11 @@ class InlineParser
                 $link = new Link($url);
                 $this->parseInlines($link, $linkText);
 
+                // Track anchor links for validation
+                if (preg_match('/^#(.+)$/', $url, $anchorMatch)) {
+                    $this->blockParser->trackAnchorLink($anchorMatch[1], $this->currentLine, $pos + 1);
+                }
+
                 $endPos = $urlEnd + 1;
 
                 // Check for attributes after link: [text](url){.class}
@@ -738,6 +743,11 @@ class InlineParser
 
                     $link = new Link($refDef->url);
                     $this->parseInlines($link, $linkText);
+
+                    // Track anchor links for validation
+                    if (preg_match('/^#(.+)$/', $refDef->url, $anchorMatch)) {
+                        $this->blockParser->trackAnchorLink($anchorMatch[1], $this->currentLine, $pos + 1);
+                    }
 
                     // Apply attributes from reference definition first
                     foreach ($refDef->attributes as $key => $value) {

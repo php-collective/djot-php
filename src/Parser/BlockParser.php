@@ -99,6 +99,22 @@ class BlockParser
     protected array $usedReferences = [];
 
     /**
+     * Anchor links found during parsing (for validation)
+     * Only populated when collectWarnings is true
+     *
+     * @var array<array{fragment: string, line: int, column: int}>
+     */
+    protected array $anchorLinks = [];
+
+    /**
+     * Heading IDs generated during heading reference extraction
+     * Used for anchor link validation
+     *
+     * @var array<string, true>
+     */
+    protected array $headingIds = [];
+
+    /**
      * Current line offset for nested parsing (0-indexed internally, 1-indexed for errors)
      */
     protected int $lineOffset = 0;
@@ -316,6 +332,8 @@ class BlockParser
         $this->pendingAttributes = [];
         $this->warnings = [];
         $this->usedReferences = [];
+        $this->anchorLinks = [];
+        $this->headingIds = [];
         $this->lineOffset = 0;
         $document = new Document();
         $lines = $this->splitLines($input);
@@ -334,9 +352,10 @@ class BlockParser
             $document->appendChild($footnote);
         }
 
-        // Validate references if warnings are enabled
+        // Validate references and anchor links if warnings are enabled
         if ($this->collectWarnings) {
             $this->validateReferences();
+            $this->validateAnchorLinks($document);
         }
 
         return $document;
@@ -593,6 +612,7 @@ class BlockParser
                     }
                 }
                 $usedIds[$id] = true;
+                $this->headingIds[$id] = true;
 
                 // Register as reference if not already defined
                 // Use normalized heading text as the label (for [Heading][] style links)
@@ -3166,6 +3186,75 @@ class BlockParser
     public function addUndefinedFootnoteWarning(string $label, int $line, int $column): void
     {
         $this->addWarning("Undefined footnote '{$label}'", $line, $column, false);
+    }
+
+    /**
+     * Track an anchor link for validation (called from InlineParser)
+     * Only tracks when collectWarnings is enabled.
+     */
+    public function trackAnchorLink(string $fragment, int $line, int $column): void
+    {
+        if ($this->collectWarnings) {
+            $this->anchorLinks[] = [
+                'fragment' => $fragment,
+                'line' => $line,
+                'column' => $column,
+            ];
+        }
+    }
+
+    /**
+     * Validate anchor links point to existing IDs in the document
+     *
+     * Checks all links with `#fragment` destinations against:
+     * - Heading IDs (from heading auto-references)
+     * - Explicit `{#id}` attributes on any element
+     */
+    protected function validateAnchorLinks(Document $document): void
+    {
+        if ($this->anchorLinks === []) {
+            return;
+        }
+
+        // Collect all known anchor targets
+        $knownIds = $this->headingIds;
+
+        // From explicit {#id} attributes on any node in the AST
+        $this->collectExplicitIds($document, $knownIds);
+
+        // Validate each tracked anchor link
+        foreach ($this->anchorLinks as $anchor) {
+            if (!isset($knownIds[$anchor['fragment']])) {
+                $this->addWarning(
+                    "Broken anchor link '#{$anchor['fragment']}' — no element with this ID exists",
+                    $anchor['line'],
+                    $anchor['column'],
+                    false,
+                    'anchor',
+                    null,
+                );
+            }
+        }
+    }
+
+    /**
+     * Recursively collect explicit {#id} attributes from the AST
+     *
+     * @param \Djot\Node\Node $node
+     * @param array<string, bool> $ids
+     */
+    protected function collectExplicitIds(Node $node, array &$ids): void
+    {
+        if ($node->hasAttribute('id')) {
+            $id = $node->getAttribute('id');
+            if (is_string($id) && $id !== '') {
+                $ids[$id] = true;
+            }
+        }
+
+        foreach ($node->getChildren() as $child) {
+            $this->collectExplicitIds($child, $ids);
+        }
     }
 
     /**

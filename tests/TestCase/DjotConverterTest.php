@@ -2670,4 +2670,124 @@ DJOT;
         $this->assertTrue($undefinedFound, 'Expected undefined reference warning');
         $this->assertTrue($unusedFound, 'Expected unused reference warning');
     }
+
+    public function testBrokenAnchorLinkInlineWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[click here](#nonexistent)');
+
+        $this->assertTrue($converter->hasWarnings());
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString("Broken anchor link '#nonexistent'", $warnings[0]->getMessage());
+        $this->assertSame('anchor', $warnings[0]->getCategory());
+    }
+
+    public function testBrokenAnchorLinkViaReferenceWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[click here][ref]\n\n[ref]: #nonexistent");
+
+        $warnings = $converter->getWarnings();
+        $anchorWarnings = array_filter(
+            $warnings,
+            fn ($w) => $w->getCategory() === 'anchor',
+        );
+        $this->assertCount(1, $anchorWarnings);
+        $this->assertStringContainsString('#nonexistent', array_values($anchorWarnings)[0]->getMessage());
+    }
+
+    public function testValidAnchorLinkToHeadingNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("# My Heading\n\n[link](#My-Heading)");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testValidAnchorLinkToExplicitIdNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("{#custom-id}\n# Heading\n\n[link](#custom-id)");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testValidAnchorLinkToExplicitDivIdNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("{#my-section}\n::: note\nContent\n:::\n\n[link](#my-section)");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testValidAnchorLinkViaHeadingReferenceNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("# Introduction\n\n[Introduction][]");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testNoAnchorWarningWithoutWarningsEnabled(): void
+    {
+        $converter = new DjotConverter(warnings: false);
+        $converter->convert('[click here](#nonexistent)');
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testMultipleBrokenAnchorLinks(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[one](#missing1)\n\n[two](#missing2)");
+
+        $warnings = $converter->getWarnings();
+        $anchorWarnings = array_filter(
+            $warnings,
+            fn ($w) => $w->getCategory() === 'anchor',
+        );
+        $this->assertCount(2, $anchorWarnings);
+    }
+
+    public function testExternalUrlWithFragmentNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[link](https://example.com/page#section)');
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testEmptyFragmentNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[link](#)');
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testBrokenAnchorWithValidHeadings(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $djot = <<<'DJOT'
+# Valid Heading
+
+[valid link](#Valid-Heading)
+
+[broken link](#nonexistent)
+DJOT;
+        $converter->convert($djot);
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString('#nonexistent', $warnings[0]->getMessage());
+    }
+
+    public function testValidAnchorLinkToSpanIdNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[target]{#my-target}\n\n[link](#my-target)");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
 }
