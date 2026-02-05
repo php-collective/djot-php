@@ -652,9 +652,9 @@ class InlineParser
             // Check for raw inline format: `...`{=format}
             // Format must be ONLY {=format} with no other attributes
             $endPos = $afterClose;
-            $isRawInline = $afterClose < $length && $text[$afterClose] === '{'
+            $hasRawInlineAttempt = $afterClose < $length && $text[$afterClose] === '{'
                 && $afterClose + 1 < $length && $text[$afterClose + 1] === '=';
-            if ($isRawInline) {
+            if ($hasRawInlineAttempt) {
                 $formatEnd = strpos($text, '}', $afterClose);
                 if ($formatEnd !== false) {
                     $format = substr($text, $afterClose + 2, $formatEnd - $afterClose - 2);
@@ -667,12 +667,26 @@ class InlineParser
                             'pos' => $endPos,
                         ];
                     }
-                    // Mixed attributes like {=html #id} - treat attribute block as literal
+                    // Mixed attributes like {=html #id} - treat attribute block as literal text
+                    // Don't parse as trailing attributes either
+                }
+            }
+
+            $code = new Code($content);
+
+            // Check for trailing attributes: `code`{.class}
+            // But NOT if there was a {= pattern (failed raw inline attempt should be literal)
+            if (!$hasRawInlineAttempt && $endPos < $length && $text[$endPos] === '{') {
+                $attrEnd = $this->findAttributeEnd($text, $endPos);
+                if ($attrEnd !== null) {
+                    $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
+                    $this->applyAttributesToNode($code, $attrStr);
+                    $endPos = $attrEnd + 1;
                 }
             }
 
             return [
-                'node' => new Code($content),
+                'node' => $code,
                 'pos' => $endPos,
             ];
         }
@@ -1074,9 +1088,21 @@ class InlineParser
                     $node = new $nodeClass();
                     $this->parseInlines($node, $content);
 
+                    $endPos = $actualClose + 1;
+
+                    // Check for trailing attributes: _text_{.class}
+                    if ($endPos < $length && $text[$endPos] === '{') {
+                        $attrEnd = $this->findAttributeEnd($text, $endPos);
+                        if ($attrEnd !== null) {
+                            $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
+                            $this->applyAttributesToNode($node, $attrStr);
+                            $endPos = $attrEnd + 1;
+                        }
+                    }
+
                     return [
                         'node' => $node,
-                        'pos' => $actualClose + 1,
+                        'pos' => $endPos,
                     ];
                 }
             }
@@ -1164,9 +1190,21 @@ class InlineParser
                 $node = new $nodeClass();
                 $this->parseInlines($node, $content);
 
+                $endPos = $searchPos + 2;
+
+                // Check for trailing attributes: {=text=}{.class}
+                if ($endPos < $length && $text[$endPos] === '{') {
+                    $attrEnd = $this->findAttributeEnd($text, $endPos);
+                    if ($attrEnd !== null) {
+                        $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
+                        $this->applyAttributesToNode($node, $attrStr);
+                        $endPos = $attrEnd + 1;
+                    }
+                }
+
                 return [
                     'node' => $node,
-                    'pos' => $searchPos + 2,
+                    'pos' => $endPos,
                 ];
             }
             $searchPos++;
@@ -1727,9 +1765,23 @@ class InlineParser
             return null;
         }
 
+        $symbol = new Symbol($matches[1]);
+        $endPos = $pos + strlen($matches[0]);
+        $length = strlen($text);
+
+        // Check for trailing attributes: :symbol:{.class}
+        if ($endPos < $length && $text[$endPos] === '{') {
+            $attrEnd = $this->findAttributeEnd($text, $endPos);
+            if ($attrEnd !== null) {
+                $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
+                $this->applyAttributesToNode($symbol, $attrStr);
+                $endPos = $attrEnd + 1;
+            }
+        }
+
         return [
-            'node' => new Symbol($matches[1]),
-            'pos' => $pos + strlen($matches[0]),
+            'node' => $symbol,
+            'pos' => $endPos,
         ];
     }
 
