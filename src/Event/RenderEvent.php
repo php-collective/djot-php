@@ -24,7 +24,7 @@ class RenderEvent
     /**
      * Callback to render children (lazily invoked)
      *
-     * @var \Closure(): string|null
+     * @var \Closure|null
      */
     protected ?Closure $childrenRenderer = null;
 
