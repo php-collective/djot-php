@@ -29,6 +29,7 @@ use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
+use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Parser\Block\FencedBlockParser;
 use Djot\Parser\Block\ListParser;
@@ -2142,6 +2143,7 @@ class BlockParser
         $i = $start;
         $alignments = [];
         $headerFound = false;
+        $hasRowspans = false;
 
         while ($i < $count) {
             $currentLine = $lines[$i];
@@ -2271,7 +2273,12 @@ class BlockParser
                     if ($cellData['attributes']) {
                         $cell->setAttributes($cellData['attributes']);
                     }
-                    $this->inlineParser->parse($cell, trim($cellData['content']), $baseLineForRow);
+                    $trimmedContent = trim($cellData['content']);
+                    if ($trimmedContent !== '' && $this->isPlainText($trimmedContent)) {
+                        $cell->appendChild(new Text($trimmedContent));
+                    } else {
+                        $this->inlineParser->parse($cell, $trimmedContent, $baseLineForRow);
+                    }
                     $row->appendChild($cell);
                     $rowCellData[] = [
                         'type' => 'cell',
@@ -2317,6 +2324,7 @@ class BlockParser
                             if (!isset($extendedCells[$cellId])) {
                                 $cellFound->setRowspan($cellFound->getRowspan() + 1);
                                 $extendedCells[$cellId] = true;
+                                $hasRowspans = true;
                             }
 
                             break;
@@ -2328,7 +2336,10 @@ class BlockParser
             // Remove cells that overlap with spanning cells from previous rows
             // This handles the case where a cell has both rowspan and colspan,
             // and the intersection area contains content that should be dropped
-            $this->removeOverlappingCells($table, $row, $rowCellData, $currentRowIndex);
+            // Only needed when rowspans exist (avoids O(n²) scan for simple tables)
+            if ($hasRowspans) {
+                $this->removeOverlappingCells($table, $row, $rowCellData, $currentRowIndex);
+            }
 
             $table->appendChild($row);
         }
@@ -3263,5 +3274,22 @@ class BlockParser
     public function getInlineParser(): InlineParser
     {
         return $this->inlineParser;
+    }
+
+    /**
+     * Check if text contains only plain characters (no inline markup triggers).
+     *
+     * Used to skip the inline parser for simple table cell content,
+     * creating a Text node directly instead.
+     */
+    protected function isPlainText(string $text): bool
+    {
+        // Can't shortcut if custom patterns or abbreviations are registered
+        if ($this->inlineParser->getInlinePatterns() || $this->abbreviations) {
+            return false;
+        }
+
+        // Check for any character that triggers inline parsing
+        return strpbrk($text, '\\`*_[{^~<$:!"\'-.\n') === false;
     }
 }

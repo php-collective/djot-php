@@ -220,7 +220,8 @@ class TableParser
             // Attribute must be immediately at start (no leading whitespace)
             // to distinguish from inline formatting like {=highlight=}
             // Also exclude inline markers: {=...=}, {+...+}, {-...-}, etc.
-            if (preg_match('/^\{([^{}]+)\}\s*/', $cellContent, $matches)) {
+            // Fast path: only run regex if cell starts with {
+            if (isset($cellContent[0]) && $cellContent[0] === '{' && preg_match('/^\{([^{}]+)\}\s*/', $cellContent, $matches)) {
                 $inner = $matches[1];
                 // Only treat as attribute if it's NOT an inline formatting marker
                 // Inline markers have same char at start and end: =text=, +text+, -text-, etc.
@@ -279,6 +280,11 @@ class TableParser
      */
     public function hasUnclosedCodeSpan(string $line): bool
     {
+        // Fast path: no backticks means no code spans at all
+        if (!str_contains($line, '`')) {
+            return false;
+        }
+
         $length = strlen($line);
         $inCode = false;
         $codeDelimLength = 0;
@@ -578,6 +584,12 @@ class TableParser
     public function lineEndsWithPipeOutsideCodeSpan(string $line): bool
     {
         $length = strlen($line);
+
+        // Fast path: no backticks means no code spans to worry about
+        if (!str_contains($line, '`')) {
+            return $line[$length - 1] === '|';
+        }
+
         $inCode = false;
         $codeDelimLength = 0;
         $lastPipeOutsideCode = -1;
