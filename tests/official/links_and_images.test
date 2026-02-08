@@ -179,7 +179,7 @@ starts first:
 ```
 *[closed](hello*)
 .
-<p><strong>[closed](hello</strong>)</p>
+<p>*<a href="hello*">closed</a></p>
 ```
 
 Avoid this with a backslash escape:

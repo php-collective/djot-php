@@ -374,6 +374,47 @@ class InlineParserTest extends TestCase
         $this->assertSame('http://example.com/a_b', $children[1]->getDestination());
     }
 
+    public function testEmphasisWithUnderscoreInLinkUrl(): void
+    {
+        // Issue #70: underscores in link URLs should not break emphasis
+        $para = $this->parseInline('_[link](http://example.com?foo_bar=1), more text_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        // Should contain a link node followed by text
+        $this->assertInstanceOf(Link::class, $emChildren[0]);
+        $this->assertSame('http://example.com?foo_bar=1', $emChildren[0]->getDestination());
+    }
+
+    public function testEmphasisWithUnderscoreInLinkUrlMoreCases(): void
+    {
+        // _hello [link](a_b) world_
+        $para = $this->parseInline('_hello [link](a_b) world_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Text::class, $emChildren[0]);
+        $this->assertSame('hello ', $emChildren[0]->getContent());
+        $this->assertInstanceOf(Link::class, $emChildren[1]);
+        $this->assertSame('a_b', $emChildren[1]->getDestination());
+    }
+
+    public function testStrongWithStarInLinkUrl(): void
+    {
+        // *[closed](hello*) - star in URL should not break strong
+        $para = $this->parseInline('*[link](http://example.com?q=a*b) text*');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Strong::class, $children[0]);
+    }
+
     public function testEmphasisFollowedByCloseBrace(): void
     {
         // Emphasis opener cannot be followed by } (closer marker)

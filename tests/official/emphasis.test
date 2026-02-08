@@ -213,7 +213,7 @@ _ab\_c_
 ```
 _[bar_](url)
 .
-<p><em>[bar</em>](url)</p>
+<p>_<a href="url">bar_</a></p>
 ```
 
 ```

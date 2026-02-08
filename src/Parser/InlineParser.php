@@ -972,6 +972,16 @@ class InlineParser
                 }
             }
 
+            // Skip over link/image constructs [...](...) and [...][]  or ![...](...) etc.
+            if ($char === '[' || ($char === '!' && ($text[$searchPos + 1] ?? '') === '[')) {
+                $linkEnd = $this->findLinkEnd($text, $char === '!' ? $searchPos + 1 : $searchPos);
+                if ($linkEnd !== null) {
+                    $searchPos = $linkEnd;
+
+                    continue;
+                }
+            }
+
             // Skip escape sequences
             if ($char === '\\' && $searchPos + 1 < $length) {
                 $searchPos += 2;
@@ -1530,6 +1540,79 @@ class InlineParser
         // Check if it's a valid email autolink
         if (filter_var($content, FILTER_VALIDATE_EMAIL)) {
             return $end + 1;
+        }
+
+        return null;
+    }
+
+    /**
+     * Find the end of a link/image construct starting at $pos (which points to '[').
+     * Handles [text](url), [text][ref], and [text][] forms.
+     *
+     * @return int|null Position after the link construct, or null if not a valid link
+     */
+    protected function findLinkEnd(string $text, int $pos): ?int
+    {
+        $length = strlen($text);
+        if ($pos >= $length || $text[$pos] !== '[') {
+            return null;
+        }
+
+        // Find matching ]
+        $bracketDepth = 1;
+        $i = $pos + 1;
+        while ($i < $length && $bracketDepth > 0) {
+            if ($text[$i] === '[') {
+                $bracketDepth++;
+            } elseif ($text[$i] === ']') {
+                $bracketDepth--;
+            } elseif ($text[$i] === '\\' && $i + 1 < $length) {
+                $i++;
+            }
+            if ($bracketDepth > 0) {
+                $i++;
+            }
+        }
+
+        if ($bracketDepth !== 0) {
+            return null;
+        }
+
+        // $i is now at the closing ]
+        $afterBracket = $i + 1;
+
+        // Inline link: [text](url)
+        if ($afterBracket < $length && $text[$afterBracket] === '(') {
+            $parenDepth = 1;
+            $j = $afterBracket + 1;
+            while ($j < $length && $parenDepth > 0) {
+                if ($text[$j] === '(') {
+                    $parenDepth++;
+                } elseif ($text[$j] === ')') {
+                    $parenDepth--;
+                } elseif ($text[$j] === '\\' && $j + 1 < $length) {
+                    $j++;
+                }
+                if ($parenDepth > 0) {
+                    $j++;
+                }
+            }
+
+            if ($parenDepth === 0) {
+                return $j + 1;
+            }
+
+            return null;
+        }
+
+        // Reference link: [text][ref] or [text][]
+        if ($afterBracket < $length && $text[$afterBracket] === '[') {
+            $refEnd = strpos($text, ']', $afterBracket + 1);
+            if ($refEnd !== false) {
+                return $refEnd + 1;
+            }
+
+            return null;
         }
 
         return null;
