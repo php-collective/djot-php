@@ -9,6 +9,7 @@ use Djot\Extension\ExtensionInterface;
 use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
+use Djot\Renderer\HeadingIdTracker;
 use Djot\Renderer\HtmlRenderer;
 use Djot\Renderer\SoftBreakMode;
 use LengthException;
@@ -276,6 +277,14 @@ class DjotConverter
     public function getRenderer(): HtmlRenderer
     {
         return $this->renderer;
+    }
+
+    /**
+     * Get the heading ID tracker
+     */
+    public function getHeadingIdTracker(): HeadingIdTracker
+    {
+        return $this->renderer->getHeadingIdTracker();
     }
 
     /**

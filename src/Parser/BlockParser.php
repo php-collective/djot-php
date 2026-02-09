@@ -29,6 +29,7 @@ use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
+use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Parser\Block\FencedBlockParser;
 use Djot\Parser\Block\ListParser;
@@ -97,6 +98,22 @@ class BlockParser
      * @var array<string, int> Maps reference label to line where used
      */
     protected array $usedReferences = [];
+
+    /**
+     * Anchor links found during parsing (for validation)
+     * Only populated when collectWarnings is true
+     *
+     * @var array<array{fragment: string, line: int, column: int}>
+     */
+    protected array $anchorLinks = [];
+
+    /**
+     * Heading IDs generated during heading reference extraction
+     * Used for anchor link validation
+     *
+     * @var array<string, true>
+     */
+    protected array $headingIds = [];
 
     /**
      * Current line offset for nested parsing (0-indexed internally, 1-indexed for errors)
@@ -316,6 +333,8 @@ class BlockParser
         $this->pendingAttributes = [];
         $this->warnings = [];
         $this->usedReferences = [];
+        $this->anchorLinks = [];
+        $this->headingIds = [];
         $this->lineOffset = 0;
         $document = new Document();
         $lines = $this->splitLines($input);
@@ -334,9 +353,10 @@ class BlockParser
             $document->appendChild($footnote);
         }
 
-        // Validate references if warnings are enabled
+        // Validate references and anchor links if warnings are enabled
         if ($this->collectWarnings) {
             $this->validateReferences();
+            $this->validateAnchorLinks($document);
         }
 
         return $document;
@@ -593,6 +613,7 @@ class BlockParser
                     }
                 }
                 $usedIds[$id] = true;
+                $this->headingIds[$id] = true;
 
                 // Register as reference if not already defined
                 // Use normalized heading text as the label (for [Heading][] style links)
@@ -2122,6 +2143,7 @@ class BlockParser
         $i = $start;
         $alignments = [];
         $headerFound = false;
+        $hasRowspans = false;
 
         while ($i < $count) {
             $currentLine = $lines[$i];
@@ -2273,7 +2295,12 @@ class BlockParser
                     if ($mergedAttributes) {
                         $cell->setAttributes($mergedAttributes);
                     }
-                    $this->inlineParser->parse($cell, $contentToParse, $baseLineForRow);
+
+                    if ($contentToParse !== '' && $this->isPlainText($contentToParse)) {
+                        $cell->appendChild(new Text($contentToParse));
+                    } else {
+                        $this->inlineParser->parse($cell, $contentToParse, $baseLineForRow);
+                    }
                     $rowCellData[] = [
                         'type' => 'cell',
                         'cell' => $cell,
@@ -2331,6 +2358,7 @@ class BlockParser
                             if (!isset($extendedCells[$cellId])) {
                                 $cellFound->setRowspan($cellFound->getRowspan() + 1);
                                 $extendedCells[$cellId] = true;
+                                $hasRowspans = true;
                             }
 
                             break;
@@ -2342,7 +2370,10 @@ class BlockParser
             // Remove cells that overlap with spanning cells from previous rows
             // This handles the case where a cell has both rowspan and colspan,
             // and the intersection area contains content that should be dropped
-            $this->removeOverlappingCells($table, $row, $rowCellData, $currentRowIndex);
+            // Only needed when rowspans exist (avoids O(n²) scan for simple tables)
+            if ($hasRowspans) {
+                $this->removeOverlappingCells($table, $row, $rowCellData, $currentRowIndex);
+            }
 
             $table->appendChild($row);
         }
@@ -2925,6 +2956,12 @@ class BlockParser
             return true;
         }
 
+        // Fenced comments `%%%` can always interrupt paragraphs
+        // Comments should be invisible and not require extra formatting
+        if ($line[0] === '%' && isset($line[1], $line[2]) && $line[1] === '%' && $line[2] === '%') {
+            return true;
+        }
+
         // In significantNewlines mode, block elements can interrupt paragraphs
         if ($this->significantNewlines) {
             return $this->startsNewBlockSignificant($line);
@@ -2976,6 +3013,9 @@ class BlockParser
             case ':':
                 // Fenced divs: :{3,}
                 return isset($line[1], $line[2]) && $line[1] === ':' && $line[2] === ':';
+            case '%':
+                // Fenced comments: %{3,}
+                return isset($line[1], $line[2]) && $line[1] === '%' && $line[2] === '%';
             default:
                 // Only 1. or 1) can interrupt paragraphs (CommonMark rule)
                 // Prevents "1985. That year..." from becoming a list
@@ -3203,10 +3243,96 @@ class BlockParser
     }
 
     /**
+     * Track an anchor link for validation (called from InlineParser)
+     * Only tracks when collectWarnings is enabled.
+     */
+    public function trackAnchorLink(string $fragment, int $line, int $column): void
+    {
+        if ($this->collectWarnings) {
+            $this->anchorLinks[] = [
+                'fragment' => $fragment,
+                'line' => $line,
+                'column' => $column,
+            ];
+        }
+    }
+
+    /**
+     * Validate anchor links point to existing IDs in the document
+     *
+     * Checks all links with `#fragment` destinations against:
+     * - Heading IDs (from heading auto-references)
+     * - Explicit `{#id}` attributes on any element
+     */
+    protected function validateAnchorLinks(Document $document): void
+    {
+        if ($this->anchorLinks === []) {
+            return;
+        }
+
+        // Collect all known anchor targets
+        $knownIds = $this->headingIds;
+
+        // From explicit {#id} attributes on any node in the AST
+        $this->collectExplicitIds($document, $knownIds);
+
+        // Validate each tracked anchor link
+        foreach ($this->anchorLinks as $anchor) {
+            if (!isset($knownIds[$anchor['fragment']])) {
+                $this->addWarning(
+                    "Broken anchor link '#{$anchor['fragment']}' — no element with this ID exists",
+                    $anchor['line'],
+                    $anchor['column'],
+                    false,
+                    'anchor',
+                    null,
+                );
+            }
+        }
+    }
+
+    /**
+     * Recursively collect explicit {#id} attributes from the AST
+     *
+     * @param \Djot\Node\Node $node
+     * @param array<string, bool> $ids
+     */
+    protected function collectExplicitIds(Node $node, array &$ids): void
+    {
+        if ($node->hasAttribute('id')) {
+            $id = $node->getAttribute('id');
+            if (is_string($id) && $id !== '') {
+                $ids[$id] = true;
+            }
+        }
+
+        foreach ($node->getChildren() as $child) {
+            $this->collectExplicitIds($child, $ids);
+        }
+    }
+
+    /**
      * Get the inline parser for registering custom patterns
      */
     public function getInlineParser(): InlineParser
     {
         return $this->inlineParser;
+    }
+
+    /**
+     * Check if text contains only plain characters (no inline markup triggers).
+     *
+     * Used to skip the inline parser for simple table cell content,
+     * creating a Text node directly instead.
+     */
+    protected function isPlainText(string $text): bool
+    {
+        // Can't shortcut if custom patterns or abbreviations are registered
+        if ($this->inlineParser->getInlinePatterns() || $this->abbreviations) {
+            return false;
+        }
+
+        // Check for any character that triggers inline parsing
+        return strpbrk($text, '\\`*_[{^~<$:!"\'-.\n') === false;
     }
 }

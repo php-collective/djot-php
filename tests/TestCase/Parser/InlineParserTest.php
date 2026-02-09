@@ -6,9 +6,12 @@ namespace Djot\Test\TestCase\Parser;
 
 use Djot\Node\Block\Paragraph;
 use Djot\Node\Inline\Code;
+use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
 use Djot\Node\Inline\HardBreak;
+use Djot\Node\Inline\Highlight;
 use Djot\Node\Inline\Image;
+use Djot\Node\Inline\Insert;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Math;
 use Djot\Node\Inline\SoftBreak;
@@ -473,5 +476,168 @@ class InlineParserTest extends TestCase
         // "Download" and "file" should NOT be boolean attributes
         $this->assertNull($link->getAttribute('Download'));
         $this->assertNull($link->getAttribute('file'));
+    }
+
+    // ===== Trailing Attributes for Inline Elements =====
+
+    public function testEmphasisWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('_emphasized text_{.highlight}');
+
+        $em = $this->getFirstChild($para);
+        $this->assertInstanceOf(Emphasis::class, $em);
+        $this->assertSame('highlight', $em->getAttribute('class'));
+    }
+
+    public function testStrongWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('*strong text*{.important #main}');
+
+        $strong = $this->getFirstChild($para);
+        $this->assertInstanceOf(Strong::class, $strong);
+        $this->assertSame('important', $strong->getAttribute('class'));
+        $this->assertSame('main', $strong->getAttribute('id'));
+    }
+
+    public function testCodeSpanWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('`code`{.lang-js}');
+
+        $code = $this->getFirstChild($para);
+        $this->assertInstanceOf(Code::class, $code);
+        $this->assertSame('lang-js', $code->getAttribute('class'));
+    }
+
+    public function testCodeSpanWithMultipleAttributes(): void
+    {
+        $para = $this->parseInline('`const x = 1`{.javascript data-line="5"}');
+
+        $code = $this->getFirstChild($para);
+        $this->assertInstanceOf(Code::class, $code);
+        $this->assertSame('javascript', $code->getAttribute('class'));
+        $this->assertSame('5', $code->getAttribute('data-line'));
+    }
+
+    public function testSuperscriptWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('^2^{.exponent}');
+
+        $sup = $this->getFirstChild($para);
+        $this->assertInstanceOf(Superscript::class, $sup);
+        $this->assertSame('exponent', $sup->getAttribute('class'));
+    }
+
+    public function testSubscriptWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('~2~{.chemical}');
+
+        $sub = $this->getFirstChild($para);
+        $this->assertInstanceOf(Subscript::class, $sub);
+        $this->assertSame('chemical', $sub->getAttribute('class'));
+    }
+
+    public function testBracedSuperscriptWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('{^text^}{.ref}');
+
+        $sup = $this->getFirstChild($para);
+        $this->assertInstanceOf(Superscript::class, $sup);
+        $this->assertSame('ref', $sup->getAttribute('class'));
+    }
+
+    public function testBracedSubscriptWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('{~text~}{.formula}');
+
+        $sub = $this->getFirstChild($para);
+        $this->assertInstanceOf(Subscript::class, $sub);
+        $this->assertSame('formula', $sub->getAttribute('class'));
+    }
+
+    public function testHighlightWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('{=highlighted=}{.match}');
+
+        $mark = $this->getFirstChild($para);
+        $this->assertInstanceOf(Highlight::class, $mark);
+        $this->assertSame('match', $mark->getAttribute('class'));
+    }
+
+    public function testInsertWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('{+inserted+}{.added}');
+
+        $ins = $this->getFirstChild($para);
+        $this->assertInstanceOf(Insert::class, $ins);
+        $this->assertSame('added', $ins->getAttribute('class'));
+    }
+
+    public function testDeleteWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('{-deleted-}{.removed}');
+
+        $del = $this->getFirstChild($para);
+        $this->assertInstanceOf(Delete::class, $del);
+        $this->assertSame('removed', $del->getAttribute('class'));
+    }
+
+    public function testSymbolWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline(':emoji:{.large}');
+
+        $symbol = $this->getFirstChild($para);
+        $this->assertInstanceOf(Symbol::class, $symbol);
+        $this->assertSame('emoji', $symbol->getName());
+        $this->assertSame('large', $symbol->getAttribute('class'));
+    }
+
+    public function testTrailingAttributesDoNotAffectFollowingText(): void
+    {
+        $para = $this->parseInline('_text_{.cls} more text');
+
+        $children = $para->getChildren();
+        $this->assertCount(2, $children);
+
+        $em = $children[0];
+        $this->assertInstanceOf(Emphasis::class, $em);
+        $this->assertSame('cls', $em->getAttribute('class'));
+
+        $text = $children[1];
+        $this->assertInstanceOf(Text::class, $text);
+        $this->assertSame(' more text', $text->getContent());
+    }
+
+    public function testMultipleInlineElementsWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('_em_{.a} and *strong*{.b}');
+
+        $children = $para->getChildren();
+        $this->assertCount(3, $children);
+
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+        $this->assertSame('a', $children[0]->getAttribute('class'));
+
+        $this->assertInstanceOf(Text::class, $children[1]);
+
+        $this->assertInstanceOf(Strong::class, $children[2]);
+        $this->assertSame('b', $children[2]->getAttribute('class'));
+    }
+
+    public function testNestedEmphasisWithTrailingAttributes(): void
+    {
+        $para = $this->parseInline('_outer *inner*_{.outer-class}');
+
+        $em = $this->getFirstChild($para);
+        $this->assertInstanceOf(Emphasis::class, $em);
+        $this->assertSame('outer-class', $em->getAttribute('class'));
+    }
+
+    public function testInlineElementWithoutTrailingAttributesStillWorks(): void
+    {
+        $para = $this->parseInline('_plain emphasis_ text');
+
+        $em = $this->getFirstChild($para);
+        $this->assertInstanceOf(Emphasis::class, $em);
+        $this->assertEmpty($em->getAttributes());
     }
 }

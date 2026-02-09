@@ -475,6 +475,29 @@ Still inside the comment
 > **Note:** This is a djot-php extension, not part of the official Djot specification.
 > See [discussion](https://github.com/jgm/djot/issues/67) for background.
 
+Fenced comment blocks are block-level elements that break paragraph continuity.
+Unlike other block elements, fenced comments can interrupt paragraphs without
+requiring a preceding blank line - making them truly "invisible" from a formatting
+perspective:
+
+**Input:**
+```djot
+Lorem ipsum
+%%%
+comment
+%%%
+dolor sit amet
+```
+
+**Output:**
+```html
+<p>Lorem ipsum</p>
+<p>dolor sit amet</p>
+```
+
+This produces two separate paragraphs. For comments that should not interrupt
+paragraph flow (keeping text in the same paragraph), use inline comments (`{% ... %}`).
+
 ### Line Blocks
 
 Preserve line breaks using `|` at the start of each line. Useful for poetry or addresses.

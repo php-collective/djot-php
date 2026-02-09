@@ -134,6 +134,22 @@ class HeadingPermalinksExtensionTest extends TestCase
         $this->assertStringContainsString('href="#emphasized-strong-text"', $html);
     }
 
+    public function testDuplicateHeadingsGetUniqueIds(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension());
+
+        $html = $converter->convert("## Summary\n\nFirst section.\n\n## Summary\n\nSecond section.");
+
+        // Both sections should have unique IDs
+        $this->assertStringContainsString('id="Summary"', $html);
+        $this->assertStringContainsString('id="Summary-1"', $html);
+
+        // Permalink links should point to the correct section
+        $this->assertStringContainsString('href="#Summary"', $html);
+        $this->assertStringContainsString('href="#Summary-1"', $html);
+    }
+
     public function testHeadingWithLineBreak(): void
     {
         $converter = new DjotConverter();
@@ -144,5 +160,64 @@ class HeadingPermalinksExtensionTest extends TestCase
 
         // The break should become a space in the ID
         $this->assertStringContainsString('href="#Hello-World"', $html);
+    }
+
+    public function testShowOnHover(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension(
+            showOnHover: true,
+        ));
+
+        $html = $converter->convert('# Hello World');
+
+        // Wrapper should have hover class
+        $this->assertStringContainsString('class="permalink-wrapper permalink-hover"', $html);
+    }
+
+    public function testShowOnHoverDisabledByDefault(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension());
+
+        $html = $converter->convert('# Hello World');
+
+        $this->assertStringNotContainsString('permalink-hover', $html);
+    }
+
+    public function testCopyToClipboard(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension(
+            copyToClipboard: true,
+        ));
+
+        $html = $converter->convert('# Hello World');
+
+        $this->assertStringContainsString('data-permalink-copy=""', $html);
+    }
+
+    public function testCopyToClipboardDisabledByDefault(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension());
+
+        $html = $converter->convert('# Hello World');
+
+        $this->assertStringNotContainsString('data-permalink-copy', $html);
+    }
+
+    public function testShowOnHoverAndCopyTogether(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension(
+            showOnHover: true,
+            copyToClipboard: true,
+        ));
+
+        $html = $converter->convert('# Hello World');
+
+        $this->assertStringContainsString('permalink-hover', $html);
+        $this->assertStringContainsString('data-permalink-copy=""', $html);
     }
 }

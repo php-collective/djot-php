@@ -6,8 +6,6 @@ namespace Djot\Extension;
 
 use Djot\DjotConverter;
 use Djot\Node\Block\Heading;
-use Djot\Node\Inline\Text;
-use Djot\Node\Node;
 
 /**
  * Table of Contents generator
@@ -74,8 +72,10 @@ class TableOfContentsExtension implements ExtensionInterface
      */
     public function register(DjotConverter $converter): void
     {
+        $tracker = $converter->getHeadingIdTracker();
+
         // Hook into heading rendering to collect TOC entries
-        $converter->on('render.heading', function ($event): void {
+        $converter->on('render.heading', function ($event) use ($tracker): void {
             $node = $event->getNode();
             if (!$node instanceof Heading) {
                 return;
@@ -87,8 +87,8 @@ class TableOfContentsExtension implements ExtensionInterface
                 return;
             }
 
-            $text = $this->getPlainText($node);
-            $id = $this->generateId($node, $text);
+            $text = $tracker->getPlainText($node);
+            $id = $tracker->getIdForHeading($node);
 
             $this->toc[] = [
                 'level' => $level,
@@ -154,49 +154,6 @@ class TableOfContentsExtension implements ExtensionInterface
     public function clear(): void
     {
         $this->toc = [];
-    }
-
-    /**
-     * Extract plain text from a node
-     */
-    protected function getPlainText(Node $node): string
-    {
-        $text = '';
-        foreach ($node->getChildren() as $child) {
-            if ($child instanceof Text) {
-                $text .= $child->getContent();
-            } elseif (method_exists($child, 'getChildren')) {
-                $text .= $this->getPlainText($child);
-            }
-        }
-
-        return $text;
-    }
-
-    /**
-     * Generate ID for a heading (matches HtmlRenderer::getSectionId() behavior)
-     */
-    protected function generateId(Heading $heading, string $text): string
-    {
-        // Check for explicit ID attribute
-        $id = $heading->getAttribute('id');
-        if (is_string($id) && $id !== '') {
-            return $id;
-        }
-
-        // Generate from text - match HtmlRenderer::getSectionId() behavior:
-        // 1. Strip # characters entirely
-        // 2. Trim whitespace
-        // 3. Replace whitespace sequences with single dashes
-        if ($text === '') {
-            return '';
-        }
-
-        $id = str_replace('#', '', $text);
-        $id = trim($id);
-        $id = preg_replace('/[\s]+/', '-', $id) ?? $id;
-
-        return $id;
     }
 
     /**
