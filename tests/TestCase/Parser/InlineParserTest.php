@@ -377,6 +377,251 @@ class InlineParserTest extends TestCase
         $this->assertSame('http://example.com/a_b', $children[1]->getDestination());
     }
 
+    /**
+     * Test: Underscore in link URL should not break emphasis
+     *
+     * This is the main issue from https://github.com/jgm/djot/issues/375
+     * _[link](http://example.com?foo_bar=1), more text_
+     * Should produce emphasis around the entire content, with a working link.
+     */
+    public function testEmphasisWithUnderscoreInLinkDestination(): void
+    {
+        $para = $this->parseInline('_[link](http://example.com?foo_bar=1), more text_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        // Should contain a link node followed by text
+        $this->assertInstanceOf(Link::class, $emChildren[0]);
+        $this->assertSame('http://example.com?foo_bar=1', $emChildren[0]->getDestination());
+
+        // Verify link text
+        $linkChildren = $emChildren[0]->getChildren();
+        $this->assertInstanceOf(Text::class, $linkChildren[0]);
+        $this->assertSame('link', $linkChildren[0]->getContent());
+    }
+
+    /**
+     * Test: Simple underscore in path should not break emphasis
+     */
+    public function testEmphasisWithUnderscoreInSimplePath(): void
+    {
+        $para = $this->parseInline('_hello [link](a_b) world_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Text::class, $emChildren[0]);
+        $this->assertSame('hello ', $emChildren[0]->getContent());
+        $this->assertInstanceOf(Link::class, $emChildren[1]);
+        $this->assertSame('a_b', $emChildren[1]->getDestination());
+        $this->assertInstanceOf(Text::class, $emChildren[2]);
+        $this->assertSame(' world', $emChildren[2]->getContent());
+    }
+
+    /**
+     * Test: Star in link URL should not break strong
+     */
+    public function testStrongWithStarInLinkDestination(): void
+    {
+        $para = $this->parseInline('*[link](http://example.com?q=a*b) text*');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Strong::class, $children[0]);
+
+        $strongChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Link::class, $strongChildren[0]);
+        $this->assertSame('http://example.com?q=a*b', $strongChildren[0]->getDestination());
+    }
+
+    /**
+     * Test: Multiple underscores in URL
+     */
+    public function testEmphasisWithMultipleUnderscoresInDestination(): void
+    {
+        $para = $this->parseInline('_[link](path/to_file_name_here)_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Link::class, $emChildren[0]);
+        $this->assertSame('path/to_file_name_here', $emChildren[0]->getDestination());
+    }
+
+    /**
+     * Test: Nested parentheses in URL should be handled correctly
+     */
+    public function testEmphasisWithNestedParensInDestination(): void
+    {
+        $para = $this->parseInline('_[wiki](http://en.wikipedia.org/wiki/Foo_(bar))_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Link::class, $emChildren[0]);
+        $this->assertSame('http://en.wikipedia.org/wiki/Foo_(bar)', $emChildren[0]->getDestination());
+    }
+
+    /**
+     * Test: Escaped underscore in URL
+     */
+    public function testEmphasisWithEscapedUnderscoreInDestination(): void
+    {
+        $para = $this->parseInline('_[link](path/to\_file)_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Link::class, $emChildren[0]);
+        // Escape is processed, so _ becomes literal
+        $this->assertSame('path/to_file', $emChildren[0]->getDestination());
+    }
+
+    /**
+     * Test: Image with underscore in URL should also work
+     */
+    public function testEmphasisWithUnderscoreInImageDestination(): void
+    {
+        $para = $this->parseInline('_![alt](image_file.png)_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Image::class, $emChildren[0]);
+        $this->assertSame('image_file.png', $emChildren[0]->getSource());
+    }
+
+    /**
+     * Test: Multiple links with underscores in URLs
+     */
+    public function testEmphasisWithMultipleLinksWithUnderscores(): void
+    {
+        $para = $this->parseInline('_[a](x_y) and [b](p_q)_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Link::class, $emChildren[0]);
+        $this->assertSame('x_y', $emChildren[0]->getDestination());
+        $this->assertInstanceOf(Text::class, $emChildren[1]);
+        $this->assertSame(' and ', $emChildren[1]->getContent());
+        $this->assertInstanceOf(Link::class, $emChildren[2]);
+        $this->assertSame('p_q', $emChildren[2]->getDestination());
+    }
+
+    /**
+     * Test: Underscore in link text still triggers emphasis (bracket-text case)
+     *
+     * This is intentionally NOT fixed by the destination-only approach.
+     * _[foo_](url) should still produce emphasis [foo then ](url) as text.
+     */
+    public function testUnderscoreInLinkTextStillTriggersEmphasis(): void
+    {
+        $para = $this->parseInline('_[bar_](url)');
+
+        $children = $para->getChildren();
+        // The _ inside [bar_] closes the emphasis started at the beginning
+        // Result: <em>[bar</em>](url)
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Text::class, $emChildren[0]);
+        $this->assertSame('[bar', $emChildren[0]->getContent());
+
+        // Remaining text after emphasis
+        $this->assertInstanceOf(Text::class, $children[1]);
+        $this->assertSame('](url)', $children[1]->getContent());
+    }
+
+    /**
+     * Test: Unclosed link destination doesn't break emphasis
+     */
+    public function testEmphasisWithUnclosedLinkDestination(): void
+    {
+        // [foo](_bar is not a complete link, so emphasis should still work
+        $para = $this->parseInline('_text [foo](_bar more_');
+
+        $children = $para->getChildren();
+        // This is complex - the [foo]( triggers unclosed link handling
+        // The emphasis should close on the last _
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+    }
+
+    /**
+     * Test: Link destination without preceding bracket should not affect emphasis
+     */
+    public function testEmphasisWithParensNotPrecededByBracket(): void
+    {
+        // Just (a_b) without [] before it - underscore should close emphasis
+        $para = $this->parseInline('_foo (a_b) bar_');
+
+        $children = $para->getChildren();
+        // The _ in (a_b) closes emphasis because there's no ]( pattern
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+        $emChildren = $children[0]->getChildren();
+        $this->assertInstanceOf(Text::class, $emChildren[0]);
+        $this->assertSame('foo (a', $emChildren[0]->getContent());
+    }
+
+    /**
+     * Test: Complex real-world URL with query params and underscores
+     */
+    public function testEmphasisWithComplexQueryString(): void
+    {
+        $para = $this->parseInline('_Check [this API](https://api.example.com/v1/users?sort_by=name&filter_type=active) for details_');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Emphasis::class, $children[0]);
+
+        $emChildren = $children[0]->getChildren();
+        $found = false;
+        foreach ($emChildren as $child) {
+            if ($child instanceof Link) {
+                $this->assertSame('https://api.example.com/v1/users?sort_by=name&filter_type=active', $child->getDestination());
+                $found = true;
+            }
+        }
+        $this->assertTrue($found, 'Link should be found within emphasis');
+    }
+
+    /**
+     * Test: Strong (star) with complex URL
+     */
+    public function testStrongWithComplexUrl(): void
+    {
+        $para = $this->parseInline('*Visit [the page](http://example.com/path*with*stars) now*');
+
+        $children = $para->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Strong::class, $children[0]);
+
+        $strongChildren = $children[0]->getChildren();
+        $foundLink = false;
+        foreach ($strongChildren as $child) {
+            if ($child instanceof Link) {
+                $this->assertSame('http://example.com/path*with*stars', $child->getDestination());
+                $foundLink = true;
+            }
+        }
+        $this->assertTrue($foundLink, 'Link should be found within strong');
+    }
+
     public function testEmphasisFollowedByCloseBrace(): void
     {
         // Emphasis opener cannot be followed by } (closer marker)

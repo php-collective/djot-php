@@ -1047,6 +1047,18 @@ class InlineParser
                 }
             }
 
+            // Skip over link destinations ](...)
+            // This prevents emphasis delimiters inside URLs from closing emphasis
+            // that started before the link. e.g. _[link](url_bar)_ should work.
+            if ($char === ']' && $searchPos + 1 < $length && $text[$searchPos + 1] === '(') {
+                $destEnd = $this->findLinkDestinationEnd($text, $searchPos + 1);
+                if ($destEnd !== null) {
+                    $searchPos = $destEnd;
+
+                    continue;
+                }
+            }
+
             // Skip escape sequences
             if ($char === '\\' && $searchPos + 1 < $length) {
                 $searchPos += 2;
@@ -1616,6 +1628,48 @@ class InlineParser
         }
 
         return null;
+    }
+
+    /**
+     * Find the end of a link destination starting at $pos (which points to '(').
+     *
+     * This is a simpler version that only handles the destination part,
+     * not the full link syntax. Used to skip over URL content when scanning
+     * for emphasis closers.
+     *
+     * @return int|null Position after the closing ), or null if not found
+     */
+    protected function findLinkDestinationEnd(string $text, int $pos): ?int
+    {
+        $length = strlen($text);
+        if ($pos >= $length || $text[$pos] !== '(') {
+            return null;
+        }
+
+        $parenDepth = 1;
+        $i = $pos + 1;
+
+        while ($i < $length && $parenDepth > 0) {
+            $char = $text[$i];
+            if ($char === '(') {
+                $parenDepth++;
+            } elseif ($char === ')') {
+                $parenDepth--;
+            } elseif ($char === '\\' && $i + 1 < $length) {
+                // Skip escaped character
+                $i++;
+            }
+            if ($parenDepth > 0) {
+                $i++;
+            }
+        }
+
+        if ($parenDepth !== 0) {
+            return null;
+        }
+
+        // Return position after the closing )
+        return $i + 1;
     }
 
     /**
