@@ -532,4 +532,81 @@ class BlockParserTest extends TestCase
         $this->assertCount(1, $children);
         $this->assertSame('<b>bold</b>', $children[0]->getContent());
     }
+
+    public function testCodeBlockWithLineNumbers(): void
+    {
+        $doc = $this->parser->parse("```php #\necho 'hello';\n```");
+
+        $codeBlock = $doc->getChildren()[0];
+        $this->assertInstanceOf(CodeBlock::class, $codeBlock);
+        $this->assertSame('php', $codeBlock->getLanguage());
+        $this->assertTrue($codeBlock->showLineNumbers());
+        $this->assertSame(1, $codeBlock->getLineNumberStart());
+    }
+
+    public function testCodeBlockWithLineNumbersStartOffset(): void
+    {
+        $doc = $this->parser->parse("```php #=5\necho 'hello';\n```");
+
+        $codeBlock = $doc->getChildren()[0];
+        $this->assertInstanceOf(CodeBlock::class, $codeBlock);
+        $this->assertSame('php', $codeBlock->getLanguage());
+        $this->assertTrue($codeBlock->showLineNumbers());
+        $this->assertSame(5, $codeBlock->getLineNumberStart());
+    }
+
+    public function testCodeBlockWithHighlightLines(): void
+    {
+        $doc = $this->parser->parse("```php {2,4-6}\nline1\nline2\nline3\nline4\nline5\nline6\n```");
+
+        $codeBlock = $doc->getChildren()[0];
+        $this->assertInstanceOf(CodeBlock::class, $codeBlock);
+        $this->assertSame('php', $codeBlock->getLanguage());
+        $this->assertFalse($codeBlock->showLineNumbers());
+        $this->assertSame([2, 4, 5, 6], $codeBlock->getHighlightLines());
+    }
+
+    public function testCodeBlockWithLineNumbersAndHighlight(): void
+    {
+        $doc = $this->parser->parse("```php # {2,4}\nline1\nline2\nline3\nline4\n```");
+
+        $codeBlock = $doc->getChildren()[0];
+        $this->assertInstanceOf(CodeBlock::class, $codeBlock);
+        $this->assertSame('php', $codeBlock->getLanguage());
+        $this->assertTrue($codeBlock->showLineNumbers());
+        $this->assertSame([2, 4], $codeBlock->getHighlightLines());
+    }
+
+    public function testCodeBlockWithLineNumbersOffsetAndHighlight(): void
+    {
+        $doc = $this->parser->parse("```php #=10 {2,4}\nline1\nline2\nline3\nline4\n```");
+
+        $codeBlock = $doc->getChildren()[0];
+        $this->assertInstanceOf(CodeBlock::class, $codeBlock);
+        $this->assertSame('php', $codeBlock->getLanguage());
+        $this->assertTrue($codeBlock->showLineNumbers());
+        $this->assertSame(10, $codeBlock->getLineNumberStart());
+        $this->assertSame([2, 4], $codeBlock->getHighlightLines());
+    }
+
+    public function testCodeBlockLineNumbersOnlyNoLanguage(): void
+    {
+        $doc = $this->parser->parse("```#\ncode\n```");
+
+        $codeBlock = $doc->getChildren()[0];
+        $this->assertInstanceOf(CodeBlock::class, $codeBlock);
+        $this->assertNull($codeBlock->getLanguage());
+        $this->assertTrue($codeBlock->showLineNumbers());
+    }
+
+    public function testCodeBlockHighlightOnlyNoLanguage(): void
+    {
+        $doc = $this->parser->parse("```{1,3}\nline1\nline2\nline3\n```");
+
+        $codeBlock = $doc->getChildren()[0];
+        $this->assertInstanceOf(CodeBlock::class, $codeBlock);
+        $this->assertNull($codeBlock->getLanguage());
+        $this->assertFalse($codeBlock->showLineNumbers());
+        $this->assertSame([1, 3], $codeBlock->getHighlightLines());
+    }
 }

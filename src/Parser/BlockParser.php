@@ -880,9 +880,16 @@ class BlockParser
             $this->addWarning('Unclosed code fence', $start, 1, true);
         }
 
-        $language = $info !== '' ? $info : null;
+        // Parse info string for language, line numbers, and highlight lines
+        $parsedInfo = $this->fencedBlockParser->parseCodeBlockInfo($info);
 
-        $codeBlock = new CodeBlock(trim($content, "\n"), $language);
+        $codeBlock = new CodeBlock(
+            trim($content, "\n"),
+            $parsedInfo['language'],
+            $parsedInfo['showLineNumbers'],
+            $parsedInfo['lineNumberStart'],
+            $parsedInfo['highlightLines'],
+        );
         $this->applyPendingAttributes($codeBlock);
         $parent->appendChild($codeBlock);
 

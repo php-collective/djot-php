@@ -208,4 +208,113 @@ class FencedBlockParser
 
         return $line;
     }
+
+    /**
+     * Parse code block info string for language, line numbers, and highlight lines.
+     *
+     * Syntax examples:
+     * - `php` - just language
+     * - `php #` - language with line numbers
+     * - `php #=5` - language with line numbers starting at 5
+     * - `php {3,5-7}` - language with highlighted lines
+     * - `php # {3,5-7}` - language with line numbers and highlighted lines
+     * - `php #=5 {3,5-7}` - language with line numbers starting at 5 and highlighted lines
+     * - `#` - no language, just line numbers
+     * - `{3,5}` - no language, just highlighted lines
+     *
+     * @param string $info The info string after the opening fence
+     *
+     * @return array{language: string|null, showLineNumbers: bool, lineNumberStart: int, highlightLines: array<int>}
+     */
+    public function parseCodeBlockInfo(string $info): array
+    {
+        $result = [
+            'language' => null,
+            'showLineNumbers' => false,
+            'lineNumberStart' => 1,
+            'highlightLines' => [],
+        ];
+
+        $info = trim($info);
+        if ($info === '') {
+            return $result;
+        }
+
+        // Match the full pattern: [language] [#[=N]] [{lines}]
+        // Language: must start with word char or dot, can contain +, #, -, . (e.g., c++, c#, .net)
+        // Line numbers: # or #=N
+        // Highlight: {1,3-5,7}
+        $pattern = '/^(?<lang>[\w.][\w+#.-]*)?\s*(?<linenum>#(?:=(?<start>\d+))?)?(?:\s*\{(?<highlight>[0-9,\-\s]+)\})?$/';
+
+        if (!preg_match($pattern, $info, $matches)) {
+            // If pattern doesn't match, treat entire info as language (backwards compatible)
+            $result['language'] = $info;
+
+            return $result;
+        }
+
+        // Extract language
+        if (!empty($matches['lang'])) {
+            $result['language'] = $matches['lang'];
+        }
+
+        // Extract line numbers
+        if (!empty($matches['linenum'])) {
+            $result['showLineNumbers'] = true;
+            if (!empty($matches['start'])) {
+                $result['lineNumberStart'] = (int)$matches['start'];
+            }
+        }
+
+        // Extract highlight lines
+        if (!empty($matches['highlight'])) {
+            $result['highlightLines'] = $this->parseHighlightLines($matches['highlight']);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Parse highlight line specification into array of line numbers.
+     *
+     * @param string $spec Comma-separated list of line numbers and ranges (e.g., "1,3-5,7")
+     *
+     * @return array<int>
+     */
+    protected function parseHighlightLines(string $spec): array
+    {
+        $lines = [];
+        $parts = explode(',', $spec);
+
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if ($part === '') {
+                continue;
+            }
+
+            if (str_contains($part, '-')) {
+                // Range: 3-7
+                [$start, $end] = explode('-', $part, 2);
+                $start = (int)trim($start);
+                $end = (int)trim($end);
+                if ($start > 0 && $end >= $start) {
+                    for ($i = $start; $i <= $end; $i++) {
+                        $lines[] = $i;
+                    }
+                }
+            } else {
+                // Single line
+                $line = (int)$part;
+                if ($line > 0) {
+                    $lines[] = $line;
+                }
+            }
+        }
+
+        // Remove duplicates and sort
+        $lines = array_unique($lines);
+        sort($lines);
+
+        return $lines;
+    }
 }

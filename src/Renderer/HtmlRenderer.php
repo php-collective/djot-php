@@ -480,6 +480,9 @@ class HtmlRenderer implements RendererInterface
     protected function renderCodeBlock(CodeBlock $node): string
     {
         $language = $node->getLanguage();
+        $showLineNumbers = $node->showLineNumbers();
+        $lineNumberStart = $node->getLineNumberStart();
+        $highlightLines = $node->getHighlightLines();
         $attrs = $this->renderAttributes($node);
 
         $code = $this->escape($node->getContent());
@@ -489,18 +492,104 @@ class HtmlRenderer implements RendererInterface
             $code = str_replace("\t", str_repeat(' ', $this->codeBlockTabWidth), $code);
         }
 
-        // Add trailing newline inside code block (official djot behavior)
-        if ($code !== '' && !str_ends_with($code, "\n")) {
-            $code .= "\n";
+        // Build pre classes
+        $preClasses = [];
+        if ($showLineNumbers) {
+            $preClasses[] = 'line-numbers';
+        }
+        if ($highlightLines !== []) {
+            $preClasses[] = 'has-highlighted-lines';
+        }
+
+        // Build pre attributes
+        $preAttrs = $attrs;
+        if ($preClasses !== []) {
+            $preAttrs = $this->mergeClassAttribute($preAttrs, implode(' ', $preClasses));
+        }
+        if ($showLineNumbers && $lineNumberStart !== 1) {
+            $preAttrs .= ' data-start="' . $lineNumberStart . '"';
+        }
+
+        // If we have line numbers or highlighting, wrap each line
+        if ($showLineNumbers || $highlightLines !== []) {
+            $code = $this->renderCodeWithLineWrappers($code, $lineNumberStart, $highlightLines);
+        } else {
+            // Add trailing newline inside code block (official djot behavior)
+            if ($code !== '' && !str_ends_with($code, "\n")) {
+                $code .= "\n";
+            }
         }
 
         if ($language !== null) {
             $langClass = 'class="language-' . $this->escape($language) . '"';
 
-            return '<pre' . $attrs . '><code ' . $langClass . '>' . $code . "</code></pre>\n";
+            return '<pre' . $preAttrs . '><code ' . $langClass . '>' . $code . "</code></pre>\n";
         }
 
-        return '<pre' . $attrs . '><code>' . $code . "</code></pre>\n";
+        return '<pre' . $preAttrs . '><code>' . $code . "</code></pre>\n";
+    }
+
+    /**
+     * Wrap each line in a span with optional highlighting.
+     *
+     * @param string $code The escaped code content
+     * @param int $startLine The starting line number
+     * @param array<int> $highlightLines Lines to highlight
+     *
+     * @return string Code with line wrappers
+     */
+    protected function renderCodeWithLineWrappers(string $code, int $startLine, array $highlightLines): string
+    {
+        $lines = explode("\n", $code);
+
+        // Remove last empty line if present (we'll add it back at the end)
+        $hadTrailingNewline = end($lines) === '';
+        if ($hadTrailingNewline) {
+            array_pop($lines);
+        }
+
+        $result = [];
+        $lineNum = $startLine;
+
+        foreach ($lines as $line) {
+            $classes = ['line'];
+            if (in_array($lineNum, $highlightLines, true)) {
+                $classes[] = 'highlighted';
+            }
+
+            $classAttr = implode(' ', $classes);
+            $result[] = '<span class="' . $classAttr . '" data-line="' . $lineNum . '">' . $line . '</span>';
+            $lineNum++;
+        }
+
+        return implode("\n", $result) . "\n";
+    }
+
+    /**
+     * Merge a class into an existing attributes string.
+     *
+     * @param string $attrs Existing attributes string (may be empty or start with space)
+     * @param string $class Class(es) to add
+     *
+     * @return string Updated attributes string
+     */
+    protected function mergeClassAttribute(string $attrs, string $class): string
+    {
+        if ($attrs === '') {
+            return ' class="' . $class . '"';
+        }
+
+        // Check if there's already a class attribute
+        if (preg_match('/\sclass="([^"]*)"/', $attrs, $matches)) {
+            // Append to existing class
+            $existingClass = $matches[1];
+            $newClass = $existingClass . ' ' . $class;
+
+            return (string)preg_replace('/\sclass="[^"]*"/', ' class="' . $newClass . '"', $attrs);
+        }
+
+        // No existing class, prepend new class attribute
+        return ' class="' . $class . '"' . $attrs;
     }
 
     protected function renderBlockQuote(BlockQuote $node): string

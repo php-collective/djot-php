@@ -358,4 +358,87 @@ class HtmlRendererTest extends TestCase
         $this->renderer->setCodeBlockTabWidth(null);
         $this->assertNull($this->renderer->getCodeBlockTabWidth());
     }
+
+    public function testCodeBlockWithLineNumbers(): void
+    {
+        $doc = new Document();
+        $codeBlock = new CodeBlock("line1\nline2\nline3", 'php', true);
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('class="line-numbers"', $result);
+        $this->assertStringContainsString('class="line" data-line="1"', $result);
+        $this->assertStringContainsString('class="line" data-line="2"', $result);
+        $this->assertStringContainsString('class="line" data-line="3"', $result);
+    }
+
+    public function testCodeBlockWithLineNumbersStartOffset(): void
+    {
+        $doc = new Document();
+        $codeBlock = new CodeBlock("line1\nline2", 'php', true, 5);
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('class="line-numbers"', $result);
+        $this->assertStringContainsString('data-start="5"', $result);
+        $this->assertStringContainsString('data-line="5"', $result);
+        $this->assertStringContainsString('data-line="6"', $result);
+    }
+
+    public function testCodeBlockWithHighlightedLines(): void
+    {
+        $doc = new Document();
+        $codeBlock = new CodeBlock("line1\nline2\nline3", 'php', false, 1, [2]);
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('class="has-highlighted-lines"', $result);
+        $this->assertStringContainsString('class="line" data-line="1"', $result);
+        $this->assertStringContainsString('class="line highlighted" data-line="2"', $result);
+        $this->assertStringContainsString('class="line" data-line="3"', $result);
+    }
+
+    public function testCodeBlockWithLineNumbersAndHighlight(): void
+    {
+        $doc = new Document();
+        $codeBlock = new CodeBlock("line1\nline2\nline3", 'php', true, 1, [1, 3]);
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('class="line-numbers has-highlighted-lines"', $result);
+        $this->assertStringContainsString('class="line highlighted" data-line="1"', $result);
+        $this->assertStringContainsString('class="line" data-line="2"', $result);
+        $this->assertStringContainsString('class="line highlighted" data-line="3"', $result);
+    }
+
+    public function testCodeBlockWithLineNumbersOffsetAndHighlight(): void
+    {
+        $doc = new Document();
+        $codeBlock = new CodeBlock("line1\nline2\nline3", 'php', true, 10, [11]);
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('data-start="10"', $result);
+        $this->assertStringContainsString('class="line" data-line="10"', $result);
+        $this->assertStringContainsString('class="line highlighted" data-line="11"', $result);
+        $this->assertStringContainsString('class="line" data-line="12"', $result);
+    }
+
+    public function testCodeBlockNoLineWrappersWithoutFeatures(): void
+    {
+        $doc = new Document();
+        $codeBlock = new CodeBlock("line1\nline2", 'php');
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        // Without line numbers or highlighting, no span wrappers
+        $this->assertStringNotContainsString('class="line"', $result);
+        $this->assertStringNotContainsString('data-line=', $result);
+    }
 }
