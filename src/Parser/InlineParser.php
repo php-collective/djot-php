@@ -352,12 +352,11 @@ class InlineParser
 
                         continue;
                     }
-                    if (isset($result['node'])) {
-                        $parent->appendChild($result['node']);
-                        $pos = $result['pos'];
+                    // At this point, result has node/pos (not unclosed_link)
+                    $parent->appendChild($result['node']);
+                    $pos = $result['pos'];
 
-                        continue;
-                    }
+                    continue;
                 }
             }
 
@@ -896,8 +895,8 @@ class InlineParser
             return null;
         }
 
-        // Unclosed links can't be images, and we need node/pos to exist
-        if (isset($result['unclosed_link']) || !isset($result['node'])) {
+        // Unclosed links can't be images
+        if (isset($result['unclosed_link'])) {
             return null;
         }
 
