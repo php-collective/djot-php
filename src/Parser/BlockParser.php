@@ -1647,8 +1647,19 @@ class BlockParser
             $lastItemHadBlankAfter = false;
             $hasNonMarkerContinuation = false;
 
-            // Calculate content indent (base + marker width, typically 2 for "- ")
-            $contentIndent = $baseIndent + 2;
+            // Calculate content indent based on list type and marker width
+            // For bullet lists (including task lists): use 2 (for "- ")
+            // For ordered lists: use actual marker width (varies with number length)
+            // Task list checkbox is considered part of content, not marker
+            if ($listType === ListBlock::TYPE_ORDERED) {
+                // Ordered list marker width = length of trimmed line - length of content
+                // Examples: "1. " = 3, "10. " = 4, "(1) " = 4, "(10) " = 5
+                $markerWidth = strlen($trimmedLine) - strlen($itemContent);
+            } else {
+                // Bullet and task lists use 2-char base marker ("- " or "* " or "+ ")
+                $markerWidth = 2;
+            }
+            $contentIndent = $baseIndent + $markerWidth;
 
             while ($i < $count) {
                 $nextLine = $lines[$i];
@@ -1718,12 +1729,20 @@ class BlockParser
                 }
             }
 
-            // For tight lists with continuation lines, parse as plain text
-            // This prevents "-like" lines from being parsed as nested lists
+            // For tight lists with continuation lines, check if content starts with
+            // a block element. If so, parse as blocks; otherwise parse as plain text.
+            // This prevents "-like" lines from being parsed as nested lists while
+            // still allowing blockquotes, code blocks, etc. to be properly recognized.
             if ($hasNonMarkerContinuation) {
-                $paragraph = new Paragraph();
-                $this->inlineParser->parse($paragraph, implode("\n", $itemLines), $start);
-                $listItem->appendChild($paragraph);
+                $firstLine = $itemLines[0];
+                if ($this->isBlockElementStart($firstLine)) {
+                    // Content starts with a block element (blockquote, code fence, etc.)
+                    $this->parseBlocks($listItem, $itemLines, 0);
+                } else {
+                    $paragraph = new Paragraph();
+                    $this->inlineParser->parse($paragraph, implode("\n", $itemLines), $start);
+                    $listItem->appendChild($paragraph);
+                }
             } else {
                 $this->parseBlocks($listItem, $itemLines, 0);
             }
