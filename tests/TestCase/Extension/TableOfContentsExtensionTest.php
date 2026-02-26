@@ -324,4 +324,32 @@ DJOT;
         $tocHtml = $tocExtension->getTocHtml();
         $this->assertStringContainsString('<nav class="toc">', $tocHtml);
     }
+
+    public function testInlineCodeTextIsIncludedInTocEntry(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+        $converter->addExtension($tocExtension);
+
+        $converter->convert("## The `foo` function\n");
+
+        $toc = $tocExtension->getToc();
+
+        $this->assertSame('The foo function', $toc[0]['text']);
+        $this->assertSame('The-foo-function', $toc[0]['id']);
+    }
+
+    public function testInlineMathTextIsIncludedInTocEntry(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+        $converter->addExtension($tocExtension);
+
+        // Djot inline math uses $`...` syntax
+        $converter->convert("## Equation \$`E=mc^2`\n");
+
+        $toc = $tocExtension->getToc();
+
+        $this->assertSame('Equation E=mc^2', $toc[0]['text']);
+    }
 }
