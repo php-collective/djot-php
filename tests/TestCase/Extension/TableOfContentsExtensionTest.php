@@ -351,5 +351,23 @@ DJOT;
         $toc = $tocExtension->getToc();
 
         $this->assertSame('Equation E=mc^2', $toc[0]['text']);
+        $this->assertSame('Equation-E=mc^2', $toc[0]['id']);
+    }
+
+    public function testRawInlineIsExcludedFromTocEntry(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+        $converter->addExtension($tocExtension);
+
+        // Raw inline HTML syntax: `content`{=html}
+        $converter->convert("## Hello `<span>raw</span>`{=html}\n");
+
+        $toc = $tocExtension->getToc();
+
+        // RawInline is format-specific and should be skipped (matches PlainTextRenderer behaviour)
+        // The space before the raw inline is preserved in the text but trimmed for the ID
+        $this->assertSame('Hello ', $toc[0]['text']);
+        $this->assertSame('Hello', $toc[0]['id']);
     }
 }

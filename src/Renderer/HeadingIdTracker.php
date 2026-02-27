@@ -8,8 +8,8 @@ use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Math;
-use Djot\Node\Inline\RawInline;
 use Djot\Node\Inline\SoftBreak;
+use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 
@@ -136,8 +136,10 @@ class HeadingIdTracker
                 $text .= $child->getContent();
             } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
                 $text .= ' ';
-            } elseif ($child instanceof Code || $child instanceof Math || $child instanceof RawInline) {
+            } elseif ($child instanceof Code || $child instanceof Math) {
                 $text .= $child->getContent();
+            } elseif ($child instanceof Symbol) {
+                $text .= ':' . $child->getName() . ':';
             } elseif ($child instanceof Node) {
                 $text .= $this->extractPlainText($child);
             }
