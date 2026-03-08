@@ -12,6 +12,7 @@ This directory contains detailed documentation for djot-php.
 - [Cookbook](cookbook.md) - Common customizations and recipes
 - [PlainText Cookbook](cookbook-plaintext.md) - PlainTextRenderer customizations
 - [Markdown Cookbook](cookbook-markdown.md) - MarkdownRenderer customizations
+- [ANSI Cookbook](cookbook-ansi.md) - AnsiRenderer customizations
 - [Architecture](architecture.md) - Internal design
 - [Converters](converters.md) - Markdown/BBCode to Djot conversion
 - [Performance](performance.md) - Benchmarks and performance data
@@ -351,6 +352,19 @@ $document = $converter->parse('Hello *world*!');
 $renderer = new MarkdownRenderer();
 echo $renderer->render($document);
 // Output: Hello **world**!
+```
+
+### ANSI (Terminal)
+
+Render colorized output for terminals:
+
+```php
+use Djot\Renderer\AnsiRenderer;
+
+$document = $converter->parse('# Hello *world*!');
+$renderer = new AnsiRenderer();
+echo $renderer->render($document);
+// Output: Colorized heading with bold text
 ```
 
 ## File Operations
