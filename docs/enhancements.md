@@ -15,6 +15,7 @@ They are either on the way to get incorporated upstream - or may be incorporated
 - [Optional Modes](#optional-modes)
   - [Significant Newlines Mode](#significant-newlines-mode)
 - [Language Features Beyond Spec](#language-features-beyond-spec)
+  - [Task List Underscore Notation](#task-list-underscore-notation)
   - [List Item Attributes](#list-item-attributes)
   - [Table Row and Cell Attributes](#table-row-and-cell-attributes)
   - [Boolean Attribute Shorthand](#boolean-attribute-shorthand)
@@ -248,6 +249,38 @@ They said:
 ## Language Features Beyond Spec
 
 These are djot syntax features we've implemented that aren't yet in the upstream spec.
+
+### Task List Underscore Notation
+
+**Related:** [jgm/djot#305](https://github.com/jgm/djot/issues/305)
+
+**Status:** Implemented in djot-php
+
+The underscore `[_]` can be used as an alternative to space `[ ]` for unchecked task list items:
+
+```djot
+- [_] unchecked with underscore
+- [ ] unchecked with space
+- [x] checked item
+```
+
+**Output:**
+```html
+<ul class="task-list">
+<li><input type="checkbox" disabled> unchecked with underscore</li>
+<li><input type="checkbox" disabled> unchecked with space</li>
+<li><input type="checkbox" disabled checked> checked item</li>
+</ul>
+```
+
+**Rationale:** The underscore notation is useful when:
+- Typing on mobile devices where spaces inside brackets can be difficult
+- Using editors without monospaced fonts where `[ ]` may look ambiguous
+- The underscore visually resembles an empty checkbox in source
+
+Both notations are fully equivalent and can be mixed within the same list.
+
+---
 
 ### List Item Attributes
 
@@ -811,6 +844,7 @@ vendor/bin/phpunit
 
 | Feature                           | Upstream PR/Issue                                                   | Status     |
 |-----------------------------------|---------------------------------------------------------------------|------------|
+| Task list underscore notation     | [djot:305](https://github.com/jgm/djot/issues/305)                  | Open       |
 | List item attributes              | [djot:262](https://github.com/jgm/djot/pull/262)                    | Open PR    |
 | Table row/cell attributes         | [djot:250](https://github.com/jgm/djot/issues/250)                  | Open       |
 | Boolean attribute shorthand       | [djot:257](https://github.com/jgm/djot/issues/257)                  | Open       |
