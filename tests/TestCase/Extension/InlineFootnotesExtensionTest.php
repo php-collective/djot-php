@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Djot\Tests\TestCase\Extension;
+namespace Djot\Test\TestCase\Extension;
 
 use Djot\DjotConverter;
 use Djot\Extension\InlineFootnotesExtension;

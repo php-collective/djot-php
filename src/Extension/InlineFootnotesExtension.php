@@ -37,9 +37,8 @@ class InlineFootnotesExtension implements ExtensionInterface
     /**
      * @param string $cssClass CSS class that marks a span as an inline footnote
      */
-    public function __construct(
-        protected string $cssClass = 'fn',
-    ) {
+    public function __construct(protected string $cssClass = 'fn')
+    {
     }
 
     public function register(DjotConverter $converter): void
