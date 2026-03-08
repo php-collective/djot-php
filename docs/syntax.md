@@ -958,3 +958,22 @@ Use backslash to escape special characters.
 <p># not a heading</p>
 <p>[not a link]</p>
 ```
+
+### Non-Breaking Space
+
+An escaped space (`\ `) produces a non-breaking space.
+
+**Input:**
+```djot
+100\ km
+
+Dr.\ Smith
+```
+
+**Output:**
+```html
+<p>100&nbsp;km</p>
+<p>Dr.&nbsp;Smith</p>
+```
+
+This is useful for keeping values and units together, titles and names, or any text that shouldn't be split across lines.
