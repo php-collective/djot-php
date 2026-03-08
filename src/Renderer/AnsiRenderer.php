@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Djot\Renderer;
 
 use Djot\Node\Block\BlockQuote;
+use Djot\Node\Block\Caption;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Comment;
 use Djot\Node\Block\DefinitionDescription;
 use Djot\Node\Block\DefinitionList;
 use Djot\Node\Block\DefinitionTerm;
 use Djot\Node\Block\Div;
+use Djot\Node\Block\Figure;
 use Djot\Node\Block\Footnote;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\LineBlock;
@@ -18,11 +20,13 @@ use Djot\Node\Block\ListBlock;
 use Djot\Node\Block\ListItem;
 use Djot\Node\Block\Paragraph;
 use Djot\Node\Block\RawBlock;
+use Djot\Node\Block\Section;
 use Djot\Node\Block\Table;
 use Djot\Node\Block\TableCell;
 use Djot\Node\Block\TableRow;
 use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
+use Djot\Node\Inline\Abbreviation;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
@@ -355,8 +359,11 @@ class AnsiRenderer
             $node instanceof Paragraph => $this->renderParagraph($node),
             $node instanceof Heading => $this->renderHeading($node),
             $node instanceof CodeBlock => $this->renderCodeBlock($node),
+            $node instanceof Caption => $this->renderCaption($node),
             $node instanceof Comment => '', // Skip comments
+            $node instanceof Figure => $this->renderFigure($node),
             $node instanceof RawBlock => $this->renderRawBlock($node),
+            $node instanceof Section => $this->renderChildren($node),
             $node instanceof BlockQuote => $this->renderBlockQuote($node),
             $node instanceof ListBlock => $this->renderList($node),
             $node instanceof ListItem => $this->renderListItem($node),
@@ -369,6 +376,7 @@ class AnsiRenderer
             $node instanceof LineBlock => $this->renderLineBlock($node),
             $node instanceof Footnote => $this->renderFootnote($node),
             $node instanceof Text => $node->getContent(),
+            $node instanceof Abbreviation => $this->renderAbbreviation($node),
             $node instanceof Emphasis => $this->renderEmphasis($node),
             $node instanceof Strong => $this->renderStrong($node),
             $node instanceof Code => $this->renderCode($node),
@@ -629,6 +637,13 @@ class AnsiRenderer
         // Bottom border
         $output .= $this->renderTableBorder($colWidths, 'bottom');
 
+        // Table caption
+        if ($node->hasCaption()) {
+            /** @var \Djot\Node\Block\Caption $caption */
+            $caption = $node->getCaption();
+            $output .= $this->renderCaption($caption);
+        }
+
         return $output . "\n";
     }
 
@@ -840,6 +855,38 @@ class AnsiRenderer
         $content = $node->getContent();
 
         return $this->style('[raw:' . $format . '] ' . $content, self::DIM) . "\n\n";
+    }
+
+    protected function renderFigure(Figure $node): string
+    {
+        $output = '';
+
+        foreach ($node->getChildren() as $child) {
+            if ($child instanceof Caption) {
+                // Render caption after content, styled as italic
+                $output .= $this->renderCaption($child);
+            } else {
+                $output .= $this->renderNode($child);
+            }
+        }
+
+        return $output;
+    }
+
+    protected function renderCaption(Caption $node): string
+    {
+        $content = trim($this->renderChildren($node));
+
+        return $this->style($content, self::ITALIC . self::DIM) . "\n\n";
+    }
+
+    protected function renderAbbreviation(Abbreviation $node): string
+    {
+        $text = $this->renderChildren($node);
+        $title = $node->getTitle();
+
+        // Show abbreviation with definition in parentheses
+        return $text . $this->style(' (' . $title . ')', self::DIM);
     }
 
     /**

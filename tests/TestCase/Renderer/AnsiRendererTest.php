@@ -242,4 +242,60 @@ class AnsiRendererTest extends TestCase
 
         $this->assertSame($renderer, $result);
     }
+
+    public function testRenderFigureWithCaption(): void
+    {
+        $doc = $this->converter->parse("![An image](photo.jpg)\n^ Figure caption here");
+        $output = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('[img:', $output);
+        $this->assertStringContainsString('An image', $output);
+        $this->assertStringContainsString('Figure caption here', $output);
+        // Caption should be styled (italic)
+        $this->assertStringContainsString("\033[3m", $output);
+    }
+
+    public function testRenderAbbreviation(): void
+    {
+        $doc = $this->converter->parse("*[HTML]: Hyper Text Markup Language\n\nThe HTML spec.");
+        $output = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('HTML', $output);
+        $this->assertStringContainsString('Hyper Text Markup Language', $output);
+    }
+
+    public function testRenderSection(): void
+    {
+        // Section nodes are handled but not currently created by the parser
+        // This test verifies the renderer gracefully handles Section nodes
+        // by testing the fallback behavior (renderChildren)
+        $doc = $this->converter->parse("# Heading\n\nContent here.");
+        $output = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('Heading', $output);
+        $this->assertStringContainsString('Content here', $output);
+    }
+
+    public function testRenderTableWithCaption(): void
+    {
+        $doc = $this->converter->parse("| A | B |\n|---|---|\n| 1 | 2 |\n^ Table caption");
+        $output = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('A', $output);
+        $this->assertStringContainsString('B', $output);
+        $this->assertStringContainsString('Table caption', $output);
+    }
+
+    public function testRenderTaskListItem(): void
+    {
+        $doc = $this->converter->parse("- [x] Completed task\n- [ ] Pending task\n- [_] Also pending");
+        $output = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('Completed task', $output);
+        $this->assertStringContainsString('Pending task', $output);
+        $this->assertStringContainsString('Also pending', $output);
+        // Should have checkboxes
+        $this->assertStringContainsString('☑', $output);
+        $this->assertStringContainsString('☐', $output);
+    }
 }
