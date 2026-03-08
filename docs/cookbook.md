@@ -6,6 +6,7 @@ Common recipes and customizations for djot-php.
 
 - [External Links](#external-links)
 - [Custom Emoji/Symbols](#custom-emojisymbols)
+- [Unicode Codepoints](#unicode-codepoints)
 - [Abbreviations](#abbreviations)
 - [Syntax Highlighting](#syntax-highlighting)
 - [Table of Contents Generation](#table-of-contents-generation)
@@ -114,6 +115,171 @@ Output:
 ```html
 <p>I <span class="emoji" title="heart">❤️</span> this <span class="emoji" title="rocket">🚀</span> feature!</p>
 ```
+
+## Unicode Codepoints
+
+Insert Unicode characters by codepoint using the `:symbol:` syntax. This is useful for
+hard-to-type characters like directional marks, variation selectors, zero-width joiners,
+and other invisible or special Unicode characters.
+
+See [djot issue #44](https://github.com/jgm/djot/issues/44) for background on this use case.
+
+### Supported Formats
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Inline\Symbol;
+
+$converter = new DjotConverter();
+
+$converter->on('render.symbol', function (RenderEvent $event): void {
+    $symbol = $event->getNode();
+    if (!$symbol instanceof Symbol) {
+        return;
+    }
+
+    $name = $symbol->getName();
+
+    // Hex with U+ prefix: :U+2192: → "→"
+    if (preg_match('/^U\+([0-9A-Fa-f]+)$/', $name, $m)) {
+        $codepoint = hexdec($m[1]);
+        if ($codepoint >= 0 && $codepoint <= 0x10FFFF) {
+            $event->setHtml(mb_chr($codepoint, 'UTF-8'));
+
+            return;
+        }
+    }
+
+    // Hex with 0x prefix: :0x14b: → "ŋ"
+    if (preg_match('/^0x([0-9A-Fa-f]+)$/', $name, $m)) {
+        $codepoint = hexdec($m[1]);
+        if ($codepoint >= 0 && $codepoint <= 0x10FFFF) {
+            $event->setHtml(mb_chr($codepoint, 'UTF-8'));
+
+            return;
+        }
+    }
+
+    // Decimal: :331: → "ŋ"
+    if (preg_match('/^[0-9]+$/', $name)) {
+        $codepoint = (int) $name;
+        if ($codepoint >= 0 && $codepoint <= 0x10FFFF) {
+            $event->setHtml(mb_chr($codepoint, 'UTF-8'));
+
+            return;
+        }
+    }
+
+    // Unknown symbol - keep original
+    $event->setHtml(':' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ':');
+});
+
+echo $converter->convert('Arrow: :U+2192: Eng: :0x14b: or :331:');
+```
+
+Output:
+```html
+<p>Arrow: → Eng: ŋ or ŋ</p>
+```
+
+### Use Cases
+
+**Bidirectional text markers** (essential for mixed RTL/LTR content):
+```djot
+English text :U+200F: متن فارسی :U+200E: more English
+```
+
+- `:U+200E:` - Left-to-right mark (LRM)
+- `:U+200F:` - Right-to-left mark (RLM)
+- `:U+200B:` - Zero-width space (allows line breaks)
+- `:U+2060:` - Word joiner (prevents line breaks)
+
+**Variation selectors** (control glyph variants):
+```djot
+The character 㐂:U+E0102: uses the third registered variant.
+```
+
+**Soft hyphens** (invisible until line break needed):
+```djot
+super:U+AD:cali:U+AD:fragi:U+AD:listic
+```
+
+### Combining with Emoji
+
+Handle both emoji names and codepoints:
+
+```php
+$emojis = [
+    'heart' => '❤️',
+    'star' => '⭐',
+];
+
+$converter->on('render.symbol', function (RenderEvent $event) use ($emojis): void {
+    $symbol = $event->getNode();
+    if (!$symbol instanceof Symbol) {
+        return;
+    }
+
+    $name = $symbol->getName();
+
+    // Check emoji map first
+    if (isset($emojis[$name])) {
+        $event->setHtml($emojis[$name]);
+
+        return;
+    }
+
+    // Then try codepoint formats
+    $codepoint = null;
+    if (preg_match('/^U\+([0-9A-Fa-f]+)$/', $name, $m)) {
+        $codepoint = hexdec($m[1]);
+    } elseif (preg_match('/^0x([0-9A-Fa-f]+)$/', $name, $m)) {
+        $codepoint = hexdec($m[1]);
+    } elseif (preg_match('/^[0-9]+$/', $name)) {
+        $codepoint = (int) $name;
+    }
+
+    if ($codepoint !== null && $codepoint >= 0 && $codepoint <= 0x10FFFF) {
+        $event->setHtml(mb_chr($codepoint, 'UTF-8'));
+
+        return;
+    }
+
+    // Unknown - keep original
+    $event->setHtml(':' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ':');
+});
+
+echo $converter->convert('I :heart: arrows :U+2192: and :star:');
+```
+
+Output:
+```html
+<p>I ❤️ arrows → and ⭐</p>
+```
+
+### Alternatives
+
+For simpler cases, djot provides built-in alternatives:
+
+**Non-breaking space** - use escaped space (`\ `):
+```djot
+100\ km
+```
+
+Output: `<p>100&nbsp;km</p>`
+
+**HTML entities** - use raw HTML syntax:
+```djot
+`&mdash;`{=html} for em-dash, `&copy;`{=html} for ©
+```
+
+Output: `<p>— for em-dash, © for ©</p>`
+
+The codepoint approach above is most useful when you need:
+- Invisible Unicode characters (directional marks, joiners)
+- Characters without named HTML entities
+- A consistent syntax for all special characters
 
 ## Abbreviations
 
