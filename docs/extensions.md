@@ -14,6 +14,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
 | [SmartQuotesExtension](#smartquotesextension) | Configures locale-specific smart quote characters |
 | [TableOfContentsExtension](#tableofcontentsextension) | Generates a table of contents from headings |
+| [WikilinksExtension](#wikilinksextension) | Converts `[[Page Name]]` patterns to wiki-style links |
 
 ## Basic Usage
 
@@ -439,6 +440,97 @@ $converter->addExtension(new DefaultAttributesExtension([
 ]));
 ```
 
+## WikilinksExtension
+
+Converts `[[Page Name]]` patterns into wiki-style links, commonly used in wiki systems and note-taking apps like Obsidian, Notion, and MediaWiki.
+
+> **Note:** This syntax is not yet part of the official djot spec. See [jgm/djot#26](https://github.com/jgm/djot/issues/26) for the upstream discussion.
+
+```php
+use Djot\Extension\WikilinksExtension;
+
+// Default: creates URL-safe slugs
+$converter->addExtension(new WikilinksExtension());
+
+// Custom URL generator
+$converter->addExtension(new WikilinksExtension(
+    urlGenerator: fn (string $page) => '/wiki/' . strtolower(str_replace(' ', '_', $page)) . '.html',
+));
+
+// Open in new window
+$converter->addExtension(new WikilinksExtension(
+    newWindow: true,
+));
+
+// Custom CSS class
+$converter->addExtension(new WikilinksExtension(
+    cssClass: 'wiki-link internal',
+));
+```
+
+**Supported syntax:**
+
+| Syntax | Description | Output |
+|--------|-------------|--------|
+| `[[Page]]` | Basic link | `<a href="page">Page</a>` |
+| `[[Page Name]]` | Spaces in name | `<a href="page-name">Page Name</a>` |
+| `[[page\|Display Text]]` | Custom display text | `<a href="page">Display Text</a>` |
+| `[[page#section]]` | Link with anchor | `<a href="page#section">page</a>` |
+| `[[page#section\|Link]]` | Anchor with display text | `<a href="page#section">Link</a>` |
+| `[[folder/page]]` | Path support | `<a href="folder/page">folder/page</a>` |
+
+**Input:**
+```djot
+See [[Tigers]] for more info, or check [[Big Cats|the cats page]].
+
+Jump to [[Getting Started#installation]] for setup instructions.
+```
+
+**Output:**
+```html
+<p>See <a href="tigers" class="wikilink" data-wikilink="Tigers">Tigers</a> for more info,
+or check <a href="big-cats" class="wikilink" data-wikilink="Big Cats">the cats page</a>.</p>
+<p>Jump to <a href="getting-started#installation" class="wikilink" data-wikilink="Getting Started">installation</a> for setup instructions.</p>
+```
+
+**Configuration options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `urlGenerator` | `Closure` | Slugify | Function that converts page name to URL |
+| `cssClass` | `string` | `'wikilink'` | CSS class(es) for the link |
+| `newWindow` | `bool` | `false` | Open links in new tab |
+
+**Common configurations:**
+
+```php
+// Obsidian-style (preserve paths, encode for URLs)
+$converter->addExtension(new WikilinksExtension(
+    urlGenerator: fn (string $page) => '/notes/' . rawurlencode($page) . '.md',
+));
+
+// MediaWiki-style (underscores instead of hyphens)
+$converter->addExtension(new WikilinksExtension(
+    urlGenerator: fn (string $page) => '/wiki/' . str_replace(' ', '_', $page),
+));
+
+// Static site generator (lowercase with .html extension)
+$converter->addExtension(new WikilinksExtension(
+    urlGenerator: fn (string $page) => '/' . strtolower(str_replace(' ', '-', $page)) . '.html',
+));
+```
+
+**JavaScript integration:**
+
+Each wikilink includes a `data-wikilink` attribute with the original page name, useful for client-side handling:
+
+```javascript
+document.querySelectorAll('a[data-wikilink]').forEach(link => {
+    const pageName = link.dataset.wikilink;
+    // Check if page exists, add special styling, etc.
+});
+```
+
 ## Creating Custom Extensions
 
 Implement `ExtensionInterface` to create your own extensions:
@@ -450,25 +542,25 @@ use Djot\Event\RenderEvent;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Text;
 
-class WikiLinkExtension implements ExtensionInterface
+class HashtagExtension implements ExtensionInterface
 {
     public function __construct(
-        protected string $baseUrl = '/wiki/',
+        protected string $baseUrl = '/tags/',
     ) {
     }
 
     public function register(DjotConverter $converter): void
     {
-        // Add inline pattern for [[Page Name]] syntax
+        // Add inline pattern for #hashtag syntax
         $converter->getParser()->getInlineParser()->addInlinePattern(
-            '/\[\[([^\]]+)\]\]/',
+            '/#([a-zA-Z][a-zA-Z0-9_]*)/',
             function (string $match, array $groups): Link {
-                $pageName = $groups[1];
-                $url = $this->baseUrl . rawurlencode($pageName);
+                $tag = $groups[1];
+                $url = $this->baseUrl . rawurlencode(strtolower($tag));
 
                 $link = new Link($url);
-                $link->addClass('wiki-link');
-                $link->appendChild(new Text($pageName));
+                $link->addClass('hashtag');
+                $link->appendChild(new Text('#' . $tag));
 
                 return $link;
             },
@@ -477,7 +569,7 @@ class WikiLinkExtension implements ExtensionInterface
 }
 
 // Usage
-$converter->addExtension(new WikiLinkExtension(baseUrl: '/docs/'));
+$converter->addExtension(new HashtagExtension(baseUrl: '/tags/'));
 ```
 
 ## Using Multiple Extensions Together
@@ -491,6 +583,7 @@ use Djot\Extension\ExternalLinksExtension;
 use Djot\Extension\HeadingPermalinksExtension;
 use Djot\Extension\MentionsExtension;
 use Djot\Extension\TableOfContentsExtension;
+use Djot\Extension\WikilinksExtension;
 
 $converter = new DjotConverter();
 $tocExtension = new TableOfContentsExtension(minLevel: 2);
@@ -500,13 +593,14 @@ $converter
     ->addExtension(new AutolinkExtension())           // First: create links from URLs
     ->addExtension(new ExternalLinksExtension())      // Then: add attributes to external links
     ->addExtension(new MentionsExtension())
+    ->addExtension(new WikilinksExtension())          // Wiki-style links
     ->addExtension($tocExtension)                     // TOC before permalinks for clean text
     ->addExtension(new HeadingPermalinksExtension());
 
 $djot = <<<'DJOT'
 # Welcome
 
-Thanks @admin for setting this up!
+Thanks @admin for setting this up! See [[Getting Started]] below.
 
 ## Getting Started
 
@@ -514,7 +608,7 @@ Visit https://example.com for documentation.
 
 ## Configuration
 
-Contact support@example.com for help.
+Contact support@example.com for help. Also check [[Advanced Config|advanced settings]].
 DJOT;
 
 $html = $converter->convert($djot);
