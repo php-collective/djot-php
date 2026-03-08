@@ -228,21 +228,23 @@ Indent with 2+ spaces for nested lists.
 
 #### Task Lists
 
-Use `[ ]` for unchecked and `[x]` or `[X]` for checked items.
+Use `[ ]` or `[_]` for unchecked and `[x]` or `[X]` for checked items.
+
+The underscore notation `[_]` is useful on mobile devices or in editors without monospaced fonts, where the space in `[ ]` can be hard to type or see.
 
 **Input:**
 ```djot
-- [ ] Todo item
+- [ ] Todo item (space)
+- [_] Todo item (underscore)
 - [x] Done item
-- [ ] Another todo
 ```
 
 **Output:**
 ```html
 <ul class="task-list">
-<li><input type="checkbox" disabled> Todo item</li>
+<li><input type="checkbox" disabled> Todo item (space)</li>
+<li><input type="checkbox" disabled> Todo item (underscore)</li>
 <li><input type="checkbox" disabled checked> Done item</li>
-<li><input type="checkbox" disabled> Another todo</li>
 </ul>
 ```
 

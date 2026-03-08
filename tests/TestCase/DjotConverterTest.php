@@ -161,6 +161,21 @@ class DjotConverterTest extends TestCase
         $this->assertStringContainsString('Checked', $result);
     }
 
+    public function testTaskListUnderscoreNotation(): void
+    {
+        $djot = "- [_] Unchecked with underscore\n- [ ] Unchecked with space\n- [x] Checked";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('task-list', $result);
+        // Both underscore and space should render as unchecked checkboxes
+        $this->assertSame(2, substr_count($result, '<input disabled="" type="checkbox"/>'));
+        $this->assertSame(1, substr_count($result, 'checked=""'));
+        $this->assertStringContainsString('Unchecked with underscore', $result);
+        $this->assertStringContainsString('Unchecked with space', $result);
+        $this->assertStringContainsString('Checked', $result);
+    }
+
     public function testThematicBreak(): void
     {
         $djot = "Before\n\n***\n\nAfter";

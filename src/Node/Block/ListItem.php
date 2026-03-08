@@ -8,7 +8,7 @@ namespace Djot\Node\Block;
  * List item
  *
  * For task lists, stores the raw marker character from inside brackets:
- * - ' ' (space) = unchecked
+ * - ' ' (space) or '_' (underscore) = unchecked
  * - 'x' or 'X' = checked/completed
  * - Extended markers (for custom rendering via events):
  *   - '-' = cancelled/not applicable
@@ -32,7 +32,7 @@ class ListItem extends BlockNode
     /**
      * Get the raw task marker character
      *
-     * Returns the character inside the brackets: ' ', 'x', 'X', '-', '/', '>', '?', etc.
+     * Returns the character inside the brackets: ' ', '_', 'x', 'X', '-', '/', '>', '?', etc.
      * Returns null if this is not a task list item.
      */
     public function getTaskMarker(): ?string
@@ -43,7 +43,7 @@ class ListItem extends BlockNode
     /**
      * For task lists: null = not a task, true = checked, false = unchecked
      *
-     * Note: This method only recognizes standard markers (' ', 'x', 'X').
+     * Note: This method only recognizes standard markers (' ', '_', 'x', 'X').
      * For extended markers, use getTaskMarker() and handle in render events.
      */
     public function getChecked(): ?bool
@@ -52,8 +52,8 @@ class ListItem extends BlockNode
             return null;
         }
 
-        // Standard markers
-        if ($this->taskMarker === ' ') {
+        // Standard markers - space and underscore are both unchecked
+        if ($this->taskMarker === ' ' || $this->taskMarker === '_') {
             return false;
         }
         if (strtolower($this->taskMarker) === 'x') {
