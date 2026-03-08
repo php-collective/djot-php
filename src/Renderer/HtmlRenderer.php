@@ -255,6 +255,7 @@ class HtmlRenderer implements RendererInterface
      * without requiring a separate footnote definition block.
      *
      * @param string $htmlContent Pre-rendered HTML content for the footnote
+     *
      * @return int The assigned footnote number
      */
     public function registerInlineFootnote(string $htmlContent): int
