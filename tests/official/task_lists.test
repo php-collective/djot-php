@@ -33,3 +33,68 @@ checked item
 </li>
 </ul>
 ```
+
+Different markers create separate task lists (consistent with regular lists):
+```
+- [ ] foo
++ [ ] bar
+* [ ] baz
+.
+<ul class="task-list">
+<li>
+<input disabled="" type="checkbox"/>
+foo
+</li>
+</ul>
+<ul class="task-list">
+<li>
+<input disabled="" type="checkbox"/>
+bar
+</li>
+</ul>
+<ul class="task-list">
+<li>
+<input disabled="" type="checkbox"/>
+baz
+</li>
+</ul>
+```
+
+Underscore notation for unchecked items:
+```
+- [_] unchecked with underscore
+- [x] checked item
+.
+<ul class="task-list">
+<li>
+<input disabled="" type="checkbox"/>
+unchecked with underscore
+</li>
+<li>
+<input disabled="" type="checkbox" checked=""/>
+checked item
+</li>
+</ul>
+```
+
+Mixed underscore and space notation:
+```
+- [_] underscore unchecked
+- [ ] space unchecked
+- [x] checked
+.
+<ul class="task-list">
+<li>
+<input disabled="" type="checkbox"/>
+underscore unchecked
+</li>
+<li>
+<input disabled="" type="checkbox"/>
+space unchecked
+</li>
+<li>
+<input disabled="" type="checkbox" checked=""/>
+checked
+</li>
+</ul>
+```

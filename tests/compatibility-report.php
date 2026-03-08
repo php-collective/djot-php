@@ -22,10 +22,17 @@ function parseTestFile(string $filename): array
     $tests = [];
 
     // Match code blocks containing test cases
-    preg_match_all('/```\n(.*?)\n```/s', $content, $matches);
+    // Support both 3-backtick and 4-backtick fences (longer fences first to handle nesting)
+    preg_match_all('/````\n(.*?)\n````|```\n(.*?)\n```/s', $content, $matches, PREG_SET_ORDER);
 
     $index = 0;
-    foreach ($matches[1] as $block) {
+    foreach ($matches as $match) {
+        // Get the captured content (either from 4-backtick or 3-backtick group)
+        $block = $match[1] !== '' ? $match[1] : ($match[2] ?? '');
+        if ($block === '') {
+            continue;
+        }
+
         // Split on the separator line (a single `.`)
         $parts = preg_split('/\n\.\n/', $block, 2);
         if (count($parts) === 2) {

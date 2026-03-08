@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Parser;
 
+use Djot\Node\Inline\Abbreviation;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
@@ -23,6 +24,7 @@ use Djot\Node\Inline\Superscript;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Parser\Utility\AttributeParser;
 
 /**
  * Inline parser for Djot
@@ -49,6 +51,36 @@ class InlineParser
      * @var array<string, callable(string, array<string>, self): ?\Djot\Node\Node>
      */
     protected array $customPatterns = [];
+
+    /**
+     * Cached abbreviation regex pattern (built once per document)
+     */
+    protected ?string $abbreviationPattern = null;
+
+    /**
+     * Cached abbreviation keys for the current pattern
+     *
+     * @var array<string, string>|null
+     */
+    protected ?array $cachedAbbreviations = null;
+
+    /**
+     * Smart quote characters (configurable via SmartQuotesExtension for locale support)
+     */
+    protected string $openDoubleQuote = "\u{201C}";
+
+    protected string $closeDoubleQuote = "\u{201D}";
+
+    protected string $openSingleQuote = "\u{2018}";
+
+    protected string $closeSingleQuote = "\u{2019}";
+
+    /**
+     * Apostrophe character (always U+2019 RIGHT SINGLE QUOTATION MARK)
+     *
+     * Not configurable via extension — apostrophes are language-independent.
+     */
+    protected string $apostrophe = "\u{2019}";
 
     public function __construct(protected BlockParser $blockParser)
     {
@@ -102,6 +134,39 @@ class InlineParser
     public function getInlinePatterns(): array
     {
         return $this->customPatterns;
+    }
+
+    /**
+     * Set locale-specific smart quote characters
+     *
+     * Apostrophes (mid-word and before digits) always remain U+2019
+     * regardless of this setting.
+     */
+    public function setQuoteCharacters(
+        string $openDoubleQuote,
+        string $closeDoubleQuote,
+        string $openSingleQuote,
+        string $closeSingleQuote,
+    ): void {
+        $this->openDoubleQuote = $openDoubleQuote;
+        $this->closeDoubleQuote = $closeDoubleQuote;
+        $this->openSingleQuote = $openSingleQuote;
+        $this->closeSingleQuote = $closeSingleQuote;
+    }
+
+    /**
+     * Get the current smart quote characters
+     *
+     * @return array{openDouble: string, closeDouble: string, openSingle: string, closeSingle: string}
+     */
+    public function getQuoteCharacters(): array
+    {
+        return [
+            'openDouble' => $this->openDoubleQuote,
+            'closeDouble' => $this->closeDoubleQuote,
+            'openSingle' => $this->openSingleQuote,
+            'closeSingle' => $this->closeSingleQuote,
+        ];
     }
 
     /**
@@ -287,12 +352,11 @@ class InlineParser
 
                         continue;
                     }
-                    if (isset($result['node'])) {
-                        $parent->appendChild($result['node']);
-                        $pos = $result['pos'];
+                    // At this point, result has node/pos (not unclosed_link)
+                    $parent->appendChild($result['node']);
+                    $pos = $result['pos'];
 
-                        continue;
-                    }
+                    continue;
                 }
             }
 
@@ -422,8 +486,67 @@ class InlineParser
 
     protected function flushText(Node $parent, string $text): void
     {
-        if ($text !== '') {
+        if ($text === '') {
+            return;
+        }
+
+        // Check if there are any abbreviations to process
+        $abbreviations = $this->blockParser->getAbbreviations();
+        if ($abbreviations === []) {
             $parent->appendChild(new Text($text));
+
+            return;
+        }
+
+        // Process abbreviations in the text
+        $this->flushTextWithAbbreviations($parent, $text, $abbreviations);
+    }
+
+    /**
+     * Flush text while replacing abbreviations with Abbreviation nodes
+     *
+     * @param \Djot\Node\Node $parent
+     * @param string $text
+     * @param array<string, string> $abbreviations
+     */
+    protected function flushTextWithAbbreviations(Node $parent, string $text, array $abbreviations): void
+    {
+        // Cache the regex pattern for abbreviations (built once per document)
+        if ($this->cachedAbbreviations !== $abbreviations) {
+            // Sort abbreviations by length (longest first) to match longer abbreviations first
+            $abbrKeys = array_keys($abbreviations);
+            usort($abbrKeys, fn ($a, $b) => strlen($b) - strlen($a));
+
+            // Build a regex pattern that matches any abbreviation at word boundaries
+            // We need to escape special regex characters in abbreviation keys
+            $escapedKeys = array_map(fn ($key) => preg_quote($key, '/'), $abbrKeys);
+            $this->abbreviationPattern = '/\b(' . implode('|', $escapedKeys) . ')\b/u';
+            $this->cachedAbbreviations = $abbreviations;
+        }
+
+        // Split text by abbreviation matches, keeping the delimiters
+        // Pattern is guaranteed to be set at this point
+        /** @var string $pattern */
+        $pattern = $this->abbreviationPattern;
+        $parts = preg_split($pattern, $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+
+        if ($parts === false) {
+            // Fallback: just output as plain text
+            $parent->appendChild(new Text($text));
+
+            return;
+        }
+
+        foreach ($parts as $part) {
+            if (isset($abbreviations[$part])) {
+                // This is an abbreviation match
+                $abbr = new Abbreviation($abbreviations[$part]);
+                $abbr->appendChild(new Text($part));
+                $parent->appendChild($abbr);
+            } else {
+                // Regular text
+                $parent->appendChild(new Text($part));
+            }
         }
     }
 
@@ -528,9 +651,9 @@ class InlineParser
             // Check for raw inline format: `...`{=format}
             // Format must be ONLY {=format} with no other attributes
             $endPos = $afterClose;
-            $isRawInline = $afterClose < $length && $text[$afterClose] === '{'
+            $hasRawInlineAttempt = $afterClose < $length && $text[$afterClose] === '{'
                 && $afterClose + 1 < $length && $text[$afterClose + 1] === '=';
-            if ($isRawInline) {
+            if ($hasRawInlineAttempt) {
                 $formatEnd = strpos($text, '}', $afterClose);
                 if ($formatEnd !== false) {
                     $format = substr($text, $afterClose + 2, $formatEnd - $afterClose - 2);
@@ -543,12 +666,26 @@ class InlineParser
                             'pos' => $endPos,
                         ];
                     }
-                    // Mixed attributes like {=html #id} - treat attribute block as literal
+                    // Mixed attributes like {=html #id} - treat attribute block as literal text
+                    // Don't parse as trailing attributes either
+                }
+            }
+
+            $code = new Code($content);
+
+            // Check for trailing attributes: `code`{.class}
+            // But NOT if there was a {= pattern (failed raw inline attempt should be literal)
+            if (!$hasRawInlineAttempt && $endPos < $length && $text[$endPos] === '{') {
+                $attrEnd = $this->findAttributeEnd($text, $endPos);
+                if ($attrEnd !== null) {
+                    $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
+                    $this->applyAttributesToNode($code, $attrStr);
+                    $endPos = $attrEnd + 1;
                 }
             }
 
             return [
-                'node' => new Code($content),
+                'node' => $code,
                 'pos' => $endPos,
             ];
         }
@@ -615,6 +752,11 @@ class InlineParser
                 $link = new Link($url);
                 $this->parseInlines($link, $linkText);
 
+                // Track anchor links for validation
+                if (preg_match('/^#(.+)$/', $url, $anchorMatch)) {
+                    $this->blockParser->trackAnchorLink($anchorMatch[1], $this->currentLine, $pos + 1);
+                }
+
                 $endPos = $urlEnd + 1;
 
                 // Check for attributes after link: [text](url){.class}
@@ -660,15 +802,23 @@ class InlineParser
 
                 $refDef = $this->blockParser->getReference($ref);
                 if ($refDef !== null) {
+                    // Track reference usage for validation
+                    $this->blockParser->markReferenceUsed($ref, $this->currentLine);
+
                     $link = new Link($refDef->url);
                     $this->parseInlines($link, $linkText);
+
+                    // Track anchor links for validation
+                    if (preg_match('/^#(.+)$/', $refDef->url, $anchorMatch)) {
+                        $this->blockParser->trackAnchorLink($anchorMatch[1], $this->currentLine, $pos + 1);
+                    }
 
                     // Apply attributes from reference definition first
                     foreach ($refDef->attributes as $key => $value) {
                         if ($key === 'class') {
                             $link->addClass((string)$value);
                         } else {
-                            $link->setAttribute($key, $value);
+                            $link->setAttribute($key, (string)$value);
                         }
                     }
 
@@ -745,8 +895,8 @@ class InlineParser
             return null;
         }
 
-        // Unclosed links can't be images, and we need node/pos to exist
-        if (isset($result['unclosed_link']) || !isset($result['node'])) {
+        // Unclosed links can't be images
+        if (isset($result['unclosed_link'])) {
             return null;
         }
 
@@ -896,6 +1046,18 @@ class InlineParser
                 }
             }
 
+            // Skip over link destinations ](...)
+            // This prevents emphasis delimiters inside URLs from closing emphasis
+            // that started before the link. e.g. _[link](url_bar)_ should work.
+            if ($char === ']' && $searchPos + 1 < $length && $text[$searchPos + 1] === '(') {
+                $destEnd = $this->findLinkDestinationEnd($text, $searchPos + 1);
+                if ($destEnd !== null) {
+                    $searchPos = $destEnd;
+
+                    continue;
+                }
+            }
+
             // Skip escape sequences
             if ($char === '\\' && $searchPos + 1 < $length) {
                 $searchPos += 2;
@@ -937,9 +1099,21 @@ class InlineParser
                     $node = new $nodeClass();
                     $this->parseInlines($node, $content);
 
+                    $endPos = $actualClose + 1;
+
+                    // Check for trailing attributes: _text_{.class}
+                    if ($endPos < $length && $text[$endPos] === '{') {
+                        $attrEnd = $this->findAttributeEnd($text, $endPos);
+                        if ($attrEnd !== null) {
+                            $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
+                            $this->applyAttributesToNode($node, $attrStr);
+                            $endPos = $attrEnd + 1;
+                        }
+                    }
+
                     return [
                         'node' => $node,
-                        'pos' => $actualClose + 1,
+                        'pos' => $endPos,
                     ];
                 }
             }
@@ -978,14 +1152,14 @@ class InlineParser
             }
             // Must be followed by closing }
             if ($quotePos < $length && $text[$quotePos] === '}') {
-                // Generate curly quotes based on count
-                $openQuote = $marker === "'" ? "\u{2018}" : "\u{201C}";
-                $closeQuote = $marker === "'" ? "\u{2019}" : "\u{201D}";
+                // Generate quotes based on count
+                $openQuote = $marker === "'" ? $this->openSingleQuote : $this->openDoubleQuote;
+                $closeQuote = $marker === "'" ? $this->closeSingleQuote : $this->closeDoubleQuote;
 
                 // For pairs like {''}, output left + right
-                // For single {'}, output just right (used for apostrophe)
+                // For single {'}, output apostrophe (always U+2019), {"} output close double
                 if ($quoteCount === 1) {
-                    $result = $closeQuote;
+                    $result = $marker === "'" ? $this->apostrophe : $closeQuote;
                 } elseif ($quoteCount === 2) {
                     $result = $openQuote . $closeQuote;
                 } else {
@@ -1027,9 +1201,21 @@ class InlineParser
                 $node = new $nodeClass();
                 $this->parseInlines($node, $content);
 
+                $endPos = $searchPos + 2;
+
+                // Check for trailing attributes: {=text=}{.class}
+                if ($endPos < $length && $text[$endPos] === '{') {
+                    $attrEnd = $this->findAttributeEnd($text, $endPos);
+                    if ($attrEnd !== null) {
+                        $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
+                        $this->applyAttributesToNode($node, $attrStr);
+                        $endPos = $attrEnd + 1;
+                    }
+                }
+
                 return [
                     'node' => $node,
-                    'pos' => $searchPos + 2,
+                    'pos' => $endPos,
                 ];
             }
             $searchPos++;
@@ -1045,7 +1231,7 @@ class InlineParser
 
         // Quote immediately after = is always an opener (attribute value start)
         if ($prevChar === '=') {
-            return $quote === '"' ? "\u{201C}" : "\u{2018}";
+            return $quote === '"' ? $this->openDoubleQuote : $this->openSingleQuote;
         }
 
         // = acts as word boundary for quotes (e.g., key="value" in attributes)
@@ -1070,17 +1256,17 @@ class InlineParser
 
         // Single quote before digit is always apostrophe (e.g., '70s)
         if ($quote === "'" && ctype_digit($nextChar)) {
-            return "\u{2019}"; // closing/apostrophe
+            return $this->apostrophe;
         }
 
         // A quote after ] or ) cannot be an opener
         if ($prevChar === ']' || $prevChar === ')') {
-            return $quote === '"' ? "\u{201D}" : "\u{2019}";
+            return $quote === '"' ? $this->closeDoubleQuote : $this->closeSingleQuote;
         }
 
         if ($quote === '"') {
             // Opening if preceded by space or start, closing otherwise
-            return $prevIsSpace && !$nextIsSpace ? "\u{201C}" : "\u{201D}";
+            return $prevIsSpace && !$nextIsSpace ? $this->openDoubleQuote : $this->closeDoubleQuote;
         }
 
         // For single quotes, use matching algorithm to determine if this could be an opener
@@ -1089,15 +1275,20 @@ class InlineParser
             // This could be an opener - check if there's a matching closer
             $matchingCloser = $this->findMatchingSingleQuoteCloser($text, $pos);
             if ($matchingCloser !== null) {
-                return "\u{2018}"; // opening quote
+                return $this->openSingleQuote;
             }
 
             // No matching closer found, treat as apostrophe
-            return "\u{2019}";
+            return $this->apostrophe;
         }
 
-        // Closing/apostrophe
-        return "\u{2019}";
+        // Check if this is mid-word (next char is a word character) — apostrophe
+        if (preg_match('/\w/u', $nextChar)) {
+            return $this->apostrophe;
+        }
+
+        // Closing single quote
+        return $this->closeSingleQuote;
     }
 
     /**
@@ -1282,16 +1473,12 @@ class InlineParser
                 break;
             }
 
-            // Check for multi-byte UTF-8 curly quotes (3 bytes each)
+            // Check for multi-byte configured quote characters
             // These act as word boundaries for attribute attachment
-            if (ord($char) >= 0x98 && ord($char) <= 0x9D && $wordStart >= 3) {
-                $threeBytes = substr($textBuffer, $wordStart - 3, 3);
-                // Check for curly quotes: " " ' ' (U+201C, U+201D, U+2018, U+2019)
-                if (
-                    $threeBytes === "\u{201C}" || $threeBytes === "\u{201D}" ||
-                    $threeBytes === "\u{2018}" || $threeBytes === "\u{2019}"
-                ) {
-                    break;
+            foreach ($this->getConfiguredQuoteStrings() as $quoteStr) {
+                $quoteLen = strlen($quoteStr);
+                if ($wordStart >= $quoteLen && substr($textBuffer, $wordStart - $quoteLen, $quoteLen) === $quoteStr) {
+                    break 2;
                 }
             }
 
@@ -1329,6 +1516,22 @@ class InlineParser
             'textBuffer' => '',
             'pos' => $attrEnd + 1,
         ];
+    }
+
+    /**
+     * Get all unique configured quote strings for word boundary detection
+     *
+     * @return array<string>
+     */
+    protected function getConfiguredQuoteStrings(): array
+    {
+        return array_unique([
+            $this->openDoubleQuote,
+            $this->closeDoubleQuote,
+            $this->openSingleQuote,
+            $this->closeSingleQuote,
+            $this->apostrophe,
+        ]);
     }
 
     /**
@@ -1427,6 +1630,48 @@ class InlineParser
     }
 
     /**
+     * Find the end of a link destination starting at $pos (which points to '(').
+     *
+     * This is a simpler version that only handles the destination part,
+     * not the full link syntax. Used to skip over URL content when scanning
+     * for emphasis closers.
+     *
+     * @return int|null Position after the closing ), or null if not found
+     */
+    protected function findLinkDestinationEnd(string $text, int $pos): ?int
+    {
+        $length = strlen($text);
+        if ($pos >= $length || $text[$pos] !== '(') {
+            return null;
+        }
+
+        $parenDepth = 1;
+        $i = $pos + 1;
+
+        while ($i < $length && $parenDepth > 0) {
+            $char = $text[$i];
+            if ($char === '(') {
+                $parenDepth++;
+            } elseif ($char === ')') {
+                $parenDepth--;
+            } elseif ($char === '\\' && $i + 1 < $length) {
+                // Skip escaped character
+                $i++;
+            }
+            if ($parenDepth > 0) {
+                $i++;
+            }
+        }
+
+        if ($parenDepth !== 0) {
+            return null;
+        }
+
+        // Return position after the closing )
+        return $i + 1;
+    }
+
+    /**
      * Find the end of an autolink starting at $pos
      *
      * @return int|null Position after the closing >, or null if not a valid autolink
@@ -1481,42 +1726,7 @@ class InlineParser
      */
     protected function applyAttributesToNode(Node $node, string $attrStr): void
     {
-        // Match: .class, #id, key="quoted value" (with escapes), key='quoted value', key=unquoted
-        // The regex uses ([^"\\]|\\.)* to match content with escaped characters
-        $pattern = '/\.([^\s.#=}]+)|#([^\s.#=}]+)'
-            . '|([^\s.#=}]+)="((?:[^"\\\\]|\\\\.)*)"|([^\s.#=}]+)=\'((?:[^\'\\\\]|\\\\.)*)\''
-            . '|([^\s.#=}]+)=([^\s}"\']+)/';
-        preg_match_all($pattern, $attrStr, $matches, PREG_SET_ORDER);
-
-        foreach ($matches as $match) {
-            if (!empty($match[1])) {
-                // Class attribute
-                $node->addClass($match[1]);
-            } elseif (!empty($match[2])) {
-                // ID attribute
-                $node->setAttribute('id', $match[2]);
-            } elseif (($match[3] ?? '') !== '') {
-                // key="double quoted value"
-                $node->setAttribute($match[3], $this->processAttributeEscapes($match[4] ?? ''));
-            } elseif (($match[5] ?? '') !== '') {
-                // key='single quoted value'
-                $node->setAttribute($match[5], $this->processAttributeEscapes($match[6] ?? ''));
-            } elseif (($match[7] ?? '') !== '') {
-                // key=unquoted
-                $node->setAttribute($match[7], $match[8] ?? '');
-            }
-        }
-    }
-
-    /**
-     * Process escape sequences in attribute values
-     *
-     * Handles \\ -> \ and \" -> " (and other escaped characters)
-     */
-    protected function processAttributeEscapes(string $value): string
-    {
-        // Replace escape sequences: \X -> X for any character X
-        return preg_replace('/\\\\(.)/', '$1', $value) ?? $value;
+        AttributeParser::applyToNode($node, $attrStr);
     }
 
     /**
@@ -1526,12 +1736,8 @@ class InlineParser
      */
     protected function parseFootnoteRef(string $text, int $pos): ?array
     {
-        // Match [^label]
-        if (!preg_match('/\[\^([^\]]+)\]/', $text, $matches, 0, $pos)) {
-            return null;
-        }
-
-        if (strpos($text, $matches[0], $pos) !== $pos) {
+        // Match [^label] - \G anchors at offset position, avoiding extra strpos check
+        if (!preg_match('/\G\[\^([^\]]+)\]/', $text, $matches, 0, $pos)) {
             return null;
         }
 
@@ -1607,18 +1813,28 @@ class InlineParser
      */
     protected function parseSymbol(string $text, int $pos): ?array
     {
-        // Match :word:
-        if (!preg_match('/:([a-zA-Z_][a-zA-Z0-9_-]*):/', $text, $matches, 0, $pos)) {
+        // Match :word: - \G anchors at offset position, avoiding extra strpos check
+        if (!preg_match('/\G:([a-zA-Z_][a-zA-Z0-9_-]*):/', $text, $matches, 0, $pos)) {
             return null;
         }
 
-        if (strpos($text, $matches[0], $pos) !== $pos) {
-            return null;
+        $symbol = new Symbol($matches[1]);
+        $endPos = $pos + strlen($matches[0]);
+        $length = strlen($text);
+
+        // Check for trailing attributes: :symbol:{.class}
+        if ($endPos < $length && $text[$endPos] === '{') {
+            $attrEnd = $this->findAttributeEnd($text, $endPos);
+            if ($attrEnd !== null) {
+                $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
+                $this->applyAttributesToNode($symbol, $attrStr);
+                $endPos = $attrEnd + 1;
+            }
         }
 
         return [
-            'node' => new Symbol($matches[1]),
-            'pos' => $pos + strlen($matches[0]),
+            'node' => $symbol,
+            'pos' => $endPos,
         ];
     }
 

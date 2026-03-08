@@ -155,6 +155,99 @@ class BlockParserTest extends TestCase
         $this->assertInstanceOf(DefinitionList::class, $doc->getChildren()[0]);
     }
 
+    public function testParseDefinitionListDdAttributeAfterContent(): void
+    {
+        // DD attribute must come AFTER content (consistent with list items)
+        $djot = ": Term\n\n  Definition content\n  {.highlight}";
+        $doc = $this->parser->parse($djot);
+
+        $this->assertCount(1, $doc->getChildren());
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        // Get the definition_description (dd)
+        $children = $dl->getChildren();
+        $dd = null;
+        foreach ($children as $child) {
+            if ($child->getType() === 'definition_description') {
+                $dd = $child;
+
+                break;
+            }
+        }
+        $this->assertNotNull($dd);
+        $this->assertSame('highlight', $dd->getAttribute('class'));
+    }
+
+    public function testParseDefinitionListDdAttributeBeforeContentNotParsed(): void
+    {
+        // Attribute BEFORE content should NOT be parsed as dd attribute
+        // (this is the old syntax that we've changed)
+        $djot = ": Term\n\n  {.highlight}\n  Definition content";
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        // Get the definition_description (dd)
+        $children = $dl->getChildren();
+        $dd = null;
+        foreach ($children as $child) {
+            if ($child->getType() === 'definition_description') {
+                $dd = $child;
+
+                break;
+            }
+        }
+        $this->assertNotNull($dd);
+        // The attribute should NOT be on the dd - it's just content now
+        $this->assertNull($dd->getAttribute('class'));
+    }
+
+    public function testParseDefinitionListBlankLineKeepsSameDd(): void
+    {
+        // Blank lines within definition content create paragraphs in same dd (spec behavior)
+        $djot = ": Term\n\n  First paragraph\n\n  Second paragraph";
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        // Should have: dt + dd = 2 children (one dd with multiple paragraphs)
+        $children = $dl->getChildren();
+        $dds = array_filter($children, fn ($c) => $c->getType() === 'definition_description');
+        $this->assertCount(1, $dds);
+    }
+
+    public function testParseDefinitionListContinuationMarker(): void
+    {
+        // `: +` marker creates additional dd for same term
+        $djot = ": Term\n\n  First definition\n\n: +\n\n  Second definition";
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        // Should have: dt + dd + dd = 3 children
+        $children = $dl->getChildren();
+        $dds = array_filter($children, fn ($c) => $c->getType() === 'definition_description');
+        $this->assertCount(2, $dds);
+    }
+
+    public function testParseDefinitionListEmptyDd(): void
+    {
+        // Term with no definition content should still create empty dd
+        $djot = ': Term';
+        $doc = $this->parser->parse($djot);
+
+        $dl = $doc->getChildren()[0];
+        $this->assertInstanceOf(DefinitionList::class, $dl);
+
+        $children = $dl->getChildren();
+        $dds = array_filter($children, fn ($c) => $c->getType() === 'definition_description');
+        $this->assertCount(1, $dds);
+    }
+
     public function testParseThematicBreak(): void
     {
         $doc = $this->parser->parse('---');
@@ -223,6 +316,39 @@ class BlockParserTest extends TestCase
         $this->assertSame('intro', $para->getAttribute('id'));
     }
 
+    public function testParseBooleanAttribute(): void
+    {
+        // {reversed} should create a boolean attribute with empty value
+        $doc = $this->parser->parse("{reversed}\n1. First\n2. Second");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+        $this->assertSame('', $list->getAttribute('reversed'));
+    }
+
+    public function testParseBooleanAttributeWithOthers(): void
+    {
+        // Boolean attr combined with class, id
+        $doc = $this->parser->parse("{#mylist .fancy reversed}\n1. First\n2. Second");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+        $this->assertSame('mylist', $list->getAttribute('id'));
+        $this->assertSame('fancy', $list->getAttribute('class'));
+        $this->assertSame('', $list->getAttribute('reversed'));
+    }
+
+    public function testParseMultipleBooleanAttributes(): void
+    {
+        // Multiple boolean attrs
+        $doc = $this->parser->parse("{hidden inert}\nParagraph");
+
+        $para = $doc->getChildren()[0];
+        $this->assertInstanceOf(Paragraph::class, $para);
+        $this->assertSame('', $para->getAttribute('hidden'));
+        $this->assertSame('', $para->getAttribute('inert'));
+    }
+
     public function testParseReferenceDefinition(): void
     {
         $doc = $this->parser->parse("[example]: https://example.com\n\n[example][]");
@@ -253,5 +379,157 @@ class BlockParserTest extends TestCase
 
         $this->assertInstanceOf(Document::class, $doc);
         $this->assertCount(0, $doc->getChildren());
+    }
+
+    public function testSignificantNewlinesDisabledByDefault(): void
+    {
+        // Without blank line, sublist syntax is treated as text
+        $doc = $this->parser->parse("- Item\n  - Not a sublist");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+        $this->assertCount(1, $list->getChildren());
+    }
+
+    public function testSignificantNewlinesNestedLists(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Fruits\n  - Apples\n  - Bananas\n- Vegetables");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+        $this->assertCount(2, $list->getChildren()); // Fruits, Vegetables
+
+        // Check first item has a sublist
+        $firstItem = $list->getChildren()[0];
+        $children = $firstItem->getChildren();
+
+        // Should have paragraph and sublist
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+
+        // Sublist should have 2 items
+        $sublist = $children[1];
+        $this->assertCount(2, $sublist->getChildren());
+    }
+
+    public function testSignificantNewlinesThreeLevels(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- L1\n  - L2\n    - L3");
+
+        $list = $doc->getChildren()[0];
+        $l1Item = $list->getChildren()[0];
+        $l2List = $l1Item->getChildren()[1];
+        $l2Item = $l2List->getChildren()[0];
+        $l3List = $l2Item->getChildren()[1];
+
+        $this->assertInstanceOf(ListBlock::class, $l3List);
+        $this->assertCount(1, $l3List->getChildren());
+    }
+
+    public function testSignificantNewlinesMixedListTypes(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Unordered\n  1. Ordered\n  2. Second");
+
+        $list = $doc->getChildren()[0];
+        $this->assertSame(ListBlock::TYPE_BULLET, $list->getListType());
+
+        $item = $list->getChildren()[0];
+        $sublist = $item->getChildren()[1];
+        $this->assertInstanceOf(ListBlock::class, $sublist);
+        $this->assertSame(ListBlock::TYPE_ORDERED, $sublist->getListType());
+    }
+
+    public function testSignificantNewlinesBlockquoteInList(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Item\n  > quoted");
+
+        $list = $doc->getChildren()[0];
+        $item = $list->getChildren()[0];
+        $children = $item->getChildren();
+
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(BlockQuote::class, $children[1]);
+    }
+
+    public function testSignificantNewlinesListInterruptsParagraph(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Here is a list:\n- item one\n- item two");
+
+        $children = $doc->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+    }
+
+    public function testSignificantNewlinesBlockquoteInterruptsParagraph(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("They said:\n> This is important");
+
+        $children = $doc->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(BlockQuote::class, $children[1]);
+    }
+
+    public function testSignificantNewlinesSetterMethod(): void
+    {
+        $parser = new BlockParser();
+        $this->assertFalse($parser->getSignificantNewlines());
+
+        $parser->setSignificantNewlines(true);
+        $this->assertTrue($parser->getSignificantNewlines());
+
+        // Test chaining
+        $result = $parser->setSignificantNewlines(false);
+        $this->assertSame($parser, $result);
+    }
+
+    public function testStandardModeBlockquoteDoesNotInterrupt(): void
+    {
+        // Standard djot: blockquote doesn't interrupt paragraph
+        $doc = $this->parser->parse("They said:\n> This is important");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
+    public function testCodeBlockTrimsLeadingAndTrailingBlankLines(): void
+    {
+        // Leading and trailing blank lines inside code block should be trimmed
+        $doc = $this->parser->parse("```\n\nbin/cake linter\n\n```");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(CodeBlock::class, $children[0]);
+        $this->assertSame('bin/cake linter', $children[0]->getContent());
+    }
+
+    public function testCodeBlockPreservesInternalBlankLines(): void
+    {
+        // Blank lines in the middle of content should be preserved
+        $doc = $this->parser->parse("```\nline1\n\nline2\n```");
+
+        $children = $doc->getChildren();
+        $this->assertInstanceOf(CodeBlock::class, $children[0]);
+        $this->assertSame("line1\n\nline2", $children[0]->getContent());
+    }
+
+    public function testRawBlockTrimsLeadingAndTrailingBlankLines(): void
+    {
+        // Leading and trailing blank lines inside raw block should be trimmed
+        $doc = $this->parser->parse("``` =html\n\n<b>bold</b>\n\n```");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertSame('<b>bold</b>', $children[0]->getContent());
     }
 }

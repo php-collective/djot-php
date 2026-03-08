@@ -16,15 +16,37 @@ Common recipes and customizations for djot-php.
 - [Content Security](#content-security)
 - [Lazy Loading Images](#lazy-loading-images)
 - [Custom Footnotes](#custom-footnotes)
+- [Extended Task List States](#extended-task-list-states)
 - [Math Rendering](#math-rendering)
 - [Working with the AST](#working-with-the-ast)
 - [Custom Inline Patterns](#custom-inline-patterns)
 - [Custom Block Patterns](#custom-block-patterns)
+- [Boolean Attributes](#boolean-attributes)
 - [Alternative Output Formats](#alternative-output-formats)
+- [Soft Break Modes](#soft-break-modes)
+- [Significant Newlines Mode](#significant-newlines-mode)
 
 ## External Links
 
+> **Tip:** Use the built-in [ExternalLinksExtension](extensions.md#externallinksextension) for common cases.
+
 Open external links in a new tab with security attributes:
+
+```php
+use Djot\Extension\ExternalLinksExtension;
+
+$converter = new DjotConverter();
+$converter->addExtension(new ExternalLinksExtension());
+
+echo $converter->convert('[External](https://example.com) and [internal](/page)');
+```
+
+Output:
+```html
+<p><a href="https://example.com" target="_blank" rel="noopener noreferrer">External</a> and <a href="/page">internal</a></p>
+```
+
+For more control (custom logic, different attributes), use the event system directly:
 
 ```php
 use Djot\DjotConverter;
@@ -41,19 +63,11 @@ $converter->on('render.link', function (RenderEvent $event): void {
 
     $href = $link->getDestination();
 
-    // Check if external link
-    if (str_starts_with($href, 'http://') || str_starts_with($href, 'https://')) {
-        $link->setAttribute('target', '_blank');
-        $link->setAttribute('rel', 'noopener noreferrer');
+    // Custom logic: only external links to specific domains
+    if (str_contains($href, 'untrusted-domain.com')) {
+        $link->setAttribute('rel', 'nofollow noopener');
     }
 });
-
-echo $converter->convert('[External](https://example.com) and [internal](/page)');
-```
-
-Output:
-```html
-<p><a href="https://example.com" target="_blank" rel="noopener noreferrer">External</a> and <a href="/page">internal</a></p>
 ```
 
 ## Custom Emoji/Symbols
@@ -181,65 +195,44 @@ $converter->on('render.code_block', function (RenderEvent $event): void {
 
 ## Table of Contents Generation
 
+> **Tip:** Use the built-in [TableOfContentsExtension](extensions.md#tableofcontentsextension) for common cases.
+
 Generate a table of contents from headings:
 
 ```php
-use Djot\Parser\BlockParser;
-use Djot\Renderer\HtmlRenderer;
-use Djot\Node\Block\Heading;
+use Djot\DjotConverter;
+use Djot\Extension\TableOfContentsExtension;
 
-function generateToc(string $djot): array
-{
-    $parser = new BlockParser();
-    $document = $parser->parse($djot);
+$converter = new DjotConverter();
+$tocExtension = new TableOfContentsExtension(
+    minLevel: 2,      // Skip h1
+    maxLevel: 3,      // Only h2 and h3
+    position: 'top',  // Auto-insert at top of output
+);
+$converter->addExtension($tocExtension);
 
-    $toc = [];
-    foreach ($document->getChildren() as $node) {
-        if ($node instanceof Heading) {
-            $text = '';
-            foreach ($node->getChildren() as $child) {
-                if (method_exists($child, 'getContent')) {
-                    $text .= $child->getContent();
-                }
-            }
+$html = $converter->convert($djot);
+```
 
-            $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $text));
-            $slug = trim($slug, '-');
+For manual placement:
 
-            $toc[] = [
-                'level' => $node->getLevel(),
-                'text' => $text,
-                'slug' => $slug,
-            ];
-        }
-    }
+```php
+$tocExtension = new TableOfContentsExtension();
+$converter->addExtension($tocExtension);
 
-    return $toc;
-}
+$html = $converter->convert($djot);
+$toc = $tocExtension->getTocHtml();
 
-function renderTocHtml(array $toc): string
-{
-    $html = '<nav class="toc"><ul>';
-    foreach ($toc as $item) {
-        $indent = str_repeat('  ', $item['level'] - 1);
-        $html .= $indent . '<li><a href="#' . $item['slug'] . '">' . htmlspecialchars($item['text']) . '</a></li>';
-    }
-    $html .= '</ul></nav>';
+// Place TOC wherever you want
+echo $toc;
+echo $html;
+```
 
-    return $html;
-}
+For fully custom TOC rendering, access the raw data:
 
-$djot = <<<'DJOT'
-# Introduction
-## Getting Started
-## Installation
-# Usage
-## Basic Example
-## Advanced Features
-DJOT;
-
-$toc = generateToc($djot);
-echo renderTocHtml($toc);
+```php
+$tocData = $tocExtension->getToc();
+// Returns: [['level' => 2, 'text' => 'Getting Started', 'id' => 'Getting-Started'], ...]
 ```
 
 ## Image Processing
@@ -343,46 +336,39 @@ echo $converter->convert($djot);
 
 ## Heading Anchors
 
+> **Tip:** Use the built-in [HeadingPermalinksExtension](extensions.md#headingpermalinksextension) for clickable permalink anchors.
+
 Add anchor links to headings:
 
 ```php
 use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Block\Heading;
-use Djot\Renderer\HtmlRenderer;
+use Djot\Extension\HeadingPermalinksExtension;
 
 $converter = new DjotConverter();
-
-$converter->on('render.heading', function (RenderEvent $event): void {
-    $heading = $event->getNode();
-    if (!$heading instanceof Heading) {
-        return;
-    }
-
-    // Extract text content for slug
-    $text = '';
-    foreach ($heading->getChildren() as $child) {
-        if (method_exists($child, 'getContent')) {
-            $text .= $child->getContent();
-        }
-    }
-
-    $slug = strtolower(preg_replace('/[^a-z0-9]+/i', '-', $text));
-    $slug = trim($slug, '-');
-
-    // Set ID for anchor
-    $heading->setAttribute('id', $slug);
-
-    // Note: To add the anchor link inside, you'd need to render children manually
-    // This example just adds the ID attribute
-});
+$converter->addExtension(new HeadingPermalinksExtension(
+    symbol: '#',         // Or '¶', '🔗', etc.
+    position: 'after',   // 'before' or 'after'
+    cssClass: 'anchor',
+));
 
 echo $converter->convert('## Getting Started');
 ```
 
 Output:
 ```html
-<h2 id="getting-started">Getting Started</h2>
+<section id="Getting-Started">
+<h2>Getting Started <span class="permalink-wrapper"><a href="#Getting-Started" class="anchor" aria-label="Permalink">#</a></span></h2>
+</section>
+```
+
+For custom anchor logic without the permalink link, use events:
+
+```php
+$converter->on('render.heading', function (RenderEvent $event): void {
+    $heading = $event->getNode();
+    // Custom ID generation logic
+    $heading->setAttribute('id', 'custom-' . uniqid());
+});
 ```
 
 ## Link Validation
@@ -470,28 +456,31 @@ $converter->on('render.raw_inline', function (RenderEvent $event) use ($allowedT
 
 ## Lazy Loading Images
 
+> **Tip:** Use the built-in [DefaultAttributesExtension](extensions.md#defaultattributesextension) for this.
+
 Add native lazy loading to all images:
 
 ```php
 use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Inline\Image;
+use Djot\Extension\DefaultAttributesExtension;
 
 $converter = new DjotConverter();
+$converter->addExtension(new DefaultAttributesExtension([
+    'image' => ['loading' => 'lazy', 'decoding' => 'async'],
+]));
+```
 
+For more complex logic (e.g., different attributes based on image source), use events:
+
+```php
 $converter->on('render.image', function (RenderEvent $event): void {
     $image = $event->getNode();
-    if (!$image instanceof Image) {
-        return;
+    $src = $image->getDestination();
+
+    // Only lazy load external images
+    if (str_starts_with($src, 'http')) {
+        $image->setAttribute('loading', 'lazy');
     }
-
-    // Add lazy loading attributes
-    $image->setAttribute('loading', 'lazy');
-    $image->setAttribute('decoding', 'async');
-
-    // Add dimensions if known (prevents layout shift)
-    // $image->setAttribute('width', '800');
-    // $image->setAttribute('height', '600');
 });
 ```
 
@@ -517,6 +506,463 @@ $converter->on('render.footnote_ref', function (RenderEvent $event): void {
     $label = htmlspecialchars($ref->getLabel(), ENT_QUOTES, 'UTF-8');
     $event->setHtml('<sup class="footnote-ref"><a href="#fn-' . $label . '" id="fnref-' . $label . '">[' . $label . ']</a></sup>');
 });
+```
+
+## Extended Task List States
+
+Djot task lists support more than just checked and unchecked states. The parser captures
+the raw character inside brackets, enabling custom rendering for extended task states
+like "in progress", "cancelled", "deferred", etc.
+
+### Standard Task Lists
+
+Standard task markers work as expected:
+
+```djot
+- [ ] Unchecked task
+- [x] Completed task
+- [X] Also completed (case insensitive)
+```
+
+```php
+use Djot\DjotConverter;
+
+$djot = <<<'DJOT'
+- [ ] Unchecked task
+- [x] Completed task
+DJOT;
+
+$converter = new DjotConverter();
+echo $converter->convert($djot);
+```
+
+Output:
+```html
+<ul>
+<li><input type="checkbox" disabled> Unchecked task</li>
+<li><input type="checkbox" disabled checked> Completed task</li>
+</ul>
+```
+
+### Accessing the Raw Marker
+
+The `ListItem` node provides methods to access task state:
+
+```php
+use Djot\Parser\BlockParser;
+use Djot\Node\Block\ListItem;
+
+$parser = new BlockParser();
+$document = $parser->parse('- [/] In progress task');
+
+foreach ($document->getChildren() as $list) {
+    foreach ($list->getChildren() as $item) {
+        if ($item instanceof ListItem && $item->isTask()) {
+            echo "Marker: " . $item->getTaskMarker() . "\n";  // "/"
+            echo "Checked: " . ($item->getChecked() ? 'yes' : 'no') . "\n";  // "no"
+            echo "Completed: " . ($item->isCompleted() ? 'yes' : 'no') . "\n";  // "no"
+        }
+    }
+}
+```
+
+### Common Extended Markers
+
+Popular conventions for extended task markers (inspired by tools like Logseq, Org-mode, and Obsidian):
+
+| Marker | Meaning | Common Use |
+|:------:|---------|------------|
+| ` ` | Unchecked | Standard unchecked task |
+| `x`/`X` | Completed | Standard checked task |
+| `-` | Cancelled | Task no longer needed |
+| `/` | In progress | Currently working on |
+| `>` | Deferred | Forwarded/rescheduled |
+| `?` | Question | Needs clarification |
+| `!` | Important | High priority |
+| `*` | Active | Currently focused |
+
+The parser accepts **any single character** - these are just conventions. You can define your own markers.
+
+### Alternative: Progress Indicators
+
+Another approach (from [djot discussion #289](https://github.com/jgm/djot/discussions/289)) uses
+visual progression where the marker fills in as the task progresses:
+
+| Marker | Visual | Meaning |
+|:------:|:------:|---------|
+| ` ` | ` ` | Not started (0%) |
+| `/` | `/` | Started (25%) |
+| `-` | `-` | Halfway (50%) |
+| `\` | `\` | Three-quarters (75%) |
+| `x` | `x` | Complete (100%) |
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Block\ListItem;
+
+$converter = new DjotConverter();
+
+// Progress-based markers using pie chart symbols
+$progressIcons = [
+    ' ' => '○',      // Empty circle (0%)
+    '/' => '◔',      // Quarter filled (25%)
+    '-' => '◑',      // Half filled (50%)
+    '\\' => '◕',     // Three-quarters filled (75%)
+    'x' => '●',      // Full circle (100%)
+];
+
+$progressPercent = [
+    ' ' => 0,
+    '/' => 25,
+    '-' => 50,
+    '\\' => 75,
+    'x' => 100,
+];
+
+$converter->on('render.list_item', function (RenderEvent $event) use ($progressIcons, $progressPercent): void {
+    $item = $event->getNode();
+    if (!$item instanceof ListItem || !$item->isTask()) {
+        return;
+    }
+
+    $marker = $item->getTaskMarker();
+    $icon = $progressIcons[$marker] ?? '○';
+    $percent = $progressPercent[$marker] ?? 0;
+
+    $html = '<li class="task-progress" data-progress="' . $percent . '">';
+    $html .= '<span class="progress-icon">' . $icon . '</span> ';
+    $html .= $event->getChildrenHtml();
+    $html .= '</li>' . "\n";
+
+    $event->setHtml($html);
+});
+
+$djot = <<<'DJOT'
+- [ ] Not started
+- [/] Just begun
+- [-] Halfway there
+- [\] Almost done
+- [x] Complete!
+DJOT;
+
+echo $converter->convert($djot);
+```
+
+Output:
+```html
+<ul>
+<li class="task-progress" data-progress="0"><span class="progress-icon">○</span> Not started</li>
+<li class="task-progress" data-progress="25"><span class="progress-icon">◔</span> Just begun</li>
+<li class="task-progress" data-progress="50"><span class="progress-icon">◑</span> Halfway there</li>
+<li class="task-progress" data-progress="75"><span class="progress-icon">◕</span> Almost done</li>
+<li class="task-progress" data-progress="100"><span class="progress-icon">●</span> Complete!</li>
+</ul>
+```
+
+With CSS progress bar styling:
+
+```css
+.task-progress {
+    position: relative;
+    list-style: none;
+}
+
+.task-progress::before {
+    content: '';
+    position: absolute;
+    left: -100%;
+    width: 80%;
+    height: 3px;
+    bottom: 0;
+    background: linear-gradient(to right,
+        #28a745 0%,
+        #28a745 var(--progress),
+        #e9ecef var(--progress),
+        #e9ecef 100%);
+}
+
+.task-progress[data-progress="0"] { --progress: 0%; }
+.task-progress[data-progress="25"] { --progress: 25%; }
+.task-progress[data-progress="50"] { --progress: 50%; }
+.task-progress[data-progress="75"] { --progress: 75%; }
+.task-progress[data-progress="100"] { --progress: 100%; color: #28a745; }
+```
+
+### Custom Checkbox Rendering
+
+Use render events to create custom checkbox appearances:
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Block\ListItem;
+
+$converter = new DjotConverter();
+
+$taskIcons = [
+    ' ' => '☐',      // Unchecked
+    'x' => '☑',      // Completed
+    'X' => '☑',      // Completed
+    '-' => '☒',      // Cancelled
+    '/' => '◐',      // In progress (half-filled)
+    '>' => '→',      // Deferred
+    '?' => '?',      // Question
+    '!' => '⚠',      // Important
+    '*' => '★',      // Active/starred
+];
+
+$converter->on('render.list_item', function (RenderEvent $event) use ($taskIcons): void {
+    $item = $event->getNode();
+    if (!$item instanceof ListItem || !$item->isTask()) {
+        return;
+    }
+
+    $marker = $item->getTaskMarker();
+    $icon = $taskIcons[$marker] ?? '○';
+
+    // Get marker-specific class
+    $stateClass = match ($marker) {
+        ' ' => 'task-unchecked',
+        'x', 'X' => 'task-completed',
+        '-' => 'task-cancelled',
+        '/' => 'task-in-progress',
+        '>' => 'task-deferred',
+        '?' => 'task-question',
+        '!' => 'task-important',
+        '*' => 'task-active',
+        default => 'task-custom',
+    };
+
+    $html = '<li class="task-item ' . $stateClass . '">';
+    $html .= '<span class="task-marker">' . $icon . '</span> ';
+    $html .= $event->getChildrenHtml();
+    $html .= '</li>' . "\n";
+
+    $event->setHtml($html);
+});
+
+$djot = <<<'DJOT'
+- [ ] Todo item
+- [x] Done item
+- [-] Cancelled item
+- [/] In progress
+- [>] Deferred to next week
+- [?] Needs discussion
+DJOT;
+
+echo $converter->convert($djot);
+```
+
+Output:
+```html
+<ul>
+<li class="task-item task-unchecked"><span class="task-marker">☐</span> Todo item</li>
+<li class="task-item task-completed"><span class="task-marker">☑</span> Done item</li>
+<li class="task-item task-cancelled"><span class="task-marker">☒</span> Cancelled item</li>
+<li class="task-item task-in-progress"><span class="task-marker">◐</span> In progress</li>
+<li class="task-item task-deferred"><span class="task-marker">→</span> Deferred to next week</li>
+<li class="task-item task-question"><span class="task-marker">?</span> Needs discussion</li>
+</ul>
+```
+
+### CSS Styling for Extended States
+
+Style the extended states with CSS:
+
+```css
+/* Base task styling */
+.task-item {
+    list-style: none;
+    margin-left: -1.5em;
+}
+
+.task-marker {
+    display: inline-block;
+    width: 1.2em;
+    text-align: center;
+    margin-right: 0.3em;
+}
+
+/* State-specific styling */
+.task-completed {
+    color: #28a745;
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.task-cancelled {
+    color: #6c757d;
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
+.task-in-progress {
+    color: #007bff;
+    font-weight: bold;
+}
+
+.task-deferred {
+    color: #fd7e14;
+    font-style: italic;
+}
+
+.task-question {
+    color: #6f42c1;
+    background: #f8f9fa;
+}
+
+.task-important {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.task-active {
+    color: #ffc107;
+    background: #fffbe6;
+}
+```
+
+### HTML5 Checkbox with Data Attributes
+
+Keep semantic HTML while adding extended state info:
+
+```php
+$converter->on('render.list_item', function (RenderEvent $event): void {
+    $item = $event->getNode();
+    if (!$item instanceof ListItem || !$item->isTask()) {
+        return;
+    }
+
+    $marker = $item->getTaskMarker();
+    $checked = $item->isCompleted() ? ' checked' : '';
+
+    // Store marker as data attribute for CSS/JS
+    $html = '<li>';
+    $html .= '<input type="checkbox" disabled' . $checked;
+    $html .= ' data-task-state="' . htmlspecialchars($marker) . '">';
+    $html .= ' ' . $event->getChildrenHtml();
+    $html .= '</li>' . "\n";
+
+    $event->setHtml($html);
+});
+```
+
+Then use CSS attribute selectors:
+
+```css
+input[data-task-state="-"] + * {
+    text-decoration: line-through;
+    color: gray;
+}
+
+input[data-task-state="/"]::before {
+    content: "🔄 ";
+}
+
+input[data-task-state=">"] + * {
+    font-style: italic;
+    color: orange;
+}
+```
+
+### Extracting Task Statistics
+
+Analyze documents for task completion:
+
+```php
+use Djot\Parser\BlockParser;
+use Djot\Node\Block\ListItem;
+
+function getTaskStats(string $djot): array
+{
+    $parser = new BlockParser();
+    $document = $parser->parse($djot);
+
+    $stats = [
+        'total' => 0,
+        'completed' => 0,
+        'cancelled' => 0,
+        'in_progress' => 0,
+        'unchecked' => 0,
+        'by_marker' => [],
+    ];
+
+    // Recursive function to find all list items
+    $findTasks = function ($node) use (&$findTasks, &$stats): void {
+        if ($node instanceof ListItem && $node->isTask()) {
+            $marker = $node->getTaskMarker();
+            $stats['total']++;
+            $stats['by_marker'][$marker] = ($stats['by_marker'][$marker] ?? 0) + 1;
+
+            if ($node->isCompleted()) {
+                $stats['completed']++;
+            } elseif ($marker === '-') {
+                $stats['cancelled']++;
+            } elseif ($marker === '/') {
+                $stats['in_progress']++;
+            } elseif ($marker === ' ') {
+                $stats['unchecked']++;
+            }
+        }
+
+        if (method_exists($node, 'getChildren')) {
+            foreach ($node->getChildren() as $child) {
+                $findTasks($child);
+            }
+        }
+    };
+
+    $findTasks($document);
+
+    return $stats;
+}
+
+$djot = <<<'DJOT'
+## Project Tasks
+
+- [x] Setup project
+- [x] Write documentation
+- [/] Implement feature A
+- [ ] Implement feature B
+- [-] Cancelled feature
+- [>] Deferred to v2
+DJOT;
+
+$stats = getTaskStats($djot);
+echo "Progress: {$stats['completed']}/{$stats['total']} completed\n";
+echo "In progress: {$stats['in_progress']}\n";
+echo "Remaining: {$stats['unchecked']}\n";
+```
+
+Output:
+```
+Progress: 2/6 completed
+In progress: 1
+Remaining: 1
+```
+
+### Backward Compatibility
+
+The `getChecked()` method maintains backward compatibility:
+
+- `' '` (space) returns `false`
+- `'x'` or `'X'` returns `true`
+- Any other marker returns `false` (safe default)
+
+This means existing code continues to work while new code can access the full marker:
+
+```php
+// Old code - still works
+if ($item->getChecked()) {
+    echo "Task is done";
+}
+
+// New code - access extended states
+$marker = $item->getTaskMarker();
+if ($marker === '/') {
+    echo "Task in progress";
+}
 ```
 
 ## Math Rendering
@@ -665,29 +1111,40 @@ Extend Djot with custom inline syntax by registering patterns on the InlineParse
 
 ### @Mentions
 
+> **Tip:** Use the built-in [MentionsExtension](extensions.md#mentionsextension) for common cases.
+
 Convert `@username` to profile links:
 
 ```php
 use Djot\DjotConverter;
-use Djot\Node\Inline\Link;
-use Djot\Node\Inline\Text;
+use Djot\Extension\MentionsExtension;
 
 $converter = new DjotConverter();
-$parser = $converter->getParser()->getInlineParser();
-
-$parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function ($match, $groups, $p) {
-    $username = $groups[1];
-    $link = new Link('https://example.com/users/' . $username);
-    $link->appendChild(new Text('@' . $username));
-    return $link;
-});
+$converter->addExtension(new MentionsExtension(
+    urlTemplate: '/users/{username}',
+    cssClass: 'mention',
+));
 
 echo $converter->convert('Hello @john_doe, meet @jane_smith!');
 ```
 
 Output:
 ```html
-<p>Hello <a href="https://example.com/users/john_doe">@john_doe</a>, meet <a href="https://example.com/users/jane_smith">@jane_smith</a>!</p>
+<p>Hello <a href="/users/john_doe" class="mention">@john_doe</a>, meet <a href="/users/jane_smith" class="mention">@jane_smith</a>!</p>
+```
+
+For custom mention logic, use inline patterns directly:
+
+```php
+$parser = $converter->getParser()->getInlineParser();
+
+$parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function ($match, $groups) {
+    $username = $groups[1];
+    // Custom logic: lookup user, validate, etc.
+    $link = new Link('/profile/' . strtolower($username));
+    $link->appendChild(new Text('@' . $username));
+    return $link;
+});
 ```
 
 ### Wiki Links
@@ -1063,6 +1520,118 @@ DJOT;
 echo $converter->convert($djot);
 ```
 
+## Boolean Attributes
+
+HTML boolean attributes (like `reversed`, `hidden`, `disabled`) can be specified as bare words in djot attribute blocks.
+
+### Reversed Ordered Lists
+
+Use `{reversed}` to create a descending ordered list:
+
+```php
+use Djot\DjotConverter;
+
+$djot = <<<'DJOT'
+{reversed}
+3. Bronze medal
+2. Silver medal
+1. Gold medal
+DJOT;
+
+$converter = new DjotConverter();
+echo $converter->convert($djot);
+```
+
+Output:
+```html
+<ol start="3" reversed="">
+<li>Bronze medal</li>
+<li>Silver medal</li>
+<li>Gold medal</li>
+</ol>
+```
+
+The browser displays this as:
+```
+3. Bronze medal
+2. Silver medal
+1. Gold medal
+```
+
+### Hidden Content
+
+Use `{hidden}` to hide elements:
+
+```djot
+{hidden}
+This paragraph is hidden.
+```
+
+Output:
+```html
+<p hidden="">This paragraph is hidden.</p>
+```
+
+### Combining Boolean Attributes
+
+Boolean attributes can be combined with classes, IDs, and key-value attributes:
+
+```djot
+{#countdown .fancy reversed}
+3. Third
+2. Second
+1. First
+```
+
+Output:
+```html
+<ol id="countdown" class="fancy" start="3" reversed="">
+<li>Third</li>
+<li>Second</li>
+<li>First</li>
+</ol>
+```
+
+### Inline Boolean Attributes
+
+Boolean attributes also work on inline spans and links:
+
+```djot
+[Download PDF](report.pdf){download .btn}
+
+[Hidden text]{hidden}
+```
+
+Output:
+```html
+<p><a href="report.pdf" class="btn" download="">Download PDF</a></p>
+<p><span hidden="">Hidden text</span></p>
+```
+
+### Syntax Reference
+
+| Syntax | Result |
+|--------|--------|
+| `{.class}` | `class="class"` |
+| `{#id}` | `id="id"` |
+| `{key=value}` | `key="value"` |
+| `{key="value"}` | `key="value"` (quoted) |
+| `{reversed}` | `reversed=""` (boolean) |
+| `{hidden}` | `hidden=""` (boolean) |
+
+Boolean attributes are rendered as `attr=""` which is valid HTML5. Browsers treat this identically to `attr` or `attr="attr"`.
+
+### Common HTML Boolean Attributes
+
+Useful boolean attributes for djot elements:
+
+| Attribute | Elements | Effect |
+|-----------|----------|--------|
+| `reversed` | `<ol>` | Count down instead of up |
+| `hidden` | Any | Hide element from display |
+| `open` | `<details>` | Show details content by default |
+| `download` | `<a>` (links) | Download linked resource |
+
 ## Alternative Output Formats
 
 For detailed customization of alternative renderers, see:
@@ -1084,7 +1653,7 @@ $renderer = new PlainTextRenderer();
 $djot = <<<'DJOT'
 # Welcome
 
-This is *formatted* text with a [link](https://example.com).
+This is *formatted* text. Visit [our website](https://example.com) for more.
 
 - Item one
 - Item two
@@ -1100,10 +1669,90 @@ Output:
 ```
 Welcome
 
-This is formatted text with a link.
+This is formatted text. Visit https://example.com for more.
 
 - Item one
 - Item two
+```
+
+### Multipart Email (HTML + Plain Text)
+
+Parse once, render to multiple formats for email clients:
+
+```php
+use Djot\DjotConverter;
+use Djot\Renderer\HtmlRenderer;
+use Djot\Renderer\PlainTextRenderer;
+
+$template = <<<'DJOT'
+# Order Confirmation
+
+Thank you for your order, **John**!
+
+## Order Details
+
+| Item | Qty | Price |
+|------|-----|-------|
+| Widget Pro | 2 | $49.99 |
+| Gadget X | 1 | $29.99 |
+
+**Total:** $79.98
+
+[Track Your Order](https://example.com/track/12345)
+
+Questions? Reply to this email or visit our [help center](https://example.com/help).
+DJOT;
+
+// Parse once
+$converter = new DjotConverter();
+$document = $converter->parse($template);
+
+// Render to HTML for rich email clients
+$htmlRenderer = new HtmlRenderer();
+$htmlBody = $htmlRenderer->render($document);
+
+// Render to plain text for basic clients
+$textRenderer = new PlainTextRenderer();
+$textBody = $textRenderer->render($document);
+
+// Send multipart email (using your preferred mail library)
+$email = new YourMailer();
+$email->setSubject('Order Confirmation');
+$email->setHtmlBody($htmlBody);
+$email->setTextBody($textBody);
+$email->send();
+```
+
+HTML output (for rich clients):
+```html
+<h1>Order Confirmation</h1>
+<p>Thank you for your order, <strong>John</strong>!</p>
+<h2>Order Details</h2>
+<table>
+<tr><th>Item</th><th>Qty</th><th>Price</th></tr>
+<tr><td>Widget Pro</td><td>2</td><td>$49.99</td></tr>
+<tr><td>Gadget X</td><td>1</td><td>$29.99</td></tr>
+</table>
+...
+```
+
+Plain text output (for basic clients):
+```
+Order Confirmation
+
+Thank you for your order, John!
+
+Order Details
+
+Item | Qty | Price
+Widget Pro | 2 | $49.99
+Gadget X | 1 | $29.99
+
+Total: $79.98
+
+https://example.com/track/12345
+
+Questions? Reply to this email or visit our https://example.com/help.
 ```
 
 ### Markdown Conversion
@@ -1162,4 +1811,222 @@ $html = $converter->convertFile('/path/to/document.djot');
 $document = $converter->parseFile('/path/to/document.djot');
 // ... modify AST ...
 $html = $converter->render($document);
+```
+
+## Soft Break Modes
+
+Control how soft breaks (single newlines in source) are rendered in HTML output.
+
+### Available Modes
+
+```php
+use Djot\DjotConverter;
+use Djot\Renderer\SoftBreakMode;
+
+$converter = new DjotConverter();
+
+// Newline mode (default) - renders as "\n" in HTML source
+$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
+
+// Space mode - renders as a single space
+$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space);
+
+// Break mode - renders as <br> (visible line break)
+$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Break);
+```
+
+### Example: Poetry or Lyrics
+
+For content where line breaks should be visible (poetry, lyrics, addresses):
+
+```php
+use Djot\DjotConverter;
+use Djot\Renderer\SoftBreakMode;
+
+$converter = new DjotConverter();
+$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Break);
+
+$poem = "Roses are red
+Violets are blue
+Sugar is sweet
+And so are you";
+
+echo $converter->convert($poem);
+```
+
+Output:
+```html
+<p>Roses are red<br>
+Violets are blue<br>
+Sugar is sweet<br>
+And so are you</p>
+```
+
+### Comparison
+
+| Source | Mode | HTML Output | Browser Display |
+|--------|------|-------------|-----------------|
+| `Line 1↵Line 2` | Newline | `Line 1\nLine 2` | Line 1 Line 2 |
+| `Line 1↵Line 2` | Space | `Line 1 Line 2` | Line 1 Line 2 |
+| `Line 1↵Line 2` | Break | `Line 1<br>\nLine 2` | Line 1<br>Line 2 |
+
+Note: Use `\` at end of line for hard breaks (always renders as `<br>`) regardless of soft break mode.
+
+## Significant Newlines Mode
+
+By default, djot-php follows the djot specification where block elements (lists, blockquotes, headings) **cannot interrupt paragraphs** - they require a blank line before them.
+
+The "significant newlines" mode provides markdown-like behavior where block elements can interrupt paragraphs without blank lines. This is useful for chat messages, comments, and quick notes.
+
+### Enabling Significant Newlines Mode
+
+```php
+use Djot\DjotConverter;
+
+// Method 1: Factory method (also enables SoftBreakMode::Break)
+$converter = DjotConverter::withSignificantNewlines();
+
+// Method 2: Constructor parameter
+$converter = new DjotConverter(significantNewlines: true);
+
+// Method 3: Parser-level control
+use Djot\Parser\BlockParser;
+$parser = new BlockParser(significantNewlines: true);
+```
+
+### Behavior Comparison
+
+**Default mode (spec-compliant):**
+```php
+$converter = new DjotConverter();
+$result = $converter->convert("Here's a list:
+- Item one
+- Item two");
+```
+
+Output:
+```html
+<p>Here's a list:
+- Item one
+- Item two</p>
+```
+
+**Significant newlines mode:**
+```php
+$converter = DjotConverter::withSignificantNewlines();
+$result = $converter->convert("Here's a list:
+- Item one
+- Item two");
+```
+
+Output:
+```html
+<p>Here's a list:</p>
+<ul>
+<li>Item one</li>
+<li>Item two</li>
+</ul>
+```
+
+### What Changes in Significant Newlines Mode
+
+| Feature | Default Mode | Significant Newlines |
+|---------|-------------|---------------------|
+| Lists interrupt paragraphs | No | Yes |
+| Blockquotes interrupt paragraphs | No | Yes |
+| Headings interrupt paragraphs | No | Yes |
+| Code fences interrupt paragraphs | No | Yes |
+| Nested lists without blank lines | No | Yes |
+| Soft breaks render as | `\n` | `<br>` |
+
+### Preventing Block Interruption with Escaping
+
+In significant newlines mode, if you want to include literal block markers without triggering block parsing, escape the first character with a backslash:
+
+```php
+$converter = DjotConverter::withSignificantNewlines();
+
+// Without escaping - creates a list
+$result = $converter->convert("Price:
+- 10 dollars");
+// Output: <p>Price:</p><ul><li>10 dollars</li></ul>
+
+// With escaping - literal text
+$result = $converter->convert("Price:
+\\- 10 dollars");
+// Output: <p>Price:<br>- 10 dollars</p>
+```
+
+Common escapes:
+- `\-`, `\*`, `\+` - Prevent list interpretation
+- `\>` - Prevent blockquote interpretation
+- `\#` - Prevent heading interpretation
+- `\|` - Prevent table interpretation
+- `` \` `` - Prevent code fence interpretation
+
+### Use Cases
+
+**Chat/Messaging Applications:**
+```php
+$converter = DjotConverter::withSignificantNewlines();
+
+$message = "Check out this quote:
+> Important information here
+And here's the follow-up";
+
+echo $converter->convert($message);
+```
+
+**Quick Notes:**
+```php
+$converter = DjotConverter::withSignificantNewlines();
+
+$note = "TODO:
+- Buy groceries
+- Call mom
+- Finish report";
+
+echo $converter->convert($note);
+```
+
+### Automatic Soft Break Configuration
+
+When using `DjotConverter::withSignificantNewlines()` or the `significantNewlines` constructor parameter, the soft break mode is automatically set to `SoftBreakMode::Break` (renders as `<br>`). This is intentional since chat/messaging contexts typically expect visible line breaks.
+
+To override this behavior:
+
+```php
+use Djot\DjotConverter;
+use Djot\Renderer\SoftBreakMode;
+
+$converter = DjotConverter::withSignificantNewlines();
+$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space); // Override if needed
+```
+
+**Note:** When using the `BlockParser` directly with a custom renderer (like `PlainTextRenderer`), the soft break mode is not automatically configured. You'll need to set it manually:
+
+```php
+use Djot\Parser\BlockParser;
+use Djot\Renderer\PlainTextRenderer;
+use Djot\Renderer\SoftBreakMode;
+
+$parser = new BlockParser(significantNewlines: true);
+$renderer = new PlainTextRenderer();
+$renderer->setSoftBreakMode(SoftBreakMode::Newline); // Configure as needed
+
+$doc = $parser->parse($input);
+echo $renderer->render($doc);
+```
+
+### Combining with Other Options
+
+```php
+use Djot\DjotConverter;
+use Djot\SafeMode;
+
+// Significant newlines with safe mode for user-generated content
+$converter = new DjotConverter(
+    safeMode: new SafeMode(),
+    significantNewlines: true,
+);
 ```

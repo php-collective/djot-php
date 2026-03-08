@@ -14,6 +14,7 @@
         "php": "^8.2"
     },
     "require-dev": {
+        "nikic/php-fuzzer": "^0.0.11",
         "php-collective/code-sniffer": "dev-master",
         "phpstan/phpstan": "^2.1.32",
         "phpunit/phpunit": "^11.0 || ^12.0"
@@ -35,6 +36,8 @@
         ],
         "cs-check": "phpcs --colors --parallel=16",
         "cs-fix": "phpcbf --colors --parallel=16",
+        "fuzz": "php-fuzzer fuzz fuzz/target.php fuzz/corpus/",
+        "fuzz-strict": "php-fuzzer fuzz fuzz/target-strict.php fuzz/corpus/",
         "stan": "phpstan analyze",
         "test": "phpunit"
     },
@@ -42,5 +45,8 @@
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
-    }
+    },
+    "bin": [
+        "bin/djot"
+    ]
 }

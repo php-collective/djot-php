@@ -123,6 +123,26 @@ Nested block quotes:
 </blockquote>
 ```
 
+#### Block Quote Captions
+
+Use `^` after a block quote to add an attribution/caption. The block quote will be wrapped in a `<figure>` element with a `<figcaption>`.
+
+**Input:**
+```djot
+> To be or not to be, that is the question.
+^ William Shakespeare
+```
+
+**Output:**
+```html
+<figure>
+<blockquote>
+<p>To be or not to be, that is the question.</p>
+</blockquote>
+<figcaption>William Shakespeare</figcaption>
+</figure>
+```
+
 ### Lists
 
 #### Bullet Lists
@@ -208,21 +228,23 @@ Indent with 2+ spaces for nested lists.
 
 #### Task Lists
 
-Use `[ ]` for unchecked and `[x]` or `[X]` for checked items.
+Use `[ ]` or `[_]` for unchecked and `[x]` or `[X]` for checked items.
+
+The underscore notation `[_]` is useful on mobile devices or in editors without monospaced fonts, where the space in `[ ]` can be hard to type or see.
 
 **Input:**
 ```djot
-- [ ] Todo item
+- [ ] Todo item (space)
+- [_] Todo item (underscore)
 - [x] Done item
-- [ ] Another todo
 ```
 
 **Output:**
 ```html
 <ul class="task-list">
-<li><input type="checkbox" disabled> Todo item</li>
+<li><input type="checkbox" disabled> Todo item (space)</li>
+<li><input type="checkbox" disabled> Todo item (underscore)</li>
 <li><input type="checkbox" disabled checked> Done item</li>
-<li><input type="checkbox" disabled> Another todo</li>
 </ul>
 ```
 
@@ -410,6 +432,74 @@ More visible text
 <p>More visible text</p>
 ```
 
+### Fenced Comments (Extension)
+
+Standard `{% %}` comments cannot contain blank lines. For longer comments that need blank lines,
+use fenced comments with `%%%`:
+
+**Input:**
+```djot
+Visible text
+
+%%%
+This is a fenced comment block.
+
+It can contain blank lines.
+
+Multiple paragraphs of notes, TODOs,
+or documentation that won't render.
+%%%
+
+More visible text
+```
+
+**Output:**
+```html
+<p>Visible text</p>
+<p>More visible text</p>
+```
+
+Like code fences, you can use more than three `%` characters. The closing fence must have
+at least as many `%` as the opening fence:
+
+**Input:**
+```djot
+%%%%
+%%% This is not the end
+Still inside the comment
+%%%%
+```
+
+**Output:**
+```html
+```
+
+> **Note:** This is a djot-php extension, not part of the official Djot specification.
+> See [discussion](https://github.com/jgm/djot/issues/67) for background.
+
+Fenced comment blocks are block-level elements that break paragraph continuity.
+Unlike other block elements, fenced comments can interrupt paragraphs without
+requiring a preceding blank line - making them truly "invisible" from a formatting
+perspective:
+
+**Input:**
+```djot
+Lorem ipsum
+%%%
+comment
+%%%
+dolor sit amet
+```
+
+**Output:**
+```html
+<p>Lorem ipsum</p>
+<p>dolor sit amet</p>
+```
+
+This produces two separate paragraphs. For comments that should not interrupt
+paragraph flow (keeping text in the same paragraph), use inline comments (`{% ... %}`).
+
 ### Line Blocks
 
 Preserve line breaks using `|` at the start of each line. Useful for poetry or addresses.
@@ -581,6 +671,23 @@ Link-level attributes can override or extend definition attributes:
 ```html
 <p><img src="image.png" alt="Alt text"></p>
 <p><img src="image.png" alt="Alt text" title="Title"></p>
+```
+
+#### Image Captions
+
+Use `^` after an image to add a caption. The image will be wrapped in a `<figure>` element with a `<figcaption>`.
+
+**Input:**
+```djot
+![Sunset over the ocean](sunset.jpg)
+^ A beautiful sunset captured at the beach
+```
+
+**Output:**
+```html
+<figure>
+<img src="sunset.jpg" alt="Sunset over the ocean"><figcaption>A beautiful sunset captured at the beach</figcaption>
+</figure>
 ```
 
 ### Superscript and Subscript
@@ -800,6 +907,37 @@ Line three
 Line two<br>
 Line three</p>
 ```
+
+## Abbreviations (Extension)
+
+Abbreviations allow you to define terms that will automatically be wrapped in `<abbr>` tags with their definitions. This is an extension feature inspired by PHP Markdown Extra.
+
+**Input:**
+```djot
+The HTML specification is maintained by the W3C.
+
+*[HTML]: Hyper Text Markup Language
+*[W3C]: World Wide Web Consortium
+```
+
+**Output:**
+```html
+<p>The <abbr title="Hyper Text Markup Language">HTML</abbr> specification is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
+```
+
+Abbreviation definitions can appear anywhere in the document and will be applied to all matching text. Matching is:
+- Case-sensitive (HTML ≠ html)
+- Word-boundary aware (HTML won't match HTMLElement)
+
+Definitions can span multiple lines if continuation lines are indented:
+
+```djot
+*[HTML]: Hyper Text Markup Language,
+  the standard markup language for documents
+  designed to be displayed in a web browser
+```
+
+**Note:** This feature works alongside the inline span approach documented in the [cookbook](cookbook.md#abbreviations). The definition-based approach automatically applies to all matching text, while the inline `[HTML]{abbr="..."}` approach allows overriding specific occurrences.
 
 ## Escaping
 

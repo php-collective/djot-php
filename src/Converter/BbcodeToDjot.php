@@ -123,14 +123,14 @@ class BbcodeToDjot
         // [code=lang]...[/code] -> ```lang\n...\n```
         $text = preg_replace_callback(
             '/\[code=([^\]]+)\](.*?)\[\/code\]/is',
-            fn ($m) => '```' . strtolower($m[1]) . "\n" . trim($m[2]) . "\n```\n",
+            fn ($m) => "\n\n```" . strtolower($m[1]) . "\n" . trim($m[2]) . "\n```\n\n",
             $text,
         ) ?? $text;
 
         // [code]...[/code] -> ```\n...\n```
         $text = preg_replace_callback(
             '/\[code\](.*?)\[\/code\]/is',
-            fn ($m) => "```\n" . trim($m[1]) . "\n```\n",
+            fn ($m) => "\n\n```\n" . trim($m[1]) . "\n```\n\n",
             $text,
         ) ?? $text;
 
@@ -143,34 +143,163 @@ class BbcodeToDjot
 
     protected function convertQuotes(string $text): string
     {
-        // [quote=author]...[/quote] -> > **author wrote:**\n> ...
-        $text = preg_replace_callback(
-            '/\[quote=([^\]]+)\](.*?)\[\/quote\]/is',
-            function ($m) {
-                $author = trim($m[1]);
-                $content = trim($m[2]);
-                $lines = explode("\n", $content);
-                $quoted = array_map(fn ($line) => '> ' . $line, $lines);
+        // Use depth tracking to handle nested quotes properly
+        return $this->parseQuotesWithDepth($text);
+    }
 
-                return "> *{$author} wrote:*\n" . implode("\n", $quoted) . "\n\n";
-            },
-            $text,
-        ) ?? $text;
+    /**
+     * Parse BBCode quotes with proper nesting support.
+     *
+     * Uses depth tracking to correctly match opening and closing tags,
+     * then recursively processes nested quotes.
+     */
+    protected function parseQuotesWithDepth(string $text): string
+    {
+        $result = '';
+        $length = strlen($text);
+        $i = 0;
 
-        // [quote]...[/quote] -> > ...
-        $text = preg_replace_callback(
-            '/\[quote\](.*?)\[\/quote\]/is',
-            function ($m) {
-                $content = trim($m[1]);
-                $lines = explode("\n", $content);
-                $quoted = array_map(fn ($line) => '> ' . $line, $lines);
+        while ($i < $length) {
+            // Check for opening quote tag - matches [quote], [quote=...], or [quote ...]
+            if (preg_match('/\[quote(?:[= ]([^\]]*))?\]/i', $text, $matches, 0, $i) && strpos($text, $matches[0], $i) === $i) {
+                $author = $matches[1] ?? null;
+                $tagLength = strlen($matches[0]);
+                $i += $tagLength;
 
-                return implode("\n", $quoted) . "\n\n";
-            },
-            $text,
-        ) ?? $text;
+                // Find the matching closing tag by tracking depth
+                $depth = 1;
+                $contentStart = $i;
 
-        return $text;
+                while ($i < $length) {
+                    // Check for nested opening quote
+                    if (preg_match('/\[quote(?:[= ][^\]]*)?\]/i', $text, $m, 0, $i) && strpos($text, $m[0], $i) === $i) {
+                        $depth++;
+                        $i += strlen($m[0]);
+
+                        continue;
+                    }
+
+                    // Check for closing quote
+                    if (preg_match('/\[\/quote\]/i', $text, $m, 0, $i) && strpos($text, $m[0], $i) === $i) {
+                        $depth--;
+                        if ($depth === 0) {
+                            // Extract content and convert to Djot blockquote
+                            $content = substr($text, $contentStart, $i - $contentStart);
+                            $i += strlen($m[0]);
+
+                            // Recursively process nested quotes in content
+                            $content = $this->parseQuotesWithDepth($content);
+
+                            // Convert to Djot blockquote format
+                            $result .= $this->formatAsBlockquote($content, $author);
+
+                            continue 2; // Continue outer loop
+                        }
+                        $i += strlen($m[0]);
+
+                        continue;
+                    }
+
+                    $i++;
+                }
+
+                // If we exit without finding closing tag, treat remaining as content
+                $content = substr($text, $contentStart);
+                $result .= $this->formatAsBlockquote($content, $author);
+
+                continue;
+            }
+
+            // Regular character, add to result
+            $result .= $text[$i];
+            $i++;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Format content as a Djot blockquote.
+     */
+    protected function formatAsBlockquote(string $content, ?string $author): string
+    {
+        $content = trim($content);
+        $lines = explode("\n", $content);
+        $quoted = array_map(fn ($line) => '> ' . $line, $lines);
+
+        // Ensure blank line before blockquote for proper Djot block separation
+        $output = "\n\n" . implode("\n", $quoted) . "\n";
+
+        if ($author !== null && $author !== '') {
+            $output .= '^ ' . $this->formatAttribution($author) . "\n";
+        }
+
+        return $output . "\n";
+    }
+
+    /**
+     * Parse BBCode quote attribution and format as "name (datetime) #id".
+     *
+     * Handles formats like:
+     * - username
+     * - username date="2024-01-01"
+     * - "9" name="user" date="2024-01-01 12:30"
+     * - id="9" name="user" date="2024-01-01"
+     */
+    protected function formatAttribution(string $attribution): string
+    {
+        $attribution = trim($attribution);
+        $remaining = $attribution;
+
+        $id = null;
+        $name = null;
+        $datetime = null;
+
+        // Extract id="..." or bare "..." at start (post/message ID)
+        if (preg_match('/^["\'](\d+)["\']/', $remaining, $m)) {
+            $id = $m[1];
+            $remaining = trim(substr($remaining, strlen($m[0])));
+        } elseif (preg_match('/\bid=["\']?(\d+)["\']?/i', $remaining, $m)) {
+            $id = $m[1];
+            $remaining = str_replace($m[0], '', $remaining);
+        }
+
+        // Extract name="..."
+        if (preg_match('/\bname=["\']([^"\']+)["\']/i', $remaining, $m)) {
+            $name = $m[1];
+            $remaining = str_replace($m[0], '', $remaining);
+        }
+
+        // Extract date="..." (may include time)
+        if (preg_match('/\bdate=["\']([^"\']+)["\']/i', $remaining, $m)) {
+            $datetime = $m[1];
+            $remaining = str_replace($m[0], '', $remaining);
+        }
+
+        // Extract time="..." separately if present
+        if (preg_match('/\btime=["\']([^"\']+)["\']/i', $remaining, $m)) {
+            $datetime = $datetime !== null ? $datetime . ' ' . $m[1] : $m[1];
+            $remaining = str_replace($m[0], '', $remaining);
+        }
+
+        // If no name attribute found, use remaining text as name
+        $remaining = trim($remaining);
+        if ($name === null && $remaining !== '') {
+            $name = $remaining;
+        }
+
+        // Build output: name (datetime) #id
+        $output = $name ?? '';
+
+        if ($datetime !== null) {
+            $output .= ' (' . $datetime . ')';
+        }
+
+        if ($id !== null) {
+            $output .= ' #' . $id;
+        }
+
+        return trim($output);
     }
 
     protected function convertLists(string $text): string
@@ -191,7 +320,8 @@ class BbcodeToDjot
                     $content,
                 );
 
-                return $content . "\n";
+                // Ensure blank line before list for proper Djot block separation
+                return "\n\n" . $content . "\n";
             },
             $text,
         ) ?? $text;
@@ -211,7 +341,8 @@ class BbcodeToDjot
                     $content,
                 );
 
-                return $content . "\n";
+                // Ensure blank line before list for proper Djot block separation
+                return "\n\n" . $content . "\n";
             },
             $text,
         ) ?? $text;
@@ -298,7 +429,8 @@ class BbcodeToDjot
                     }
                 }
 
-                return implode("\n", $rows) . "\n\n";
+                // Ensure blank line before table for proper Djot block separation
+                return "\n\n" . implode("\n", $rows) . "\n\n";
             },
             $text,
         ) ?? $text;

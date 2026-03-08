@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Djot;
 
 use Closure;
+use Djot\Extension\ExtensionInterface;
 use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
+use Djot\Renderer\HeadingIdTracker;
 use Djot\Renderer\HtmlRenderer;
+use Djot\Renderer\SoftBreakMode;
 use LengthException;
 use RuntimeException;
 
@@ -30,11 +33,26 @@ class DjotConverter
     protected ?ProfileFilter $profileFilter = null;
 
     /**
+     * Registered extensions
+     *
+     * @var array<\Djot\Extension\ExtensionInterface>
+     */
+    protected array $extensions = [];
+
+    /**
+     * Output transformers (called after rendering)
+     *
+     * @var array<\Closure(string): string>
+     */
+    protected array $outputTransformers = [];
+
+    /**
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
      * @param bool $strict Whether to throw exceptions on parse errors
      * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode (true for defaults, SafeMode instance for custom config)
      * @param \Djot\Profile|null $profile Profile for feature restriction (null = all features allowed)
+     * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
      */
     public function __construct(
         bool $xhtml = false,
@@ -42,10 +60,11 @@ class DjotConverter
         bool $strict = false,
         bool|SafeMode|null $safeMode = null,
         ?Profile $profile = null,
+        bool $significantNewlines = false,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
-        $this->parser = new BlockParser($warnings, $strict);
+        $this->parser = new BlockParser($warnings, $strict, $significantNewlines);
         $this->renderer = new HtmlRenderer($xhtml);
 
         // Configure safe mode
@@ -55,11 +74,36 @@ class DjotConverter
             $this->renderer->setSafeMode($safeMode);
         }
 
+        // In significant newlines mode, soft breaks become visible <br>
+        if ($significantNewlines) {
+            $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
+        }
+
         // Configure profile
         $this->profile = $profile;
         if ($profile !== null) {
             $this->profileFilter = new ProfileFilter();
         }
+    }
+
+    /**
+     * Create a converter with significant newlines mode enabled
+     *
+     * In this mode:
+     * - Block elements (lists, blockquotes, code) can interrupt paragraphs
+     * - Soft breaks render as visible <br> tags
+     * - Nested blocks in lists don't need blank lines
+     *
+     * Ideal for chat messages, comments, and quick notes.
+     */
+    public static function withSignificantNewlines(
+        bool $xhtml = false,
+        bool $warnings = false,
+        bool $strict = false,
+        bool|SafeMode|null $safeMode = null,
+        ?Profile $profile = null,
+    ): self {
+        return new self($xhtml, $warnings, $strict, $safeMode, $profile, true);
     }
 
     /**
@@ -130,7 +174,14 @@ class DjotConverter
             $document = $this->profileFilter->filter($document, $this->profile);
         }
 
-        return $this->render($document);
+        $html = $this->render($document);
+
+        // Apply output transformers
+        foreach ($this->outputTransformers as $transformer) {
+            $html = $transformer($html);
+        }
+
+        return $html;
     }
 
     /**
@@ -140,7 +191,14 @@ class DjotConverter
     {
         $document = $this->parseFile($path);
 
-        return $this->render($document);
+        $html = $this->render($document);
+
+        // Apply output transformers
+        foreach ($this->outputTransformers as $transformer) {
+            $html = $transformer($html);
+        }
+
+        return $html;
     }
 
     /**
@@ -222,11 +280,65 @@ class DjotConverter
     }
 
     /**
+     * Get the heading ID tracker
+     */
+    public function getHeadingIdTracker(): HeadingIdTracker
+    {
+        return $this->renderer->getHeadingIdTracker();
+    }
+
+    /**
      * Get the block parser for direct access
      */
     public function getParser(): BlockParser
     {
         return $this->parser;
+    }
+
+    /**
+     * Register an extension
+     *
+     * Extensions can add custom inline/block patterns and render event listeners.
+     *
+     * Example:
+     * ```php
+     * $converter->addExtension(new ExternalLinksExtension());
+     * $converter->addExtension(new MentionsExtension(
+     *     userUrlTemplate: 'https://github.com/{username}',
+     * ));
+     * ```
+     */
+    public function addExtension(ExtensionInterface $extension): self
+    {
+        $this->extensions[] = $extension;
+        $extension->register($this);
+
+        return $this;
+    }
+
+    /**
+     * Get all registered extensions
+     *
+     * @return array<\Djot\Extension\ExtensionInterface>
+     */
+    public function getExtensions(): array
+    {
+        return $this->extensions;
+    }
+
+    /**
+     * Add an output transformer
+     *
+     * Output transformers are called after rendering, allowing extensions
+     * to modify the final HTML output (e.g., prepend/append content).
+     *
+     * @param \Closure(string): string $transformer
+     */
+    public function addOutputTransformer(Closure $transformer): self
+    {
+        $this->outputTransformers[] = $transformer;
+
+        return $this;
     }
 
     /**

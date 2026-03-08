@@ -1,0 +1,11 @@
+Inline `code` here.
+
+```php
+function test() {
+    return true;
+}
+```
+
+````
+Nested ``` backticks
+````

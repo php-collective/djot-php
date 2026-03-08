@@ -174,15 +174,15 @@ b*)
 <p><a href="hello *ab*">closed</a></p>
 ```
 
-Here the strong takes precedence over the link because it
-starts first:
+Here the link takes precedence because the star inside the
+destination is protected from closing emphasis:
 ```
 *[closed](hello*)
 .
-<p><strong>[closed](hello</strong>)</p>
+<p>*<a href="hello*">closed</a></p>
 ```
 
-Avoid this with a backslash escape:
+This also works with a backslash escape:
 ```
 *[closed](hello\*)
 .

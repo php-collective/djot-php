@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
-use Closure;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\BlockQuote;
+use Djot\Node\Block\Caption;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Comment;
 use Djot\Node\Block\DefinitionDescription;
 use Djot\Node\Block\DefinitionList;
 use Djot\Node\Block\DefinitionTerm;
 use Djot\Node\Block\Div;
+use Djot\Node\Block\Figure;
 use Djot\Node\Block\Footnote;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\LineBlock;
@@ -25,6 +26,7 @@ use Djot\Node\Block\TableCell;
 use Djot\Node\Block\TableRow;
 use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
+use Djot\Node\Inline\Abbreviation;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
@@ -44,24 +46,22 @@ use Djot\Node\Inline\Superscript;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Renderer\Utility\EventDispatcherTrait;
 use Djot\SafeMode;
 
 /**
  * Renders AST to HTML
  */
-class HtmlRenderer
+class HtmlRenderer implements RendererInterface
 {
-    protected bool $softBreakAsNewline = true;
+    use EventDispatcherTrait;
+
+    protected SoftBreakMode $softBreakMode = SoftBreakMode::Newline;
 
     /**
      * Safe mode configuration (null = disabled)
      */
     protected ?SafeMode $safeMode = null;
-
-    /**
-     * @var array<string, array<\Closure(\Djot\Event\RenderEvent): void>>
-     */
-    protected array $listeners = [];
 
     /**
      * Tracks footnote reference counts for generating unique IDs
@@ -70,17 +70,12 @@ class HtmlRenderer
      */
     protected array $footnoteRefCounts = [];
 
-    /**
-     * Tracks used IDs for deduplication
-     *
-     * @var array<string, int>
-     */
-    protected array $usedIds = [];
+    protected HeadingIdTracker $headingIdTracker;
 
     /**
-     * Counter for auto-generated section IDs (when heading has no text)
+     * Tab width for code blocks (null = preserve tabs, integer = convert to spaces)
      */
-    protected int $sectionCounter = 0;
+    protected ?int $codeBlockTabWidth = null;
 
     /**
      * Maps footnote labels to their assigned numbers (order of first reference)
@@ -101,8 +96,76 @@ class HtmlRenderer
      */
     protected array $collectedFootnotes = [];
 
+    /**
+     * Dispatch table mapping node class names to render method names
+     *
+     * @var array<class-string<\Djot\Node\Node>, string>
+     */
+    protected array $nodeRenderers = [];
+
     public function __construct(protected bool $xhtml = false)
     {
+        $this->headingIdTracker = new HeadingIdTracker();
+        $this->initNodeRenderers();
+    }
+
+    /**
+     * Get the heading ID tracker
+     */
+    public function getHeadingIdTracker(): HeadingIdTracker
+    {
+        return $this->headingIdTracker;
+    }
+
+    /**
+     * Initialize the node renderer dispatch table
+     *
+     * Maps node class names to render method names for O(1) lookup.
+     */
+    protected function initNodeRenderers(): void
+    {
+        $this->nodeRenderers = [
+            Document::class => 'renderChildren',
+            Paragraph::class => 'renderParagraph',
+            Heading::class => 'renderHeading',
+            CodeBlock::class => 'renderCodeBlock',
+            Comment::class => '',
+            RawBlock::class => 'renderRawBlock',
+            BlockQuote::class => 'renderBlockQuote',
+            DefinitionList::class => 'renderDefinitionList',
+            DefinitionTerm::class => 'renderDefinitionTerm',
+            DefinitionDescription::class => 'renderDefinitionDescription',
+            ListBlock::class => 'renderList',
+            ListItem::class => 'renderListItem',
+            ThematicBreak::class => 'renderThematicBreak',
+            Div::class => 'renderDiv',
+            Figure::class => 'renderFigure',
+            Caption::class => 'renderCaption',
+            Table::class => 'renderTable',
+            TableRow::class => 'renderTableRow',
+            TableCell::class => 'renderTableCell',
+            LineBlock::class => 'renderLineBlock',
+            Footnote::class => 'renderFootnote',
+            Text::class => 'renderText',
+            Emphasis::class => 'renderEmphasis',
+            Strong::class => 'renderStrong',
+            Link::class => 'renderLink',
+            Image::class => 'renderImage',
+            Code::class => 'renderCode',
+            RawInline::class => 'renderRawInline',
+            Math::class => 'renderMath',
+            Symbol::class => 'renderSymbol',
+            FootnoteRef::class => 'renderFootnoteRef',
+            SoftBreak::class => 'renderSoftBreak',
+            HardBreak::class => 'renderHardBreak',
+            Span::class => 'renderSpan',
+            Highlight::class => 'renderHighlight',
+            Superscript::class => 'renderSuperscript',
+            Subscript::class => 'renderSubscript',
+            Insert::class => 'renderInsert',
+            Delete::class => 'renderDelete',
+            Abbreviation::class => 'renderAbbreviation',
+        ];
     }
 
     /**
@@ -131,44 +194,58 @@ class HtmlRenderer
         return $this->safeMode !== null;
     }
 
-    public function setSoftBreakAsNewline(bool $value): void
+    /**
+     * Set how soft breaks are rendered
+     *
+     * @param \Djot\Renderer\SoftBreakMode $mode How to render soft breaks:
+     *   - Newline: renders as "\n" (default, not visible in browser)
+     *   - Space: renders as " " (not visible in browser)
+     *   - Break: renders as "<br>" (visible line break)
+     */
+    public function setSoftBreakMode(SoftBreakMode $mode): self
     {
-        $this->softBreakAsNewline = $value;
+        $this->softBreakMode = $mode;
+
+        return $this;
     }
 
     /**
-     * Register a listener for a render event
-     *
-     * Event names correspond to node types:
-     * - render.link, render.image, render.paragraph, etc.
-     * - render.* for all nodes
-     *
-     * @param string $event
-     * @param \Closure(\Djot\Event\RenderEvent): void $listener
+     * Get the current soft break mode
      */
-    public function on(string $event, Closure $listener): void
+    public function getSoftBreakMode(): SoftBreakMode
     {
-        $this->listeners[$event][] = $listener;
+        return $this->softBreakMode;
     }
 
     /**
-     * Remove all listeners for an event (or all events if no event specified)
+     * Set tab width for code blocks
+     *
+     * When set, tabs in code blocks and inline code are converted to spaces.
+     * This ensures consistent display across all browsers and contexts
+     * (email clients, RSS readers, etc.) without relying on CSS tab-size.
+     *
+     * @param int|null $width Number of spaces per tab (null to preserve tabs)
      */
-    public function off(?string $event = null): void
+    public function setCodeBlockTabWidth(?int $width): self
     {
-        if ($event === null) {
-            $this->listeners = [];
-        } else {
-            unset($this->listeners[$event]);
-        }
+        $this->codeBlockTabWidth = $width;
+
+        return $this;
+    }
+
+    /**
+     * Get the current code block tab width
+     */
+    public function getCodeBlockTabWidth(): ?int
+    {
+        return $this->codeBlockTabWidth;
     }
 
     public function render(Document $document): string
     {
         // Reset state for each render
         $this->footnoteRefCounts = [];
-        $this->usedIds = [];
-        $this->sectionCounter = 0;
+        $this->headingIdTracker->reset();
         $this->footnoteNumbers = [];
         $this->footnoteCounter = 0;
         $this->collectedFootnotes = [];
@@ -257,46 +334,7 @@ class HtmlRenderer
      */
     protected function getSectionId(Heading $node): string
     {
-        // If heading has explicit id attribute, use it
-        if ($node->hasAttribute('id')) {
-            $id = (string)$node->getAttribute('id');
-            // Track explicit IDs so auto-generated IDs don't conflict
-            if (!isset($this->usedIds[$id])) {
-                $this->usedIds[$id] = 0;
-            }
-
-            return $id;
-        }
-
-        // Generate from heading text
-        $headingText = $this->getPlainText($node);
-
-        if ($headingText === '') {
-            // Generate fallback ID
-            $this->sectionCounter++;
-
-            return 's-' . $this->sectionCounter;
-        }
-
-        // Convert to valid ID:
-        // 1. Strip # characters entirely
-        // 2. Trim whitespace
-        // 3. Replace whitespace sequences with single dashes
-        $baseId = str_replace('#', '', $headingText);
-        $baseId = trim($baseId);
-        $baseId = preg_replace('/[\s]+/', '-', $baseId) ?? $baseId;
-
-        // Track and deduplicate
-        if (!isset($this->usedIds[$baseId])) {
-            $this->usedIds[$baseId] = 0;
-
-            return $baseId;
-        }
-
-        // Already used, add suffix (first conflict is -1, second is -2, etc.)
-        $this->usedIds[$baseId]++;
-
-        return $baseId . '-' . $this->usedIds[$baseId];
+        return $this->headingIdTracker->getIdForHeading($node);
     }
 
     /**
@@ -305,10 +343,9 @@ class HtmlRenderer
     protected function trackIdFromNode(Node $node): void
     {
         if ($node->hasAttribute('id')) {
-            $id = (string)$node->getAttribute('id');
-            if (!isset($this->usedIds[$id])) {
-                $this->usedIds[$id] = 0;
-            }
+            $idAttr = $node->getAttribute('id');
+            $id = is_string($idAttr) ? $idAttr : '';
+            $this->headingIdTracker->trackId($id);
         }
     }
 
@@ -349,17 +386,12 @@ class HtmlRenderer
             $attrs = $this->safeMode->filterAttributes($attrs);
         }
 
-        // Sort attributes: id first, then others in source order
-        uksort($attrs, function (string $a, string $b): int {
-            if ($a === 'id') {
-                return -1;
-            }
-            if ($b === 'id') {
-                return 1;
-            }
-
-            return 0;
-        });
+        // Put id first if present (faster than uksort)
+        if (isset($attrs['id'])) {
+            $id = $attrs['id'];
+            unset($attrs['id']);
+            $attrs = ['id' => $id] + $attrs;
+        }
 
         $html = '';
         foreach ($attrs as $key => $value) {
@@ -371,61 +403,39 @@ class HtmlRenderer
 
     protected function renderNode(Node $node): string
     {
-        // Dispatch render event
-        $eventName = 'render.' . $node->getType();
-        $event = new RenderEvent($node);
+        // Only dispatch events if listeners are registered (avoid object allocation)
+        if ($this->hasAnyListeners()) {
+            $eventName = 'render.' . $node->getType();
+            $event = new RenderEvent($node);
 
-        // Call specific listeners
-        $this->dispatchEvent($eventName, $event);
+            // Provide lazy children renderer for extensions that need to wrap children
+            $event->setChildrenRenderer(fn (): string => $this->renderChildren($node));
 
-        // Call wildcard listeners
-        $this->dispatchEvent('render.*', $event);
+            // Call specific listeners
+            $this->dispatchEvent($eventName, $event);
 
-        // If listener provided custom HTML, use it
-        if ($event->isDefaultPrevented()) {
-            return $event->getHtml() ?? '';
+            // Call wildcard listeners
+            $this->dispatchEvent('render.*', $event);
+
+            // If listener provided custom HTML, use it
+            if ($event->isDefaultPrevented()) {
+                return $event->getHtml() ?? '';
+            }
         }
 
-        return match (true) {
-            $node instanceof Document => $this->renderChildren($node),
-            $node instanceof Paragraph => $this->renderParagraph($node),
-            $node instanceof Heading => $this->renderHeading($node),
-            $node instanceof CodeBlock => $this->renderCodeBlock($node),
-            $node instanceof Comment => '', // Comments are stripped from output
-            $node instanceof RawBlock => $this->renderRawBlock($node),
-            $node instanceof BlockQuote => $this->renderBlockQuote($node),
-            $node instanceof DefinitionList => $this->renderDefinitionList($node),
-            $node instanceof DefinitionTerm => $this->renderDefinitionTerm($node),
-            $node instanceof DefinitionDescription => $this->renderDefinitionDescription($node),
-            $node instanceof ListBlock => $this->renderList($node),
-            $node instanceof ListItem => $this->renderListItem($node),
-            $node instanceof ThematicBreak => $this->renderThematicBreak($node),
-            $node instanceof Div => $this->renderDiv($node),
-            $node instanceof Table => $this->renderTable($node),
-            $node instanceof TableRow => $this->renderTableRow($node),
-            $node instanceof TableCell => $this->renderTableCell($node),
-            $node instanceof LineBlock => $this->renderLineBlock($node),
-            $node instanceof Footnote => $this->renderFootnote($node),
-            $node instanceof Text => $this->renderText($node),
-            $node instanceof Emphasis => $this->renderEmphasis($node),
-            $node instanceof Strong => $this->renderStrong($node),
-            $node instanceof Link => $this->renderLink($node),
-            $node instanceof Image => $this->renderImage($node),
-            $node instanceof Code => $this->renderCode($node),
-            $node instanceof RawInline => $this->renderRawInline($node),
-            $node instanceof Math => $this->renderMath($node),
-            $node instanceof Symbol => $this->renderSymbol($node),
-            $node instanceof FootnoteRef => $this->renderFootnoteRef($node),
-            $node instanceof SoftBreak => $this->renderSoftBreak(),
-            $node instanceof HardBreak => $this->renderHardBreak(),
-            $node instanceof Span => $this->renderSpan($node),
-            $node instanceof Highlight => $this->renderHighlight($node),
-            $node instanceof Superscript => $this->renderSuperscript($node),
-            $node instanceof Subscript => $this->renderSubscript($node),
-            $node instanceof Insert => $this->renderInsert($node),
-            $node instanceof Delete => $this->renderDelete($node),
-            default => $this->renderChildren($node),
-        };
+        // Use dispatch table for O(1) lookup instead of instanceof chain
+        $class = $node::class;
+        if (isset($this->nodeRenderers[$class])) {
+            $method = $this->nodeRenderers[$class];
+            if ($method === '') {
+                return ''; // Comment nodes
+            }
+
+            /** @var string */
+            return $this->$method($node);
+        }
+
+        return $this->renderChildren($node);
     }
 
     protected function renderChildren(Node $node): string
@@ -464,18 +474,7 @@ class HtmlRenderer
      */
     protected function getPlainText(Node $node): string
     {
-        $text = '';
-        foreach ($node->getChildren() as $child) {
-            if ($child instanceof Text) {
-                $text .= $child->getContent();
-            } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
-                $text .= ' ';
-            } elseif ($child instanceof Node) {
-                $text .= $this->getPlainText($child);
-            }
-        }
-
-        return $text;
+        return $this->headingIdTracker->getPlainText($node);
     }
 
     protected function renderCodeBlock(CodeBlock $node): string
@@ -484,6 +483,12 @@ class HtmlRenderer
         $attrs = $this->renderAttributes($node);
 
         $code = $this->escape($node->getContent());
+
+        // Convert tabs to spaces if configured
+        if ($this->codeBlockTabWidth !== null) {
+            $code = str_replace("\t", str_repeat(' ', $this->codeBlockTabWidth), $code);
+        }
+
         // Add trailing newline inside code block (official djot behavior)
         if ($code !== '' && !str_ends_with($code, "\n")) {
             $code .= "\n";
@@ -591,20 +596,45 @@ class HtmlRenderer
         return '<div class="line-block"' . $attrs . ">\n" . $this->renderChildren($node) . "</div>\n";
     }
 
+    protected function renderFigure(Figure $node): string
+    {
+        $attrs = $this->renderAttributes($node);
+        $html = '<figure' . $attrs . ">\n";
+
+        foreach ($node->getChildren() as $child) {
+            if ($child instanceof Caption) {
+                // Caption becomes figcaption
+                $html .= '<figcaption>' . rtrim($this->renderChildren($child)) . "</figcaption>\n";
+            } elseif ($child instanceof Image) {
+                // Image rendered directly (not wrapped in p)
+                $html .= $this->renderImage($child);
+            } else {
+                // Other content (blockquote, etc.)
+                $html .= $this->renderNode($child);
+            }
+        }
+
+        return $html . "</figure>\n";
+    }
+
+    protected function renderCaption(Caption $node): string
+    {
+        // Caption is usually rendered as part of figure or table
+        // This is a fallback if caption appears standalone
+        return '<figcaption>' . rtrim($this->renderChildren($node)) . "</figcaption>\n";
+    }
+
     protected function renderTable(Table $node): string
     {
         $attrs = $this->renderAttributes($node);
         $html = '<table' . $attrs . ">\n";
 
-        // Render caption if present (with parsed inline content)
-        if ($node->hasCaptionChildren()) {
-            $captionHtml = '';
-            foreach ($node->getCaptionChildren() as $child) {
-                $captionHtml .= $this->renderNode($child);
-            }
-            // Remove trailing newline from last text node
-            $captionHtml = rtrim($captionHtml);
-            $html .= '<caption>' . $captionHtml . "</caption>\n";
+        // Render caption if present
+        if ($node->hasCaption()) {
+            /** @var \Djot\Node\Block\Caption $caption */
+            $caption = $node->getCaption();
+            $captionHtml = $this->renderChildren($caption);
+            $html .= '<caption>' . rtrim($captionHtml) . "</caption>\n";
         }
 
         // djot tables don't use thead/tbody - just rows with th or td cells
@@ -628,6 +658,16 @@ class HtmlRenderer
     {
         $tag = $node->isHeader() ? 'th' : 'td';
         $attrs = $this->renderAttributes($node);
+
+        $rowspan = $node->getRowspan();
+        if ($rowspan > 1) {
+            $attrs .= ' rowspan="' . $rowspan . '"';
+        }
+
+        $colspan = $node->getColspan();
+        if ($colspan > 1) {
+            $attrs .= ' colspan="' . $colspan . '"';
+        }
 
         $alignment = $node->getAlignment();
         if ($alignment !== TableCell::ALIGN_DEFAULT) {
@@ -704,13 +744,23 @@ class HtmlRenderer
     protected function renderCode(Code $node): string
     {
         $attrs = $this->renderAttributes($node);
+        $content = $this->escape($node->getContent());
 
-        return '<code' . $attrs . '>' . $this->escape($node->getContent()) . '</code>';
+        // Convert tabs to spaces if configured
+        if ($this->codeBlockTabWidth !== null) {
+            $content = str_replace("\t", str_repeat(' ', $this->codeBlockTabWidth), $content);
+        }
+
+        return '<code' . $attrs . '>' . $content . '</code>';
     }
 
     protected function renderSoftBreak(): string
     {
-        return $this->softBreakAsNewline ? "\n" : ' ';
+        return match ($this->softBreakMode) {
+            SoftBreakMode::Newline => "\n",
+            SoftBreakMode::Space => ' ',
+            SoftBreakMode::Break => $this->xhtml ? "<br />\n" : "<br>\n",
+        };
     }
 
     protected function renderHardBreak(): string
@@ -760,6 +810,15 @@ class HtmlRenderer
         return '<del' . $attrs . '>' . $this->renderChildren($node) . '</del>';
     }
 
+    protected function renderAbbreviation(Abbreviation $node): string
+    {
+        $attrs = $this->renderAttributes($node);
+        $title = $node->getTitle();
+
+        return '<abbr title="' . $this->escapeAttribute($title) . '"' . $attrs . '>'
+            . $this->renderChildren($node) . '</abbr>';
+    }
+
     protected function renderAttributes(Node $node): string
     {
         $attrs = $node->getAttributes();
@@ -772,17 +831,12 @@ class HtmlRenderer
             $attrs = $this->safeMode->filterAttributes($attrs);
         }
 
-        // Sort attributes: id first, then others in source order
-        uksort($attrs, function (string $a, string $b): int {
-            if ($a === 'id') {
-                return -1;
-            }
-            if ($b === 'id') {
-                return 1;
-            }
-
-            return 0; // preserve order for other attributes
-        });
+        // Put id first if present (faster than uksort)
+        if (isset($attrs['id'])) {
+            $id = $attrs['id'];
+            unset($attrs['id']);
+            $attrs = ['id' => $id] + $attrs;
+        }
 
         $html = '';
         foreach ($attrs as $key => $value) {
@@ -1041,24 +1095,5 @@ class HtmlRenderer
         // By default, symbols are rendered as their name
         // Could be extended to support emoji mappings
         return ':' . $this->escape($node->getName()) . ':';
-    }
-
-    /**
-     * Dispatch an event to all registered listeners
-     */
-    protected function dispatchEvent(string $event, RenderEvent $renderEvent): void
-    {
-        if (!isset($this->listeners[$event])) {
-            return;
-        }
-
-        foreach ($this->listeners[$event] as $listener) {
-            $listener($renderEvent);
-
-            // Stop propagation if default was prevented
-            if ($renderEvent->isDefaultPrevented()) {
-                break;
-            }
-        }
     }
 }

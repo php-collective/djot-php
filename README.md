@@ -1,10 +1,10 @@
 # Djot PHP
 
 [![CI](https://img.shields.io/github/actions/workflow/status/php-collective/djot-php/ci.yml?branch=master&style=flat-square)](https://github.com/php-collective/djot-php/actions)
-[![codecov](https://img.shields.io/codecov/c/github/php-collective/djot-php?style=flat-square)](https://codecov.io/gh/php-collective/djot-php)
+[![Coverage](https://codecov.io/gh/php-collective/djot-php/branch/master/graph/badge.svg)](https://codecov.io/gh/php-collective/djot-php)
 [![Latest Stable Version](https://img.shields.io/packagist/v/php-collective/djot?style=flat-square)](https://packagist.org/packages/php-collective/djot)
 [![Total Downloads](https://img.shields.io/packagist/dt/php-collective/djot?style=flat-square)](https://packagist.org/packages/php-collective/djot)
-[![PHPStan](https://img.shields.io/badge/PHPStan-level%208-brightgreen.svg?style=flat-square)](https://phpstan.org/)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level%209-brightgreen.svg?style=flat-square)](https://phpstan.org/)
 [![PHP Version](https://img.shields.io/badge/php-%3E%3D8.2-8892BF.svg?style=flat-square)](https://php.net)
 [![Software License](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 
@@ -33,6 +33,7 @@ $html = $converter->convert('Hello *world*!');
 - **Advanced**: Footnotes, math expressions, symbols, block attributes, raw HTML blocks, comments
 - **Smart typography**: Curly quotes, en/em dashes, ellipsis
 - **Multiple renderers**: HTML, plain text, Markdown output
+- **Extensions**: Built-in extensions for external links, TOC, heading permalinks, @mentions, autolinks, default attributes
 - **Extensible**: Custom inline/block patterns, render events
 - **File support**: Parse and convert files directly
 
@@ -40,17 +41,17 @@ $html = $converter->convert('Hello *world*!');
 
 ```php
 use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
+use Djot\Extension\ExternalLinksExtension;
+use Djot\Extension\DefaultAttributesExtension;
 
 $converter = new DjotConverter();
 
-// Customize link rendering
-$converter->on('render.link', function (RenderEvent $event): void {
-    $link = $event->getNode();
-    if (str_starts_with($link->getDestination(), 'http')) {
-        $link->setAttribute('target', '_blank');
-    }
-});
+// Add extensions for common features
+$converter
+    ->addExtension(new ExternalLinksExtension())
+    ->addExtension(new DefaultAttributesExtension([
+        'table' => ['class' => 'table'],
+    ]));
 
 $djot = <<<'DJOT'
 # Welcome
@@ -75,8 +76,8 @@ Output:
 
 ```html
 <h1>Welcome</h1>
-<p>This is <em>emphasized</em> and <strong>strong</strong> text with a <a href="https://example.com" target="_blank">link</a>.</p>
-<table>
+<p>This is <em>emphasized</em> and <strong>strong</strong> text with a <a href="https://example.com" target="_blank" rel="noopener noreferrer">link</a>.</p>
+<table class="table">
 <thead>
 <tr><th>Name</th><th>Role</th></tr>
 </thead>
@@ -101,6 +102,7 @@ https://sandbox.dereuromark.de/sandbox/djot
 - [Examples](docs/README.md) - Comprehensive usage examples
 - [Syntax Reference](docs/syntax.md) - Complete Djot syntax guide
 - [API Reference](docs/api.md) - Classes and methods
+- [Extensions](docs/extensions.md) - Built-in extensions for common features
 - [Profiles](docs/profiles.md) - Feature restriction for different contexts
 - [Converters](docs/converters.md) - Markdown/BBCode to Djot conversion
 - [Cookbook](docs/cookbook.md) - Common customizations and recipes
@@ -125,8 +127,10 @@ See [Security Considerations](docs/README.md#security-considerations) for detail
 ## Implementations
 
 - [php-collective/wp-djot](https://github.com/php-collective/wp-djot) - WordPress plugin for Djot support
+- [dereuromark/cakephp-markup](https://github.com/dereuromark/cakephp-markup) - CakePHP integration with Djot helper and view class
 
 ## See Also
 
 - [Djot](https://djot.net/) - Official Djot website with syntax reference and playground
 - [jgm/djot](https://github.com/jgm/djot) - Reference implementation in JavaScript by John MacFarlane
+- [JetBrains IDE support](https://github.com/php-collective/djot-intellij) - Plugin for PhpStorm, IntelliJ IDEA, WebStorm, etc.

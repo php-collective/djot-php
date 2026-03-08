@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Djot Syntax Highlighting Demo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #0066cc;
+            padding-bottom: 0.5rem;
+        }
+        h2 {
+            color: #555;
+            margin-top: 2rem;
+        }
+        pre {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        code.hljs {
+            background: transparent;
+            padding: 0;
+        }
+        .note {
+            background: #e7f3ff;
+            border-left: 4px solid #0066cc;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Djot Syntax Highlighting Demo</h1>
+    <p class="note">
+        This page demonstrates the highlight.js language definition for Djot markup.
+        <br>Include <code>hljs-djot.js</code> after highlight.js to enable Djot highlighting.
+    </p>
+
+    <h2>Headings &amp; Paragraphs</h2>
+    <pre><code class="language-djot"># Heading 1
+## Heading 2
+### Heading 3 {#custom-id .custom-class}
+
+This is a paragraph with *strong* and _emphasis_ text.
+
+{.note}
+This paragraph has block attributes applied.</code></pre>
+
+    <h2>Inline Formatting</h2>
+    <pre><code class="language-djot">Text with *strong*, _emphasis_, and `inline code`.
+
+Highlight: {=highlighted text=}
+Insert: {+inserted text+}
+Delete: {-deleted text-}
+
+Superscript: E=mc^2^
+Subscript: H~2~O
+
+[styled span]{.highlight #unique-id}</code></pre>
+
+    <h2>Links &amp; Images</h2>
+    <pre><code class="language-djot">[Link text](https://example.com)
+[Link with title](https://example.com "Title")
+[Link with attributes](https://example.com){.external target=_blank}
+
+![Image alt](image.png)
+![Image with title](image.png "Photo title")
+
+[Reference link][ref]
+<https://autolink.example.com>
+<user@example.com>
+
+[ref]: https://example.com</code></pre>
+
+    <h2>Code Blocks</h2>
+    <pre><code class="language-djot">```php
+function hello(): void {
+    echo "Hello, World!";
+}
+```
+
+```
+Plain code block without language
+```
+
+``` =html
+&lt;div class="raw"&gt;Raw HTML block&lt;/div&gt;
+```</code></pre>
+
+    <h2>Raw Inline &amp; Block</h2>
+    <pre><code class="language-djot">Inline raw: `&lt;span style="color:red"&gt;red text&lt;/span&gt;`{=html}
+
+Block raw HTML:
+
+``` =html
+&lt;div class="alert alert-info"&gt;
+  &lt;strong&gt;Note:&lt;/strong&gt; This is raw HTML!
+&lt;/div&gt;
+```
+
+Also works for LaTeX: `\textbf{bold}`{=latex}</code></pre>
+
+    <h2>Divs</h2>
+    <pre><code class="language-djot">::: warning
+This is a warning message.
+:::
+
+::: outer
+Outer content
+
+::: inner
+Nested div content
+:::
+
+More outer content
+:::</code></pre>
+
+    <h2>Lists</h2>
+    <pre><code class="language-djot">- Bullet item 1
+- Bullet item 2
+  - Nested item
+  - Another nested
+
+1. Ordered item 1
+2. Ordered item 2
+
+- [ ] Todo item
+- [x] Completed item
+- [ ] Another todo</code></pre>
+
+    <h2>Definition Lists</h2>
+    <pre><code class="language-djot">: Term 1
+  Definition of term 1
+
+: Term 2
+  Definition of term 2
+  With multiple lines</code></pre>
+
+    <h2>Tables</h2>
+    <pre><code class="language-djot">| Header 1 | Header 2 | Header 3 |
+|:---------|:--------:|---------:|
+| Left     | Center   | Right    |
+| Cell     | Cell     | Cell     |
+^ Table caption
+
+| Name   | Value |{.header-row}
+|--------|-------|
+| Alpha  | 100   |{.highlight}</code></pre>
+
+    <h2>Block Quotes</h2>
+    <pre><code class="language-djot">> This is a block quote
+> spanning multiple lines.
+>
+> With multiple paragraphs.
+
+> To be or not to be, that is the question.
+^ William Shakespeare</code></pre>
+
+    <h2>Line Blocks (Poetry)</h2>
+    <pre><code class="language-djot">| Roses are red,
+| Violets are blue,
+| Sugar is sweet,
+| And so are you.</code></pre>
+
+    <h2>Math</h2>
+    <pre><code class="language-djot">Inline math: $`E = mc^2`$
+
+Display math: $$`\sum_{i=0}^{n} i = \frac{n(n+1)}{2}`$$</code></pre>
+
+    <h2>Footnotes</h2>
+    <pre><code class="language-djot">Here is a statement[^1] with footnotes[^note].
+
+[^1]: This is the first footnote.
+
+[^note]: This is a named footnote with more detail.</code></pre>
+
+    <h2>Comments</h2>
+    <pre><code class="language-djot">Visible text {% this is an inline comment %} more text.
+
+%%%
+This is a fenced comment block.
+It can span multiple lines.
+Nothing here will be rendered.
+%%%</code></pre>
+
+    <h2>Symbols</h2>
+    <pre><code class="language-djot">I :heart: Djot! :arrow_right: It's awesome :star:</code></pre>
+
+    <h2>Horizontal Rules</h2>
+    <pre><code class="language-djot">Above the rule
+
+---
+
+Below the rule
+
+***
+
+Another section</code></pre>
+
+    <h2>Escaping &amp; Special Characters</h2>
+    <pre><code class="language-djot">\*not strong\*
+\[not a link\]
+\# not a heading
+
+Line with hard break\
+continues here</code></pre>
+
+    <h2>Smart Typography</h2>
+    <pre><code class="language-djot">"Double quotes" and 'single quotes'
+
+En-dash: 1--10
+Em-dash: wait---what?
+
+Ellipsis...</code></pre>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="hljs-djot.js"></script>
+    <script>
+        hljs.highlightAll();
+    </script>
+</body>
+</html>

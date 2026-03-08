@@ -11,3 +11,8 @@
 /.idea/
 /.phpstorm.meta.php
 /_*
+/tests/benchmark_alternatives/results/
+/tests/benchmark/results/
+# Fuzz testing artifacts
+/fuzz/crash-*
+/fuzz/minimized-*

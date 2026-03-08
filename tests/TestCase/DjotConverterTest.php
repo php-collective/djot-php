@@ -9,6 +9,7 @@ use Djot\Event\RenderEvent;
 use Djot\Exception\ParseException;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Symbol;
+use Djot\Renderer\SoftBreakMode;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -157,6 +158,21 @@ class DjotConverterTest extends TestCase
         $this->assertStringContainsString('type="checkbox"', $result);
         $this->assertStringContainsString('checked=""', $result);
         $this->assertStringContainsString('Unchecked', $result);
+        $this->assertStringContainsString('Checked', $result);
+    }
+
+    public function testTaskListUnderscoreNotation(): void
+    {
+        $djot = "- [_] Unchecked with underscore\n- [ ] Unchecked with space\n- [x] Checked";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('task-list', $result);
+        // Both underscore and space should render as unchecked checkboxes
+        $this->assertSame(2, substr_count($result, '<input disabled="" type="checkbox"/>'));
+        $this->assertSame(1, substr_count($result, 'checked=""'));
+        $this->assertStringContainsString('Unchecked with underscore', $result);
+        $this->assertStringContainsString('Unchecked with space', $result);
         $this->assertStringContainsString('Checked', $result);
     }
 
@@ -552,6 +568,66 @@ DJOT;
         $this->assertSame(1, substr_count($result, '<dd>'));
     }
 
+    public function testDefinitionListMultipleTermsMultipleDefinitions(): void
+    {
+        // Use `: +` continuation marker to create multiple dd elements
+        $djot = ": color\n: colour\n\n  The visual property of objects.\n\n: +\n\n  Used in art and design.";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dt>color</dt>', $result);
+        $this->assertStringContainsString('<dt>colour</dt>', $result);
+        $this->assertStringContainsString('The visual property', $result);
+        $this->assertStringContainsString('Used in art and design', $result);
+        // `: +` marker creates second dd element
+        $this->assertSame(2, substr_count($result, '<dd>'));
+    }
+
+    public function testDefinitionListDlAttribute(): void
+    {
+        $djot = "{.vocabulary}\n: Term\n\n  Definition";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dl class="vocabulary">', $result);
+        $this->assertStringContainsString('<dt>Term</dt>', $result);
+    }
+
+    public function testDefinitionListDtAttribute(): void
+    {
+        $djot = ": Term\n{.highlighted}\n\n  Definition";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dt class="highlighted">Term</dt>', $result);
+    }
+
+    public function testDefinitionListDdAttribute(): void
+    {
+        // DD attribute comes AFTER content (consistent with list items)
+        $djot = ": Term\n\n  Definition content\n  {.note}";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dd class="note">', $result);
+        $this->assertStringContainsString('Definition content', $result);
+    }
+
+    public function testDefinitionListAllAttributes(): void
+    {
+        // DD attributes come AFTER content (consistent with list items)
+        // Use `: +` continuation marker to create multiple dd elements with separate attributes
+        $djot = "{.vocabulary}\n: color\n{.american}\n: colour\n{.british}\n\n  The visual property.\n  {.primary}\n\n: +\n\n  Used in design.\n  {.secondary}";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dl class="vocabulary">', $result);
+        $this->assertStringContainsString('<dt class="american">color</dt>', $result);
+        $this->assertStringContainsString('<dt class="british">colour</dt>', $result);
+        $this->assertStringContainsString('<dd class="primary">', $result);
+        $this->assertStringContainsString('<dd class="secondary">', $result);
+    }
+
     public function testComment(): void
     {
         $djot = "Before\n\n{% This is a comment %}\n\nAfter";
@@ -572,6 +648,99 @@ DJOT;
         $this->assertStringContainsString('<p>Before</p>', $result);
         $this->assertStringContainsString('<p>After</p>', $result);
         $this->assertStringNotContainsString('multiline', $result);
+    }
+
+    public function testFencedComment(): void
+    {
+        $djot = "Before\n\n%%%\nThis is a fenced comment\n%%%\n\nAfter";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<p>Before</p>', $result);
+        $this->assertStringContainsString('<p>After</p>', $result);
+        $this->assertStringNotContainsString('fenced comment', $result);
+    }
+
+    public function testFencedCommentWithBlankLines(): void
+    {
+        $djot = "Before\n\n%%%\nComment line 1\n\nBlank line above\n\nComment line 3\n%%%\n\nAfter";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<p>Before</p>', $result);
+        $this->assertStringContainsString('<p>After</p>', $result);
+        $this->assertStringNotContainsString('Comment line', $result);
+        $this->assertStringNotContainsString('Blank line', $result);
+    }
+
+    public function testFencedCommentWithMorePercents(): void
+    {
+        // Can use more than 3 percent signs, and can contain shorter runs inside
+        $djot = "Before\n\n%%%%\n%% not closing\n%%% also not closing\n%%%%\n\nAfter";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<p>Before</p>', $result);
+        $this->assertStringContainsString('<p>After</p>', $result);
+        $this->assertStringNotContainsString('not closing', $result);
+    }
+
+    public function testFencedCommentClosingNeedsMatchingLength(): void
+    {
+        // Closing fence must have at least as many % as opening
+        $djot = "Before\n\n%%%%\ncomment\n%%%\nstill comment\n%%%%\n\nAfter";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<p>Before</p>', $result);
+        $this->assertStringContainsString('<p>After</p>', $result);
+        $this->assertStringNotContainsString('comment', $result);
+        $this->assertStringNotContainsString('still', $result);
+    }
+
+    public function testFencedCommentBreaksParagraphContinuity(): void
+    {
+        // Fenced comments are block-level elements that break paragraph continuity
+        // Text before and after becomes two separate paragraphs
+        $djot = "Lorem ipsum\n\n%%%\ncomment\n%%%\n\ndolor sit amet";
+
+        $result = $this->converter->convert($djot);
+
+        // Should produce two separate paragraphs
+        $this->assertStringContainsString('<p>Lorem ipsum</p>', $result);
+        $this->assertStringContainsString('<p>dolor sit amet</p>', $result);
+        $this->assertStringNotContainsString('comment', $result);
+
+        // Should NOT be a single paragraph
+        $this->assertStringNotContainsString('Lorem ipsum dolor', $result);
+    }
+
+    public function testFencedCommentInterruptsParagraph(): void
+    {
+        // Fenced comments can interrupt paragraphs without requiring blank lines
+        // This makes comments truly "invisible" from a formatting perspective
+        $djot = "Lorem ipsum\n%%%\ncomment\n%%%\ndolor sit amet";
+
+        $result = $this->converter->convert($djot);
+
+        // Should produce two separate paragraphs with comment stripped
+        $this->assertStringContainsString('<p>Lorem ipsum</p>', $result);
+        $this->assertStringContainsString('<p>dolor sit amet</p>', $result);
+        $this->assertStringNotContainsString('comment', $result);
+        $this->assertStringNotContainsString('%%%', $result);
+    }
+
+    public function testFencedCommentWithBlankLinesAlsoWorks(): void
+    {
+        // Also works with blank lines (traditional block element style)
+        $djot = "Lorem ipsum\n\n%%%\ncomment\n%%%\n\ndolor sit amet";
+
+        $result = $this->converter->convert($djot);
+
+        // Comment should be recognized and stripped
+        $this->assertStringContainsString('<p>Lorem ipsum</p>', $result);
+        $this->assertStringContainsString('<p>dolor sit amet</p>', $result);
+        $this->assertStringNotContainsString('comment', $result);
     }
 
     // Edge cases from official Djot test suite
@@ -1859,7 +2028,7 @@ DJOT;
      */
     public function testSmartQuotesConsecutiveOpenersAtLineStart(): void
     {
-        $this->converter->getRenderer()->setSoftBreakAsNewline(true);
+        $this->converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
 
         $djot = "\"Hello,\" said the spider.\n\"'Shelob' is my name.\"";
         $result = $this->converter->convert($djot);
@@ -2459,5 +2628,226 @@ DJOT;
         // Simple backlink without numbering
         $this->assertStringContainsString('href="#fnref1"', $result);
         $this->assertStringNotContainsString('<sup>1</sup></a> <a', $result);
+    }
+
+    public function testWarningCategory(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][ref]');
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertSame('reference', $warnings[0]->getCategory());
+    }
+
+    public function testWarningSuggestion(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][myref]');
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertNotNull($warnings[0]->getSuggestion());
+        $this->assertStringContainsString('[myref]:', $warnings[0]->getSuggestion());
+    }
+
+    public function testWarningToArrayIncludesNewFields(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][ref]');
+
+        $warnings = $converter->getWarnings();
+        $array = $warnings[0]->toArray();
+
+        $this->assertArrayHasKey('category', $array);
+        $this->assertArrayHasKey('suggestion', $array);
+        $this->assertSame('reference', $array['category']);
+    }
+
+    public function testWarningToStringIncludesCategory(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[Missing][ref]');
+
+        $warnings = $converter->getWarnings();
+        $string = (string)$warnings[0];
+
+        $this->assertStringContainsString('[reference]', $string);
+    }
+
+    public function testUnusedReferenceWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("Some text.\n\n[unused]: https://example.com");
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString("Reference 'unused' defined but never used", $warnings[0]->getMessage());
+        $this->assertSame('reference', $warnings[0]->getCategory());
+    }
+
+    public function testNoUnusedWarningForUsedReference(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[Link text][myref]\n\n[myref]: https://example.com");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testNoUnusedWarningForHeadingAutoReferences(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        // Heading creates auto-reference but we don't warn if unused
+        $converter->convert("# My Heading\n\nSome text without link.");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testMultipleReferenceWarningTypes(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $djot = <<<'DJOT'
+[Link][undefined]
+
+[unused]: https://example.com
+DJOT;
+        $converter->convert($djot);
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(2, $warnings);
+
+        $messages = array_map(fn ($w) => $w->getMessage(), $warnings);
+        $undefinedFound = false;
+        $unusedFound = false;
+        foreach ($messages as $msg) {
+            if (str_contains($msg, 'Undefined')) {
+                $undefinedFound = true;
+            }
+            if (str_contains($msg, 'never used')) {
+                $unusedFound = true;
+            }
+        }
+        $this->assertTrue($undefinedFound, 'Expected undefined reference warning');
+        $this->assertTrue($unusedFound, 'Expected unused reference warning');
+    }
+
+    public function testBrokenAnchorLinkInlineWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[click here](#nonexistent)');
+
+        $this->assertTrue($converter->hasWarnings());
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString("Broken anchor link '#nonexistent'", $warnings[0]->getMessage());
+        $this->assertSame('anchor', $warnings[0]->getCategory());
+    }
+
+    public function testBrokenAnchorLinkViaReferenceWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[click here][ref]\n\n[ref]: #nonexistent");
+
+        $warnings = $converter->getWarnings();
+        $anchorWarnings = array_filter(
+            $warnings,
+            fn ($w) => $w->getCategory() === 'anchor',
+        );
+        $this->assertCount(1, $anchorWarnings);
+        $this->assertStringContainsString('#nonexistent', array_values($anchorWarnings)[0]->getMessage());
+    }
+
+    public function testValidAnchorLinkToHeadingNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("# My Heading\n\n[link](#My-Heading)");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testValidAnchorLinkToExplicitIdNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("{#custom-id}\n# Heading\n\n[link](#custom-id)");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testValidAnchorLinkToExplicitDivIdNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("{#my-section}\n::: note\nContent\n:::\n\n[link](#my-section)");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testValidAnchorLinkViaHeadingReferenceNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("# Introduction\n\n[Introduction][]");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testNoAnchorWarningWithoutWarningsEnabled(): void
+    {
+        $converter = new DjotConverter(warnings: false);
+        $converter->convert('[click here](#nonexistent)');
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testMultipleBrokenAnchorLinks(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[one](#missing1)\n\n[two](#missing2)");
+
+        $warnings = $converter->getWarnings();
+        $anchorWarnings = array_filter(
+            $warnings,
+            fn ($w) => $w->getCategory() === 'anchor',
+        );
+        $this->assertCount(2, $anchorWarnings);
+    }
+
+    public function testExternalUrlWithFragmentNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[link](https://example.com/page#section)');
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testEmptyFragmentNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert('[link](#)');
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testBrokenAnchorWithValidHeadings(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $djot = <<<'DJOT'
+# Valid Heading
+
+[valid link](#Valid-Heading)
+
+[broken link](#nonexistent)
+DJOT;
+        $converter->convert($djot);
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString('#nonexistent', $warnings[0]->getMessage());
+    }
+
+    public function testValidAnchorLinkToSpanIdNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("[target]{#my-target}\n\n[link](#my-target)");
+
+        $this->assertFalse($converter->hasWarnings());
     }
 }

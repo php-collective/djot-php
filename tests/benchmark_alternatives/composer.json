@@ -1,0 +1,18 @@
+{
+    "name": "djot/benchmark-alternatives",
+    "description": "Benchmark djot-php against PHP Markdown parsers",
+    "type": "project",
+    "require": {
+        "php": "^8.2",
+        "php-collective/djot": "@dev",
+        "league/commonmark": "^2.8",
+        "erusev/parsedown": "^1.7",
+        "michelf/php-markdown": "^2.0"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../.."
+        }
+    ]
+}

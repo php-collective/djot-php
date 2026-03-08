@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test;
 
 use Djot\DjotConverter;
+use Djot\Renderer\SoftBreakMode;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
@@ -27,13 +28,24 @@ use function count;
 #[Group('official')]
 class OfficialTestSuiteTest extends TestCase
 {
+    /**
+     * Tests to skip due to intentional spec deviations
+     *
+     * Format: 'filename_index' => 'reason for deviation'
+     *
+     * @var array<string, string>
+     */
+    protected const INTENTIONAL_DEVIATIONS = [
+        // Currently no intentional deviations
+    ];
+
     protected DjotConverter $converter;
 
     protected function setUp(): void
     {
         $this->converter = new DjotConverter();
         // Official djot renders soft breaks as newlines
-        $this->converter->getRenderer()->setSoftBreakAsNewline(true);
+        $this->converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
     }
 
     /**
@@ -134,6 +146,12 @@ class OfficialTestSuiteTest extends TestCase
     #[DataProvider('officialTestProvider')]
     public function testOfficialSuite(string $input, string $expected, string $file, int $index): void
     {
+        $testName = basename($file, '.test') . '_' . $index;
+
+        if (isset(self::INTENTIONAL_DEVIATIONS[$testName])) {
+            $this->markTestSkipped('Intentional deviation: ' . self::INTENTIONAL_DEVIATIONS[$testName]);
+        }
+
         $result = $this->converter->convert($input);
 
         // Normalize whitespace for comparison

@@ -179,6 +179,7 @@ class Profile
             NodeType::SPAN => 'Custom spans are disabled in comments.',
             NodeType::SYMBOL => 'Symbol markup is disabled in comments.',
             NodeType::MATH => 'Math markup is disabled in comments.',
+            NodeType::ABBREVIATION => 'Abbreviations are disabled in comments.',
         ];
 
         return $profile;
@@ -231,6 +232,7 @@ class Profile
             NodeType::SPAN => 'Custom spans are disabled in this minimal context.',
             NodeType::SYMBOL => 'Symbols are disabled in this minimal context.',
             NodeType::MATH => 'Math is disabled in this minimal context.',
+            NodeType::ABBREVIATION => 'Abbreviations are disabled in this minimal context.',
             'default' => 'Only basic text formatting and lists are allowed in this context.',
         ];
 

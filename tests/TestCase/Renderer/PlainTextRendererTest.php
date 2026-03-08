@@ -8,6 +8,7 @@ use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Inline\Symbol;
 use Djot\Renderer\PlainTextRenderer;
+use Djot\Renderer\SoftBreakMode;
 use PHPUnit\Framework\TestCase;
 
 class PlainTextRendererTest extends TestCase
@@ -43,7 +44,7 @@ class PlainTextRendererTest extends TestCase
         $djot = '[Click here](https://example.com) to visit.';
         $document = $this->converter->parse($djot);
 
-        $this->assertSame("Click here to visit.\n", $this->renderer->render($document));
+        $this->assertSame("https://example.com to visit.\n", $this->renderer->render($document));
     }
 
     public function testImages(): void
@@ -176,6 +177,44 @@ class PlainTextRendererTest extends TestCase
         $this->assertSame("Line one\nLine two\n", $this->renderer->render($document));
     }
 
+    public function testSoftBreakDefault(): void
+    {
+        $djot = "Line one\nLine two";
+        $document = $this->converter->parse($djot);
+
+        // Default: soft break as space
+        $this->assertSame("Line one Line two\n", $this->renderer->render($document));
+    }
+
+    public function testSoftBreakAsNewline(): void
+    {
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Newline);
+
+        $djot = "Line one\nLine two";
+        $document = $this->converter->parse($djot);
+
+        $this->assertSame("Line one\nLine two\n", $this->renderer->render($document));
+    }
+
+    public function testSoftBreakAsBreak(): void
+    {
+        // In plain text, Break mode behaves the same as Newline
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
+
+        $djot = "Line one\nLine two";
+        $document = $this->converter->parse($djot);
+
+        $this->assertSame("Line one\nLine two\n", $this->renderer->render($document));
+    }
+
+    public function testGetSoftBreakMode(): void
+    {
+        $this->assertSame(SoftBreakMode::Space, $this->renderer->getSoftBreakMode());
+
+        $this->renderer->setSoftBreakMode(SoftBreakMode::Newline);
+        $this->assertSame(SoftBreakMode::Newline, $this->renderer->getSoftBreakMode());
+    }
+
     public function testSuperscriptSubscript(): void
     {
         $djot = 'E=mc^2^ and H~2~O';
@@ -189,7 +228,7 @@ class PlainTextRendererTest extends TestCase
         $djot = '{=highlighted=} {+inserted+} {-deleted-}';
         $document = $this->converter->parse($djot);
 
-        $this->assertSame("highlighted inserted deleted\n", $this->renderer->render($document));
+        $this->assertSame("highlighted inserted ~deleted~\n", $this->renderer->render($document));
     }
 
     public function testSymbol(): void
@@ -284,7 +323,7 @@ DJOT;
 
         $this->assertStringContainsString('Welcome', $result);
         $this->assertStringContainsString('first paragraph', $result);
-        $this->assertStringContainsString('link', $result);
+        $this->assertStringContainsString('https://example.com', $result);
         $this->assertStringContainsString('Features', $result);
         $this->assertStringContainsString('- Item one', $result);
         $this->assertStringContainsString('echo "Hello";', $result);

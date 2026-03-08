@@ -18,6 +18,7 @@ use Djot\Node\Block\ListBlock;
 use Djot\Node\Block\ListItem;
 use Djot\Node\Block\Paragraph;
 use Djot\Node\Block\Table;
+use Djot\Node\Block\TableCell;
 use Djot\Node\Block\TableRow;
 use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
@@ -267,7 +268,13 @@ class ProfileFilter
         // Check if all children are empty
         $children = $node->getChildren();
         if ($children === []) {
-            // Empty containers should be removed, except for thematic breaks, etc.
+            // Structural elements that must be preserved even when empty:
+            // - ThematicBreak: valid self-closing element (renders as <hr>)
+            // - TableCell: maintains table column structure
+            if ($node instanceof ThematicBreak || $node instanceof TableCell) {
+                return false;
+            }
+
             return $node instanceof BlockNode;
         }
 

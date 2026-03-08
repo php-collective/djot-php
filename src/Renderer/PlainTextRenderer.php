@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
-use Closure;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
@@ -25,15 +24,18 @@ use Djot\Node\Block\TableRow;
 use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\Code;
+use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
+use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Math;
 use Djot\Node\Inline\RawInline;
 use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Renderer\Utility\EventDispatcherTrait;
 
 /**
  * Renders AST to plain text
@@ -44,8 +46,10 @@ use Djot\Node\Node;
  * - Plain text email fallbacks
  * - Word count / reading time estimation
  */
-class PlainTextRenderer
+class PlainTextRenderer implements RendererInterface
 {
+    use EventDispatcherTrait;
+
     protected string $listItemPrefix = '- ';
 
     protected string $orderedListItemPrefix = '. ';
@@ -56,50 +60,29 @@ class PlainTextRenderer
 
     protected string $blockQuoteSuffix = '"';
 
-    /**
-     * @var array<string, array<\Closure(\Djot\Event\RenderEvent): void>>
-     */
-    protected array $listeners = [];
+    protected SoftBreakMode $softBreakMode = SoftBreakMode::Space;
 
     /**
-     * Register an event listener
+     * Set how soft breaks are rendered
      *
-     * @param string $event Event name (e.g., 'render.paragraph', 'render.*')
-     * @param \Closure(\Djot\Event\RenderEvent): void $listener
+     * @param \Djot\Renderer\SoftBreakMode $mode How to render soft breaks:
+     *   - Newline: renders as "\n"
+     *   - Space: renders as " " (default)
+     *   - Break: renders as "\n" (same as Newline for plain text)
      */
-    public function on(string $event, Closure $listener): void
+    public function setSoftBreakMode(SoftBreakMode $mode): self
     {
-        $this->listeners[$event][] = $listener;
+        $this->softBreakMode = $mode;
+
+        return $this;
     }
 
     /**
-     * Remove event listeners
-     *
-     * @param string|null $event Event name or null to remove all listeners
+     * Get the current soft break mode
      */
-    public function off(?string $event = null): void
+    public function getSoftBreakMode(): SoftBreakMode
     {
-        if ($event === null) {
-            $this->listeners = [];
-        } else {
-            unset($this->listeners[$event]);
-        }
-    }
-
-    /**
-     * Dispatch an event to all registered listeners
-     */
-    protected function dispatchEvent(string $event, RenderEvent $renderEvent): void
-    {
-        if (!isset($this->listeners[$event])) {
-            return;
-        }
-        foreach ($this->listeners[$event] as $listener) {
-            $listener($renderEvent);
-            if ($renderEvent->isDefaultPrevented()) {
-                break;
-            }
-        }
+        return $this->softBreakMode;
     }
 
     public function render(Document $document): string
@@ -147,9 +130,11 @@ class PlainTextRenderer
             $node instanceof Code => $node->getContent(),
             $node instanceof Math => $node->getContent(),
             $node instanceof Image => $node->getAlt(),
+            $node instanceof Link => $this->renderLink($node),
+            $node instanceof Delete => '~' . $this->renderChildren($node) . '~',
             $node instanceof Symbol => ':' . $node->getName() . ':',
             $node instanceof FootnoteRef => '[' . $node->getLabel() . ']',
-            $node instanceof SoftBreak => ' ',
+            $node instanceof SoftBreak => $this->softBreakMode === SoftBreakMode::Space ? ' ' : "\n",
             $node instanceof HardBreak => "\n",
             $node instanceof RawInline => '', // Skip raw inlines (format-specific)
             default => $this->renderChildren($node),
@@ -243,10 +228,10 @@ class PlainTextRenderer
             }
         }
 
-        if ($node->hasCaptionChildren()) {
-            foreach ($node->getCaptionChildren() as $child) {
-                $text .= $this->renderNode($child);
-            }
+        if ($node->hasCaption()) {
+            /** @var \Djot\Node\Block\Caption $caption */
+            $caption = $node->getCaption();
+            $text .= $this->renderChildren($caption);
             $text = rtrim($text) . "\n";
         }
 
@@ -283,6 +268,11 @@ class PlainTextRenderer
     protected function renderFootnote(Footnote $node): string
     {
         return '[' . $node->getLabel() . ']: ' . trim($this->renderChildren($node)) . "\n";
+    }
+
+    protected function renderLink(Link $node): string
+    {
+        return $node->getDestination() ?? $this->renderChildren($node);
     }
 
     /**
