@@ -53,13 +53,13 @@ class ListParser
         // Task list: - [.] where . is any single character
         // Standard markers: ' ' (unchecked), 'x'/'X' (checked)
         // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred), etc.
-        if (preg_match('/^[-*+] +\[(.)\] +(.*)$/', $line, $matches)) {
-            $taskMarker = $matches[1];
+        if (preg_match('/^([-*+]) +\[(.)\] +(.*)$/', $line, $matches)) {
+            $taskMarker = $matches[2];
 
             return [
                 'type' => ListBlock::TYPE_TASK,
-                'marker' => '-',
-                'content' => $matches[2],
+                'marker' => $matches[1],
+                'content' => $matches[3],
                 'checked' => strtolower($taskMarker) === 'x',
                 'taskMarker' => $taskMarker,
             ];
