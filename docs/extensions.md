@@ -10,6 +10,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
+| [InlineFootnotesExtension](#inlinefootnotesextension) | Converts `[content]{.fn}` spans to inline footnotes |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
 | [SmartQuotesExtension](#smartquotesextension) | Configures locale-specific smart quote characters |
@@ -103,6 +104,61 @@ $converter->addExtension(new HeadingPermalinksExtension(
 <h2>Getting Started <span class="permalink-wrapper"><a href="#Getting-Started" class="permalink" aria-label="Permalink">¶</a></span></h2>
 </section>
 ```
+
+## InlineFootnotesExtension
+
+Converts spans with `.fn` class to inline footnotes. This allows footnote content to be written inline with the text, rather than requiring a separate footnote definition block.
+
+```php
+use Djot\Extension\InlineFootnotesExtension;
+
+$converter->addExtension(new InlineFootnotesExtension());
+
+// Or with custom class name
+$converter->addExtension(new InlineFootnotesExtension(
+    cssClass: 'footnote',
+));
+```
+
+**Input:**
+```djot
+Some text[This is an inline footnote]{.fn} that continues here.
+
+Inline footnotes support [_formatting_ and `code`]{.fn} too.
+```
+
+**Output:**
+```html
+<p>Some text<sup class="footnote-ref"><a href="#fn1" id="fnref1" role="doc-noteref">1</a></sup> that continues here.</p>
+<p>Inline footnotes support <sup class="footnote-ref"><a href="#fn2" id="fnref2" role="doc-noteref">2</a></sup> too.</p>
+<section role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn1">
+<p>This is an inline footnote<a href="#fnref1" role="doc-backlink">↩︎</a></p>
+</li>
+<li id="fn2">
+<p><em>formatting</em> and <code>code</code><a href="#fnref2" role="doc-backlink">↩︎</a></p>
+</li>
+</ol>
+</section>
+```
+
+### Mixing with Regular Footnotes
+
+Inline footnotes integrate seamlessly with regular footnotes - they share the same numbering sequence:
+
+```djot
+Regular footnote[^ref] and inline[Inline content]{.fn} together.
+
+[^ref]: Regular footnote content.
+```
+
+Both footnotes appear in order in the endnotes section.
+
+### Why This Syntax?
+
+This follows the approach discussed in [djot issue #286](https://github.com/jgm/djot/issues/286). The `^[...]` syntax used by Pandoc conflicts with djot's superscript syntax (`^text^`), so the span-with-class approach provides inline footnotes without parser changes.
 
 ## MentionsExtension
 

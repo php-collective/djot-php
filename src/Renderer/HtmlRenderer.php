@@ -97,6 +97,13 @@ class HtmlRenderer implements RendererInterface
     protected array $collectedFootnotes = [];
 
     /**
+     * Pre-rendered content for inline footnotes (number => html content)
+     *
+     * @var array<int, string>
+     */
+    protected array $inlineFootnoteContents = [];
+
+    /**
      * Dispatch table mapping node class names to render method names
      *
      * @var array<class-string<\Djot\Node\Node>, string>
@@ -241,6 +248,31 @@ class HtmlRenderer implements RendererInterface
         return $this->codeBlockTabWidth;
     }
 
+    /**
+     * Register an inline footnote and return its number
+     *
+     * Used by extensions like InlineFootnotesExtension to add footnotes
+     * without requiring a separate footnote definition block.
+     *
+     * @param string $htmlContent Pre-rendered HTML content for the footnote
+     * @return int The assigned footnote number
+     */
+    public function registerInlineFootnote(string $htmlContent): int
+    {
+        $this->footnoteCounter++;
+        $number = $this->footnoteCounter;
+
+        // Use synthetic label to integrate with regular footnote tracking
+        $label = '_inline_' . $number;
+        $this->footnoteNumbers[$label] = $number;
+        $this->footnoteRefCounts[$label] = 1;
+
+        // Store pre-rendered content
+        $this->inlineFootnoteContents[$number] = $htmlContent;
+
+        return $number;
+    }
+
     public function render(Document $document): string
     {
         // Reset state for each render
@@ -249,6 +281,7 @@ class HtmlRenderer implements RendererInterface
         $this->footnoteNumbers = [];
         $this->footnoteCounter = 0;
         $this->collectedFootnotes = [];
+        $this->inlineFootnoteContents = [];
 
         $html = $this->renderDocumentWithSections($document);
 
@@ -972,8 +1005,11 @@ class HtmlRenderer implements RendererInterface
                 }
                 $processedNumbers[$number] = true;
 
-                if (isset($this->collectedFootnotes[$label])) {
-                    // Rendering may discover new footnote references
+                if (isset($this->inlineFootnoteContents[$number])) {
+                    // Inline footnote - content already pre-rendered
+                    $renderedContents[$number] = trim($this->inlineFootnoteContents[$number]);
+                } elseif (isset($this->collectedFootnotes[$label])) {
+                    // Regular footnote - rendering may discover new footnote references
                     $renderedContents[$number] = trim($this->renderChildren($this->collectedFootnotes[$label]));
                 } else {
                     $renderedContents[$number] = '';
