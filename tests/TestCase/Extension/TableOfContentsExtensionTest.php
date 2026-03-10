@@ -351,7 +351,7 @@ DJOT;
         $toc = $tocExtension->getToc();
 
         $this->assertSame('Equation E=mc^2', $toc[0]['text']);
-        $this->assertSame('Equation-E=mc^2', $toc[0]['id']);
+        $this->assertSame('Equation-E-mc-2', $toc[0]['id']);
     }
 
     public function testRawInlineIsExcludedFromTocEntry(): void

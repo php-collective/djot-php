@@ -155,6 +155,10 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('No-Hashes', $this->tracker->normalizeId('#No# #Hashes#'));
         $this->assertSame('Trim-Me', $this->tracker->normalizeId('  Trim Me  '));
         $this->assertSame('Multiple-Spaces', $this->tracker->normalizeId('Multiple   Spaces'));
+        $this->assertSame('this-t-key-params-fallback', $this->tracker->normalizeId("\$this->t(\$key, \$params = [], \$fallback = '')"));
+        $this->assertSame('My-title', $this->tracker->normalizeId('My --- title'));
+        $this->assertSame('日本語の見出し', $this->tracker->normalizeId('日本語の見出し'));
+        $this->assertSame('heading', $this->tracker->normalizeId('###'));
     }
 
     public function testGetPlainText(): void
