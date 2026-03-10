@@ -159,6 +159,8 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('My-title', $this->tracker->normalizeId('My --- title'));
         $this->assertSame('日本語の見出し', $this->tracker->normalizeId('日本語の見出し'));
         $this->assertSame('heading', $this->tracker->normalizeId('###'));
+        $this->assertSame('h-123-Things', $this->tracker->normalizeId('123 Things'));
+        $this->assertSame('h-1-Introduction', $this->tracker->normalizeId('1. Introduction'));
     }
 
     public function testGetPlainText(): void
