@@ -194,4 +194,29 @@ const slots = useSlots()
   padding: 0.1em 0.3em;
   border-radius: 3px;
 }
+
+.tab-content.result :deep(.note) {
+  background: var(--vp-c-tip-soft);
+  border-left: 3px solid var(--vp-c-tip-1);
+  padding: 0.5rem 1rem;
+  border-radius: 0 4px 4px 0;
+}
+
+.tab-content.result :deep(.external)::after {
+  content: ' ↗';
+  font-size: 0.8em;
+}
+
+.tab-content.result :deep(.button) {
+  display: inline-block;
+  padding: 0.4em 0.8em;
+  background: var(--vp-c-brand-1);
+  color: white !important;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.tab-content.result :deep(.button):hover {
+  background: var(--vp-c-brand-2);
+}
 </style>
