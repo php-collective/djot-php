@@ -253,21 +253,46 @@ $converter->on('render.code_block', function (RenderEvent $event): void {
 
 This project provides syntax highlighting grammars for Djot source code itself, useful for documentation and editors.
 
-### TextMate Grammar (Shiki/VS Code)
+### TextMate Grammar (Shiki/VS Code/Phiki)
 
 The `djot.tmLanguage.json` grammar works with:
 - **Shiki** — VitePress, Astro, and standalone
+- **Phiki** — PHP syntax highlighter (Torchlight Engine)
 - **VS Code** — Editor syntax highlighting
 - **TextMate** — And compatible editors
 
-The canonical source is the [djot-intellij](https://github.com/php-collective/djot-intellij) repository:
+The canonical source is included in this package at:
 
-<https://github.com/php-collective/djot-intellij/blob/main/src/main/resources/textmate/djot.tmLanguage.json>
+```
+vendor/php-collective/djot/resources/grammars/djot.tmLanguage.json
+```
 
-This grammar is used by:
+This grammar is also used by:
 - **IntelliJ/PhpStorm** — Via the [Djot plugin](https://plugins.jetbrains.com/plugin/18828-djot)
 - **VS Code** — Via TextMate grammar support
 - **VitePress/Shiki** — Fetched dynamically during `npm install`
+
+#### Using with Phiki
+
+[Phiki](https://github.com/phikiphp/phiki) is a PHP syntax highlighter that uses TextMate grammars, also used by [Torchlight Engine](https://github.com/torchlight-api/engine). To add Djot highlighting:
+
+```php
+use Phiki\Phiki;
+use Phiki\Environment\Environment;
+
+// Get the path to the Djot grammar included in this package
+$grammarPath = dirname((new \ReflectionClass(\Djot\DjotConverter::class))->getFileName())
+    . '/../resources/grammars/djot.tmLanguage.json';
+
+// Create Phiki with the Djot grammar registered
+$environment = Environment::default();
+$environment->getGrammarRepository()->register('djot', $grammarPath);
+
+$phiki = new Phiki($environment);
+$html = $phiki->codeToHtml($djotCode, 'djot', 'github-light');
+```
+
+Or with Torchlight Engine, you can extend the Engine class to register the grammar.
 
 ### highlight.js Grammar
 
@@ -360,20 +385,20 @@ The highlighter uses standard highlight.js classes:
 
 ## Comparison
 
-| Feature | Shiki | highlight.js | Prism.js |
-|---------|-------|--------------|----------|
-| Rendering | Server-side | Client-side | Client-side |
-| JS required | No | Yes | Yes |
-| Languages | 200+ | 190+ | 290+ |
-| Themes | VS Code themes | 90+ themes | 8 themes + community |
-| Bundle size | N/A (SSR) | ~40KB core | ~20KB core |
-| Auto-detection | No | Yes | No |
-| Plugins | Limited | Some | Extensive |
-| Djot grammar | ✓ TextMate | ✓ Custom | ✗ |
+| Feature | Shiki | Phiki | highlight.js | Prism.js |
+|---------|-------|-------|--------------|----------|
+| Rendering | Server-side | Server-side (PHP) | Client-side | Client-side |
+| JS required | No | No | Yes | Yes |
+| Languages | 200+ | 200+ | 190+ | 290+ |
+| Themes | VS Code themes | VS Code themes | 90+ themes | 8 themes + community |
+| Bundle size | N/A (SSR) | N/A (SSR) | ~40KB core | ~20KB core |
+| Auto-detection | No | No | Yes | No |
+| Plugins | Limited | Limited | Some | Extensive |
+| Djot grammar | ✓ TextMate | ✓ TextMate | ✓ Custom | ✗ |
 
 ### Recommendations
 
 - **VitePress/Astro sites** — Use Shiki (built-in)
+- **PHP applications** — Use Phiki with the TextMate grammar from this package
 - **Dynamic web apps** — Use highlight.js for auto-detection
 - **Static sites with plugins** — Use Prism.js for line numbers, copy button, etc.
-- **PHP server-side** — Call Shiki via CLI or use a PHP highlighting library
