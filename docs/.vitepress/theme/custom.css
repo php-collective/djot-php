@@ -17,6 +17,17 @@
   --vp-c-brand-3: #7c3aed;
 }
 
+/* Apply Shiki font-style and font-weight CSS variables */
+.vp-code span {
+  font-style: var(--shiki-light-font-style, inherit);
+  font-weight: var(--shiki-light-font-weight, inherit);
+}
+
+.dark .vp-code span {
+  font-style: var(--shiki-dark-font-style, inherit);
+  font-weight: var(--shiki-dark-font-weight, inherit);
+}
+
 /* Playground styles */
 .djot-playground {
   margin: 2rem 0;
