@@ -36,6 +36,7 @@ document.querySelectorAll('pre code.language-djot').forEach(el => {
 The language definition supports the full Djot specification plus djot-php enhancements:
 
 #### Block Elements
+- **Frontmatter** (`---` YAML metadata blocks)
 - **Headings** (`# Title` through `###### Title`)
 - **Code fences** (`` ``` `` with optional language)
 - **Div blocks** (`:::` with optional class)
@@ -54,8 +55,8 @@ The language definition supports the full Djot specification plus djot-php enhan
 - **Highlight** (`{=text=}`)
 - **Insert** (`{+text+}`)
 - **Delete** (`{-text-}`)
-- **Superscript** (`^text^`)
-- **Subscript** (`~text~`)
+- **Superscript** (`^text^` or `{^text^}`)
+- **Subscript** (`~text~` or `{~text~}`)
 - **Inline code** (`` `code` ``)
 - **Links** (`[text](url)`)
 - **Images** (`![alt](url)`)
@@ -66,10 +67,12 @@ The language definition supports the full Djot specification plus djot-php enhan
 - **Symbols** (`:name:`)
 - **Spans with attributes** (`[text]{.class}`)
 - **Raw format markers** (`` `code`{=html} ``)
+- **Smart punctuation** (`---` em-dash, `--` en-dash, `...` ellipsis)
 - **Escape sequences** (`\*`, `\[`, etc.)
 - **Hard line breaks** (`\` at end of line)
 
 #### djot-php Extensions
+- **Abbreviation definitions** (`*[ABBR]: Full text`)
 - **Captions** (`^ caption text` for images, tables, blockquotes)
 - **Fenced comments** (`%%%` blocks that can contain blank lines)
 - **Inline comments** (`{% comment %}`)
@@ -95,7 +98,8 @@ The highlighter uses standard highlight.js CSS classes:
 | Attributes | `hljs-attr` |
 | Comments | `hljs-comment` |
 | Math | `hljs-formula` |
-| Meta (rules, breaks) | `hljs-meta` |
+| Meta (rules, breaks, frontmatter) | `hljs-meta` |
 | Titles (captions, terms) | `hljs-title` |
 | Keywords (languages) | `hljs-keyword` |
 | Sub/Superscript | `hljs-built_in` |
+| Smart punctuation | `hljs-punctuation` |
