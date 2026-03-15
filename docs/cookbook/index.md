@@ -26,6 +26,7 @@ Common recipes and customizations for djot-php.
 - [Alternative Output Formats](#alternative-output-formats)
 - [Soft Break Modes](#soft-break-modes)
 - [Significant Newlines Mode](#significant-newlines-mode)
+- [Social Meta Tags](#social-meta-tags)
 
 ## External Links
 
@@ -2195,4 +2196,246 @@ $converter = new DjotConverter(
     safeMode: new SafeMode(),
     significantNewlines: true,
 );
+```
+
+## Social Meta Tags
+
+Extract metadata from Djot documents for Open Graph and Twitter Card tags, useful for social sharing previews.
+
+### Basic Extraction
+
+Extract title, description, and image from a parsed document:
+
+```php
+use Djot\DjotConverter;
+use Djot\Node\Block\Heading;
+use Djot\Node\Block\Paragraph;
+use Djot\Node\Inline\Image;
+use Djot\Node\Inline\Text;
+
+function extractSocialMeta(Document $document): array
+{
+    $meta = [
+        'title' => null,
+        'description' => null,
+        'image' => null,
+    ];
+
+    foreach ($document->getChildren() as $node) {
+        // First heading becomes title
+        if ($meta['title'] === null && $node instanceof Heading) {
+            $meta['title'] = getTextContent($node);
+        }
+
+        // First paragraph becomes description
+        if ($meta['description'] === null && $node instanceof Paragraph) {
+            $text = getTextContent($node);
+            $meta['description'] = mb_strlen($text) > 160
+                ? mb_substr($text, 0, 157) . '...'
+                : $text;
+        }
+
+        // First image becomes preview image
+        if ($meta['image'] === null) {
+            $meta['image'] = findFirstImage($node);
+        }
+
+        // Stop once we have everything
+        if ($meta['title'] && $meta['description'] && $meta['image']) {
+            break;
+        }
+    }
+
+    return $meta;
+}
+
+function getTextContent($node): string
+{
+    $text = '';
+    foreach ($node->getChildren() as $child) {
+        if ($child instanceof Text) {
+            $text .= $child->getContent();
+        } elseif (method_exists($child, 'getChildren')) {
+            $text .= getTextContent($child);
+        }
+    }
+    return trim($text);
+}
+
+function findFirstImage($node): ?string
+{
+    if ($node instanceof Image) {
+        return $node->getDestination();
+    }
+    if (method_exists($node, 'getChildren')) {
+        foreach ($node->getChildren() as $child) {
+            $image = findFirstImage($child);
+            if ($image !== null) {
+                return $image;
+            }
+        }
+    }
+    return null;
+}
+
+// Usage
+$converter = new DjotConverter();
+$document = $converter->parse($djot);
+$meta = extractSocialMeta($document);
+```
+
+### Generating HTML Meta Tags
+
+Generate Open Graph and Twitter Card markup:
+
+```php
+function generateMetaTags(array $meta, string $url, string $siteName = ''): string
+{
+    $tags = [];
+
+    // Open Graph
+    if ($meta['title']) {
+        $title = htmlspecialchars($meta['title'], ENT_QUOTES, 'UTF-8');
+        $tags[] = "<meta property=\"og:title\" content=\"{$title}\">";
+        $tags[] = "<meta name=\"twitter:title\" content=\"{$title}\">";
+    }
+
+    if ($meta['description']) {
+        $desc = htmlspecialchars($meta['description'], ENT_QUOTES, 'UTF-8');
+        $tags[] = "<meta property=\"og:description\" content=\"{$desc}\">";
+        $tags[] = "<meta name=\"twitter:description\" content=\"{$desc}\">";
+        $tags[] = "<meta name=\"description\" content=\"{$desc}\">";
+    }
+
+    if ($meta['image']) {
+        $image = htmlspecialchars($meta['image'], ENT_QUOTES, 'UTF-8');
+        $tags[] = "<meta property=\"og:image\" content=\"{$image}\">";
+        $tags[] = "<meta name=\"twitter:image\" content=\"{$image}\">";
+        $tags[] = "<meta name=\"twitter:card\" content=\"summary_large_image\">";
+    } else {
+        $tags[] = "<meta name=\"twitter:card\" content=\"summary\">";
+    }
+
+    $tags[] = "<meta property=\"og:url\" content=\"{$url}\">";
+    $tags[] = "<meta property=\"og:type\" content=\"article\">";
+
+    if ($siteName) {
+        $tags[] = "<meta property=\"og:site_name\" content=\"{$siteName}\">";
+    }
+
+    return implode("\n", $tags);
+}
+
+// Usage
+$meta = extractSocialMeta($document);
+$metaTags = generateMetaTags($meta, 'https://example.com/article', 'My Blog');
+```
+
+Output:
+```html
+<meta property="og:title" content="Article Title">
+<meta name="twitter:title" content="Article Title">
+<meta property="og:description" content="First paragraph of the article...">
+<meta name="twitter:description" content="First paragraph of the article...">
+<meta name="description" content="First paragraph of the article...">
+<meta property="og:image" content="https://example.com/image.jpg">
+<meta name="twitter:image" content="https://example.com/image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:url" content="https://example.com/article">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="My Blog">
+```
+
+### Custom Extraction Rules
+
+Override extraction for specific needs:
+
+```php
+function extractSocialMeta(Document $document, array $defaults = []): array
+{
+    $meta = array_merge([
+        'title' => null,
+        'description' => null,
+        'image' => null,
+    ], $defaults);
+
+    // Check for explicit attributes on the document or first div
+    foreach ($document->getChildren() as $node) {
+        if ($node instanceof Div) {
+            // Use div attributes as metadata: ::: {og-title="Custom Title"}
+            if ($ogTitle = $node->getAttribute('og-title')) {
+                $meta['title'] = $ogTitle;
+            }
+            if ($ogDesc = $node->getAttribute('og-description')) {
+                $meta['description'] = $ogDesc;
+            }
+            if ($ogImage = $node->getAttribute('og-image')) {
+                $meta['image'] = $ogImage;
+            }
+            break;
+        }
+    }
+
+    // Fall back to content extraction...
+    // (same logic as basic extraction)
+
+    return $meta;
+}
+```
+
+Usage in Djot:
+```djot
+::: {og-title="Custom Social Title" og-description="A custom description for social sharing"}
+
+# Article Title
+
+This is the article content...
+
+:::
+```
+
+### Fallback Values
+
+Provide fallbacks for missing metadata:
+
+```php
+$meta = extractSocialMeta($document);
+
+// Apply fallbacks
+$meta['title'] ??= 'Untitled';
+$meta['description'] ??= 'No description available.';
+$meta['image'] ??= 'https://example.com/default-og-image.jpg';
+
+echo generateMetaTags($meta, $currentUrl, 'My Site');
+```
+
+### Framework Integration
+
+Example with a simple controller pattern:
+
+```php
+class ArticleController
+{
+    public function show(string $slug): Response
+    {
+        $djot = $this->loadArticle($slug);
+
+        $converter = new DjotConverter();
+        $document = $converter->parse($djot);
+        $html = $converter->render($document);
+
+        $meta = extractSocialMeta($document);
+        $metaTags = generateMetaTags(
+            $meta,
+            "https://example.com/articles/{$slug}",
+            'My Blog',
+        );
+
+        return $this->render('article.html', [
+            'content' => $html,
+            'metaTags' => $metaTags,
+            'title' => $meta['title'] ?? 'Article',
+        ]);
+    }
+}
 ```
