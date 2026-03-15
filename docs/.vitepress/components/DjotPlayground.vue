@@ -118,7 +118,6 @@ async function convert() {
     } else {
       htmlOutput.value = data.html || ''
       error.value = ''
-      highlightCodeBlocks()
     }
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
@@ -128,6 +127,10 @@ async function convert() {
     htmlOutput.value = ''
   } finally {
     isLoading.value = false
+    // Must highlight after isLoading=false so preview div exists in DOM
+    if (htmlOutput.value && !error.value) {
+      highlightCodeBlocks()
+    }
   }
 }
 
