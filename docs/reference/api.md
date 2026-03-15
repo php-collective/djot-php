@@ -710,6 +710,9 @@ All block nodes extend `Djot\Node\Block\BlockNode`:
 | `TableRow` | Table row |
 | `TableCell` | Table cell (th or td) |
 | `Div` | Generic div container |
+| `Section` | Section wrapper (used with HeadingPermalinksExtension) |
+| `Figure` | Figure container for images/blockquotes with captions |
+| `Caption` | Caption for figures and tables |
 | `LineBlock` | Line block (preserves line breaks) |
 | `ThematicBreak` | Horizontal rule |
 | `DefinitionList` | Definition list |
@@ -739,6 +742,7 @@ All inline nodes extend `Djot\Node\Inline\InlineNode`:
 | `Highlight` | Highlighted text |
 | `Insert` | Inserted text |
 | `Delete` | Deleted text |
+| `Abbreviation` | Abbreviation with title (`<abbr>`) |
 | `FootnoteRef` | Footnote reference |
 | `Math` | Math expression |
 | `Symbol` | Symbol (e.g., `:heart:`) |
@@ -876,3 +880,66 @@ $converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space);
 ```
 
 See [enhancements.md](./enhancements#significant-newlines-mode) for upstream tracking.
+
+## Feature Support Matrix
+
+This matrix shows which features are supported by each renderer.
+
+### Block Elements
+
+| Feature | HtmlRenderer | PlainTextRenderer | MarkdownRenderer | AnsiRenderer |
+|---------|:------------:|:-----------------:|:----------------:|:------------:|
+| Paragraph | ✓ | ✓ | ✓ | ✓ |
+| Heading | ✓ | ✓ | ✓ | ✓ (styled) |
+| Code Block | ✓ | ✓ | ✓ | ✓ (boxed) |
+| Block Quote | ✓ | ✓ (prefixed) | ✓ | ✓ (styled) |
+| Lists (ul/ol) | ✓ | ✓ | ✓ | ✓ |
+| Task Lists | ✓ | ✓ | ✓ (GFM) | ✓ |
+| Tables | ✓ | ✓ (tab-separated) | ✓ (GFM) | ✓ (boxed) |
+| Table Captions | ✓ (`<caption>`) | – | – | ✓ |
+| Definition Lists | ✓ | ✓ | ✓ (approximated) | ✓ |
+| Divs | ✓ | ✓ (content only) | – (content only) | ✓ |
+| Line Blocks | ✓ | ✓ | ✓ (hard breaks) | ✓ |
+| Thematic Break | ✓ | ✓ (dashes) | ✓ | ✓ |
+| Footnotes | ✓ | ✓ (numbered) | ✓ (GFM) | ✓ |
+| Figure/Caption | ✓ | – | – | ✓ |
+| Raw HTML | ✓ / escaped | – | ✓ | – |
+| Comments | – (stripped) | – | – | – |
+
+### Inline Elements
+
+| Feature | HtmlRenderer | PlainTextRenderer | MarkdownRenderer | AnsiRenderer |
+|---------|:------------:|:-----------------:|:----------------:|:------------:|
+| Emphasis | ✓ (`<em>`) | ✓ (content only) | ✓ (`*text*`) | ✓ (italic) |
+| Strong | ✓ (`<strong>`) | ✓ (content only) | ✓ (`**text**`) | ✓ (bold) |
+| Code | ✓ (`<code>`) | ✓ | ✓ (`` `code` ``) | ✓ (styled) |
+| Links | ✓ | ✓ (text + URL) | ✓ | ✓ (text + URL) |
+| Images | ✓ | ✓ (alt text) | ✓ | ✓ (alt text) |
+| Superscript | ✓ (`<sup>`) | ✓ (content only) | ✓ (`<sup>`) | ✓ (styled) |
+| Subscript | ✓ (`<sub>`) | ✓ (content only) | ✓ (`<sub>`) | ✓ (styled) |
+| Highlight | ✓ (`<mark>`) | ✓ (content only) | ✓ (`<mark>`) | ✓ (styled) |
+| Insert | ✓ (`<ins>`) | ✓ (content only) | ✓ (`<ins>`) | ✓ (styled) |
+| Delete | ✓ (`<del>`) | ✓ (content only) | ✓ (`~~text~~`) | ✓ (strikethrough) |
+| Abbreviation | ✓ (`<abbr>`) | ✓ (content only) | – | ✓ |
+| Spans | ✓ | ✓ (content only) | – (content only) | ✓ (content only) |
+| Math | ✓ (`$...$`) | ✓ (content only) | ✓ (`$...$`) | ✓ |
+| Symbols | ✓ (`:name:`) | ✓ (content only) | ✓ (`:name:`) | ✓ (mapped) |
+| Footnote Refs | ✓ | ✓ (`[n]`) | ✓ (`[^n]`) | ✓ |
+| Soft Break | ✓ (configurable) | ✓ | ✓ | ✓ |
+| Hard Break | ✓ (`<br>`) | ✓ (newline) | ✓ (`  \n`) | ✓ |
+| Raw HTML | ✓ / escaped | – | ✓ | – |
+
+### Legend
+
+- **✓** — Full support
+- **✓ (note)** — Supported with noted behavior
+- **–** — Not supported / stripped
+
+### Renderer Use Cases
+
+| Renderer | Primary Use Case |
+|----------|------------------|
+| **HtmlRenderer** | Web pages, HTML emails, CMS content |
+| **PlainTextRenderer** | Search indexing, SEO descriptions, email fallbacks, accessibility |
+| **MarkdownRenderer** | Converting Djot to CommonMark/GFM for Markdown-only systems |
+| **AnsiRenderer** | Terminal output, CLI tools, console applications |
