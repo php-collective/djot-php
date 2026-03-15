@@ -1,12 +1,35 @@
 import { defineConfig } from 'vitepress'
+import { readFileSync } from 'fs'
+import { dirname, resolve } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+// Load custom Djot grammar for syntax highlighting
+const djotGrammar = JSON.parse(
+  readFileSync(resolve(__dirname, 'grammars/djot.tmLanguage.json'), 'utf-8')
+)
 
 export default defineConfig({
   title: 'djot-php',
   description: 'A PHP parser and converter for Djot markup language',
 
+  base: '/djot-php/',
+
   head: [
-    ['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
+    ['link', { rel: 'icon', href: '/djot-php/favicon.svg', type: 'image/svg+xml' }],
   ],
+
+  markdown: {
+    languages: [
+      {
+        id: 'djot',
+        scopeName: 'text.djot',
+        ...djotGrammar,
+        aliases: ['dj'],
+      },
+    ],
+  },
 
   themeConfig: {
     logo: '/logo.svg',
