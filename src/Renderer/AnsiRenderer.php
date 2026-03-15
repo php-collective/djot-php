@@ -866,7 +866,7 @@ class AnsiRenderer
                 // Render caption after content, styled as italic
                 $output .= $this->renderCaption($child);
             } else {
-                $output .= $this->renderNode($child);
+                $output .= $this->renderNode($child) . "\n";
             }
         }
 
