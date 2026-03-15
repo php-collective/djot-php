@@ -2210,7 +2210,10 @@ Extract title, description, and image from a parsed document:
 use Djot\DjotConverter;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\Paragraph;
+use Djot\Node\Document;
+use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
+use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Text;
 
 function extractSocialMeta(Document $document): array
@@ -2255,6 +2258,8 @@ function getTextContent($node): string
     foreach ($node->getChildren() as $child) {
         if ($child instanceof Text) {
             $text .= $child->getContent();
+        } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
+            $text .= ' ';
         } elseif (method_exists($child, 'getChildren')) {
             $text .= getTextContent($child);
         }
@@ -2265,7 +2270,7 @@ function getTextContent($node): string
 function findFirstImage($node): ?string
 {
     if ($node instanceof Image) {
-        return $node->getDestination();
+        return $node->getSource();
     }
     if (method_exists($node, 'getChildren')) {
         foreach ($node->getChildren() as $child) {
@@ -2316,10 +2321,12 @@ function generateMetaTags(array $meta, string $url, string $siteName = ''): stri
         $tags[] = "<meta name=\"twitter:card\" content=\"summary\">";
     }
 
+    $url = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
     $tags[] = "<meta property=\"og:url\" content=\"{$url}\">";
     $tags[] = "<meta property=\"og:type\" content=\"article\">";
 
     if ($siteName) {
+        $siteName = htmlspecialchars($siteName, ENT_QUOTES, 'UTF-8');
         $tags[] = "<meta property=\"og:site_name\" content=\"{$siteName}\">";
     }
 
@@ -2351,6 +2358,9 @@ Output:
 Override extraction for specific needs:
 
 ```php
+use Djot\Node\Block\Div;
+use Djot\Node\Document;
+
 function extractSocialMeta(Document $document, array $defaults = []): array
 {
     $meta = array_merge([
@@ -2359,7 +2369,7 @@ function extractSocialMeta(Document $document, array $defaults = []): array
         'image' => null,
     ], $defaults);
 
-    // Check for explicit attributes on the document or first div
+    // Check for explicit attributes on the first div
     foreach ($document->getChildren() as $node) {
         if ($node instanceof Div) {
             // Use div attributes as metadata: ::: {og-title="Custom Title"}
