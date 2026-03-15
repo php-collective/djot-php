@@ -93,22 +93,21 @@ Output:
 </code></pre>
 ```
 
-## Demo: Sandbox with live preview
-https://sandbox.dereuromark.de/sandbox/djot
-
 ## Documentation
 
-- [Why Djot?](docs/why-djot.md) - Comparison with Markdown, migration guide
-- [Examples](docs/README.md) - Comprehensive usage examples
-- [Syntax Reference](docs/syntax.md) - Complete Djot syntax guide
-- [API Reference](docs/api.md) - Classes and methods
-- [Extensions](docs/extensions.md) - Built-in extensions for common features
-- [Profiles](docs/profiles.md) - Feature restriction for different contexts
-- [Converters](docs/converters.md) - Markdown/BBCode to Djot conversion
-- [Cookbook](docs/cookbook.md) - Common customizations and recipes
-- [Architecture](docs/architecture.md) - Internal design
-- [Enhancements](docs/enhancements.md) - Fixes beyond the current spec
-- [Performance](docs/performance.md) - Benchmarks and performance data
+Full documentation is available at **https://php-collective.github.io/djot-php/**
+
+- [Getting Started](https://php-collective.github.io/djot-php/guide/) - Installation and quick start
+- [Why Djot?](https://php-collective.github.io/djot-php/guide/why-djot) - Comparison with Markdown
+- [Syntax Reference](https://php-collective.github.io/djot-php/guide/syntax) - Complete Djot syntax guide
+- [Extensions](https://php-collective.github.io/djot-php/extensions/) - Built-in extensions
+- [API Reference](https://php-collective.github.io/djot-php/reference/api) - Classes and methods
+- [Cookbook](https://php-collective.github.io/djot-php/cookbook/) - Customization recipes
+
+## Demo
+
+- [Interactive Playground](https://php-collective.github.io/djot-php/playground) - Try djot-php in your browser
+- [Sandbox](https://sandbox.dereuromark.de/sandbox/djot) - Full-featured sandbox with all options
 
 ## Security
 
@@ -121,7 +120,7 @@ $html = $converter->convert($untrustedInput);
 
 Safe mode automatically blocks dangerous URL schemes (`javascript:`, etc.), strips event handler attributes (`onclick`, etc.), and escapes raw HTML.
 
-See [Security Considerations](docs/README.md#security-considerations) for details and advanced configuration.
+See [Safe Mode](https://php-collective.github.io/djot-php/guide/safe-mode) for details and advanced configuration.
 
 
 ## Implementations
