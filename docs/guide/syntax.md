@@ -28,6 +28,16 @@ Headings use `#` characters. The number of `#` determines the level (1-6).
 <h6>Heading 6</h6>
 ```
 
+**Result:**
+<div class="result-preview">
+<h1>Heading 1</h1>
+<h2>Heading 2</h2>
+<h3>Heading 3</h3>
+<h4>Heading 4</h4>
+<h5>Heading 5</h5>
+<h6>Heading 6</h6>
+</div>
+
 ### Paragraphs
 
 Paragraphs are separated by blank lines. Text within a paragraph wraps normally.
@@ -46,6 +56,13 @@ Second paragraph.
 multiple lines.</p>
 <p>Second paragraph.</p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p>First paragraph with
+multiple lines.</p>
+<p>Second paragraph.</p>
+</div>
 
 ### Code Blocks
 
@@ -68,6 +85,14 @@ function hello(): void {
 </code></pre>
 ```
 
+**Result:**
+<div class="result-preview">
+<pre><code class="language-php">function hello(): void {
+    echo "Hello World";
+}
+</code></pre>
+</div>
+
 Without a language:
 
 **Input:**
@@ -82,6 +107,12 @@ Plain code block
 <pre><code>Plain code block
 </code></pre>
 ```
+
+**Result:**
+<div class="result-preview">
+<pre><code>Plain code block
+</code></pre>
+</div>
 
 ### Block Quotes
 
@@ -104,6 +135,15 @@ spanning multiple lines.</p>
 </blockquote>
 ```
 
+**Result:**
+<div class="result-preview">
+<blockquote>
+<p>This is a quote
+spanning multiple lines.</p>
+<p>With multiple paragraphs.</p>
+</blockquote>
+</div>
+
 Nested block quotes:
 
 **Input:**
@@ -122,6 +162,16 @@ Nested block quotes:
 </blockquote>
 </blockquote>
 ```
+
+**Result:**
+<div class="result-preview">
+<blockquote>
+<p>Outer quote</p>
+<blockquote>
+<p>Nested quote</p>
+</blockquote>
+</blockquote>
+</div>
 
 #### Block Quote Captions
 
@@ -142,6 +192,16 @@ Use `^` after a block quote to add an attribution/caption. The block quote will 
 <figcaption>William Shakespeare</figcaption>
 </figure>
 ```
+
+**Result:**
+<div class="result-preview">
+<figure>
+<blockquote>
+<p>To be or not to be, that is the question.</p>
+</blockquote>
+<figcaption>William Shakespeare</figcaption>
+</figure>
+</div>
 
 ### Lists
 
@@ -165,6 +225,15 @@ Use `-`, `*`, or `+` for bullet lists.
 </ul>
 ```
 
+**Result:**
+<div class="result-preview">
+<ul>
+<li>Item 1</li>
+<li>Item 2</li>
+<li>Item 3</li>
+</ul>
+</div>
+
 #### Ordered Lists
 
 Use numbers followed by `.` or `)`.
@@ -185,6 +254,15 @@ Use numbers followed by `.` or `)`.
 </ol>
 ```
 
+**Result:**
+<div class="result-preview">
+<ol>
+<li>First</li>
+<li>Second</li>
+<li>Third</li>
+</ol>
+</div>
+
 Lists can start at any number:
 
 **Input:**
@@ -200,6 +278,14 @@ Lists can start at any number:
 <li>Sixth item</li>
 </ol>
 ```
+
+**Result:**
+<div class="result-preview">
+<ol start="5">
+<li>Fifth item</li>
+<li>Sixth item</li>
+</ol>
+</div>
 
 #### Nested Lists
 
@@ -226,6 +312,19 @@ Indent with 2+ spaces for nested lists.
 </ul>
 ```
 
+**Result:**
+<div class="result-preview">
+<ul>
+<li>Item 1
+<ul>
+<li>Nested A</li>
+<li>Nested B</li>
+</ul>
+</li>
+<li>Item 2</li>
+</ul>
+</div>
+
 #### Task Lists
 
 Use `[ ]` or `[_]` for unchecked and `[x]` or `[X]` for checked items.
@@ -247,6 +346,15 @@ The underscore notation `[_]` is useful on mobile devices or in editors without 
 <li><input type="checkbox" disabled checked> Done item</li>
 </ul>
 ```
+
+**Result:**
+<div class="result-preview">
+<ul class="task-list">
+<li><input type="checkbox" disabled> Todo item (space)</li>
+<li><input type="checkbox" disabled> Todo item (underscore)</li>
+<li><input type="checkbox" disabled checked> Done item</li>
+</ul>
+</div>
 
 ### Definition Lists
 
@@ -273,6 +381,17 @@ Term 2
 </dl>
 ```
 
+**Result:**
+<div class="result-preview">
+<dl>
+<dt>Term 1</dt>
+<dd>Definition of term 1</dd>
+<dt>Term 2</dt>
+<dd>Definition of term 2</dd>
+<dd>Alternative definition</dd>
+</dl>
+</div>
+
 ### Tables
 
 Tables use `|` to separate columns.
@@ -298,6 +417,19 @@ Tables use `|` to separate columns.
 </table>
 ```
 
+**Result:**
+<div class="result-preview">
+<table>
+<thead>
+<tr><th>Header 1</th><th>Header 2</th></tr>
+</thead>
+<tbody>
+<tr><td>Cell 1</td><td>Cell 2</td></tr>
+<tr><td>Cell 3</td><td>Cell 4</td></tr>
+</tbody>
+</table>
+</div>
+
 #### Column Alignment
 
 Use `:` in the separator row for alignment.
@@ -320,6 +452,18 @@ Use `:` in the separator row for alignment.
 </tbody>
 </table>
 ```
+
+**Result:**
+<div class="result-preview">
+<table>
+<thead>
+<tr><th style="text-align: left">Left</th><th style="text-align: center">Center</th><th style="text-align: right">Right</th></tr>
+</thead>
+<tbody>
+<tr><td style="text-align: left">L</td><td style="text-align: center">C</td><td style="text-align: right">R</td></tr>
+</tbody>
+</table>
+</div>
 
 #### Table Captions
 
@@ -346,6 +490,19 @@ Use `^` after the table for a caption.
 </table>
 ```
 
+**Result:**
+<div class="result-preview">
+<table>
+<caption>This is the caption</caption>
+<thead>
+<tr><th>A</th><th>B</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>2</td></tr>
+</tbody>
+</table>
+</div>
+
 ### Thematic Breaks
 
 Use `***`, `---`, or `___` (3+ characters) on a line by itself.
@@ -366,6 +523,13 @@ Below
 <p>Below</p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>Above</p>
+<hr>
+<p>Below</p>
+</div>
+
 ### Divs
 
 Fenced divs use `:::` with an optional class name.
@@ -383,6 +547,13 @@ This is a warning message.
 <p>This is a warning message.</p>
 </div>
 ```
+
+**Result:**
+<div class="result-preview">
+<div class="warning">
+<p>This is a warning message.</p>
+</div>
+</div>
 
 Nested divs:
 
@@ -410,6 +581,17 @@ More outer
 </div>
 ```
 
+**Result:**
+<div class="result-preview">
+<div class="outer">
+<p>Outer content</p>
+<div class="inner">
+<p>Inner content</p>
+</div>
+<p>More outer</p>
+</div>
+</div>
+
 ### Comments
 
 Comments are not rendered in output.
@@ -431,6 +613,12 @@ More visible text
 <p>Visible text</p>
 <p>More visible text</p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p>Visible text</p>
+<p>More visible text</p>
+</div>
 
 ### Fenced Comments (Extension)
 
@@ -458,6 +646,12 @@ More visible text
 <p>Visible text</p>
 <p>More visible text</p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p>Visible text</p>
+<p>More visible text</p>
+</div>
 
 Like code fences, you can use more than three `%` characters. The closing fence must have
 at least as many `%` as the opening fence:
@@ -497,6 +691,12 @@ dolor sit amet
 <p>dolor sit amet</p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>Lorem ipsum</p>
+<p>dolor sit amet</p>
+</div>
+
 This produces two separate paragraphs. For comments that should not interrupt
 paragraph flow (keeping text in the same paragraph), use inline comments (`{% ... %}`).
 
@@ -522,6 +722,16 @@ And so are you.</p>
 </div>
 ```
 
+**Result:**
+<div class="result-preview">
+<div class="line-block">
+<p>Roses are red,<br>
+Violets are blue,<br>
+Sugar is sweet,<br>
+And so are you.</p>
+</div>
+</div>
+
 ### Block Attributes
 
 Apply attributes to the following block using `{...}` syntax.
@@ -540,6 +750,12 @@ This is a note.
 <h1 class="highlight" id="intro">Introduction</h1>
 <p class="note" data-version="2.0">This is a note.</p>
 ```
+
+**Result:**
+<div class="result-preview">
+<h1 class="highlight" id="intro">Introduction</h1>
+<p class="note" data-version="2.0">This is a note.</p>
+</div>
 
 ## Inline Elements
 
@@ -560,6 +776,12 @@ You can _nest *strong* inside_ emphasis.
 <p>You can <em>nest <strong>strong</strong> inside</em> emphasis.</p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>This is <em>emphasized</em> and <strong>strong</strong> text.</p>
+<p>You can <em>nest <strong>strong</strong> inside</em> emphasis.</p>
+</div>
+
 ### Code Spans
 
 Use backticks for inline code.
@@ -576,6 +798,12 @@ For literal backticks: `` `code` ``
 <p>Use the <code>print()</code> function.</p>
 <p>For literal backticks: <code>`code`</code></p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p>Use the <code>print()</code> function.</p>
+<p>For literal backticks: <code>`code`</code></p>
+</div>
 
 ### Links
 
@@ -594,6 +822,12 @@ For literal backticks: `` `code` ``
 <p><a href="https://example.com" title="Title">Link with title</a></p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p><a href="https://example.com">Link text</a></p>
+<p><a href="https://example.com" title="Title">Link with title</a></p>
+</div>
+
 #### Reference Links
 
 **Input:**
@@ -610,6 +844,12 @@ For literal backticks: `` `code` ``
 <p><a href="https://example.com">Link text</a></p>
 <p><a href="https://example.com">Another link</a></p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p><a href="https://example.com">Link text</a></p>
+<p><a href="https://example.com">Another link</a></p>
+</div>
 
 #### Reference Links with Attributes
 
@@ -628,6 +868,11 @@ Attributes can be added to reference definitions and will be applied to all link
 <p><a href="https://example.com" class="external" title="Example Site">Click here</a></p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p><a href="https://example.com" class="external" title="Example Site">Click here</a></p>
+</div>
+
 Link-level attributes can override or extend definition attributes:
 
 **Input:**
@@ -643,6 +888,11 @@ Link-level attributes can override or extend definition attributes:
 <p><a href="https://example.com" class="external button">Click here</a></p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p><a href="https://example.com" class="external button">Click here</a></p>
+</div>
+
 #### Autolinks
 
 **Input:**
@@ -657,6 +907,12 @@ Link-level attributes can override or extend definition attributes:
 <p><a href="https://example.com">https://example.com</a></p>
 <p><a href="mailto:user@example.com">user@example.com</a></p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p><a href="https://example.com">https://example.com</a></p>
+<p><a href="mailto:user@example.com">user@example.com</a></p>
+</div>
 
 ### Images
 
@@ -707,6 +963,12 @@ H~2~O
 <p>H<sub>2</sub>O</p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>E=mc<sup>2</sup></p>
+<p>H<sub>2</sub>O</p>
+</div>
+
 ### Highlight, Insert, Delete
 
 **Input:**
@@ -724,6 +986,13 @@ H~2~O
 <p><ins>inserted text</ins></p>
 <p><del>deleted text</del></p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p><mark>highlighted text</mark></p>
+<p><ins>inserted text</ins></p>
+<p><del>deleted text</del></p>
+</div>
 
 ### Spans with Attributes
 
@@ -745,6 +1014,13 @@ Apply attributes to inline text.
 <p><span data-value="42">data text</span></p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p><span class="highlight">styled text</span></p>
+<p><span id="unique-id">more text</span></p>
+<p><span data-value="42">data text</span></p>
+</div>
+
 ### Math
 
 #### Inline Math
@@ -759,6 +1035,11 @@ The equation $`E = mc^2`$ is famous.
 <p>The equation <span class="math inline">\(E = mc^2\)</span> is famous.</p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>The equation <span class="math inline">\(E = mc^2\)</span> is famous.</p>
+</div>
+
 #### Display Math
 
 **Input:**
@@ -770,6 +1051,11 @@ $$`\sum_{i=0}^{n} i = \frac{n(n+1)}{2}`$$
 ```html
 <span class="math display">\[\sum_{i=0}^{n} i = \frac{n(n+1)}{2}\]</span>
 ```
+
+**Result:**
+<div class="result-preview">
+<span class="math display">\[\sum_{i=0}^{n} i = \frac{n(n+1)}{2}\]</span>
+</div>
 
 ### Symbols
 
@@ -784,6 +1070,11 @@ I :heart: Djot
 ```html
 <p>I <span class="symbol">heart</span> Djot</p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p>I <span class="symbol">heart</span> Djot</p>
+</div>
 
 Note: Symbol rendering can be customized via events. See the [Cookbook](/cookbook/) for examples.
 
@@ -812,6 +1103,18 @@ Another reference[^note].
 </div>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>Here is a statement<sup id="fnref-1-1"><a href="#fn-1">1</a></sup> with a footnote.</p>
+<p>Another reference<sup id="fnref-note-1"><a href="#fn-note">note</a></sup>.</p>
+<div class="footnote" id="fn-1">
+<p><sup>1</sup> This is the first footnote. <a href="#fnref-1-1">↩</a></p>
+</div>
+<div class="footnote" id="fn-note">
+<p><sup>note</sup> This is a named footnote. <a href="#fnref-note-1">↩</a></p>
+</div>
+</div>
+
 ### Raw HTML
 
 #### Inline Raw HTML
@@ -825,6 +1128,11 @@ Text `<span class="special">raw html</span>`{=html} more text
 ```html
 <p>Text <span class="special">raw html</span> more text</p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p>Text <span class="special">raw html</span> more text</p>
+</div>
 
 #### Block Raw HTML
 
@@ -843,6 +1151,13 @@ Text `<span class="special">raw html</span>`{=html} more text
   <p>Raw HTML block</p>
 </div>
 ```
+
+**Result:**
+<div class="result-preview">
+<div class="custom">
+  <p>Raw HTML block</p>
+</div>
+</div>
 
 ## Smart Typography
 
@@ -863,6 +1178,12 @@ The parser automatically converts certain character sequences.
 <p>"Nested 'quotes' work" too</p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>"Double quotes" and 'single quotes'</p>
+<p>"Nested 'quotes' work" too</p>
+</div>
+
 ### Dashes
 
 **Input:**
@@ -878,6 +1199,12 @@ Em-dash: wait---what?
 <p>Em-dash: wait—what?</p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>En-dash: 1–10</p>
+<p>Em-dash: wait—what?</p>
+</div>
+
 ### Ellipsis
 
 **Input:**
@@ -889,6 +1216,11 @@ Wait for it...
 ```html
 <p>Wait for it…</p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p>Wait for it…</p>
+</div>
 
 ## Hard Line Breaks
 
@@ -908,6 +1240,13 @@ Line two<br>
 Line three</p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>Line one<br>
+Line two<br>
+Line three</p>
+</div>
+
 ## Abbreviations (Extension)
 
 Abbreviations allow you to define terms that will automatically be wrapped in `<abbr>` tags with their definitions. This is an extension feature inspired by PHP Markdown Extra.
@@ -924,6 +1263,11 @@ The HTML specification is maintained by the W3C.
 ```html
 <p>The <abbr title="Hyper Text Markup Language">HTML</abbr> specification is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p>The <abbr title="Hyper Text Markup Language">HTML</abbr> specification is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
+</div>
 
 Abbreviation definitions can appear anywhere in the document and will be applied to all matching text. Matching is:
 - Case-sensitive (HTML ≠ html)
@@ -959,6 +1303,13 @@ Use backslash to escape special characters.
 <p>[not a link]</p>
 ```
 
+**Result:**
+<div class="result-preview">
+<p>*not strong*</p>
+<p># not a heading</p>
+<p>[not a link]</p>
+</div>
+
 ### Non-Breaking Space
 
 An escaped space (`\ `) produces a non-breaking space.
@@ -975,5 +1326,11 @@ Dr.\ Smith
 <p>100&nbsp;km</p>
 <p>Dr.&nbsp;Smith</p>
 ```
+
+**Result:**
+<div class="result-preview">
+<p>100&nbsp;km</p>
+<p>Dr.&nbsp;Smith</p>
+</div>
 
 This is useful for keeping values and units together, titles and names, or any text that shouldn't be split across lines.
