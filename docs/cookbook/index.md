@@ -8,7 +8,6 @@ Common recipes and customizations for djot-php.
 - [Custom Emoji/Symbols](#custom-emojisymbols)
 - [Unicode Codepoints](#unicode-codepoints)
 - [Abbreviations](#abbreviations)
-- [Syntax Highlighting](./syntax-highlighting)
 - [Table of Contents Generation](#table-of-contents-generation)
 - [Image Processing](#image-processing)
 - [Custom Admonitions](#custom-admonitions)
@@ -328,15 +327,6 @@ Output:
 
 This uses standard djot span syntax with attributes, so no custom parsing is needed.
 You can combine with other attributes: `[CSS]{abbr="Cascading Style Sheets" .tech-term}`.
-
-## Syntax Highlighting
-
-See the dedicated [Syntax Highlighting](./syntax-highlighting) page for comprehensive coverage of:
-
-- **Shiki** — Server-side highlighting (VitePress, Astro)
-- **highlight.js** — Client-side with auto-detection
-- **Prism.js** — Client-side with plugins
-- **Djot grammars** — TextMate and highlight.js grammars for Djot source
 
 ## Table of Contents Generation
 
