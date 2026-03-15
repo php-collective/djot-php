@@ -18,7 +18,9 @@ Headings use `#` characters. The number of `#` determines the level (1-6).
 ###### Heading 6
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <h1>Heading 1</h1>
 <h2>Heading 2</h2>
@@ -28,15 +30,16 @@ Headings use `#` characters. The number of `#` determines the level (1-6).
 <h6>Heading 6</h6>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <h1>Heading 1</h1>
 <h2>Heading 2</h2>
 <h3>Heading 3</h3>
 <h4>Heading 4</h4>
 <h5>Heading 5</h5>
 <h6>Heading 6</h6>
-</div>
+</template>
+</OutputTabs>
 
 ### Paragraphs
 
@@ -50,19 +53,22 @@ multiple lines.
 Second paragraph.
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>First paragraph with
 multiple lines.</p>
 <p>Second paragraph.</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>First paragraph with
 multiple lines.</p>
 <p>Second paragraph.</p>
-</div>
+</template>
+</OutputTabs>
 
 ### Code Blocks
 
@@ -77,7 +83,9 @@ function hello(): void {
 ```
 ````
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <pre><code class="language-php">function hello(): void {
     echo "Hello World";
@@ -85,13 +93,14 @@ function hello(): void {
 </code></pre>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <pre><code class="language-php">function hello(): void {
     echo "Hello World";
 }
 </code></pre>
-</div>
+</template>
+</OutputTabs>
 
 Without a language:
 
@@ -102,17 +111,20 @@ Plain code block
 ```
 ````
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <pre><code>Plain code block
 </code></pre>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <pre><code>Plain code block
 </code></pre>
-</div>
+</template>
+</OutputTabs>
 
 ### Block Quotes
 
@@ -126,7 +138,9 @@ Block quotes use `>` at the start of each line.
 > With multiple paragraphs.
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <blockquote>
 <p>This is a quote
@@ -135,14 +149,15 @@ spanning multiple lines.</p>
 </blockquote>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <blockquote>
 <p>This is a quote
 spanning multiple lines.</p>
 <p>With multiple paragraphs.</p>
 </blockquote>
-</div>
+</template>
+</OutputTabs>
 
 Nested block quotes:
 
@@ -153,7 +168,9 @@ Nested block quotes:
 > > Nested quote
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <blockquote>
 <p>Outer quote</p>
@@ -163,15 +180,16 @@ Nested block quotes:
 </blockquote>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <blockquote>
 <p>Outer quote</p>
 <blockquote>
 <p>Nested quote</p>
 </blockquote>
 </blockquote>
-</div>
+</template>
+</OutputTabs>
 
 #### Block Quote Captions
 
@@ -183,7 +201,9 @@ Use `^` after a block quote to add an attribution/caption. The block quote will 
 ^ William Shakespeare
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <figure>
 <blockquote>
@@ -193,15 +213,16 @@ Use `^` after a block quote to add an attribution/caption. The block quote will 
 </figure>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <figure>
 <blockquote>
 <p>To be or not to be, that is the question.</p>
 </blockquote>
 <figcaption>William Shakespeare</figcaption>
 </figure>
-</div>
+</template>
+</OutputTabs>
 
 ### Lists
 
@@ -216,7 +237,9 @@ Use `-`, `*`, or `+` for bullet lists.
 - Item 3
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <ul>
 <li>Item 1</li>
@@ -225,14 +248,15 @@ Use `-`, `*`, or `+` for bullet lists.
 </ul>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <ul>
 <li>Item 1</li>
 <li>Item 2</li>
 <li>Item 3</li>
 </ul>
-</div>
+</template>
+</OutputTabs>
 
 #### Ordered Lists
 
@@ -245,7 +269,9 @@ Use numbers followed by `.` or `)`.
 3. Third
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <ol>
 <li>First</li>
@@ -254,14 +280,15 @@ Use numbers followed by `.` or `)`.
 </ol>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <ol>
 <li>First</li>
 <li>Second</li>
 <li>Third</li>
 </ol>
-</div>
+</template>
+</OutputTabs>
 
 Lists can start at any number:
 
@@ -271,7 +298,9 @@ Lists can start at any number:
 6. Sixth item
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <ol start="5">
 <li>Fifth item</li>
@@ -279,13 +308,14 @@ Lists can start at any number:
 </ol>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <ol start="5">
 <li>Fifth item</li>
 <li>Sixth item</li>
 </ol>
-</div>
+</template>
+</OutputTabs>
 
 #### Nested Lists
 
@@ -299,7 +329,9 @@ Indent with 2+ spaces for nested lists.
 - Item 2
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <ul>
 <li>Item 1
@@ -312,8 +344,8 @@ Indent with 2+ spaces for nested lists.
 </ul>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <ul>
 <li>Item 1
 <ul>
@@ -323,7 +355,8 @@ Indent with 2+ spaces for nested lists.
 </li>
 <li>Item 2</li>
 </ul>
-</div>
+</template>
+</OutputTabs>
 
 #### Task Lists
 
@@ -338,7 +371,9 @@ The underscore notation `[_]` is useful on mobile devices or in editors without 
 - [x] Done item
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <ul class="task-list">
 <li><input type="checkbox" disabled> Todo item (space)</li>
@@ -347,14 +382,15 @@ The underscore notation `[_]` is useful on mobile devices or in editors without 
 </ul>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <ul class="task-list">
 <li><input type="checkbox" disabled> Todo item (space)</li>
 <li><input type="checkbox" disabled> Todo item (underscore)</li>
 <li><input type="checkbox" disabled checked> Done item</li>
 </ul>
-</div>
+</template>
+</OutputTabs>
 
 ### Definition Lists
 
@@ -370,7 +406,9 @@ Term 2
 : Alternative definition
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <dl>
 <dt>Term 1</dt>
@@ -381,8 +419,8 @@ Term 2
 </dl>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <dl>
 <dt>Term 1</dt>
 <dd>Definition of term 1</dd>
@@ -390,7 +428,8 @@ Term 2
 <dd>Definition of term 2</dd>
 <dd>Alternative definition</dd>
 </dl>
-</div>
+</template>
+</OutputTabs>
 
 ### Tables
 
@@ -404,7 +443,9 @@ Tables use `|` to separate columns.
 | Cell 3   | Cell 4   |
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <table>
 <thead>
@@ -417,8 +458,8 @@ Tables use `|` to separate columns.
 </table>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <table>
 <thead>
 <tr><th>Header 1</th><th>Header 2</th></tr>
@@ -428,7 +469,8 @@ Tables use `|` to separate columns.
 <tr><td>Cell 3</td><td>Cell 4</td></tr>
 </tbody>
 </table>
-</div>
+</template>
+</OutputTabs>
 
 #### Column Alignment
 
@@ -441,7 +483,9 @@ Use `:` in the separator row for alignment.
 | L    | C      | R     |
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <table>
 <thead>
@@ -453,8 +497,8 @@ Use `:` in the separator row for alignment.
 </table>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <table>
 <thead>
 <tr><th style="text-align: left">Left</th><th style="text-align: center">Center</th><th style="text-align: right">Right</th></tr>
@@ -463,7 +507,8 @@ Use `:` in the separator row for alignment.
 <tr><td style="text-align: left">L</td><td style="text-align: center">C</td><td style="text-align: right">R</td></tr>
 </tbody>
 </table>
-</div>
+</template>
+</OutputTabs>
 
 #### Table Captions
 
@@ -477,7 +522,9 @@ Use `^` after the table for a caption.
 ^ This is the caption
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <table>
 <caption>This is the caption</caption>
@@ -490,8 +537,8 @@ Use `^` after the table for a caption.
 </table>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <table>
 <caption>This is the caption</caption>
 <thead>
@@ -501,7 +548,8 @@ Use `^` after the table for a caption.
 <tr><td>1</td><td>2</td></tr>
 </tbody>
 </table>
-</div>
+</template>
+</OutputTabs>
 
 ### Thematic Breaks
 
@@ -516,19 +564,22 @@ Above
 Below
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>Above</p>
 <hr>
 <p>Below</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>Above</p>
 <hr>
 <p>Below</p>
-</div>
+</template>
+</OutputTabs>
 
 ### Divs
 
@@ -541,19 +592,22 @@ This is a warning message.
 :::
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <div class="warning">
 <p>This is a warning message.</p>
 </div>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <div class="warning">
 <p>This is a warning message.</p>
 </div>
-</div>
+</template>
+</OutputTabs>
 
 Nested divs:
 
@@ -570,7 +624,9 @@ More outer
 :::
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <div class="outer">
 <p>Outer content</p>
@@ -581,8 +637,8 @@ More outer
 </div>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <div class="outer">
 <p>Outer content</p>
 <div class="inner">
@@ -590,7 +646,8 @@ More outer
 </div>
 <p>More outer</p>
 </div>
-</div>
+</template>
+</OutputTabs>
 
 ### Comments
 
@@ -608,17 +665,20 @@ More visible text
    comment here %}
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>Visible text</p>
 <p>More visible text</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>Visible text</p>
 <p>More visible text</p>
-</div>
+</template>
+</OutputTabs>
 
 ### Fenced Comments (Extension)
 
@@ -641,32 +701,50 @@ or documentation that won't render.
 More visible text
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>Visible text</p>
 <p>More visible text</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>Visible text</p>
 <p>More visible text</p>
-</div>
+</template>
+</OutputTabs>
 
 Like code fences, you can use more than three `%` characters. The closing fence must have
 at least as many `%` as the opening fence:
 
 **Input:**
 ```djot
+Some text
+
 %%%%
 %%% This is not the end
 Still inside the comment
 %%%%
+
+More text
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
+<p>Some text</p>
+<p>More text</p>
 ```
+
+</template>
+<template #result>
+<p>Some text</p>
+<p>More text</p>
+</template>
+</OutputTabs>
 
 > **Note:** This is a djot-php extension, not part of the official Djot specification.
 > See [discussion](https://github.com/jgm/djot/issues/67) for background.
@@ -685,17 +763,20 @@ comment
 dolor sit amet
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>Lorem ipsum</p>
 <p>dolor sit amet</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>Lorem ipsum</p>
 <p>dolor sit amet</p>
-</div>
+</template>
+</OutputTabs>
 
 This produces two separate paragraphs. For comments that should not interrupt
 paragraph flow (keeping text in the same paragraph), use inline comments (`{% ... %}`).
@@ -712,7 +793,9 @@ Preserve line breaks using `|` at the start of each line. Useful for poetry or a
 | And so are you.
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <div class="line-block">
 <p>Roses are red,<br>
@@ -722,15 +805,16 @@ And so are you.</p>
 </div>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <div class="line-block">
 <p>Roses are red,<br>
 Violets are blue,<br>
 Sugar is sweet,<br>
 And so are you.</p>
 </div>
-</div>
+</template>
+</OutputTabs>
 
 ### Block Attributes
 
@@ -745,17 +829,20 @@ Apply attributes to the following block using `{...}` syntax.
 This is a note.
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <h1 class="highlight" id="intro">Introduction</h1>
 <p class="note" data-version="2.0">This is a note.</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <h1 class="highlight" id="intro">Introduction</h1>
 <p class="note" data-version="2.0">This is a note.</p>
-</div>
+</template>
+</OutputTabs>
 
 ## Inline Elements
 
@@ -770,17 +857,20 @@ This is _emphasized_ and *strong* text.
 You can _nest *strong* inside_ emphasis.
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>This is <em>emphasized</em> and <strong>strong</strong> text.</p>
 <p>You can <em>nest <strong>strong</strong> inside</em> emphasis.</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>This is <em>emphasized</em> and <strong>strong</strong> text.</p>
 <p>You can <em>nest <strong>strong</strong> inside</em> emphasis.</p>
-</div>
+</template>
+</OutputTabs>
 
 ### Code Spans
 
@@ -793,17 +883,20 @@ Use the `print()` function.
 For literal backticks: `` `code` ``
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>Use the <code>print()</code> function.</p>
 <p>For literal backticks: <code>`code`</code></p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>Use the <code>print()</code> function.</p>
 <p>For literal backticks: <code>`code`</code></p>
-</div>
+</template>
+</OutputTabs>
 
 ### Links
 
@@ -816,17 +909,20 @@ For literal backticks: `` `code` ``
 [Link with title](https://example.com "Title")
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p><a href="https://example.com">Link text</a></p>
 <p><a href="https://example.com" title="Title">Link with title</a></p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p><a href="https://example.com">Link text</a></p>
 <p><a href="https://example.com" title="Title">Link with title</a></p>
-</div>
+</template>
+</OutputTabs>
 
 #### Reference Links
 
@@ -839,17 +935,20 @@ For literal backticks: `` `code` ``
 [ref]: https://example.com
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p><a href="https://example.com">Link text</a></p>
 <p><a href="https://example.com">Another link</a></p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p><a href="https://example.com">Link text</a></p>
 <p><a href="https://example.com">Another link</a></p>
-</div>
+</template>
+</OutputTabs>
 
 #### Reference Links with Attributes
 
@@ -863,15 +962,18 @@ Attributes can be added to reference definitions and will be applied to all link
 [example]: https://example.com
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p><a href="https://example.com" class="external" title="Example Site">Click here</a></p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p><a href="https://example.com" class="external" title="Example Site">Click here</a></p>
-</div>
+</template>
+</OutputTabs>
 
 Link-level attributes can override or extend definition attributes:
 
@@ -883,15 +985,18 @@ Link-level attributes can override or extend definition attributes:
 [example]: https://example.com
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p><a href="https://example.com" class="external button">Click here</a></p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p><a href="https://example.com" class="external button">Click here</a></p>
-</div>
+</template>
+</OutputTabs>
 
 #### Autolinks
 
@@ -902,32 +1007,44 @@ Link-level attributes can override or extend definition attributes:
 <user@example.com>
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p><a href="https://example.com">https://example.com</a></p>
 <p><a href="mailto:user@example.com">user@example.com</a></p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p><a href="https://example.com">https://example.com</a></p>
 <p><a href="mailto:user@example.com">user@example.com</a></p>
-</div>
+</template>
+</OutputTabs>
 
 ### Images
 
 **Input:**
 ```djot
-![Alt text](image.png)
+![Demo landscape](/demo.svg)
 
-![Alt text](image.png "Title")
+![Demo landscape](/demo.svg "A simple landscape")
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
-<p><img src="image.png" alt="Alt text"></p>
-<p><img src="image.png" alt="Alt text" title="Title"></p>
+<p><img src="/demo.svg" alt="Demo landscape"></p>
+<p><img src="/demo.svg" alt="Demo landscape" title="A simple landscape"></p>
 ```
+
+</template>
+<template #result>
+<p><img src="/demo.svg" alt="Demo landscape"></p>
+<p><img src="/demo.svg" alt="Demo landscape" title="A simple landscape"></p>
+</template>
+</OutputTabs>
 
 #### Image Captions
 
@@ -935,16 +1052,26 @@ Use `^` after an image to add a caption. The image will be wrapped in a `<figure
 
 **Input:**
 ```djot
-![Sunset over the ocean](sunset.jpg)
-^ A beautiful sunset captured at the beach
+![Demo landscape](/demo.svg)
+^ A simple landscape with sun, hills, and sky
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <figure>
-<img src="sunset.jpg" alt="Sunset over the ocean"><figcaption>A beautiful sunset captured at the beach</figcaption>
+<img src="/demo.svg" alt="Demo landscape"><figcaption>A simple landscape with sun, hills, and sky</figcaption>
 </figure>
 ```
+
+</template>
+<template #result>
+<figure>
+<img src="/demo.svg" alt="Demo landscape"><figcaption>A simple landscape with sun, hills, and sky</figcaption>
+</figure>
+</template>
+</OutputTabs>
 
 ### Superscript and Subscript
 
@@ -957,17 +1084,20 @@ E=mc^2^
 H~2~O
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>E=mc<sup>2</sup></p>
 <p>H<sub>2</sub>O</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>E=mc<sup>2</sup></p>
 <p>H<sub>2</sub>O</p>
-</div>
+</template>
+</OutputTabs>
 
 ### Highlight, Insert, Delete
 
@@ -980,19 +1110,22 @@ H~2~O
 {-deleted text-}
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p><mark>highlighted text</mark></p>
 <p><ins>inserted text</ins></p>
 <p><del>deleted text</del></p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p><mark>highlighted text</mark></p>
 <p><ins>inserted text</ins></p>
 <p><del>deleted text</del></p>
-</div>
+</template>
+</OutputTabs>
 
 ### Spans with Attributes
 
@@ -1007,19 +1140,22 @@ Apply attributes to inline text.
 [data text]{data-value="42"}
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p><span class="highlight">styled text</span></p>
 <p><span id="unique-id">more text</span></p>
 <p><span data-value="42">data text</span></p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p><span class="highlight">styled text</span></p>
 <p><span id="unique-id">more text</span></p>
 <p><span data-value="42">data text</span></p>
-</div>
+</template>
+</OutputTabs>
 
 ### Math
 
@@ -1030,15 +1166,18 @@ Apply attributes to inline text.
 The equation $`E = mc^2`$ is famous.
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>The equation <span class="math inline">\(E = mc^2\)</span> is famous.</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>The equation <span class="math inline">\(E = mc^2\)</span> is famous.</p>
-</div>
+</template>
+</OutputTabs>
 
 #### Display Math
 
@@ -1047,15 +1186,18 @@ The equation $`E = mc^2`$ is famous.
 $$`\sum_{i=0}^{n} i = \frac{n(n+1)}{2}`$$
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <span class="math display">\[\sum_{i=0}^{n} i = \frac{n(n+1)}{2}\]</span>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <span class="math display">\[\sum_{i=0}^{n} i = \frac{n(n+1)}{2}\]</span>
-</div>
+</template>
+</OutputTabs>
 
 ### Symbols
 
@@ -1066,15 +1208,18 @@ Use `:name:` for symbols.
 I :heart: Djot
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>I <span class="symbol">heart</span> Djot</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>I <span class="symbol">heart</span> Djot</p>
-</div>
+</template>
+</OutputTabs>
 
 Note: Symbol rendering can be customized via events. See the [Cookbook](/cookbook/) for examples.
 
@@ -1091,7 +1236,9 @@ Another reference[^note].
 [^note]: This is a named footnote.
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>Here is a statement<sup id="fnref-1-1"><a href="#fn-1">1</a></sup> with a footnote.</p>
 <p>Another reference<sup id="fnref-note-1"><a href="#fn-note">note</a></sup>.</p>
@@ -1103,8 +1250,8 @@ Another reference[^note].
 </div>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>Here is a statement<sup id="fnref-1-1"><a href="#fn-1">1</a></sup> with a footnote.</p>
 <p>Another reference<sup id="fnref-note-1"><a href="#fn-note">note</a></sup>.</p>
 <div class="footnote" id="fn-1">
@@ -1113,7 +1260,8 @@ Another reference[^note].
 <div class="footnote" id="fn-note">
 <p><sup>note</sup> This is a named footnote. <a href="#fnref-note-1">↩</a></p>
 </div>
-</div>
+</template>
+</OutputTabs>
 
 ### Raw HTML
 
@@ -1124,15 +1272,18 @@ Another reference[^note].
 Text `<span class="special">raw html</span>`{=html} more text
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>Text <span class="special">raw html</span> more text</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>Text <span class="special">raw html</span> more text</p>
-</div>
+</template>
+</OutputTabs>
 
 #### Block Raw HTML
 
@@ -1145,19 +1296,22 @@ Text `<span class="special">raw html</span>`{=html} more text
 ```
 ````
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <div class="custom">
   <p>Raw HTML block</p>
 </div>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <div class="custom">
   <p>Raw HTML block</p>
 </div>
-</div>
+</template>
+</OutputTabs>
 
 ## Smart Typography
 
@@ -1172,17 +1326,20 @@ The parser automatically converts certain character sequences.
 "Nested 'quotes' work" too
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>"Double quotes" and 'single quotes'</p>
 <p>"Nested 'quotes' work" too</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>"Double quotes" and 'single quotes'</p>
 <p>"Nested 'quotes' work" too</p>
-</div>
+</template>
+</OutputTabs>
 
 ### Dashes
 
@@ -1193,17 +1350,20 @@ En-dash: 1--10
 Em-dash: wait---what?
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>En-dash: 1–10</p>
 <p>Em-dash: wait—what?</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>En-dash: 1–10</p>
 <p>Em-dash: wait—what?</p>
-</div>
+</template>
+</OutputTabs>
 
 ### Ellipsis
 
@@ -1212,15 +1372,18 @@ Em-dash: wait---what?
 Wait for it...
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>Wait for it…</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>Wait for it…</p>
-</div>
+</template>
+</OutputTabs>
 
 ## Hard Line Breaks
 
@@ -1233,19 +1396,22 @@ Line two\
 Line three
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>Line one<br>
 Line two<br>
 Line three</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>Line one<br>
 Line two<br>
 Line three</p>
-</div>
+</template>
+</OutputTabs>
 
 ## Abbreviations (Extension)
 
@@ -1259,15 +1425,18 @@ The HTML specification is maintained by the W3C.
 *[W3C]: World Wide Web Consortium
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>The <abbr title="Hyper Text Markup Language">HTML</abbr> specification is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>The <abbr title="Hyper Text Markup Language">HTML</abbr> specification is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
-</div>
+</template>
+</OutputTabs>
 
 Abbreviation definitions can appear anywhere in the document and will be applied to all matching text. Matching is:
 - Case-sensitive (HTML ≠ html)
@@ -1296,19 +1465,22 @@ Use backslash to escape special characters.
 \[not a link\]
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>*not strong*</p>
 <p># not a heading</p>
 <p>[not a link]</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>*not strong*</p>
 <p># not a heading</p>
 <p>[not a link]</p>
-</div>
+</template>
+</OutputTabs>
 
 ### Non-Breaking Space
 
@@ -1321,16 +1493,19 @@ An escaped space (`\ `) produces a non-breaking space.
 Dr.\ Smith
 ```
 
-**Output:**
+<OutputTabs>
+<template #output>
+
 ```html
 <p>100&nbsp;km</p>
 <p>Dr.&nbsp;Smith</p>
 ```
 
-**Result:**
-<div class="result-preview">
+</template>
+<template #result>
 <p>100&nbsp;km</p>
 <p>Dr.&nbsp;Smith</p>
-</div>
+</template>
+</OutputTabs>
 
 This is useful for keeping values and units together, titles and names, or any text that shouldn't be split across lines.
