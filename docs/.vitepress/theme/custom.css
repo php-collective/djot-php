@@ -150,26 +150,73 @@
 
 /* Code blocks in playground preview */
 .djot-playground .preview pre {
+  position: relative;
   background: var(--vp-code-block-bg);
+  border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
-  padding: 1rem;
+  padding: 1.25rem 1.5rem;
   overflow-x: auto;
-  margin: 1rem 0;
+  margin: 1.25rem 0;
 }
 
 .djot-playground .preview pre code {
+  display: block;
   font-family: var(--vp-font-family-mono);
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.7;
   color: var(--vp-c-text-1);
+  background: transparent;
+  padding: 0;
 }
 
+/* Language label for code blocks */
+.djot-playground .preview pre code[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--vp-c-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.djot-playground .preview pre code.language-php::before {
+  content: 'php';
+}
+
+.djot-playground .preview pre code.language-js::before,
+.djot-playground .preview pre code.language-javascript::before {
+  content: 'js';
+}
+
+.djot-playground .preview pre code.language-html::before {
+  content: 'html';
+}
+
+.djot-playground .preview pre code.language-css::before {
+  content: 'css';
+}
+
+.djot-playground .preview pre code.language-bash::before,
+.djot-playground .preview pre code.language-shell::before {
+  content: 'sh';
+}
+
+.djot-playground .preview pre code.language-djot::before {
+  content: 'djot';
+}
+
+/* Inline code */
 .djot-playground .preview code:not(pre code) {
   background: var(--vp-code-block-bg);
-  padding: 0.2em 0.4em;
+  border: 1px solid var(--vp-c-divider);
+  padding: 0.15em 0.4em;
   border-radius: 4px;
   font-family: var(--vp-font-family-mono);
-  font-size: 0.9em;
+  font-size: 0.875em;
+  color: var(--vp-c-text-1);
 }
 
 /* highlight.js theme for playground */

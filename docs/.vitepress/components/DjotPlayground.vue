@@ -2,6 +2,34 @@
 import { ref, watch, onMounted, nextTick } from 'vue'
 import hljs from 'highlight.js'
 
+// Register Djot language for syntax highlighting
+function registerDjotLanguage() {
+  if (hljs.getLanguage('djot')) return
+
+  hljs.registerLanguage('djot', () => ({
+    name: 'Djot',
+    aliases: ['djot'],
+    case_insensitive: false,
+    contains: [
+      { className: 'section', begin: /^#{1,6}\s/, end: /$/ },
+      { className: 'emphasis', begin: /(?<!\w)_(?!\s)/, end: /_(?!\w)/ },
+      { className: 'strong', begin: /(?<!\w)\*(?!\s)/, end: /\*(?!\w)/ },
+      { className: 'code', begin: /`+/, end: /`+/ },
+      { className: 'link', begin: /\[[^\]]*\]\([^)]*\)/ },
+      { className: 'quote', begin: /^>/, end: /$/ },
+      { className: 'bullet', begin: /^[ \t]*[-*+](?=\s)/ },
+      { className: 'bullet', begin: /^[ \t]*\d+[.)](?=\s)/ },
+      { className: 'keyword', begin: /^`{3,}\s*[a-zA-Z]*$/ },
+      { className: 'attr', begin: /\{(?![=+\-%])[^}]+\}/ },
+      { className: 'addition', begin: /\{=/, end: /=\}/ },
+      { className: 'addition', begin: /\{\+/, end: /\+\}/ },
+      { className: 'deletion', begin: /\{-/, end: /-\}/ },
+    ],
+  }))
+}
+
+registerDjotLanguage()
+
 const SANDBOX_URL = 'https://sandbox.dereuromark.de/sandbox/djot'
 
 const djotInput = ref(`# Welcome to Djot
