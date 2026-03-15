@@ -150,6 +150,11 @@ function debouncedConvert() {
 watch(djotInput, debouncedConvert)
 watch(profile, convert)
 watch(extensions, convert, { deep: true })
+watch(activeTab, (newTab) => {
+  if (newTab === 'preview' && htmlOutput.value) {
+    highlightCodeBlocks()
+  }
+})
 
 onMounted(() => {
   convert()
