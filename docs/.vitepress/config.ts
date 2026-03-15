@@ -23,10 +23,9 @@ export default defineConfig({
   markdown: {
     languages: [
       {
-        id: 'djot',
-        scopeName: 'text.djot',
         ...djotGrammar,
-        aliases: ['dj'],
+        name: 'djot',
+        aliases: ['dj', 'Djot'],
       },
     ],
   },
