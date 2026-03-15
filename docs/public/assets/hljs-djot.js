@@ -31,20 +31,21 @@
             relevance: 10,
         };
 
-        // Strong: *text*
-        const STRONG = {
-            className: 'strong',
-            begin: /\*(?!\s)/,
-            end: /\*/,
+        // Emphasis: _text_ - not in middle of words (defined first for nesting)
+        const EMPHASIS = {
+            className: 'emphasis',
+            begin: /(?<!\w)_(?!\s)/,
+            end: /_(?!\w)/,
             relevance: 0,
         };
 
-        // Emphasis: _text_
-        const EMPHASIS = {
-            className: 'emphasis',
-            begin: /_(?!\s)/,
-            end: /_/,
+        // Strong: *text* - not in middle of words, can contain emphasis
+        const STRONG = {
+            className: 'strong',
+            begin: /(?<!\w)\*(?!\s)/,
+            end: /\*(?!\w)/,
             relevance: 0,
+            contains: [EMPHASIS],
         };
 
         // Highlight: {=text=}

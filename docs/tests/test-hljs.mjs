@@ -672,6 +672,43 @@ const testCases = [
     input: ':heart: and :star:',
     expectClasses: ['hljs-symbol'],
   },
+
+  // ==================== EDGE CASES ====================
+  {
+    name: 'Underscore in variable name should not be emphasis',
+    input: 'some_var_name',
+    rejectClasses: ['hljs-emphasis'],
+  },
+  {
+    name: 'Asterisk in middle of word should not be strong',
+    input: 'un*frigging*believable',
+    rejectClasses: ['hljs-strong'],
+  },
+  {
+    name: 'Emphasis at start of text',
+    input: '_emphasized_ text',
+    expectClasses: ['hljs-emphasis'],
+  },
+  {
+    name: 'Strong at start of text',
+    input: '*strong* text',
+    expectClasses: ['hljs-strong'],
+  },
+  {
+    name: 'Emphasis after punctuation',
+    input: 'Hello, _world_!',
+    expectClasses: ['hljs-emphasis'],
+  },
+  {
+    name: 'Strong after punctuation',
+    input: 'Hello, *world*!',
+    expectClasses: ['hljs-strong'],
+  },
+  {
+    name: 'Nested emphasis in strong',
+    input: '*_bold italic_*',
+    expectClasses: ['hljs-strong', 'hljs-emphasis'],
+  },
 ];
 
 /**
@@ -688,11 +725,25 @@ function runTests() {
     let testPassed = true;
     const errors = [];
 
-    for (const expectedClass of test.expectClasses) {
-      if (!html.includes(expectedClass)) {
-        testPassed = false;
-        errors.push(`  Expected class "${expectedClass}" not found in output`);
-        errors.push(`  Got: ${html}`);
+    // Check expected classes are present
+    if (test.expectClasses) {
+      for (const expectedClass of test.expectClasses) {
+        if (!html.includes(expectedClass)) {
+          testPassed = false;
+          errors.push(`  Expected class "${expectedClass}" not found in output`);
+          errors.push(`  Got: ${html}`);
+        }
+      }
+    }
+
+    // Check rejected classes are NOT present
+    if (test.rejectClasses) {
+      for (const rejectedClass of test.rejectClasses) {
+        if (html.includes(rejectedClass)) {
+          testPassed = false;
+          errors.push(`  Unexpected class "${rejectedClass}" found in output`);
+          errors.push(`  Got: ${html}`);
+        }
       }
     }
 
