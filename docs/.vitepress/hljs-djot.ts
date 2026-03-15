@@ -1,0 +1,415 @@
+/**
+ * Djot language definition for highlight.js (ES module wrapper)
+ *
+ * Supports the full Djot specification plus djot-php enhancements.
+ * @see https://djot.net for Djot specification
+ * @see https://github.com/php-collective/djot-php for enhancements
+ */
+import type { HLJSApi, LanguageFn } from 'highlight.js'
+
+const djot: LanguageFn = (hljs: HLJSApi) => {
+  // Block attributes: {.class #id key=value} or boolean {reversed}
+  // Excludes special syntax like {= {+ {- {%
+  const ATTRIBUTE = {
+    className: 'attr',
+    begin: /\{(?![=+\-%])[^}]+\}/,
+    relevance: 5,
+  }
+
+  // Frontmatter: YAML metadata at document start
+  const FRONTMATTER = {
+    className: 'meta',
+    begin: /^---$/,
+    end: /^---$/,
+    relevance: 10,
+  }
+
+  // Headings: # to ######
+  const HEADING = {
+    className: 'section',
+    begin: /^#{1,6}\s/,
+    end: /$/,
+    relevance: 10,
+  }
+
+  // Emphasis: _text_ - not in middle of words (defined first for nesting)
+  const EMPHASIS = {
+    className: 'emphasis',
+    begin: /(?<!\w)_(?!\s)/,
+    end: /_(?!\w)/,
+    relevance: 0,
+  }
+
+  // Strong: *text* - not in middle of words, can contain emphasis
+  const STRONG = {
+    className: 'strong',
+    begin: /(?<!\w)\*(?!\s)/,
+    end: /\*(?!\w)/,
+    relevance: 0,
+    contains: [EMPHASIS],
+  }
+
+  // Highlight: {=text=}
+  const HIGHLIGHT = {
+    className: 'addition',
+    begin: /\{=/,
+    end: /=\}/,
+    relevance: 5,
+  }
+
+  // Insert: {+text+}
+  const INSERT = {
+    className: 'addition',
+    begin: /\{\+/,
+    end: /\+\}/,
+    relevance: 5,
+  }
+
+  // Delete: {-text-}
+  const DELETE = {
+    className: 'deletion',
+    begin: /\{-/,
+    end: /-\}/,
+    relevance: 5,
+  }
+
+  // Superscript: ^text^
+  const SUPERSCRIPT = {
+    className: 'built_in',
+    begin: /\^(?!\s)/,
+    end: /\^/,
+    relevance: 2,
+  }
+
+  // Braced superscript: {^text^}
+  const BRACED_SUPERSCRIPT = {
+    className: 'built_in',
+    begin: /\{\^/,
+    end: /\^\}/,
+    relevance: 5,
+  }
+
+  // Subscript: ~text~
+  const SUBSCRIPT = {
+    className: 'built_in',
+    begin: /~(?!\s)/,
+    end: /~/,
+    relevance: 2,
+  }
+
+  // Braced subscript: {~text~}
+  const BRACED_SUBSCRIPT = {
+    className: 'built_in',
+    begin: /\{~/,
+    end: /~\}/,
+    relevance: 5,
+  }
+
+  // Inline code: `code` or ``code``
+  const INLINE_CODE = {
+    className: 'code',
+    begin: /`+/,
+    end: /`+/,
+    relevance: 0,
+  }
+
+  // Inline links: [text](url) with optional trailing attributes
+  const LINK = {
+    className: 'link',
+    begin: /\[[^\]]*\]\([^)]*\)(\{[^}]+\})?/,
+    relevance: 5,
+  }
+
+  // Autolinks: <https://...> or <mailto:...>
+  const AUTOLINK = {
+    className: 'link',
+    begin: /<https?:\/\/[^>]+>/,
+    relevance: 5,
+  }
+
+  // Email autolinks: <user@example.com>
+  const EMAIL_AUTOLINK = {
+    className: 'link',
+    begin: /<[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}>/,
+    relevance: 5,
+  }
+
+  // Images: ![alt](url) with optional trailing attributes
+  const IMAGE = {
+    className: 'link',
+    begin: /!\[[^\]]*\]\([^)]*\)(\{[^}]+\})?/,
+    relevance: 5,
+  }
+
+  // Reference links: [text][ref] with optional trailing attributes
+  const REFERENCE_LINK = {
+    className: 'link',
+    begin: /\[[^\]]+\]\[[^\]]*\](\{[^}]+\})?/,
+    relevance: 5,
+  }
+
+  // Spans with attributes: [text]{.class} or [text]{#id}
+  const SPAN = {
+    className: 'string',
+    begin: /\[[^\]]+\]\{[^}]+\}/,
+    relevance: 5,
+  }
+
+  // Reference definitions: [ref]: url
+  const REFERENCE_DEF = {
+    className: 'symbol',
+    begin: /^\[[^\]^\]]+\]:/,
+    end: /$/,
+    relevance: 10,
+  }
+
+  // Footnote references: [^note]
+  const FOOTNOTE_REF = {
+    className: 'symbol',
+    begin: /\[\^[^\]]+\]/,
+    relevance: 5,
+  }
+
+  // Footnote definitions: [^note]: content
+  const FOOTNOTE_DEF = {
+    className: 'symbol',
+    begin: /^\[\^[^\]]+\]:/,
+    end: /$/,
+    relevance: 10,
+  }
+
+  // Abbreviation definitions (djot-php extension): *[ABBR]: text
+  const ABBREVIATION_DEF = {
+    className: 'symbol',
+    begin: /^\*\[[^\]]+\]:/,
+    end: /$/,
+    relevance: 10,
+  }
+
+  // Blockquotes: > text
+  const BLOCKQUOTE = {
+    className: 'quote',
+    begin: /^>/,
+    end: /$/,
+    relevance: 0,
+  }
+
+  // Horizontal rules: --- or *** or ___
+  const HORIZONTAL_RULE = {
+    className: 'meta',
+    begin: /^(-{3,}|\*{3,}|_{3,})$/,
+    relevance: 10,
+  }
+
+  // Bullet list items: - or * or +
+  const LIST_BULLET = {
+    className: 'bullet',
+    begin: /^[ \t]*[-*+](?=\s)/,
+    relevance: 0,
+  }
+
+  // Numbered list items: 1. or 1)
+  const LIST_NUMBER = {
+    className: 'bullet',
+    begin: /^[ \t]*\d+[.)](?=\s)/,
+    relevance: 0,
+  }
+
+  // Task list items: - [ ] or - [x]
+  const TASK_LIST = {
+    className: 'bullet',
+    begin: /^[ \t]*[-*+]\s\[[ xX]\]/,
+    relevance: 5,
+  }
+
+  // Definition list terms: : term
+  const DEFINITION_TERM = {
+    className: 'title',
+    begin: /^: /,
+    end: /$/,
+    relevance: 5,
+  }
+
+  // Code fence opening: ``` with optional language
+  const CODE_FENCE_START = {
+    className: 'keyword',
+    begin: /^`{3,}\s*=?[a-zA-Z]*$/,
+    relevance: 10,
+  }
+
+  // Code fence closing: ```
+  const CODE_FENCE_END = {
+    className: 'keyword',
+    begin: /^`{3,}$/,
+    relevance: 10,
+  }
+
+  // Div block opening: ::: with optional class
+  const DIV_BLOCK_START = {
+    className: 'keyword',
+    begin: /^:{3,}\s*\w*$/,
+    relevance: 10,
+  }
+
+  // Div block closing: :::
+  const DIV_BLOCK_END = {
+    className: 'keyword',
+    begin: /^:{3,}$/,
+    relevance: 10,
+  }
+
+  // Fenced comment (djot-php extension): %%%
+  const FENCED_COMMENT = {
+    className: 'comment',
+    begin: /^%{3,}$/,
+    relevance: 10,
+  }
+
+  // Inline comments: {% comment %}
+  const INLINE_COMMENT = {
+    className: 'comment',
+    begin: /\{%/,
+    end: /%\}/,
+    relevance: 5,
+  }
+
+  // Table rows: | cell | cell |
+  const TABLE_ROW = {
+    className: 'string',
+    begin: /^\|/,
+    end: /\|(\{[^}]*\})?$/,
+    relevance: 2,
+  }
+
+  // Table separator: |---|---|
+  const TABLE_SEPARATOR = {
+    className: 'meta',
+    begin: /^\|[-:| ]+\|$/,
+    relevance: 5,
+  }
+
+  // Line blocks: | text (for poetry)
+  const LINE_BLOCK = {
+    className: 'string',
+    begin: /^\| /,
+    end: /$/,
+    relevance: 3,
+  }
+
+  // Captions (djot-php extension): ^ caption text
+  const CAPTION = {
+    className: 'title',
+    begin: /^\^ /,
+    end: /$/,
+    relevance: 5,
+  }
+
+  // Symbols: :name:
+  const SYMBOL = {
+    className: 'symbol',
+    begin: /:[a-zA-Z_][a-zA-Z0-9_]*:/,
+    relevance: 3,
+  }
+
+  // Inline math: $`code`$
+  const INLINE_MATH = {
+    className: 'formula',
+    begin: /\$`/,
+    end: /`\$/,
+    relevance: 5,
+  }
+
+  // Display math: $$`code`$$
+  const DISPLAY_MATH = {
+    className: 'formula',
+    begin: /\$\$`/,
+    end: /`\$\$/,
+    relevance: 5,
+  }
+
+  // Raw format marker: {=html} or {=latex}
+  const RAW_FORMAT = {
+    className: 'meta',
+    begin: /\{=[a-zA-Z]+\}/,
+    relevance: 5,
+  }
+
+  // Smart punctuation
+  const EM_DASH = { className: 'punctuation', begin: /---/, relevance: 0 }
+  const EN_DASH = { className: 'punctuation', begin: /--/, relevance: 0 }
+  const ELLIPSIS = { className: 'punctuation', begin: /\.\.\./, relevance: 0 }
+
+  // Escaped characters: \* \[ etc
+  const ESCAPE = {
+    className: 'symbol',
+    begin: /\\[!"#$%&'()*+,.\/:;<=>?@\[\\\]^_`{|}~-]/,
+    relevance: 0,
+  }
+
+  // Hard line break: \ at end of line
+  const HARD_BREAK = {
+    className: 'meta',
+    begin: /\\$/,
+    relevance: 2,
+  }
+
+  return {
+    name: 'Djot',
+    aliases: ['djot'],
+    case_insensitive: false,
+    contains: [
+      // Block-level elements (order matters - more specific first)
+      FRONTMATTER,
+      HEADING,
+      CODE_FENCE_START,
+      CODE_FENCE_END,
+      DIV_BLOCK_START,
+      DIV_BLOCK_END,
+      FENCED_COMMENT,
+      HORIZONTAL_RULE,
+      TABLE_SEPARATOR,
+      LINE_BLOCK,
+      TABLE_ROW,
+      BLOCKQUOTE,
+      CAPTION,
+      TASK_LIST,
+      LIST_BULLET,
+      LIST_NUMBER,
+      DEFINITION_TERM,
+      FOOTNOTE_DEF,
+      ABBREVIATION_DEF,
+      REFERENCE_DEF,
+      // Inline elements (order matters - more specific first)
+      FOOTNOTE_REF,
+      IMAGE,
+      SPAN,
+      REFERENCE_LINK,
+      LINK,
+      AUTOLINK,
+      EMAIL_AUTOLINK,
+      DISPLAY_MATH,
+      INLINE_MATH,
+      RAW_FORMAT,
+      HIGHLIGHT,
+      INSERT,
+      DELETE,
+      BRACED_SUPERSCRIPT,
+      BRACED_SUBSCRIPT,
+      INLINE_COMMENT,
+      SUPERSCRIPT,
+      SUBSCRIPT,
+      STRONG,
+      EMPHASIS,
+      INLINE_CODE,
+      SYMBOL,
+      ATTRIBUTE,
+      EM_DASH,
+      EN_DASH,
+      ELLIPSIS,
+      ESCAPE,
+      HARD_BREAK,
+    ],
+  }
+}
+
+export default djot
