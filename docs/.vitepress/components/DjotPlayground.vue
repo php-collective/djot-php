@@ -28,8 +28,8 @@ echo $converter->convert($djot);
 
 | Feature | Djot | Markdown |
 |---------|------|----------|
-| Emphasis | _text_ | *text* |
-| Strong | *text* | **text** |
+| Emphasis | \`_text_\` | \`*text*\` |
+| Strong | \`*text*\` | \`**text**\` |
 `)
 
 const htmlOutput = ref('')
