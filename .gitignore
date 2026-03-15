@@ -16,3 +16,8 @@
 # Fuzz testing artifacts
 /fuzz/crash-*
 /fuzz/minimized-*
+
+# Documentation
+/docs/node_modules/
+/docs/.vitepress/cache/
+/docs/.vitepress/dist/
