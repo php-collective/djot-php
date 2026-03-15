@@ -15,6 +15,14 @@
             relevance: 5,
         };
 
+        // Frontmatter: YAML metadata at document start
+        const FRONTMATTER = {
+            className: 'meta',
+            begin: /^---$/,
+            end: /^---$/,
+            relevance: 10,
+        };
+
         // Headings: # to ######
         const HEADING = {
             className: 'section',
@@ -63,7 +71,7 @@
             relevance: 5,
         };
 
-        // Superscript: ^text^
+        // Superscript: ^text^ or {^text^}
         const SUPERSCRIPT = {
             className: 'built_in',
             begin: /\^(?!\s)/,
@@ -71,12 +79,28 @@
             relevance: 2,
         };
 
-        // Subscript: ~text~
+        // Braced superscript: {^text^}
+        const BRACED_SUPERSCRIPT = {
+            className: 'built_in',
+            begin: /\{\^/,
+            end: /\^\}/,
+            relevance: 5,
+        };
+
+        // Subscript: ~text~ or {~text~}
         const SUBSCRIPT = {
             className: 'built_in',
             begin: /~(?!\s)/,
             end: /~/,
             relevance: 2,
+        };
+
+        // Braced subscript: {~text~}
+        const BRACED_SUBSCRIPT = {
+            className: 'built_in',
+            begin: /\{~/,
+            end: /~\}/,
+            relevance: 5,
         };
 
         // Inline code: `code` or ``code``
@@ -148,6 +172,14 @@
         const FOOTNOTE_DEF = {
             className: 'symbol',
             begin: /^\[\^[^\]]+\]:/,
+            end: /$/,
+            relevance: 10,
+        };
+
+        // Abbreviation definitions (djot-php extension): *[ABBR]: text
+        const ABBREVIATION_DEF = {
+            className: 'symbol',
+            begin: /^\*\[[^\]]+\]:/,
             end: /$/,
             relevance: 10,
         };
@@ -307,6 +339,25 @@
             relevance: 5,
         };
 
+        // Smart punctuation: em-dash (---), en-dash (--), ellipsis (...)
+        const EM_DASH = {
+            className: 'punctuation',
+            begin: /---/,
+            relevance: 0,
+        };
+
+        const EN_DASH = {
+            className: 'punctuation',
+            begin: /--/,
+            relevance: 0,
+        };
+
+        const ELLIPSIS = {
+            className: 'punctuation',
+            begin: /\.\.\./,
+            relevance: 0,
+        };
+
         // Escaped characters: \* \[ etc
         const ESCAPE = {
             className: 'symbol',
@@ -327,6 +378,7 @@
             case_insensitive: false,
             contains: [
                 // Block-level elements (order matters - more specific first)
+                FRONTMATTER,       // Must be first (document start)
                 HEADING,
                 CODE_FENCE_START,
                 CODE_FENCE_END,
@@ -345,6 +397,7 @@
                 LIST_NUMBER,
                 DEFINITION_TERM,
                 FOOTNOTE_DEF,      // Must be before REFERENCE_DEF
+                ABBREVIATION_DEF,  // Must be before REFERENCE_DEF (*[ABBR]: vs [ref]:)
                 REFERENCE_DEF,
 
                 // Inline elements (order matters - more specific first)
@@ -361,6 +414,8 @@
                 HIGHLIGHT,         // {=text=}
                 INSERT,            // {+text+}
                 DELETE,            // {-text-}
+                BRACED_SUPERSCRIPT, // Must be before SUPERSCRIPT ({^text^} vs ^text^)
+                BRACED_SUBSCRIPT,   // Must be before SUBSCRIPT ({~text~} vs ~text~)
                 INLINE_COMMENT,    // {% %} - must be before ATTRIBUTE
                 SUPERSCRIPT,
                 SUBSCRIPT,
@@ -369,6 +424,9 @@
                 INLINE_CODE,
                 SYMBOL,
                 ATTRIBUTE,
+                EM_DASH,           // Must be before EN_DASH (--- vs --)
+                EN_DASH,
+                ELLIPSIS,
                 ESCAPE,
                 HARD_BREAK,
             ],
