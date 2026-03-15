@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
+import hljs from 'highlight.js'
 
 const SANDBOX_URL = 'https://sandbox.dereuromark.de/sandbox/djot'
 
@@ -37,6 +38,16 @@ const profile = ref('')
 const isLoading = ref(false)
 const error = ref('')
 const extensions = ref<string[]>([])
+const previewRef = ref<HTMLElement | null>(null)
+
+async function highlightCodeBlocks() {
+  await nextTick()
+  if (previewRef.value) {
+    previewRef.value.querySelectorAll('pre code').forEach((block) => {
+      hljs.highlightElement(block as HTMLElement)
+    })
+  }
+}
 
 const availableExtensions = [
   { id: 'autolink', label: 'Autolink' },
@@ -107,6 +118,7 @@ async function convert() {
     } else {
       htmlOutput.value = data.html || ''
       error.value = ''
+      highlightCodeBlocks()
     }
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
@@ -199,6 +211,7 @@ function toggleExtension(extId: string) {
       </div>
       <div
         v-else-if="activeTab === 'preview'"
+        ref="previewRef"
         class="output-content preview"
         v-html="htmlOutput"
       ></div>
