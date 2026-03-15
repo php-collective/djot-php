@@ -141,3 +141,94 @@
   color: var(--vp-c-text-1);
   font-size: 14px;
 }
+
+.djot-playground .extension-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* Code blocks in playground preview */
+.djot-playground .preview pre {
+  background: var(--vp-code-block-bg);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.djot-playground .preview pre code {
+  font-family: var(--vp-font-family-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--vp-c-text-1);
+}
+
+.djot-playground .preview code:not(pre code) {
+  background: var(--vp-code-block-bg);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.9em;
+}
+
+/* highlight.js theme for playground */
+.djot-playground .preview .hljs-keyword,
+.djot-playground .preview .hljs-selector-tag,
+.djot-playground .preview .hljs-title,
+.djot-playground .preview .hljs-section,
+.djot-playground .preview .hljs-doctag,
+.djot-playground .preview .hljs-name,
+.djot-playground .preview .hljs-strong {
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+.djot-playground .preview .hljs-string,
+.djot-playground .preview .hljs-attr {
+  color: #22863a;
+}
+
+.dark .djot-playground .preview .hljs-string,
+.dark .djot-playground .preview .hljs-attr {
+  color: #7ee787;
+}
+
+.djot-playground .preview .hljs-variable,
+.djot-playground .preview .hljs-template-variable,
+.djot-playground .preview .hljs-type,
+.djot-playground .preview .hljs-selector-class,
+.djot-playground .preview .hljs-selector-attr,
+.djot-playground .preview .hljs-selector-pseudo,
+.djot-playground .preview .hljs-number {
+  color: #e36209;
+}
+
+.dark .djot-playground .preview .hljs-variable,
+.dark .djot-playground .preview .hljs-template-variable,
+.dark .djot-playground .preview .hljs-type,
+.dark .djot-playground .preview .hljs-selector-class,
+.dark .djot-playground .preview .hljs-selector-attr,
+.dark .djot-playground .preview .hljs-selector-pseudo,
+.dark .djot-playground .preview .hljs-number {
+  color: #ffa657;
+}
+
+.djot-playground .preview .hljs-comment,
+.djot-playground .preview .hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.dark .djot-playground .preview .hljs-comment,
+.dark .djot-playground .preview .hljs-quote {
+  color: #8b949e;
+}
+
+.djot-playground .preview .hljs-built_in {
+  color: #005cc5;
+}
+
+.dark .djot-playground .preview .hljs-built_in {
+  color: #79c0ff;
+}
