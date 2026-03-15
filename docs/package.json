@@ -2,6 +2,7 @@
   "name": "djot-php-docs",
   "type": "module",
   "scripts": {
+    "postinstall": "mkdir -p .vitepress/grammars && curl -fsSL -o .vitepress/grammars/djot.tmLanguage.json https://raw.githubusercontent.com/php-collective/djot-intellij/main/src/main/resources/textmate/djot.tmLanguage.json",
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
     "docs:preview": "vitepress preview"

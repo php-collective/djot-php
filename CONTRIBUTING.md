@@ -114,6 +114,30 @@ public function testFeatureContains(): void
 }
 ```
 
+## Documentation Site
+
+The documentation is built with [VitePress](https://vitepress.dev/).
+
+### Local Development
+
+```bash
+cd docs
+npm install    # Fetches Djot grammar from djot-intellij automatically
+npm run docs:dev
+```
+
+This starts a dev server at `http://localhost:5173/djot-php/` with hot reload.
+
+The Djot syntax highlighting grammar is fetched from [djot-intellij](https://github.com/php-collective/djot-intellij) during `npm install` (via postinstall hook), ensuring you always have the latest version.
+
+### Building
+
+```bash
+cd docs
+npm run docs:build
+npm run docs:preview  # Preview the build
+```
+
 ## Pull Request Guidelines
 
 1. Create a feature branch from `master`
