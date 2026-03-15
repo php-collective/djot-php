@@ -8,7 +8,6 @@ Common recipes and customizations for djot-php.
 - [Custom Emoji/Symbols](#custom-emojisymbols)
 - [Unicode Codepoints](#unicode-codepoints)
 - [Abbreviations](#abbreviations)
-- [Syntax Highlighting](#syntax-highlighting)
 - [Table of Contents Generation](#table-of-contents-generation)
 - [Image Processing](#image-processing)
 - [Custom Admonitions](#custom-admonitions)
@@ -328,37 +327,6 @@ Output:
 
 This uses standard djot span syntax with attributes, so no custom parsing is needed.
 You can combine with other attributes: `[CSS]{abbr="Cascading Style Sheets" .tech-term}`.
-
-## Syntax Highlighting
-
-Add syntax highlighting classes for a JS library like Prism or Highlight.js:
-
-```php
-use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Block\CodeBlock;
-
-$converter = new DjotConverter();
-
-$converter->on('render.code_block', function (RenderEvent $event): void {
-    $block = $event->getNode();
-    if (!$block instanceof CodeBlock) {
-        return;
-    }
-
-    $lang = $block->getLanguage();
-    $code = htmlspecialchars($block->getContent(), ENT_QUOTES, 'UTF-8');
-
-    if ($lang) {
-        // For Prism.js
-        $html = '<pre class="language-' . $lang . '"><code class="language-' . $lang . '">' . $code . '</code></pre>' . "\n";
-    } else {
-        $html = '<pre><code>' . $code . '</code></pre>' . "\n";
-    }
-
-    $event->setHtml($html);
-});
-```
 
 ## Table of Contents Generation
 
