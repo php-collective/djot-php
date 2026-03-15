@@ -890,7 +890,7 @@ is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
 - Case-sensitive matching (HTML ≠ html)
 - Word-boundary aware (HTML won't match HTMLElement or XHTML)
 - Multi-line definitions supported with indentation
-- Works alongside the inline span approach (`[HTML]{abbr="..."}`) from the [cookbook](cookbook.md#abbreviations)
+- Works alongside the inline span approach (`[HTML]{abbr="..."}`) from the [cookbook](/cookbook/#abbreviations)
 
 **Multi-line definition example:**
 ```djot

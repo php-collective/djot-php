@@ -189,7 +189,7 @@ Events are fired for each node type using the pattern `render.{node_type}`:
 - `render.paragraph`, `render.heading`, `render.code_block`, etc.
 - `render.link`, `render.image`, `render.emphasis`, `render.symbol`, etc.
 
-See the [Cookbook](cookbook.md) for common customization recipes.
+See the [Cookbook](/cookbook/) for common customization recipes.
 
 ### Adding New Syntax
 

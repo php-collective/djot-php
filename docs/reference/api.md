@@ -28,7 +28,7 @@ public function __construct(
 - `$warnings`: When `true`, collects warnings during parsing (see [Error Handling](#error-handling)).
 - `$strict`: When `true`, throws `ParseException` on parse errors (see [Error Handling](#error-handling)).
 - `$safeMode`: When `true` or a `SafeMode` instance, enables XSS protection (see [Safe Mode](#safe-mode)).
-- `$profile`: A `Profile` instance for feature restriction (see [Profiles](profiles.md)).
+- `$profile`: A `Profile` instance for feature restriction (see [Profiles](/guide/profiles)).
 - `$significantNewlines`: When `true`, enables markdown-like parsing where block elements can interrupt paragraphs (see [Significant Newlines Mode](#significant-newlines-mode)).
 
 ### Factory Methods
@@ -875,4 +875,4 @@ $converter = DjotConverter::withSignificantNewlines();
 $converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space);
 ```
 
-See [enhancements.md](enhancements.md#significant-newlines-mode) for upstream tracking.
+See [enhancements.md](./enhancements#significant-newlines-mode) for upstream tracking.

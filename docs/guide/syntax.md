@@ -785,7 +785,7 @@ I :heart: Djot
 <p>I <span class="symbol">heart</span> Djot</p>
 ```
 
-Note: Symbol rendering can be customized via events. See the [Cookbook](cookbook.md) for examples.
+Note: Symbol rendering can be customized via events. See the [Cookbook](/cookbook/) for examples.
 
 ### Footnotes
 
@@ -937,7 +937,7 @@ Definitions can span multiple lines if continuation lines are indented:
   designed to be displayed in a web browser
 ```
 
-**Note:** This feature works alongside the inline span approach documented in the [cookbook](cookbook.md#abbreviations). The definition-based approach automatically applies to all matching text, while the inline `[HTML]{abbr="..."}` approach allows overriding specific occurrences.
+**Note:** This feature works alongside the inline span approach documented in the [cookbook](/cookbook/#abbreviations). The definition-based approach automatically applies to all matching text, while the inline `[HTML]{abbr="..."}` approach allows overriding specific occurrences.
 
 ## Escaping
 

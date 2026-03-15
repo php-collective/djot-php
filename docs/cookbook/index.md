@@ -29,7 +29,7 @@ Common recipes and customizations for djot-php.
 
 ## External Links
 
-> **Tip:** Use the built-in [ExternalLinksExtension](extensions.md#externallinksextension) for common cases.
+> **Tip:** Use the built-in [ExternalLinksExtension](/extensions/#externallinksextension) for common cases.
 
 Open external links in a new tab with security attributes:
 
@@ -361,7 +361,7 @@ $converter->on('render.code_block', function (RenderEvent $event): void {
 
 ## Table of Contents Generation
 
-> **Tip:** Use the built-in [TableOfContentsExtension](extensions.md#tableofcontentsextension) for common cases.
+> **Tip:** Use the built-in [TableOfContentsExtension](/extensions/#tableofcontentsextension) for common cases.
 
 Generate a table of contents from headings:
 
@@ -502,7 +502,7 @@ echo $converter->convert($djot);
 
 ## Heading Anchors
 
-> **Tip:** Use the built-in [HeadingPermalinksExtension](extensions.md#headingpermalinksextension) for clickable permalink anchors.
+> **Tip:** Use the built-in [HeadingPermalinksExtension](/extensions/#headingpermalinksextension) for clickable permalink anchors.
 
 Add anchor links to headings:
 
@@ -622,7 +622,7 @@ $converter->on('render.raw_inline', function (RenderEvent $event) use ($allowedT
 
 ## Lazy Loading Images
 
-> **Tip:** Use the built-in [DefaultAttributesExtension](extensions.md#defaultattributesextension) for this.
+> **Tip:** Use the built-in [DefaultAttributesExtension](/extensions/#defaultattributesextension) for this.
 
 Add native lazy loading to all images:
 
@@ -1277,7 +1277,7 @@ Extend Djot with custom inline syntax by registering patterns on the InlineParse
 
 ### @Mentions
 
-> **Tip:** Use the built-in [MentionsExtension](extensions.md#mentionsextension) for common cases.
+> **Tip:** Use the built-in [MentionsExtension](/extensions/#mentionsextension) for common cases.
 
 Convert `@username` to profile links:
 
@@ -1801,9 +1801,9 @@ Useful boolean attributes for djot elements:
 ## Alternative Output Formats
 
 For detailed customization of alternative renderers, see:
-- [PlainText Cookbook](cookbook-plaintext.md) - PlainTextRenderer customizations
-- [Markdown Cookbook](cookbook-markdown.md) - MarkdownRenderer customizations
-- [ANSI Cookbook](cookbook-ansi.md) - AnsiRenderer customizations
+- [PlainText Cookbook](./plaintext) - PlainTextRenderer customizations
+- [Markdown Cookbook](./markdown) - MarkdownRenderer customizations
+- [ANSI Cookbook](./ansi) - AnsiRenderer customizations
 
 ### Plain Text Extraction
 
