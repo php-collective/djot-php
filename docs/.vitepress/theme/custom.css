@@ -286,3 +286,71 @@
 .dark .djot-playground .preview .hljs-built_in {
   color: #79c0ff;
 }
+
+.djot-playground .preview .hljs-addition {
+  background-color: rgba(46, 160, 67, 0.15);
+  color: #22863a;
+}
+
+.dark .djot-playground .preview .hljs-addition {
+  background-color: rgba(46, 160, 67, 0.2);
+  color: #7ee787;
+}
+
+.djot-playground .preview .hljs-deletion {
+  background-color: rgba(248, 81, 73, 0.15);
+  color: #cb2431;
+}
+
+.dark .djot-playground .preview .hljs-deletion {
+  background-color: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.djot-playground .preview .hljs-link {
+  color: #0366d6;
+  text-decoration: underline;
+}
+
+.dark .djot-playground .preview .hljs-link {
+  color: #58a6ff;
+}
+
+.djot-playground .preview .hljs-bullet {
+  color: var(--vp-c-brand-1);
+}
+
+.djot-playground .preview .hljs-code {
+  background: var(--vp-code-block-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+.djot-playground .preview .hljs-meta {
+  color: #6a737d;
+}
+
+.dark .djot-playground .preview .hljs-meta {
+  color: #8b949e;
+}
+
+.djot-playground .preview .hljs-symbol {
+  color: #6f42c1;
+}
+
+.dark .djot-playground .preview .hljs-symbol {
+  color: #d2a8ff;
+}
+
+.djot-playground .preview .hljs-formula {
+  color: #005cc5;
+  font-style: italic;
+}
+
+.dark .djot-playground .preview .hljs-formula {
+  color: #79c0ff;
+}
+
+.djot-playground .preview .hljs-punctuation {
+  color: var(--vp-c-text-2);
+}
