@@ -2,6 +2,7 @@
  * Tests for Djot highlight.js grammar
  *
  * Tests that the hljs-djot.js grammar correctly highlights Djot syntax.
+ * Covers all patterns defined in the grammar plus edge cases.
  */
 
 import hljs from 'highlight.js';
@@ -36,6 +37,16 @@ const testCases = [
     expectClasses: ['hljs-section'],
   },
   {
+    name: 'Heading level 2',
+    input: '## Heading',
+    expectClasses: ['hljs-section'],
+  },
+  {
+    name: 'Heading level 3',
+    input: '### Heading',
+    expectClasses: ['hljs-section'],
+  },
+  {
     name: 'Heading level 6',
     input: '###### Heading',
     expectClasses: ['hljs-section'],
@@ -48,8 +59,18 @@ const testCases = [
     expectClasses: ['hljs-strong'],
   },
   {
+    name: 'Strong with content',
+    input: '*bold text here*',
+    expectClasses: ['hljs-strong'],
+  },
+  {
     name: 'Emphasis text',
     input: '_emphasis_',
+    expectClasses: ['hljs-emphasis'],
+  },
+  {
+    name: 'Emphasis with content',
+    input: '_italic text here_',
     expectClasses: ['hljs-emphasis'],
   },
 
@@ -60,8 +81,18 @@ const testCases = [
     expectClasses: ['hljs-code'],
   },
   {
+    name: 'Inline code with content',
+    input: '`console.log(x)`',
+    expectClasses: ['hljs-code'],
+  },
+  {
     name: 'Double backtick code',
     input: '`` `nested` ``',
+    expectClasses: ['hljs-code'],
+  },
+  {
+    name: 'Triple backtick code',
+    input: '``` ``double`` ```',
     expectClasses: ['hljs-code'],
   },
   {
@@ -70,8 +101,23 @@ const testCases = [
     expectClasses: ['hljs-keyword'],
   },
   {
+    name: 'Code fence start without language',
+    input: '```',
+    expectClasses: ['hljs-keyword'],
+  },
+  {
     name: 'Code fence with raw format',
     input: '``` =html',
+    expectClasses: ['hljs-keyword'],
+  },
+  {
+    name: 'Code fence with 4 backticks',
+    input: '````python',
+    expectClasses: ['hljs-keyword'],
+  },
+  {
+    name: 'Code fence end',
+    input: '```',
     expectClasses: ['hljs-keyword'],
   },
 
@@ -82,13 +128,38 @@ const testCases = [
     expectClasses: ['hljs-link'],
   },
   {
+    name: 'Inline link with title',
+    input: '[text](https://example.com "Title")',
+    expectClasses: ['hljs-link'],
+  },
+  {
+    name: 'Link with attributes',
+    input: '[text](url){.external}',
+    expectClasses: ['hljs-link'],
+  },
+  {
+    name: 'Empty link text',
+    input: '[](https://example.com)',
+    expectClasses: ['hljs-link'],
+  },
+  {
     name: 'Reference link',
     input: '[text][ref]',
     expectClasses: ['hljs-link'],
   },
   {
+    name: 'Shortcut reference link',
+    input: '[ref][]',
+    expectClasses: ['hljs-link'],
+  },
+  {
     name: 'Autolink URL',
     input: '<https://example.com>',
+    expectClasses: ['hljs-link'],
+  },
+  {
+    name: 'Autolink HTTP',
+    input: '<http://example.com>',
     expectClasses: ['hljs-link'],
   },
   {
@@ -103,26 +174,71 @@ const testCases = [
     input: '![alt](image.png)',
     expectClasses: ['hljs-link'],
   },
+  {
+    name: 'Image with title',
+    input: '![alt](image.png "Title")',
+    expectClasses: ['hljs-link'],
+  },
+  {
+    name: 'Image with attributes',
+    input: '![alt](image.png){width=100}',
+    expectClasses: ['hljs-link'],
+  },
+  {
+    name: 'Image empty alt',
+    input: '![](image.png)',
+    expectClasses: ['hljs-link'],
+  },
 
   // ==================== LISTS ====================
   {
-    name: 'Bullet list',
+    name: 'Bullet list with dash',
     input: '- item',
     expectClasses: ['hljs-bullet'],
   },
   {
-    name: 'Numbered list',
+    name: 'Bullet list with asterisk',
+    input: '* item',
+    expectClasses: ['hljs-bullet'],
+  },
+  {
+    name: 'Bullet list with plus',
+    input: '+ item',
+    expectClasses: ['hljs-bullet'],
+  },
+  {
+    name: 'Numbered list with dot',
     input: '1. item',
     expectClasses: ['hljs-bullet'],
   },
   {
-    name: 'Task list checked',
+    name: 'Numbered list with paren',
+    input: '1) item',
+    expectClasses: ['hljs-bullet'],
+  },
+  {
+    name: 'Numbered list double digit',
+    input: '10. item',
+    expectClasses: ['hljs-bullet'],
+  },
+  {
+    name: 'Task list checked lowercase',
     input: '- [x] done',
+    expectClasses: ['hljs-bullet'],
+  },
+  {
+    name: 'Task list checked uppercase',
+    input: '- [X] done',
     expectClasses: ['hljs-bullet'],
   },
   {
     name: 'Task list unchecked',
     input: '- [ ] todo',
+    expectClasses: ['hljs-bullet'],
+  },
+  {
+    name: 'Indented list item',
+    input: '  - nested',
     expectClasses: ['hljs-bullet'],
   },
 
@@ -132,11 +248,26 @@ const testCases = [
     input: '> quoted text',
     expectClasses: ['hljs-quote'],
   },
+  {
+    name: 'Blockquote marker only',
+    input: '>',
+    expectClasses: ['hljs-quote'],
+  },
 
   // ==================== DIVS ====================
   {
-    name: 'Div block start',
+    name: 'Div block start with class',
     input: '::: warning',
+    expectClasses: ['hljs-keyword'],
+  },
+  {
+    name: 'Div block start without class',
+    input: ':::',
+    expectClasses: ['hljs-keyword'],
+  },
+  {
+    name: 'Div block with 4 colons',
+    input: ':::: note',
     expectClasses: ['hljs-keyword'],
   },
   {
@@ -152,8 +283,28 @@ const testCases = [
     expectClasses: ['hljs-string'],
   },
   {
+    name: 'Table row with content',
+    input: '| Cell 1 | Cell 2 | Cell 3 |',
+    expectClasses: ['hljs-string'],
+  },
+  {
+    name: 'Table row with attributes',
+    input: '| A | B |{.highlight}',
+    expectClasses: ['hljs-string'],
+  },
+  {
     name: 'Table separator',
     input: '|---|---|',
+    expectClasses: ['hljs-meta'],
+  },
+  {
+    name: 'Table separator with alignment',
+    input: '|:--|:--:|--:|',
+    expectClasses: ['hljs-meta'],
+  },
+  {
+    name: 'Table separator with spaces',
+    input: '| --- | --- |',
     expectClasses: ['hljs-meta'],
   },
 
@@ -164,8 +315,18 @@ const testCases = [
     expectClasses: ['hljs-comment'],
   },
   {
+    name: 'Inline comment with content',
+    input: '{% this is a comment %}',
+    expectClasses: ['hljs-comment'],
+  },
+  {
     name: 'Fenced comment',
     input: '%%%',
+    expectClasses: ['hljs-comment'],
+  },
+  {
+    name: 'Fenced comment with 4 percent',
+    input: '%%%%',
     expectClasses: ['hljs-comment'],
   },
 
@@ -176,8 +337,18 @@ const testCases = [
     expectClasses: ['hljs-addition'],
   },
   {
+    name: 'Highlight with content',
+    input: '{=important text=}',
+    expectClasses: ['hljs-addition'],
+  },
+  {
     name: 'Insert',
     input: '{+inserted+}',
+    expectClasses: ['hljs-addition'],
+  },
+  {
+    name: 'Insert with content',
+    input: '{+new text here+}',
     expectClasses: ['hljs-addition'],
   },
   {
@@ -185,26 +356,41 @@ const testCases = [
     input: '{-deleted-}',
     expectClasses: ['hljs-deletion'],
   },
+  {
+    name: 'Delete with content',
+    input: '{-old text here-}',
+    expectClasses: ['hljs-deletion'],
+  },
 
   // ==================== SUPER/SUBSCRIPT ====================
   {
-    name: 'Superscript',
+    name: 'Superscript single char',
     input: '^2^',
     expectClasses: ['hljs-built_in'],
   },
   {
-    name: 'Subscript',
+    name: 'Superscript word',
+    input: '^super^',
+    expectClasses: ['hljs-built_in'],
+  },
+  {
+    name: 'Subscript single char',
     input: '~2~',
     expectClasses: ['hljs-built_in'],
   },
   {
+    name: 'Subscript word',
+    input: '~sub~',
+    expectClasses: ['hljs-built_in'],
+  },
+  {
     name: 'Braced superscript',
-    input: '{^super^}',
+    input: '{^super text^}',
     expectClasses: ['hljs-built_in'],
   },
   {
     name: 'Braced subscript',
-    input: '{~sub~}',
+    input: '{~sub text~}',
     expectClasses: ['hljs-built_in'],
   },
 
@@ -215,8 +401,18 @@ const testCases = [
     expectClasses: ['hljs-formula'],
   },
   {
+    name: 'Inline math with formula',
+    input: '$`E = mc^2`$',
+    expectClasses: ['hljs-formula'],
+  },
+  {
     name: 'Display math',
     input: '$$`x^2`$$',
+    expectClasses: ['hljs-formula'],
+  },
+  {
+    name: 'Display math multiline',
+    input: '$$`\\sum_{i=1}^n`$$',
     expectClasses: ['hljs-formula'],
   },
 
@@ -227,8 +423,18 @@ const testCases = [
     expectClasses: ['hljs-symbol'],
   },
   {
+    name: 'Reference definition with title',
+    input: '[ref]: https://example.com "Title"',
+    expectClasses: ['hljs-symbol'],
+  },
+  {
     name: 'Footnote reference',
     input: '[^1]',
+    expectClasses: ['hljs-symbol'],
+  },
+  {
+    name: 'Named footnote reference',
+    input: '[^note]',
     expectClasses: ['hljs-symbol'],
   },
   {
@@ -237,42 +443,117 @@ const testCases = [
     expectClasses: ['hljs-symbol'],
   },
   {
+    name: 'Named footnote definition',
+    input: '[^note]: footnote content',
+    expectClasses: ['hljs-symbol'],
+  },
+  {
     name: 'Abbreviation definition',
     input: '*[HTML]: Hyper Text Markup Language',
+    expectClasses: ['hljs-symbol'],
+  },
+  {
+    name: 'Abbreviation definition short',
+    input: '*[CSS]: Cascading Style Sheets',
     expectClasses: ['hljs-symbol'],
   },
 
   // ==================== ATTRIBUTES ====================
   {
-    name: 'Block attribute',
+    name: 'Block attribute class',
+    input: '{.class}',
+    expectClasses: ['hljs-attr'],
+  },
+  {
+    name: 'Block attribute id',
+    input: '{#id}',
+    expectClasses: ['hljs-attr'],
+  },
+  {
+    name: 'Block attribute combined',
     input: '{.class #id}',
     expectClasses: ['hljs-attr'],
   },
   {
-    name: 'Span with attributes',
+    name: 'Block attribute key-value',
+    input: '{key=value}',
+    expectClasses: ['hljs-attr'],
+  },
+  {
+    name: 'Block attribute complex',
+    input: '{.warning #alert role=alert}',
+    expectClasses: ['hljs-attr'],
+  },
+  {
+    name: 'Span with class',
     input: '[text]{.highlight}',
     expectClasses: ['hljs-string'],
   },
-
-  // ==================== MISC ====================
   {
-    name: 'Horizontal rule',
+    name: 'Span with id',
+    input: '[text]{#unique}',
+    expectClasses: ['hljs-string'],
+  },
+
+  // ==================== HORIZONTAL RULES ====================
+  {
+    name: 'Horizontal rule dashes',
     input: '---',
     expectClasses: ['hljs-meta'],
   },
   {
-    name: 'Symbol',
+    name: 'Horizontal rule asterisks',
+    input: '***',
+    expectClasses: ['hljs-meta'],
+  },
+  {
+    name: 'Horizontal rule underscores',
+    input: '___',
+    expectClasses: ['hljs-meta'],
+  },
+  {
+    name: 'Long horizontal rule',
+    input: '-----',
+    expectClasses: ['hljs-meta'],
+  },
+
+  // ==================== SYMBOLS ====================
+  {
+    name: 'Symbol heart',
     input: ':heart:',
     expectClasses: ['hljs-symbol'],
   },
+  {
+    name: 'Symbol arrow',
+    input: ':arrow_right:',
+    expectClasses: ['hljs-symbol'],
+  },
+  {
+    name: 'Symbol with numbers',
+    input: ':num123:',
+    expectClasses: ['hljs-symbol'],
+  },
+
+  // ==================== SMART PUNCTUATION ====================
   {
     name: 'Em dash',
     input: 'wait---what',
     expectClasses: ['hljs-punctuation'],
   },
   {
+    name: 'Em dash standalone',
+    input: '---',
+    // Note: matches horizontal rule at start of line, but em dash inline
+    expectClasses: ['hljs-meta'], // horizontal rule takes precedence
+  },
+  {
     name: 'En dash',
     input: '1--10',
+    expectClasses: ['hljs-punctuation'],
+  },
+  {
+    name: 'En dash in text',
+    input: 'pages 10--20',
     expectClasses: ['hljs-punctuation'],
   },
   {
@@ -281,34 +562,115 @@ const testCases = [
     expectClasses: ['hljs-punctuation'],
   },
   {
-    name: 'Escape',
-    input: '\\*escaped\\*',
+    name: 'Ellipsis in sentence',
+    input: 'and then... silence',
+    expectClasses: ['hljs-punctuation'],
+  },
+
+  // ==================== ESCAPES ====================
+  {
+    name: 'Escaped asterisk',
+    input: '\\*not bold\\*',
     expectClasses: ['hljs-symbol'],
   },
   {
-    name: 'Raw format marker',
+    name: 'Escaped bracket',
+    input: '\\[not a link\\]',
+    expectClasses: ['hljs-symbol'],
+  },
+  {
+    name: 'Escaped backslash',
+    input: '\\\\',
+    expectClasses: ['hljs-symbol'],
+  },
+  {
+    name: 'Escaped underscore',
+    input: '\\_not italic\\_',
+    expectClasses: ['hljs-symbol'],
+  },
+
+  // ==================== RAW FORMAT ====================
+  {
+    name: 'Raw format html',
     input: '{=html}',
     expectClasses: ['hljs-meta'],
   },
+  {
+    name: 'Raw format latex',
+    input: '{=latex}',
+    expectClasses: ['hljs-meta'],
+  },
+
+  // ==================== CAPTIONS ====================
   {
     name: 'Caption',
     input: '^ Caption text',
     expectClasses: ['hljs-title'],
   },
   {
-    name: 'Definition term',
-    input: ': definition',
+    name: 'Caption with formatting',
+    input: '^ Figure 1: Description',
     expectClasses: ['hljs-title'],
   },
+
+  // ==================== DEFINITION LISTS ====================
+  {
+    name: 'Definition term',
+    input: ': definition text',
+    expectClasses: ['hljs-title'],
+  },
+  {
+    name: 'Definition with content',
+    input: ': This is the definition',
+    expectClasses: ['hljs-title'],
+  },
+
+  // ==================== LINE BLOCKS ====================
   {
     name: 'Line block',
     input: '| poetry line',
     expectClasses: ['hljs-string'],
   },
   {
-    name: 'Frontmatter',
+    name: 'Line block with content',
+    input: '| Roses are red',
+    expectClasses: ['hljs-string'],
+  },
+
+  // ==================== FRONTMATTER ====================
+  {
+    name: 'Frontmatter delimiter',
     input: '---',
     expectClasses: ['hljs-meta'],
+  },
+
+  // ==================== HARD LINE BREAK ====================
+  {
+    name: 'Hard line break',
+    input: 'text\\',
+    expectClasses: ['hljs-meta'],
+  },
+
+  // ==================== EDGE CASES ====================
+  {
+    name: 'Multiple inline elements',
+    input: '*bold* and _italic_',
+    expectClasses: ['hljs-strong', 'hljs-emphasis'],
+  },
+  {
+    name: 'Link in text',
+    input: 'See [this link](url) for more',
+    expectClasses: ['hljs-link'],
+  },
+  {
+    name: 'Code in text',
+    input: 'Use `code` here',
+    expectClasses: ['hljs-code'],
+  },
+  {
+    name: 'Multiple symbols',
+    input: ':heart: and :star:',
+    expectClasses: ['hljs-symbol'],
   },
 ];
 
