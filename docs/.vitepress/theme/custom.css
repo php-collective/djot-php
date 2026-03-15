@@ -225,10 +225,17 @@
 .djot-playground .preview .hljs-title,
 .djot-playground .preview .hljs-section,
 .djot-playground .preview .hljs-doctag,
-.djot-playground .preview .hljs-name,
-.djot-playground .preview .hljs-strong {
+.djot-playground .preview .hljs-name {
   color: var(--vp-c-brand-1);
   font-weight: 600;
+}
+
+.djot-playground .preview .hljs-strong {
+  font-weight: 700;
+}
+
+.djot-playground .preview .hljs-emphasis {
+  font-style: italic;
 }
 
 .djot-playground .preview .hljs-string,
