@@ -2244,7 +2244,7 @@ function extractSocialMeta(Document $document): array
         }
 
         // Stop once we have everything
-        if ($meta['title'] && $meta['description'] && $meta['image']) {
+        if ($meta['title'] !== null && $meta['description'] !== null && $meta['image'] !== null) {
             break;
         }
     }
@@ -2297,23 +2297,26 @@ Generate Open Graph and Twitter Card markup:
 function generateMetaTags(array $meta, string $url, string $siteName = ''): string
 {
     $tags = [];
+    $title = $meta['title'] ?? null;
+    $description = $meta['description'] ?? null;
+    $image = $meta['image'] ?? null;
 
     // Open Graph
-    if ($meta['title']) {
-        $title = htmlspecialchars($meta['title'], ENT_QUOTES, 'UTF-8');
+    if ($title) {
+        $title = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
         $tags[] = "<meta property=\"og:title\" content=\"{$title}\">";
         $tags[] = "<meta name=\"twitter:title\" content=\"{$title}\">";
     }
 
-    if ($meta['description']) {
-        $desc = htmlspecialchars($meta['description'], ENT_QUOTES, 'UTF-8');
+    if ($description) {
+        $desc = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
         $tags[] = "<meta property=\"og:description\" content=\"{$desc}\">";
         $tags[] = "<meta name=\"twitter:description\" content=\"{$desc}\">";
         $tags[] = "<meta name=\"description\" content=\"{$desc}\">";
     }
 
-    if ($meta['image']) {
-        $image = htmlspecialchars($meta['image'], ENT_QUOTES, 'UTF-8');
+    if ($image) {
+        $image = htmlspecialchars($image, ENT_QUOTES, 'UTF-8');
         $tags[] = "<meta property=\"og:image\" content=\"{$image}\">";
         $tags[] = "<meta name=\"twitter:image\" content=\"{$image}\">";
         $tags[] = "<meta name=\"twitter:card\" content=\"summary_large_image\">";
@@ -2355,39 +2358,33 @@ Output:
 
 ### Custom Extraction Rules
 
-Override extraction for specific needs:
+Override the basic extraction with explicit div attributes:
 
 ```php
 use Djot\Node\Block\Div;
 use Djot\Node\Document;
 
-function extractSocialMeta(Document $document, array $defaults = []): array
+function extractSocialMetaWithOverrides(Document $document): array
 {
-    $meta = array_merge([
-        'title' => null,
-        'description' => null,
-        'image' => null,
-    ], $defaults);
+    // Start with basic content extraction
+    $meta = extractSocialMeta($document);
 
-    // Check for explicit attributes on the first div
+    // Override with explicit div attributes if present
     foreach ($document->getChildren() as $node) {
         if ($node instanceof Div) {
-            // Use div attributes as metadata: ::: {og-title="Custom Title"}
-            if ($ogTitle = $node->getAttribute('og-title')) {
+            // Use div attributes: ::: {og-title="Custom Title"}
+            if (($ogTitle = $node->getAttribute('og-title')) !== null) {
                 $meta['title'] = $ogTitle;
             }
-            if ($ogDesc = $node->getAttribute('og-description')) {
+            if (($ogDesc = $node->getAttribute('og-description')) !== null) {
                 $meta['description'] = $ogDesc;
             }
-            if ($ogImage = $node->getAttribute('og-image')) {
+            if (($ogImage = $node->getAttribute('og-image')) !== null) {
                 $meta['image'] = $ogImage;
             }
             break;
         }
     }
-
-    // Fall back to content extraction...
-    // (same logic as basic extraction)
 
     return $meta;
 }
@@ -2421,14 +2418,14 @@ echo generateMetaTags($meta, $currentUrl, 'My Site');
 
 ### Framework Integration
 
-Example with a simple controller pattern:
+Example controller pattern (adapt `loadArticle()`, `render()`, and `Response` to your framework):
 
 ```php
 class ArticleController
 {
-    public function show(string $slug): Response
+    public function show(string $slug)
     {
-        $djot = $this->loadArticle($slug);
+        $djot = $this->loadArticle($slug); // Your article loading logic
 
         $converter = new DjotConverter();
         $document = $converter->parse($djot);
