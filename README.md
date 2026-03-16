@@ -133,3 +133,4 @@ See [Safe Mode](https://php-collective.github.io/djot-php/guide/safe-mode) for d
 - [Djot](https://djot.net/) - Official Djot website with syntax reference and playground
 - [jgm/djot](https://github.com/jgm/djot) - Reference implementation in JavaScript by John MacFarlane
 - [JetBrains IDE support](https://github.com/php-collective/djot-intellij) - Plugin for PhpStorm, IntelliJ IDEA, WebStorm, etc.
+- [djot-grammars](https://github.com/php-collective/djot-grammars) - Syntax highlighting grammars (TextMate, highlight.js, Prism.js)

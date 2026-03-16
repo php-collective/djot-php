@@ -2,12 +2,13 @@
   "name": "djot-php-docs",
   "type": "module",
   "scripts": {
-    "postinstall": "mkdir -p .vitepress/grammars && curl -fsSL -o .vitepress/grammars/djot.tmLanguage.json https://raw.githubusercontent.com/php-collective/djot-intellij/main/src/main/resources/textmate/djot.tmLanguage.json",
+    "postinstall": "mkdir -p .vitepress/grammars && cp node_modules/djot-grammars/textmate/djot.tmLanguage.json .vitepress/grammars/",
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
     "docs:preview": "vitepress preview"
   },
   "devDependencies": {
+    "djot-grammars": "^1.0.0",
     "highlight.js": "^11.11.1",
     "vitepress": "^1.6.3",
     "vue": "^3.5.13"
