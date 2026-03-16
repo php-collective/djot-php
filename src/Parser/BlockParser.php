@@ -667,10 +667,12 @@ class BlockParser
             }
 
             // Try to match block elements in order of precedence
+            // Line comment (%%) must come before fenced comment (%%%)
             // Fenced comment must come before thematic break (%%% vs ---)
             // Comment and raw block must come before code block since ``` =format is a special case
             // Caption must come before paragraph to catch `^ caption text`
-            $consumed = $this->tryParseFencedComment($parent, $lines, $i)
+            $consumed = $this->tryParseLineComment($lines, $i)
+                ?? $this->tryParseFencedComment($parent, $lines, $i)
                 ?? $this->tryParseComment($parent, $lines, $i)
                 ?? $this->tryParseRawBlock($parent, $lines, $i)
                 ?? $this->tryParseCodeBlock($parent, $lines, $i)
@@ -887,6 +889,34 @@ class BlockParser
         $parent->appendChild($codeBlock);
 
         return $i - $start;
+    }
+
+    /**
+     * Try to parse a line comment (%% to end of line)
+     *
+     * A line starting with %% (after optional whitespace) is a full-line comment.
+     * It is completely ignored without creating any nodes.
+     *
+     * @param array<string> $lines
+     * @param int $start
+     */
+    protected function tryParseLineComment(array $lines, int $start): ?int
+    {
+        $line = $lines[$start];
+        $trimmed = ltrim($line);
+
+        // Check if line starts with %%
+        if (!str_starts_with($trimmed, '%%')) {
+            return null;
+        }
+
+        // Make sure it's not %%% (fenced comment opener)
+        if (str_starts_with($trimmed, '%%%')) {
+            return null;
+        }
+
+        // Line comment - consume the line without creating any node
+        return 1;
     }
 
     /**

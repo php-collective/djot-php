@@ -180,6 +180,8 @@ class InlineParser
     {
         $this->delimiterStack = [];
         $this->currentLine = $sourceLine;
+        // Strip line comments (%% to end of line) before parsing
+        $text = $this->removeLineComments($text);
         $this->parseInlines($parent, $text);
     }
 
@@ -1719,6 +1721,31 @@ class InlineParser
         }
 
         return $result ?? $attrStr;
+    }
+
+    /**
+     * Remove line comments from text: %% to end of line
+     *
+     * Line comments start with %% and extend to the end of the line.
+     * They are stripped before inline parsing.
+     */
+    protected function removeLineComments(string $text): string
+    {
+        // Process line by line to strip %% to end of line
+        $lines = explode("\n", $text);
+        $result = [];
+
+        foreach ($lines as $line) {
+            // Find %% that's not inside verbatim/code spans
+            // Simple approach: just strip %% to end of line
+            $commentPos = strpos($line, '%%');
+            if ($commentPos !== false) {
+                $line = rtrim(substr($line, 0, $commentPos));
+            }
+            $result[] = $line;
+        }
+
+        return implode("\n", $result);
     }
 
     /**
