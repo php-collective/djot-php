@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick } from 'vue'
 import hljs from 'highlight.js'
-import hljsDjot from '../hljs-djot'
+import hljsDjot from 'djot-grammars/highlightjs/djot.js'
 
 // Register Djot language for syntax highlighting
 if (!hljs.getLanguage('djot')) {

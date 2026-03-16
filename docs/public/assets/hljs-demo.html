@@ -45,7 +45,8 @@
     <h1>Djot Syntax Highlighting Demo</h1>
     <p class="note">
         This page demonstrates the highlight.js language definition for Djot markup.
-        <br>Include <code>hljs-djot.js</code> after highlight.js to enable Djot highlighting.
+        <br>The grammar is provided by <a href="https://github.com/php-collective/djot-grammars">djot-grammars</a>.
+        <br>Run <code>npm install djot-grammars</code> and include the grammar after highlight.js.
     </p>
 
     <h2>Headings &amp; Paragraphs</h2>
@@ -226,7 +227,7 @@ Em-dash: wait---what?
 Ellipsis...</code></pre>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <script src="hljs-djot.js"></script>
+    <script src="../../node_modules/djot-grammars/highlightjs/djot.js"></script>
     <script>
         hljs.highlightAll();
     </script>

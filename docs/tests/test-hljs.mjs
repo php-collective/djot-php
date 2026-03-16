@@ -1,28 +1,12 @@
 /**
  * Tests for Djot highlight.js grammar
  *
- * Tests that the hljs-djot.js grammar correctly highlights Djot syntax.
+ * Tests that the djot-grammars highlight.js grammar correctly highlights Djot syntax.
  * Covers all patterns defined in the grammar plus edge cases.
  */
 
 import hljs from 'highlight.js';
-import { readFileSync } from 'fs';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// Load and register the Djot grammar
-const grammarPath = resolve(__dirname, '../public/assets/hljs-djot.js');
-const grammarCode = readFileSync(grammarPath, 'utf-8');
-
-// Execute the grammar code to get the language definition
-const djotGrammar = eval(`
-  (function() {
-    ${grammarCode.replace('(function() {', '').replace(/\}\)\(\);?\s*$/, '')}
-    return djot;
-  })()
-`);
+import djotGrammar from 'djot-grammars/highlightjs/djot.js';
 
 hljs.registerLanguage('djot', djotGrammar);
 

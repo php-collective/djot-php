@@ -251,7 +251,7 @@ $converter->on('render.code_block', function (RenderEvent $event): void {
 
 ## Djot Language Grammars
 
-This project provides syntax highlighting grammars for Djot source code itself, useful for documentation and editors.
+The [djot-grammars](https://github.com/php-collective/djot-grammars) repository provides syntax highlighting grammars for Djot source code, useful for documentation and editors.
 
 ### TextMate Grammar (Shiki/VS Code)
 
@@ -260,22 +260,24 @@ The `djot.tmLanguage.json` grammar works with:
 - **VS Code** — Editor syntax highlighting
 - **TextMate** — And compatible editors
 
-The canonical source is the [djot-intellij](https://github.com/php-collective/djot-intellij) repository:
+The canonical source is the [djot-grammars](https://github.com/php-collective/djot-grammars) repository:
 
-<https://github.com/php-collective/djot-intellij/blob/main/src/main/resources/textmate/djot.tmLanguage.json>
+<https://github.com/php-collective/djot-grammars/blob/master/textmate/djot.tmLanguage.json>
 
 This grammar is used by:
-- **IntelliJ/PhpStorm** — Via the [Djot plugin](https://plugins.jetbrains.com/plugin/18828-djot)
+- **IntelliJ/PhpStorm** — Via the [Djot plugin](https://plugins.jetbrains.com/plugin/29244-djot)
 - **VS Code** — Via TextMate grammar support
-- **VitePress/Shiki** — Fetched dynamically during `npm install`
+- **VitePress/Shiki** — Via npm package
 
 ### highlight.js Grammar
 
-The `hljs-djot.js` grammar provides Djot highlighting for highlight.js.
+The `djot.js` grammar provides Djot highlighting for highlight.js.
 
-The canonical source is in this repository:
+Install via npm:
 
-<https://github.com/php-collective/djot-php/blob/master/docs/public/assets/hljs-djot.js>
+```bash
+npm install djot-grammars
+```
 
 #### Usage
 
@@ -285,7 +287,7 @@ The canonical source is in this repository:
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
 <!-- Load the Djot language definition -->
-<script src="path/to/hljs-djot.js"></script>
+<script src="node_modules/djot-grammars/highlightjs/djot.js"></script>
 
 <!-- Initialize -->
 <script>hljs.highlightAll();</script>
