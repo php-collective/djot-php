@@ -7,7 +7,7 @@
     "test": "node test-hljs.mjs"
   },
   "devDependencies": {
-    "djot-grammars": "^1.0.0",
+    "djot-grammars": "github:php-collective/djot-grammars",
     "highlight.js": "^11.9.0"
   }
 }

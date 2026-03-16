@@ -8,7 +8,7 @@
     "docs:preview": "vitepress preview"
   },
   "devDependencies": {
-    "djot-grammars": "^1.0.0",
+    "djot-grammars": "github:php-collective/djot-grammars",
     "highlight.js": "^11.11.1",
     "vitepress": "^1.6.3",
     "vue": "^3.5.13"
