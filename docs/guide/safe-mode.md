@@ -39,6 +39,8 @@ $html = $converter->convert($userInput);
 | Event handlers (`onclick`, etc.) | Allowed | Stripped |
 | Raw HTML blocks | Allowed | Escaped |
 
+Safe mode also normalizes URL schemes by stripping ASCII control characters and whitespace before comparison, preventing bypass attempts like `java\tscript:` or `java\x0bscript:`.
+
 ## Strict Mode
 
 For maximum protection, use strict mode:
