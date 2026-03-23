@@ -1712,25 +1712,226 @@ class InlineParser
      * Remove line comments from text: %% to end of line
      *
      * Line comments start with %% and extend to the end of the line.
-     * They are stripped before inline parsing.
+     * They are stripped before inline parsing, but only when not inside:
+     * - Code spans (backticks)
+     * - Quoted strings (in attributes or link titles)
+     * - Link/image destinations
      */
     protected function removeLineComments(string $text): string
     {
-        // Process line by line to strip %% to end of line
         $lines = explode("\n", $text);
         $result = [];
 
         foreach ($lines as $line) {
-            // Find %% that's not inside verbatim/code spans
-            // Simple approach: just strip %% to end of line
-            $commentPos = strpos($line, '%%');
-            if ($commentPos !== false) {
-                $line = rtrim(substr($line, 0, $commentPos));
-            }
-            $result[] = $line;
+            $result[] = $this->stripLineComment($line);
         }
 
         return implode("\n", $result);
+    }
+
+    /**
+     * Strip %% comment from a single line, respecting context
+     */
+    protected function stripLineComment(string $line): string
+    {
+        $length = strlen($line);
+        $pos = 0;
+
+        while ($pos < $length - 1) {
+            $char = $line[$pos];
+            $nextChar = $line[$pos + 1];
+
+            // Check for escape sequence
+            if ($char === '\\' && $pos + 1 < $length) {
+                $pos += 2; // Skip escaped character
+                continue;
+            }
+
+            // Check for %% (line comment) - but not %%%
+            if ($char === '%' && $nextChar === '%') {
+                // Make sure it's not %%% (fenced comment marker)
+                if ($pos + 2 < $length && $line[$pos + 2] === '%') {
+                    $pos++;
+                    continue;
+                }
+                // Found line comment - strip rest of line
+                return rtrim(substr($line, 0, $pos));
+            }
+
+            // Skip backtick spans (code)
+            if ($char === '`') {
+                $pos = $this->skipBacktickSpan($line, $pos, $length);
+                continue;
+            }
+
+            // Skip dollar signs (math) - $...$ or $$...$$
+            if ($char === '$') {
+                $pos = $this->skipMathSpan($line, $pos, $length);
+                continue;
+            }
+
+            // Skip parenthesized content (link destinations/titles)
+            if ($char === '(') {
+                $pos = $this->skipParenthesized($line, $pos, $length);
+                continue;
+            }
+
+            // Skip curly braces (attributes) - handle quoted values inside
+            if ($char === '{') {
+                $pos = $this->skipAttributeBlock($line, $pos, $length);
+                continue;
+            }
+
+            $pos++;
+        }
+
+        return $line;
+    }
+
+    /**
+     * Skip a backtick span (code), returning position after closing backticks
+     */
+    protected function skipBacktickSpan(string $line, int $start, int $length): int
+    {
+        // Count opening backticks
+        $backtickCount = 0;
+        $pos = $start;
+        while ($pos < $length && $line[$pos] === '`') {
+            $backtickCount++;
+            $pos++;
+        }
+
+        // Find matching closing backticks
+        while ($pos <= $length - $backtickCount) {
+            if (substr($line, $pos, $backtickCount) === str_repeat('`', $backtickCount)) {
+                // Check it's exactly this many backticks (not more)
+                $afterBackticks = $pos + $backtickCount;
+                if ($afterBackticks >= $length || $line[$afterBackticks] !== '`') {
+                    return $afterBackticks;
+                }
+            }
+            $pos++;
+        }
+
+        // No closing found, return end
+        return $length;
+    }
+
+    /**
+     * Skip a math span ($...$ or $$...$$), returning position after closing
+     */
+    protected function skipMathSpan(string $line, int $start, int $length): int
+    {
+        $pos = $start;
+        $isDisplay = ($pos + 1 < $length && $line[$pos + 1] === '$');
+        $delimiter = $isDisplay ? '$$' : '$';
+        $delimLen = strlen($delimiter);
+
+        $pos += $delimLen; // Skip opening delimiter
+
+        // Find closing delimiter
+        while ($pos <= $length - $delimLen) {
+            if ($line[$pos] === '\\' && $pos + 1 < $length) {
+                $pos += 2; // Skip escaped character
+                continue;
+            }
+            if (substr($line, $pos, $delimLen) === $delimiter) {
+                return $pos + $delimLen;
+            }
+            $pos++;
+        }
+
+        return $length;
+    }
+
+    /**
+     * Skip parenthesized content (link destination/title), returning position after )
+     */
+    protected function skipParenthesized(string $line, int $start, int $length): int
+    {
+        $pos = $start + 1; // Skip opening (
+        $depth = 1;
+
+        while ($pos < $length && $depth > 0) {
+            $char = $line[$pos];
+
+            if ($char === '\\' && $pos + 1 < $length) {
+                $pos += 2; // Skip escaped character
+                continue;
+            }
+
+            // Handle quoted strings inside parentheses (link titles)
+            if ($char === '"' || $char === "'") {
+                $pos = $this->skipQuotedString($line, $pos, $length, $char);
+                continue;
+            }
+
+            if ($char === '(') {
+                $depth++;
+            } elseif ($char === ')') {
+                $depth--;
+            }
+            $pos++;
+        }
+
+        return $pos;
+    }
+
+    /**
+     * Skip an attribute block {...}, returning position after }
+     */
+    protected function skipAttributeBlock(string $line, int $start, int $length): int
+    {
+        $pos = $start + 1; // Skip opening {
+        $depth = 1;
+
+        while ($pos < $length && $depth > 0) {
+            $char = $line[$pos];
+
+            if ($char === '\\' && $pos + 1 < $length) {
+                $pos += 2; // Skip escaped character
+                continue;
+            }
+
+            // Handle quoted attribute values
+            if ($char === '"' || $char === "'") {
+                $pos = $this->skipQuotedString($line, $pos, $length, $char);
+                continue;
+            }
+
+            if ($char === '{') {
+                $depth++;
+            } elseif ($char === '}') {
+                $depth--;
+            }
+            $pos++;
+        }
+
+        return $pos;
+    }
+
+    /**
+     * Skip a quoted string, returning position after closing quote
+     */
+    protected function skipQuotedString(string $line, int $start, int $length, string $quote): int
+    {
+        $pos = $start + 1; // Skip opening quote
+
+        while ($pos < $length) {
+            $char = $line[$pos];
+
+            if ($char === '\\' && $pos + 1 < $length) {
+                $pos += 2; // Skip escaped character
+                continue;
+            }
+
+            if ($char === $quote) {
+                return $pos + 1;
+            }
+            $pos++;
+        }
+
+        return $length;
     }
 
     /**

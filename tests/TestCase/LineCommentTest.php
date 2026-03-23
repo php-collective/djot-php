@@ -100,4 +100,97 @@ class LineCommentTest extends TestCase
         $this->assertStringContainsString('<h1>Heading</h1>', $result);
         $this->assertStringNotContainsString('comment', $result);
     }
+
+    /**
+     * %% inside code spans should NOT be treated as a comment
+     */
+    public function testPercentInCodeSpanPreserved(): void
+    {
+        $djot = '`code %% not a comment`';
+        $expected = "<p><code>code %% not a comment</code></p>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    public function testPercentInCodeSpanMidText(): void
+    {
+        $djot = 'Before `a %% b` after';
+        $expected = "<p>Before <code>a %% b</code> after</p>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    /**
+     * %% inside quoted attribute values should NOT be treated as a comment
+     */
+    public function testPercentInQuotedAttributePreserved(): void
+    {
+        $djot = '[text]{title="%% not a comment"}';
+        $expected = "<p><span title=\"%% not a comment\">text</span></p>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    public function testPercentInSingleQuotedAttributePreserved(): void
+    {
+        $djot = "[text]{title='%% test'}";
+        $expected = "<p><span title=\"%% test\">text</span></p>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    /**
+     * %% inside link URLs should NOT be treated as a comment
+     */
+    public function testPercentInLinkUrlPreserved(): void
+    {
+        $djot = '[link](url%%test)';
+        $expected = "<p><a href=\"url%%test\">link</a></p>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    /**
+     * Escaped %% should NOT be treated as a comment
+     */
+    public function testEscapedPercentNotComment(): void
+    {
+        $djot = 'Text \\%\\% not a comment';
+        $expected = "<p>Text %% not a comment</p>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    /**
+     * %% inside inline math should NOT be treated as a comment
+     */
+    public function testPercentInMathPreserved(): void
+    {
+        $djot = '$x %% y$';
+        $result = $this->converter->convert($djot);
+        // Math content should be preserved (whether parsed as math or not)
+        $this->assertStringContainsString('%%', $result);
+    }
+
+    /**
+     * Line comment should work with both {% %} and %%
+     */
+    public function testMixedCommentSyntax(): void
+    {
+        $djot = 'Text {% inline comment %} more %% line comment';
+        $expected = "<p>Text  more</p>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    /**
+     * %% should strip first occurrence to end of line
+     */
+    public function testMultiplePercentOnLine(): void
+    {
+        $djot = 'a %% b %% c';
+        $expected = "<p>a</p>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
 }
