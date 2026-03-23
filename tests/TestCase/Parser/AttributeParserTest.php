@@ -284,4 +284,65 @@ class AttributeParserTest extends TestCase
         $this->assertStringNotContainsString('invalid=', $result);
         $this->assertLessThan($dataPos, $classPos, 'class should appear before data-x');
     }
+
+    /**
+     * Tests for comment handling in attributes.
+     *
+     * Djot supports two comment styles in attributes:
+     * - Inline: % comment % (removed entirely)
+     * - Trailing: % to end of string (removed)
+     */
+    public function testInlineCommentIsRemoved(): void
+    {
+        $result = AttributeParser::parse('.class % this is a comment %');
+
+        $this->assertSame('class', $result['class']);
+        $this->assertArrayNotHasKey('this', $result);
+        $this->assertArrayNotHasKey('is', $result);
+        $this->assertArrayNotHasKey('a', $result);
+        $this->assertArrayNotHasKey('comment', $result);
+    }
+
+    public function testTrailingCommentIsRemoved(): void
+    {
+        $result = AttributeParser::parse('.class % trailing comment');
+
+        $this->assertSame('class', $result['class']);
+        $this->assertArrayNotHasKey('trailing', $result);
+        $this->assertArrayNotHasKey('comment', $result);
+    }
+
+    public function testInlineCommentBetweenAttributes(): void
+    {
+        $result = AttributeParser::parse('.foo % inline comment % .bar');
+
+        $this->assertSame('foo bar', $result['class']);
+        $this->assertArrayNotHasKey('inline', $result);
+        $this->assertArrayNotHasKey('comment', $result);
+    }
+
+    public function testCommentOnlyAttributeBlock(): void
+    {
+        $result = AttributeParser::parse('% just a comment %');
+
+        $this->assertEmpty($result);
+    }
+
+    public function testCommentWithKeyValue(): void
+    {
+        $result = AttributeParser::parse('key=val % comment % .class');
+
+        $this->assertSame('val', $result['key']);
+        $this->assertSame('class', $result['class']);
+        $this->assertArrayNotHasKey('comment', $result);
+    }
+
+    public function testCommentInConvertedOutput(): void
+    {
+        $result = $this->converter->convert('[text]{.class % this is a comment %}');
+
+        $this->assertStringContainsString('class="class"', $result);
+        $this->assertStringNotContainsString('this', $result);
+        $this->assertStringNotContainsString('comment', $result);
+    }
 }
