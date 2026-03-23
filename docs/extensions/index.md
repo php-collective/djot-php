@@ -40,6 +40,8 @@ Extensions are applied in registration order. Generally, order doesn't matter, b
 - **AutolinkExtension** should be registered before **ExternalLinksExtension** if you want auto-linked URLs to also get external link attributes
 - **TableOfContentsExtension** should be registered before **HeadingPermalinksExtension** if you want clean heading text in the TOC (without permalink symbols)
 
+Extensions are reset per render, so reusing the same `DjotConverter` across multiple `convert()` calls will not carry per-document extension state such as collected TOC entries into the next output.
+
 ## ExternalLinksExtension
 
 Adds `target="_blank"` and `rel="noopener noreferrer"` to external links (http/https URLs).

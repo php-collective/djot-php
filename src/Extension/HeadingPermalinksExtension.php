@@ -107,6 +107,10 @@ class HeadingPermalinksExtension implements ExtensionInterface
                 return;
             }
 
+            if ($this->hasPermalink($node, $id)) {
+                return;
+            }
+
             // Set it explicitly so the renderer uses this ID, not one generated
             // from the modified heading content (which would include the permalink symbol)
             if (!$node->hasAttribute('id')) {
@@ -141,5 +145,27 @@ class HeadingPermalinksExtension implements ExtensionInterface
                 $node->appendChild($span);
             }
         });
+    }
+
+    protected function hasPermalink(Heading $node, string $id): bool
+    {
+        foreach ($node->getChildren() as $child) {
+            if (!$child instanceof Span) {
+                continue;
+            }
+
+            $classes = preg_split('/\s+/', trim((string)$child->getAttribute('class')));
+            if (!is_array($classes) || !in_array('permalink-wrapper', $classes, true)) {
+                continue;
+            }
+
+            foreach ($child->getChildren() as $grandChild) {
+                if ($grandChild instanceof Link && $grandChild->getDestination() === '#' . $id) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

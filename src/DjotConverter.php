@@ -233,6 +233,12 @@ class DjotConverter
      */
     public function render(Document $document): string
     {
+        foreach ($this->extensions as $extension) {
+            if (method_exists($extension, 'clear')) {
+                $extension->clear();
+            }
+        }
+
         return $this->renderer->render($document);
     }
 

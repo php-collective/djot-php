@@ -99,6 +99,8 @@ public function render(Document $document): string
 
 Renders an AST Document to HTML.
 
+Registered extensions are reset before each render, so repeated `convert()` calls on the same converter start with fresh per-document extension state.
+
 #### getParser
 
 ```php

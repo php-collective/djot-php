@@ -285,11 +285,11 @@ DJOT;
         $converter->convert("# First Doc\n\n## Section A");
         $this->assertCount(2, $tocExtension->getToc());
 
-        // Second conversion - TOC accumulates without clear()
+        // Second conversion starts fresh for the new document
         $converter->convert('# Second Doc');
-        $this->assertCount(3, $tocExtension->getToc());
+        $this->assertCount(1, $tocExtension->getToc());
 
-        // After clear(), start fresh
+        // Manual clear still works as before
         $tocExtension->clear();
         $converter->convert('# Third Doc');
         $this->assertCount(1, $tocExtension->getToc());

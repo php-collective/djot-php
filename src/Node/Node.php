@@ -179,12 +179,21 @@ abstract class Node
      */
     public function addClass(string $class): void
     {
-        $classes = $this->getAttribute('class') ?? '';
-        if ($classes !== '') {
-            $classes .= ' ';
+        $class = trim($class);
+        if ($class === '') {
+            return;
         }
-        $classes .= $class;
-        $this->setAttribute('class', $classes);
+
+        $classes = (string)($this->getAttribute('class') ?? '');
+        $classList = $classes !== '' ? preg_split('/\s+/', trim($classes)) : [];
+        $classList = is_array($classList) ? $classList : [];
+
+        if (in_array($class, $classList, true)) {
+            return;
+        }
+
+        $classList[] = $class;
+        $this->setAttribute('class', implode(' ', $classList));
     }
 
     abstract public function getType(): string;

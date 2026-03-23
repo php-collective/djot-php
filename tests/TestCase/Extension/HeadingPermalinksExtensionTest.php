@@ -220,4 +220,18 @@ class HeadingPermalinksExtensionTest extends TestCase
         $this->assertStringContainsString('permalink-hover', $html);
         $this->assertStringContainsString('data-permalink-copy=""', $html);
     }
+
+    public function testRepeatedRenderDoesNotDuplicatePermalinks(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingPermalinksExtension());
+
+        $document = $converter->parse('# Hello World');
+
+        $first = $converter->render($document);
+        $second = $converter->render($document);
+
+        $this->assertSame(1, substr_count($first, 'class="permalink"'));
+        $this->assertSame(1, substr_count($second, 'class="permalink"'));
+    }
 }
