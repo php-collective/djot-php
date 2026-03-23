@@ -188,6 +188,25 @@ class SafeModeTest extends TestCase
         $this->assertStringNotContainsString('script', $result);
     }
 
+    public function testStyleAttributeIsBlockedInStrictMode(): void
+    {
+        $converter = new DjotConverter(safeMode: SafeMode::strict());
+        $djot = '[text]{style="background:expression(alert(1))"}';
+        $result = $converter->convert($djot);
+
+        $this->assertStringNotContainsString('style', $result);
+        $this->assertStringNotContainsString('expression', $result);
+    }
+
+    public function testStyleAttributeAllowedInDefaultSafeMode(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = '[text]{style="color:red"}';
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('style="color:red"', $result);
+    }
+
     public function testRawHtmlAllowedWhenConfigured(): void
     {
         $safeMode = SafeMode::defaults()->setRawHtmlMode(SafeMode::RAW_HTML_ALLOW);

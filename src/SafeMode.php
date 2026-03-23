@@ -80,11 +80,13 @@ class SafeMode
     }
 
     /**
-     * Create a strict safe mode (strips raw HTML completely)
+     * Create a strict safe mode (strips raw HTML and blocks style attribute)
      */
     public static function strict(): self
     {
-        return (new self())->setRawHtmlMode(self::RAW_HTML_STRIP);
+        return (new self())
+            ->setRawHtmlMode(self::RAW_HTML_STRIP)
+            ->setBlockedAttributes(['srcdoc', 'formaction', 'style']);
     }
 
     /**
