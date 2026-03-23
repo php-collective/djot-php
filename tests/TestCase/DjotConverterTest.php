@@ -83,6 +83,14 @@ class DjotConverterTest extends TestCase
         $this->assertSame($expected, $this->converter->convert($djot));
     }
 
+    public function testCodeBlockLanguageEscapesQuotesInAttributeContext(): void
+    {
+        $djot = "``` php\" onclick=\"alert(1)\necho 1;\n```";
+        $expected = "<pre><code class=\"language-php&quot; onclick=&quot;alert(1)\">echo 1;\n</code></pre>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
     public function testCodeBlockWithoutLanguage(): void
     {
         $djot = "```\nplain code\n```";
@@ -159,6 +167,14 @@ class DjotConverterTest extends TestCase
         $this->assertStringContainsString('checked=""', $result);
         $this->assertStringContainsString('Unchecked', $result);
         $this->assertStringContainsString('Checked', $result);
+    }
+
+    public function testTaskListMergesExistingClasses(): void
+    {
+        $djot = "{.outer}\n- [ ] Task";
+        $expected = "<ul class=\"outer task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\nTask\n</li>\n</ul>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
     }
 
     public function testTaskListUnderscoreNotation(): void
@@ -1244,6 +1260,14 @@ DJOT;
         $this->assertStringContainsString('Line one', $result);
         $this->assertStringContainsString('Line two', $result);
         $this->assertStringContainsString('<br>', $result);
+    }
+
+    public function testLineBlockMergesExistingClasses(): void
+    {
+        $djot = "{.mine}\n| Line one\n| Line two";
+        $expected = "<div class=\"mine line-block\">\n<p>Line one<br>\nLine two</p>\n</div>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
     }
 
     public function testLineBlockWithFormatting(): void
