@@ -6,7 +6,11 @@ namespace Djot\Test\TestCase\Renderer;
 
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Heading;
+use Djot\Node\Block\LineBlock;
 use Djot\Node\Block\Paragraph;
+use Djot\Node\Block\Table;
+use Djot\Node\Block\TableCell;
+use Djot\Node\Block\TableRow;
 use Djot\Node\Document;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Emphasis;
@@ -96,6 +100,23 @@ class HtmlRendererTest extends TestCase
         $this->assertSame("<p><a href=\"https://example.com\">Example</a></p>\n", $result);
     }
 
+    public function testRenderLinkEscapesAttributeValues(): void
+    {
+        $doc = new Document();
+        $para = new Paragraph();
+        $link = new Link('https://example.com" onclick="alert(1)', 'Title "quoted"');
+        $link->appendChild(new Text('Example'));
+        $para->appendChild($link);
+        $doc->appendChild($para);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertSame(
+            "<p><a href=\"https://example.com&quot; onclick=&quot;alert(1)\" title=\"Title &quot;quoted&quot;\">Example</a></p>\n",
+            $result,
+        );
+    }
+
     public function testRenderImage(): void
     {
         $doc = new Document();
@@ -107,6 +128,22 @@ class HtmlRendererTest extends TestCase
         $result = $this->renderer->render($doc);
 
         $this->assertSame("<p><img alt=\"A photo\" src=\"photo.jpg\"></p>\n", $result);
+    }
+
+    public function testRenderImageEscapesAttributeValues(): void
+    {
+        $doc = new Document();
+        $para = new Paragraph();
+        $image = new Image('photo.jpg" onerror="alert(1)', 'A "photo"', 'Title "quoted"');
+        $para->appendChild($image);
+        $doc->appendChild($para);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertSame(
+            "<p><img alt=\"A &quot;photo&quot;\" src=\"photo.jpg&quot; onerror=&quot;alert(1)\" title=\"Title &quot;quoted&quot;\"></p>\n",
+            $result,
+        );
     }
 
     public function testRenderCode(): void
@@ -131,6 +168,20 @@ class HtmlRendererTest extends TestCase
         $result = $this->renderer->render($doc);
 
         $this->assertSame("<pre><code class=\"language-php\">echo 'hello';\n</code></pre>\n", $result);
+    }
+
+    public function testRenderCodeBlockEscapesLanguageAttribute(): void
+    {
+        $doc = new Document();
+        $codeBlock = new CodeBlock('echo 1;', 'php" onclick="alert(1)');
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertSame(
+            "<pre><code class=\"language-php&quot; onclick=&quot;alert(1)\">echo 1;\n</code></pre>\n",
+            $result,
+        );
     }
 
     public function testRenderCodeBlockWithoutLanguage(): void
@@ -256,6 +307,44 @@ class HtmlRendererTest extends TestCase
 
         $this->assertStringNotContainsString('<script>', $result);
         $this->assertStringContainsString('&lt;script&gt;', $result);
+    }
+
+    public function testLineBlockMergesExistingClasses(): void
+    {
+        $doc = new Document();
+        $lineBlock = new LineBlock();
+        $lineBlock->addClass('custom');
+
+        $para = new Paragraph();
+        $para->appendChild(new Text('line'));
+        $lineBlock->appendChild($para);
+        $doc->appendChild($lineBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertSame("<div class=\"custom line-block\">\n<p>line</p>\n</div>\n", $result);
+    }
+
+    public function testTableCellMergesExistingStyle(): void
+    {
+        $doc = new Document();
+        $cell = new TableCell(false, TableCell::ALIGN_CENTER);
+        $cell->setAttribute('style', 'color:red');
+        $cell->appendChild(new Text('cell'));
+
+        $row = new TableRow();
+        $row->appendChild($cell);
+
+        $table = new Table();
+        $table->appendChild($row);
+        $doc->appendChild($table);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertSame(
+            "<table>\n<tr>\n<td style=\"color:red; text-align: center;\">cell</td>\n</tr>\n</table>\n",
+            $result,
+        );
     }
 
     public function testXhtmlMode(): void

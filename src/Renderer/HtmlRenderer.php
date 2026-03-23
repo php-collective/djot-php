@@ -370,29 +370,7 @@ class HtmlRenderer implements RendererInterface
      */
     protected function renderAttributesExcluding(Node $node, array $exclude): string
     {
-        $attrs = $node->getAttributes();
-        if (!$attrs) {
-            return '';
-        }
-
-        // Filter out excluded attributes
-        $attrs = array_diff_key($attrs, array_flip($exclude));
-        if (!$attrs) {
-            return '';
-        }
-
-        // Filter dangerous attributes in safe mode
-        if ($this->safeMode !== null) {
-            $attrs = $this->safeMode->filterAttributes($attrs);
-        }
-
-        // Preserve source order of attributes (matching JS reference implementation)
-        $html = '';
-        foreach ($attrs as $key => $value) {
-            $html .= ' ' . $this->escape($key) . '="' . $this->escapeAttribute((string)$value) . '"';
-        }
-
-        return $html;
+        return $this->renderAttributeArray($this->getRenderableAttributes($node, $exclude));
     }
 
     protected function renderNode(Node $node): string
@@ -489,7 +467,7 @@ class HtmlRenderer implements RendererInterface
         }
 
         if ($language !== null) {
-            $langClass = 'class="language-' . $this->escape($language) . '"';
+            $langClass = 'class="language-' . $this->escapeAttribute($language) . '"';
 
             return '<pre' . $attrs . '><code ' . $langClass . '>' . $code . "</code></pre>\n";
         }
@@ -506,7 +484,7 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderList(ListBlock $node): string
     {
-        $attrs = $this->renderAttributes($node);
+        $attrs = $this->getRenderableAttributes($node);
         $tight = $node->isTight();
 
         // Render children with tight parameter
@@ -532,14 +510,14 @@ class HtmlRenderer implements RendererInterface
                 $olAttrs .= ' type="' . $style . '"';
             }
 
-            return '<ol' . $olAttrs . $attrs . ">\n" . $html . "</ol>\n";
+            return '<ol' . $olAttrs . $this->renderAttributeArray($attrs) . ">\n" . $html . "</ol>\n";
         }
 
         if ($node->getListType() === ListBlock::TYPE_TASK) {
-            $attrs .= ' class="task-list"';
+            $attrs = $this->mergeAttribute($attrs, 'class', 'task-list');
         }
 
-        return '<ul' . $attrs . ">\n" . $html . "</ul>\n";
+        return '<ul' . $this->renderAttributeArray($attrs) . ">\n" . $html . "</ul>\n";
     }
 
     protected function renderListItem(ListItem $node, bool $tight = true): string
@@ -585,9 +563,10 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderLineBlock(LineBlock $node): string
     {
-        $attrs = $this->renderAttributes($node);
+        $attrs = $this->getRenderableAttributes($node);
+        $attrs = $this->mergeAttribute($attrs, 'class', 'line-block');
 
-        return '<div class="line-block"' . $attrs . ">\n" . $this->renderChildren($node) . "</div>\n";
+        return '<div' . $this->renderAttributeArray($attrs) . ">\n" . $this->renderChildren($node) . "</div>\n";
     }
 
     protected function renderFigure(Figure $node): string
@@ -651,24 +630,24 @@ class HtmlRenderer implements RendererInterface
     protected function renderTableCell(TableCell $node): string
     {
         $tag = $node->isHeader() ? 'th' : 'td';
-        $attrs = $this->renderAttributes($node);
+        $attrs = $this->getRenderableAttributes($node);
 
         $rowspan = $node->getRowspan();
         if ($rowspan > 1) {
-            $attrs .= ' rowspan="' . $rowspan . '"';
+            $attrs['rowspan'] = (string)$rowspan;
         }
 
         $colspan = $node->getColspan();
         if ($colspan > 1) {
-            $attrs .= ' colspan="' . $colspan . '"';
+            $attrs['colspan'] = (string)$colspan;
         }
 
         $alignment = $node->getAlignment();
         if ($alignment !== TableCell::ALIGN_DEFAULT) {
-            $attrs .= ' style="text-align: ' . $alignment . ';"';
+            $attrs = $this->mergeAttribute($attrs, 'style', 'text-align: ' . $alignment . ';');
         }
 
-        return '<' . $tag . $attrs . '>' . $this->renderChildren($node) . '</' . $tag . ">\n";
+        return '<' . $tag . $this->renderAttributeArray($attrs) . '>' . $this->renderChildren($node) . '</' . $tag . ">\n";
     }
 
     protected function renderText(Text $node): string
@@ -704,10 +683,10 @@ class HtmlRenderer implements RendererInterface
         $html = '<a';
         // Only output href if destination is set (even if empty)
         if ($href !== null) {
-            $html .= ' href="' . $this->escape($href) . '"';
+            $html .= ' href="' . $this->escapeAttribute($href) . '"';
         }
         if ($title !== null) {
-            $html .= ' title="' . $this->escape($title) . '"';
+            $html .= ' title="' . $this->escapeAttribute($title) . '"';
         }
         $html .= $attrs . '>' . $this->renderChildren($node) . '</a>';
 
@@ -717,7 +696,7 @@ class HtmlRenderer implements RendererInterface
     protected function renderImage(Image $node): string
     {
         $attrs = $this->renderAttributes($node);
-        $alt = $this->escape($node->getAlt());
+        $alt = $this->escapeAttribute($node->getAlt());
         $src = $node->getSource();
         $title = $node->getTitle();
 
@@ -726,9 +705,9 @@ class HtmlRenderer implements RendererInterface
             $src = $this->safeMode->sanitizeUrl($src);
         }
 
-        $html = '<img alt="' . $alt . '" src="' . $this->escape($src) . '"';
+        $html = '<img alt="' . $alt . '" src="' . $this->escapeAttribute($src) . '"';
         if ($title !== null) {
-            $html .= ' title="' . $this->escape($title) . '"';
+            $html .= ' title="' . $this->escapeAttribute($title) . '"';
         }
         $html .= $attrs;
 
@@ -815,9 +794,24 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderAttributes(Node $node): string
     {
+        return $this->renderAttributeArray($this->getRenderableAttributes($node));
+    }
+
+    /**
+     * @param \Djot\Node\Node $node
+     * @param array<string> $exclude
+     *
+     * @return array<string, string>
+     */
+    protected function getRenderableAttributes(Node $node, array $exclude = []): array
+    {
         $attrs = $node->getAttributes();
         if (!$attrs) {
-            return '';
+            return [];
+        }
+
+        if ($exclude !== []) {
+            $attrs = array_diff_key($attrs, array_flip($exclude));
         }
 
         // Filter dangerous attributes in safe mode
@@ -825,13 +819,65 @@ class HtmlRenderer implements RendererInterface
             $attrs = $this->safeMode->filterAttributes($attrs);
         }
 
+        return $attrs;
+    }
+
+    /**
+     * @param array<string, string> $attrs
+     */
+    protected function renderAttributeArray(array $attrs): string
+    {
+        if ($attrs === []) {
+            return '';
+        }
+
         // Preserve source order of attributes (matching JS reference implementation)
         $html = '';
         foreach ($attrs as $key => $value) {
-            $html .= ' ' . $this->escape($key) . '="' . $this->escapeAttribute((string)$value) . '"';
+            $html .= ' ' . $this->escape($key) . '="' . $this->escapeAttribute($value) . '"';
         }
 
         return $html;
+    }
+
+    /**
+     * @param array<string, string> $attrs
+     * @param string $value
+     * @param string $key
+     *
+     * @return array<string, string>
+     */
+    protected function mergeAttribute(array $attrs, string $key, string $value): array
+    {
+        if ($value === '') {
+            return $attrs;
+        }
+
+        if (!isset($attrs[$key]) || $attrs[$key] === '') {
+            $attrs[$key] = $value;
+
+            return $attrs;
+        }
+
+        if ($key === 'class') {
+            $attrs[$key] .= ' ' . $value;
+
+            return $attrs;
+        }
+
+        if ($key === 'style') {
+            $existing = rtrim($attrs[$key]);
+            if ($existing !== '' && !str_ends_with($existing, ';')) {
+                $existing .= ';';
+            }
+            $attrs[$key] = trim($existing . ' ' . $value);
+
+            return $attrs;
+        }
+
+        $attrs[$key] = $value;
+
+        return $attrs;
     }
 
     protected function escape(string $text): string

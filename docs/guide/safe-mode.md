@@ -41,6 +41,8 @@ $html = $converter->convert($userInput);
 
 Safe mode also normalizes URL schemes by stripping ASCII control characters and whitespace before comparison, preventing bypass attempts like `java\tscript:` or `java\x0bscript:`.
 
+In addition, djot-php escapes all rendered HTML attribute values in attribute context, so quotes inside link destinations, titles, image alt text, and code-block language info cannot break out into new HTML attributes.
+
 ## Strict Mode
 
 For maximum protection, use strict mode:

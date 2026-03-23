@@ -74,6 +74,16 @@ class SafeModeTest extends TestCase
         $this->assertStringContainsString('href="https://example.com"', $result);
     }
 
+    public function testAllowedLinkUrlIsEscapedInAttributeContext(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = '[link](https://example.com " onclick="alert(1))';
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('href="https://example.com &quot; onclick=&quot;alert(1)"', $result);
+        $this->assertStringNotContainsString('" onclick="alert(1)"', $result);
+    }
+
     public function testRelativeUrlIsAllowed(): void
     {
         $converter = new DjotConverter(safeMode: true);
@@ -155,6 +165,17 @@ class SafeModeTest extends TestCase
         $result = $converter->convert($djot);
 
         $this->assertStringContainsString('data-value="123"', $result);
+    }
+
+    public function testImageAttributesAreEscapedInAttributeContext(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = '![alt "quoted"](image.png){title="title\" onerror=\"alert(1)"}';
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('alt="alt “quoted”"', $result);
+        $this->assertStringContainsString('title="title&quot; onerror=&quot;alert(1)"', $result);
+        $this->assertStringNotContainsString('" onerror="alert(1)"', $result);
     }
 
     // ==================== Raw HTML Handling ====================
