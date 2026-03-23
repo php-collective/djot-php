@@ -543,4 +543,86 @@ class AttributeParserTest extends TestCase
 
         $this->assertSame('\*', $result['key']);
     }
+
+    /**
+     * Tests for multiple consecutive attribute blocks.
+     *
+     * Per djot spec, multiple consecutive attribute blocks like {.foo}{.bar}
+     * should merge. Classes combine, later values override earlier ones.
+     */
+    public function testMultipleAttributeBlocksOnSpan(): void
+    {
+        $result = $this->converter->convert('[text]{.foo}{.bar}');
+
+        $this->assertStringContainsString('class="foo bar"', $result);
+    }
+
+    public function testMultipleAttributeBlocksClassAndId(): void
+    {
+        $result = $this->converter->convert('[text]{.foo}{#myid}');
+
+        $this->assertStringContainsString('class="foo"', $result);
+        $this->assertStringContainsString('id="myid"', $result);
+    }
+
+    public function testMultipleAttributeBlocksIdOverride(): void
+    {
+        // Later id should override earlier one
+        $result = $this->converter->convert('[text]{#id1}{#id2}');
+
+        $this->assertStringContainsString('id="id2"', $result);
+        $this->assertStringNotContainsString('id="id1"', $result);
+    }
+
+    public function testMultipleAttributeBlocksKeyOverride(): void
+    {
+        // Later key=value should override earlier one
+        $result = $this->converter->convert('[text]{key=a}{key=b}');
+
+        $this->assertStringContainsString('key="b"', $result);
+        $this->assertStringNotContainsString('key="a"', $result);
+    }
+
+    public function testThreeConsecutiveClassAttributes(): void
+    {
+        $result = $this->converter->convert('[text]{.a}{.b}{.c}');
+
+        $this->assertStringContainsString('class="a b c"', $result);
+    }
+
+    public function testMultipleAttributeBlocksOnLink(): void
+    {
+        $result = $this->converter->convert('[link](http://example.com){.foo}{.bar}');
+
+        $this->assertStringContainsString('class="foo bar"', $result);
+        $this->assertStringContainsString('href="http://example.com"', $result);
+    }
+
+    public function testMultipleAttributeBlocksOnStrong(): void
+    {
+        $result = $this->converter->convert('*bold*{.foo}{.bar}');
+
+        $this->assertStringContainsString('<strong class="foo bar">bold</strong>', $result);
+    }
+
+    public function testMultipleAttributeBlocksOnEmphasis(): void
+    {
+        $result = $this->converter->convert('_italic_{.foo}{.bar}');
+
+        $this->assertStringContainsString('<em class="foo bar">italic</em>', $result);
+    }
+
+    public function testMultipleAttributeBlocksOnCode(): void
+    {
+        $result = $this->converter->convert('`code`{.foo}{.bar}');
+
+        $this->assertStringContainsString('<code class="foo bar">code</code>', $result);
+    }
+
+    public function testMultipleAttributeBlocksOnHighlight(): void
+    {
+        $result = $this->converter->convert('{=highlight=}{.foo}{.bar}');
+
+        $this->assertStringContainsString('<mark class="foo bar">highlight</mark>', $result);
+    }
 }
