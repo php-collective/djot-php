@@ -102,4 +102,94 @@ class AttributeParserTest extends TestCase
         $this->assertStringContainsString('ref="/guides/setup.html"', $result);
         $this->assertStringNotContainsString('class', $result);
     }
+
+    /**
+     * Tests for unquoted attribute value validation.
+     *
+     * Per djot spec, unquoted values may only contain:
+     * ASCII alphanumeric characters, underscore (_), colon (:), or hyphen (-)
+     *
+     * Invalid characters like dots, slashes, etc. should cause the attribute
+     * to not be recognized (matching the reference JS implementation behavior).
+     */
+    public function testValidUnquotedValueWithUnderscore(): void
+    {
+        $result = AttributeParser::parse('key=foo_bar');
+
+        $this->assertSame('foo_bar', $result['key']);
+    }
+
+    public function testValidUnquotedValueWithHyphen(): void
+    {
+        $result = AttributeParser::parse('key=foo-bar');
+
+        $this->assertSame('foo-bar', $result['key']);
+    }
+
+    public function testValidUnquotedValueWithColon(): void
+    {
+        $result = AttributeParser::parse('key=foo:bar');
+
+        $this->assertSame('foo:bar', $result['key']);
+    }
+
+    public function testValidUnquotedValueWithNumbers(): void
+    {
+        $result = AttributeParser::parse('key=abc123');
+
+        $this->assertSame('abc123', $result['key']);
+    }
+
+    public function testInvalidUnquotedValueWithDotIsNotParsed(): void
+    {
+        // Dots are not allowed in unquoted values per djot spec
+        // The attribute should not be recognized
+        $result = AttributeParser::parse('key=foo.bar');
+
+        $this->assertArrayNotHasKey('key', $result);
+        // And importantly, .bar should NOT become a class
+        $this->assertArrayNotHasKey('class', $result);
+    }
+
+    public function testInvalidUnquotedValueWithSlashIsNotParsed(): void
+    {
+        $result = AttributeParser::parse('key=foo/bar');
+
+        $this->assertArrayNotHasKey('key', $result);
+    }
+
+    public function testInvalidUnquotedValueWithAtSignIsNotParsed(): void
+    {
+        $result = AttributeParser::parse('key=foo@bar');
+
+        $this->assertArrayNotHasKey('key', $result);
+    }
+
+    public function testDottedValueWorksWhenQuoted(): void
+    {
+        // Same value works fine when properly quoted
+        $result = AttributeParser::parse('key="foo.bar"');
+
+        $this->assertSame('foo.bar', $result['key']);
+        $this->assertArrayNotHasKey('class', $result);
+    }
+
+    public function testMixedValidAndInvalidUnquotedValues(): void
+    {
+        // valid=good should be parsed, invalid=bad.value should not
+        $result = AttributeParser::parse('valid=good invalid=bad.value');
+
+        $this->assertSame('good', $result['valid']);
+        $this->assertArrayNotHasKey('invalid', $result);
+        $this->assertArrayNotHasKey('class', $result);
+    }
+
+    public function testRealClassWithInvalidUnquotedValue(): void
+    {
+        // .myclass should work, but key=foo.bar should not create spurious class
+        $result = AttributeParser::parse('.myclass key=foo.bar');
+
+        $this->assertSame('myclass', $result['class']);
+        $this->assertArrayNotHasKey('key', $result);
+    }
 }

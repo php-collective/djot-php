@@ -32,10 +32,14 @@ class AttributeParser
     {
         $attributes = [];
 
-        // Strip quoted values before matching .class and #id to avoid
-        // matching dots/hashes inside attribute values like key="file.txt"
+        // Strip quoted values and unquoted key=value pairs before matching .class and #id
+        // to avoid matching dots/hashes inside attribute values like key="file.txt"
+        // or partial matches from invalid unquoted values like key=foo.bar
         $strippedForShorthand = preg_replace('/"(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
         $strippedForShorthand = preg_replace("/'(?:[^'\\\\]|\\\\.)*'/", '', $strippedForShorthand) ?? $strippedForShorthand;
+        // Strip unquoted key=value tokens entirely (up to whitespace) to prevent
+        // invalid chars like dots from being misinterpreted as .class shorthand
+        $strippedForShorthand = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}]+/', '', $strippedForShorthand) ?? $strippedForShorthand;
 
         // Parse .class
         if (preg_match_all('/\.([^\s.#=}]+)/', $strippedForShorthand, $classMatches)) {
@@ -49,9 +53,11 @@ class AttributeParser
 
         // Parse key="double quoted value", key='single quoted value', or key=unquoted
         // The regex uses ([^"\\]|\\.)* to match content with escaped characters
+        // Per djot spec, unquoted values may only contain: alphanumerics, underscore, colon, hyphen
+        // Unquoted values must be followed by whitespace or } to be valid (not invalid chars like dots)
         $kvPattern = '/([a-zA-Z_][a-zA-Z0-9_-]*)="((?:[^"\\\\]|\\\\.)*)"|'
             . '([a-zA-Z_][a-zA-Z0-9_-]*)=\'((?:[^\'\\\\]|\\\\.)*)\''
-            . '|([a-zA-Z_][a-zA-Z0-9_-]*)=([^\s}"\']+)/';
+            . '|([a-zA-Z_][a-zA-Z0-9_-]*)=([a-zA-Z0-9_:-]+)(?=\s|}|$)/';
 
         if (preg_match_all($kvPattern, $attrStr, $kvMatches, PREG_SET_ORDER)) {
             foreach ($kvMatches as $match) {
@@ -72,7 +78,7 @@ class AttributeParser
         // First, strip out quoted values and key=value pairs to avoid matching words inside them
         $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*="(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
         $strippedAttr = preg_replace("/[a-zA-Z_][a-zA-Z0-9_-]*='(?:[^'\\\\]|\\\\.)*'/", '', $strippedAttr) ?? $strippedAttr;
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}"\']+/', '', $strippedAttr) ?? $strippedAttr;
+        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[a-zA-Z0-9_:-]+/', '', $strippedAttr) ?? $strippedAttr;
 
         // Now match bare words (must not start with . or #)
         if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $strippedAttr, $boolMatches)) {
@@ -112,10 +118,14 @@ class AttributeParser
      */
     public static function applyToNode(Node $node, string $attrStr): void
     {
-        // Strip quoted values before matching .class and #id to avoid
-        // matching dots/hashes inside attribute values like key="file.txt"
+        // Strip quoted values and unquoted key=value pairs before matching .class and #id
+        // to avoid matching dots/hashes inside attribute values like key="file.txt"
+        // or partial matches from invalid unquoted values like key=foo.bar
         $strippedForShorthand = preg_replace('/"(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
         $strippedForShorthand = preg_replace("/'(?:[^'\\\\]|\\\\.)*'/", '', $strippedForShorthand) ?? $strippedForShorthand;
+        // Strip unquoted key=value tokens entirely (up to whitespace) to prevent
+        // invalid chars like dots from being misinterpreted as .class shorthand
+        $strippedForShorthand = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}]+/', '', $strippedForShorthand) ?? $strippedForShorthand;
 
         // Parse .class and #id on stripped string
         if (preg_match_all('/\.([^\s.#=}]+)/', $strippedForShorthand, $classMatches)) {
@@ -129,8 +139,10 @@ class AttributeParser
         }
 
         // Parse key=value on original string (needs quoted values intact)
+        // Per djot spec, unquoted values may only contain: alphanumerics, underscore, colon, hyphen
+        // Unquoted values must be followed by whitespace or } to be valid (not invalid chars like dots)
         $kvPattern = '/([^\s.#=}]+)="((?:[^"\\\\]|\\\\.)*)"|([^\s.#=}]+)=\'((?:[^\'\\\\]|\\\\.)*)\''
-            . '|([^\s.#=}]+)=([^\s}"\']+)/';
+            . '|([^\s.#=}]+)=([a-zA-Z0-9_:-]+)(?=\s|}|$)/';
         preg_match_all($kvPattern, $attrStr, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $match) {
@@ -149,7 +161,7 @@ class AttributeParser
         // Parse boolean attributes
         $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*="(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
         $strippedAttr = preg_replace("/[a-zA-Z_][a-zA-Z0-9_-]*='(?:[^'\\\\]|\\\\.)*'/", '', $strippedAttr) ?? $strippedAttr;
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}"\']+/', '', $strippedAttr) ?? $strippedAttr;
+        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[a-zA-Z0-9_:-]+/', '', $strippedAttr) ?? $strippedAttr;
 
         if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $strippedAttr, $boolMatches)) {
             foreach ($boolMatches[1] as $boolAttr) {
