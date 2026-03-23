@@ -9,7 +9,9 @@ use Djot\Event\RenderEvent;
 use Djot\Exception\ParseException;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Symbol;
+use Djot\Profile;
 use Djot\Renderer\SoftBreakMode;
+use LengthException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -1403,6 +1405,38 @@ DJOT;
             $this->assertStringContainsString('<section id="Hello">', $result);
             $this->assertStringContainsString('<h1>Hello</h1>', $result);
             $this->assertStringContainsString('<p>World</p>', $result);
+        } finally {
+            unlink($tempFile);
+        }
+    }
+
+    public function testConvertFileAppliesProfileFiltering(): void
+    {
+        $tempFile = sys_get_temp_dir() . '/djot_test_' . uniqid() . '.djot';
+        file_put_contents($tempFile, "# Heading\n\n[link](https://example.com)");
+
+        try {
+            $converter = new DjotConverter(profile: Profile::comment());
+            $result = $converter->convertFile($tempFile);
+
+            $this->assertStringNotContainsString('<h1>', $result);
+            $this->assertStringContainsString('rel="nofollow ugc"', $result);
+            $this->assertTrue($converter->hasProfileViolations());
+        } finally {
+            unlink($tempFile);
+        }
+    }
+
+    public function testConvertFileEnforcesProfileMaxLength(): void
+    {
+        $tempFile = sys_get_temp_dir() . '/djot_test_' . uniqid() . '.djot';
+        file_put_contents($tempFile, str_repeat('a', 20));
+
+        try {
+            $converter = new DjotConverter(profile: Profile::minimal()->setMaxLength(5));
+
+            $this->expectException(LengthException::class);
+            $converter->convertFile($tempFile);
         } finally {
             unlink($tempFile);
         }
