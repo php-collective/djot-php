@@ -2133,6 +2133,66 @@ DJOT;
         $this->assertStringNotContainsString('hidden', $result);
     }
 
+    /**
+     * Inline comment at start of line should preserve text after it
+     */
+    public function testInlineCommentAtStartPreservesTextAfter(): void
+    {
+        $djot = '{% comment %} text after';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('text after', $result);
+        $this->assertStringNotContainsString('comment', $result);
+    }
+
+    /**
+     * Multiple inline comments on same line
+     */
+    public function testMultipleInlineComments(): void
+    {
+        $djot = '{% one %} text {% two %}';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('text', $result);
+        $this->assertStringNotContainsString('one', $result);
+        $this->assertStringNotContainsString('two', $result);
+    }
+
+    /**
+     * Inline comment in middle of text
+     */
+    public function testInlineCommentInMiddle(): void
+    {
+        $djot = 'before {% comment %} after';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('before', $result);
+        $this->assertStringContainsString('after', $result);
+        $this->assertStringNotContainsString('comment', $result);
+    }
+
+    /**
+     * Inline comment should not strip {% %} inside code spans
+     */
+    public function testInlineCommentNotInCodeSpan(): void
+    {
+        $djot = '`{% not a comment %}`';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('{% not a comment %}', $result);
+    }
+
+    /**
+     * Inline comment should not strip {% %} inside quoted attributes
+     */
+    public function testInlineCommentNotInQuotedAttribute(): void
+    {
+        $djot = '[text]{title="{% not %}"}';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('{% not %}', $result);
+    }
+
     // Edge cases: Raw content
 
     public function testRawBlockNonHtml(): void
