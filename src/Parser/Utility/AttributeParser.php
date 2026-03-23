@@ -23,6 +23,7 @@ class AttributeParser
      * - key='single quoted value' (with escape support)
      * - key=unquoted
      * - bareword (boolean attribute)
+     * - % comment % or % trailing comment (stripped)
      *
      * @param string $attrStr The attribute string (contents inside {})
      *
@@ -30,6 +31,9 @@ class AttributeParser
      */
     public static function parse(string $attrStr): array
     {
+        // Remove comments before parsing
+        $attrStr = self::removeComments($attrStr);
+
         $attributes = [];
 
         // Strip quoted values and unquoted key=value pairs before matching .class and #id
@@ -121,6 +125,9 @@ class AttributeParser
      */
     public static function applyToNode(Node $node, string $attrStr): void
     {
+        // Remove comments before parsing
+        $attrStr = self::removeComments($attrStr);
+
         // Single-pass regex that matches all token types in source order.
         // Order matters: quoted values and invalid unquoted values must be matched/skipped
         // first to prevent dots/hashes inside them from being matched as .class or #id.
@@ -177,5 +184,26 @@ class AttributeParser
     {
         // Replace escape sequences: \X -> X for any character X
         return preg_replace('/\\\\(.)/', '$1', $value) ?? $value;
+    }
+
+    /**
+     * Remove comments from attribute string
+     *
+     * Supports two comment styles:
+     * - Inline: % comment % (removed entirely)
+     * - Trailing: % to end of string (removed)
+     */
+    protected static function removeComments(string $attrStr): string
+    {
+        // Remove % ... % inline comments
+        $result = preg_replace('/%[^%]*%/', '', $attrStr);
+
+        // Remove % to end of string (trailing comment)
+        $percentPos = strpos($result ?? $attrStr, '%');
+        if ($percentPos !== false) {
+            $result = substr($result ?? $attrStr, 0, $percentPos);
+        }
+
+        return $result ?? $attrStr;
     }
 }
