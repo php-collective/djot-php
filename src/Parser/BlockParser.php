@@ -1754,7 +1754,7 @@ class BlockParser
                     preg_match('/^\{([^{}]+)\}\s*$/', $trimmedAttrLine, $attrMatch) &&
                     IndentationHelper::getLeadingSpaces($potentialAttrLine) >= $contentIndent
                 ) {
-                    $itemAttributes = AttributeParser::parse($attrMatch[1]);
+                    $itemAttributes = AttributeParser::parseOrdered($attrMatch[1]);
                     $i++;
                 }
             }

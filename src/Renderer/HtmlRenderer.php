@@ -386,13 +386,7 @@ class HtmlRenderer implements RendererInterface
             $attrs = $this->safeMode->filterAttributes($attrs);
         }
 
-        // Put id first if present (faster than uksort)
-        if (isset($attrs['id'])) {
-            $id = $attrs['id'];
-            unset($attrs['id']);
-            $attrs = ['id' => $id] + $attrs;
-        }
-
+        // Preserve source order of attributes (matching JS reference implementation)
         $html = '';
         foreach ($attrs as $key => $value) {
             $html .= ' ' . $this->escape($key) . '="' . $this->escapeAttribute((string)$value) . '"';
@@ -831,13 +825,7 @@ class HtmlRenderer implements RendererInterface
             $attrs = $this->safeMode->filterAttributes($attrs);
         }
 
-        // Put id first if present (faster than uksort)
-        if (isset($attrs['id'])) {
-            $id = $attrs['id'];
-            unset($attrs['id']);
-            $attrs = ['id' => $id] + $attrs;
-        }
-
+        // Preserve source order of attributes (matching JS reference implementation)
         $html = '';
         foreach ($attrs as $key => $value) {
             $html .= ' ' . $this->escape($key) . '="' . $this->escapeAttribute((string)$value) . '"';

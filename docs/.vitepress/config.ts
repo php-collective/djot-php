@@ -65,6 +65,7 @@ export default defineConfig({
           text: 'Features',
           items: [
             { text: 'Safe Mode', link: '/guide/safe-mode' },
+            { text: 'Validation', link: '/guide/validation' },
             { text: 'Profiles', link: '/guide/profiles' },
             { text: 'Converters', link: '/guide/converters' },
           ],
