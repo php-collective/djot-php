@@ -223,12 +223,14 @@ class AttributeParser
                         // Closing quote
                         $result .= $c;
                         $i++;
+
                         break;
                     } else {
                         $result .= $c;
                         $i++;
                     }
                 }
+
                 continue;
             }
 
@@ -238,6 +240,7 @@ class AttributeParser
                     // End of inline comment
                     $inComment = false;
                     $i++;
+
                     continue;
                 }
 
@@ -250,6 +253,7 @@ class AttributeParser
                         // Inline comment - skip to closing %
                         $inComment = true;
                         $i++;
+
                         continue;
                     }
                 }
