@@ -920,6 +920,7 @@ class InlineParser
      */
     protected function parseAutolink(string $text, int $pos): ?array
     {
+        $length = strlen($text);
         $end = strpos($text, '>', $pos);
         if ($end === false) {
             return null;
@@ -932,9 +933,16 @@ class InlineParser
             $link = new Link($content);
             $link->appendChild(new Text($content));
 
+            $endPos = $end + 1;
+
+            // Check for trailing attributes: <url>{.class}{.more}
+            if ($endPos < $length && $text[$endPos] === '{') {
+                $endPos = $this->applyConsecutiveAttributes($link, $text, $endPos);
+            }
+
             return [
                 'node' => $link,
-                'pos' => $end + 1,
+                'pos' => $endPos,
             ];
         }
 
@@ -943,9 +951,16 @@ class InlineParser
             $link = new Link('mailto:' . $content);
             $link->appendChild(new Text($content));
 
+            $endPos = $end + 1;
+
+            // Check for trailing attributes: <email>{.class}{.more}
+            if ($endPos < $length && $text[$endPos] === '{') {
+                $endPos = $this->applyConsecutiveAttributes($link, $text, $endPos);
+            }
+
             return [
                 'node' => $link,
-                'pos' => $end + 1,
+                'pos' => $endPos,
             ];
         }
 

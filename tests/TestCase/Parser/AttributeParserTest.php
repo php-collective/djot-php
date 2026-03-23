@@ -625,4 +625,46 @@ class AttributeParserTest extends TestCase
 
         $this->assertStringContainsString('<mark class="foo bar">highlight</mark>', $result);
     }
+
+    /**
+     * Tests for autolink attributes.
+     *
+     * Per djot spec, autolinks (<url> or <email>) can have trailing attributes.
+     */
+    public function testAutolinkWithClass(): void
+    {
+        $result = $this->converter->convert('<https://example.com>{.link}');
+
+        $this->assertStringContainsString('class="link"', $result);
+        $this->assertStringContainsString('href="https://example.com"', $result);
+    }
+
+    public function testAutolinkWithId(): void
+    {
+        $result = $this->converter->convert('<https://example.com>{#myid}');
+
+        $this->assertStringContainsString('id="myid"', $result);
+    }
+
+    public function testAutolinkWithKeyValue(): void
+    {
+        $result = $this->converter->convert('<https://example.com>{target=_blank}');
+
+        $this->assertStringContainsString('target="_blank"', $result);
+    }
+
+    public function testEmailAutolinkWithClass(): void
+    {
+        $result = $this->converter->convert('<user@example.com>{.email}');
+
+        $this->assertStringContainsString('class="email"', $result);
+        $this->assertStringContainsString('href="mailto:user@example.com"', $result);
+    }
+
+    public function testAutolinkWithMultipleAttributeBlocks(): void
+    {
+        $result = $this->converter->convert('<https://example.com>{.foo}{.bar}');
+
+        $this->assertStringContainsString('class="foo bar"', $result);
+    }
 }
