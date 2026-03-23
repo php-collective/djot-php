@@ -43,7 +43,7 @@ class AttributeParser
         $strippedForShorthand = preg_replace("/'(?:[^'\\\\]|\\\\.)*'/", '', $strippedForShorthand) ?? $strippedForShorthand;
         // Strip unquoted key=value tokens entirely (up to whitespace) to prevent
         // invalid chars like dots from being misinterpreted as .class shorthand
-        $strippedForShorthand = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}]+/', '', $strippedForShorthand) ?? $strippedForShorthand;
+        $strippedForShorthand = preg_replace('/[a-zA-Z][a-zA-Z0-9_:-]*=[^\s}]+/', '', $strippedForShorthand) ?? $strippedForShorthand;
 
         // Parse .class
         if (preg_match_all('/\.([^\s.#=}]+)/', $strippedForShorthand, $classMatches)) {
@@ -59,9 +59,10 @@ class AttributeParser
         // The regex uses ([^"\\]|\\.)* to match content with escaped characters
         // Per djot spec, unquoted values may only contain: alphanumerics, underscore, colon, hyphen
         // Unquoted values must be followed by whitespace or } to be valid (not invalid chars like dots)
-        $kvPattern = '/([a-zA-Z_][a-zA-Z0-9_-]*)="((?:[^"\\\\]|\\\\.)*)"|'
-            . '([a-zA-Z_][a-zA-Z0-9_-]*)=\'((?:[^\'\\\\]|\\\\.)*)\''
-            . '|([a-zA-Z_][a-zA-Z0-9_-]*)=([a-zA-Z0-9_:-]+)(?=\s|}|$)/';
+        // Keys can contain letters, digits, underscore, hyphen, colon (permissive like JS reference)
+        $kvPattern = '/(?:(?<=\s)|^)([a-zA-Z0-9_:-]+)="((?:[^"\\\\]|\\\\.)*)"|'
+            . '(?:(?<=\s)|^)([a-zA-Z0-9_:-]+)=\'((?:[^\'\\\\]|\\\\.)*)\''
+            . '|(?:(?<=\s)|^)([a-zA-Z0-9_:-]+)=([a-zA-Z0-9_:-]+)(?=\s|}|$)/';
 
         if (preg_match_all($kvPattern, $attrStr, $kvMatches, PREG_SET_ORDER)) {
             foreach ($kvMatches as $match) {
@@ -80,9 +81,9 @@ class AttributeParser
 
         // Parse boolean attributes (bare words like "reversed", "hidden")
         // First, strip out quoted values and key=value pairs to avoid matching words inside them
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*="(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
-        $strippedAttr = preg_replace("/[a-zA-Z_][a-zA-Z0-9_-]*='(?:[^'\\\\]|\\\\.)*'/", '', $strippedAttr) ?? $strippedAttr;
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[a-zA-Z0-9_:-]+/', '', $strippedAttr) ?? $strippedAttr;
+        $strippedAttr = preg_replace('/(?:(?<=\s)|^)[a-zA-Z0-9_:-]+="(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
+        $strippedAttr = preg_replace("/(?:(?<=\s)|^)[a-zA-Z0-9_:-]+='(?:[^'\\\\]|\\\\.)*'/", '', $strippedAttr) ?? $strippedAttr;
+        $strippedAttr = preg_replace('/(?:(?<=\s)|^)[a-zA-Z0-9_:-]+=[a-zA-Z0-9_:-]+/', '', $strippedAttr) ?? $strippedAttr;
 
         // Now match bare words (must not start with . or #)
         if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $strippedAttr, $boolMatches)) {
@@ -134,14 +135,14 @@ class AttributeParser
         // Per djot spec, unquoted values may only contain: alphanumerics, underscore, colon, hyphen
         $pattern = '/'
             // Group 1,2: key="double quoted value"
-            . '([a-zA-Z_][a-zA-Z0-9_-]*)="((?:[^"\\\\]|\\\\.)*)"|'
+            . '(?:(?<=\s)|^)([a-zA-Z0-9_:-]+)="((?:[^"\\\\]|\\\\.)*)"|'
             // Group 3,4: key='single quoted value'
-            . '([a-zA-Z_][a-zA-Z0-9_-]*)=\'((?:[^\'\\\\]|\\\\.)*)\'|'
+            . '(?:(?<=\s)|^)([a-zA-Z0-9_:-]+)=\'((?:[^\'\\\\]|\\\\.)*)\'|'
             // Group 5,6: key=unquoted (must end at whitespace/}/end, not invalid chars)
-            . '([a-zA-Z_][a-zA-Z0-9_-]*)=([a-zA-Z0-9_:-]+)(?=\s|}|$)|'
+            . '(?:(?<=\s)|^)([a-zA-Z0-9_:-]+)=([a-zA-Z0-9_:-]+)(?=\s|}|$)|'
             // Skip invalid unquoted values (e.g. key=foo.bar) - consume but don't capture
             // This prevents .bar from being matched as a class
-            . '[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}]+|'
+            . '(?:(?<=\s)|^)[a-zA-Z0-9_:-]+=[^\s}]+|'
             // Group 7: .class shorthand
             . '\.([^\s.#=}]+)|'
             // Group 8: #id shorthand
@@ -178,12 +179,46 @@ class AttributeParser
     /**
      * Process escape sequences in attribute values
      *
-     * Handles \\ -> \ and \" -> " (and other escaped characters)
+     * Per djot spec, backslash escapes work on ASCII punctuation characters:
+     * - \\ -> \ (escaped backslash)
+     * - \" -> " (escaped quote)
+     * - \* -> * (escaped asterisk)
+     * - etc. for all ASCII punctuation
+     *
+     * Backslash before alphanumeric characters is kept literal:
+     * - \n -> \n (not a newline)
+     * - \t -> \t (not a tab)
+     * - \U -> \U (literal)
      */
     public static function processEscapes(string $value): string
     {
-        // Replace escape sequences: \X -> X for any character X
-        return preg_replace('/\\\\(.)/', '$1', $value) ?? $value;
+        $result = '';
+        $length = strlen($value);
+        $i = 0;
+
+        // ASCII punctuation that can be escaped
+        // Includes: !"#$%&'()*+,-./:;<=>?@[\]^_`{|}~
+        $punctuation = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~';
+
+        while ($i < $length) {
+            $char = $value[$i];
+
+            if ($char === '\\' && $i + 1 < $length) {
+                $next = $value[$i + 1];
+                // Escape if next char is ASCII punctuation
+                if (strpos($punctuation, $next) !== false) {
+                    $result .= $next;
+                    $i += 2;
+
+                    continue;
+                }
+            }
+
+            $result .= $char;
+            $i++;
+        }
+
+        return $result;
     }
 
     /**

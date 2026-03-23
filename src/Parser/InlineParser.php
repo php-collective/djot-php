@@ -761,8 +761,8 @@ class InlineParser
 
                 // Check for attributes after link: [text](url){.class}
                 if ($endPos < $length && $text[$endPos] === '{') {
-                    $attrEnd = strpos($text, '}', $endPos);
-                    if ($attrEnd !== false) {
+                    $attrEnd = $this->findAttributeEnd($text, $endPos);
+                    if ($attrEnd !== null) {
                         $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
                         $this->applyAttributesToNode($link, $attrStr);
                         $endPos = $attrEnd + 1;
@@ -826,8 +826,8 @@ class InlineParser
 
                     // Check for attributes after reference link (override definition attrs)
                     if ($endPos < $length && $text[$endPos] === '{') {
-                        $attrEnd = strpos($text, '}', $endPos);
-                        if ($attrEnd !== false) {
+                        $attrEnd = $this->findAttributeEnd($text, $endPos);
+                        if ($attrEnd !== null) {
                             $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
                             $this->applyAttributesToNode($link, $attrStr);
                             $endPos = $attrEnd + 1;
@@ -850,8 +850,8 @@ class InlineParser
 
                 // Check for attributes after reference link
                 if ($endPos < $length && $text[$endPos] === '{') {
-                    $attrEnd = strpos($text, '}', $endPos);
-                    if ($attrEnd !== false) {
+                    $attrEnd = $this->findAttributeEnd($text, $endPos);
+                    if ($attrEnd !== null) {
                         $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
                         $this->applyAttributesToNode($link, $attrStr);
                         $endPos = $attrEnd + 1;
@@ -867,8 +867,8 @@ class InlineParser
 
         // Check for attribute span: [text]{.class}
         if ($afterBracket < $length && $text[$afterBracket] === '{') {
-            $attrEnd = strpos($text, '}', $afterBracket);
-            if ($attrEnd !== false) {
+            $attrEnd = $this->findAttributeEnd($text, $afterBracket);
+            if ($attrEnd !== null) {
                 $attrStr = substr($text, $afterBracket + 1, $attrEnd - $afterBracket - 1);
                 $span = new Span();
                 $this->applyAttributesToNode($span, $attrStr);
