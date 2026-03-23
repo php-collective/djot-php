@@ -32,13 +32,18 @@ class AttributeParser
     {
         $attributes = [];
 
+        // Strip quoted values before matching .class and #id to avoid
+        // matching dots/hashes inside attribute values like key="file.txt"
+        $strippedForShorthand = preg_replace('/"(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
+        $strippedForShorthand = preg_replace("/'(?:[^'\\\\]|\\\\.)*'/", '', $strippedForShorthand) ?? $strippedForShorthand;
+
         // Parse .class
-        if (preg_match_all('/\.([^\s.#=}]+)/', $attrStr, $classMatches)) {
+        if (preg_match_all('/\.([^\s.#=}]+)/', $strippedForShorthand, $classMatches)) {
             $attributes['class'] = implode(' ', $classMatches[1]);
         }
 
         // Parse #id
-        if (preg_match('/#([^\s.#=}]+)/', $attrStr, $idMatch)) {
+        if (preg_match('/#([^\s.#=}]+)/', $strippedForShorthand, $idMatch)) {
             $attributes['id'] = $idMatch[1];
         }
 
@@ -107,28 +112,37 @@ class AttributeParser
      */
     public static function applyToNode(Node $node, string $attrStr): void
     {
-        // Parse key=value, .class, #id patterns
-        $pattern = '/\.([^\s.#=}]+)|#([^\s.#=}]+)'
-            . '|([^\s.#=}]+)="((?:[^"\\\\]|\\\\.)*)"|([^\s.#=}]+)=\'((?:[^\'\\\\]|\\\\.)*)\''
+        // Strip quoted values before matching .class and #id to avoid
+        // matching dots/hashes inside attribute values like key="file.txt"
+        $strippedForShorthand = preg_replace('/"(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
+        $strippedForShorthand = preg_replace("/'(?:[^'\\\\]|\\\\.)*'/", '', $strippedForShorthand) ?? $strippedForShorthand;
+
+        // Parse .class and #id on stripped string
+        if (preg_match_all('/\.([^\s.#=}]+)/', $strippedForShorthand, $classMatches)) {
+            foreach ($classMatches[1] as $class) {
+                $node->addClass($class);
+            }
+        }
+
+        if (preg_match('/#([^\s.#=}]+)/', $strippedForShorthand, $idMatch)) {
+            $node->setAttribute('id', $idMatch[1]);
+        }
+
+        // Parse key=value on original string (needs quoted values intact)
+        $kvPattern = '/([^\s.#=}]+)="((?:[^"\\\\]|\\\\.)*)"|([^\s.#=}]+)=\'((?:[^\'\\\\]|\\\\.)*)\''
             . '|([^\s.#=}]+)=([^\s}"\']+)/';
-        preg_match_all($pattern, $attrStr, $matches, PREG_SET_ORDER);
+        preg_match_all($kvPattern, $attrStr, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $match) {
-            if (!empty($match[1])) {
-                // Class attribute
-                $node->addClass($match[1]);
-            } elseif (!empty($match[2])) {
-                // ID attribute
-                $node->setAttribute('id', $match[2]);
-            } elseif (($match[3] ?? '') !== '') {
+            if (($match[1] ?? '') !== '') {
                 // key="double quoted value"
+                $node->setAttribute($match[1], self::processEscapes($match[2] ?? ''));
+            } elseif (($match[3] ?? '') !== '') {
+                // key='single quoted value'
                 $node->setAttribute($match[3], self::processEscapes($match[4] ?? ''));
             } elseif (($match[5] ?? '') !== '') {
-                // key='single quoted value'
-                $node->setAttribute($match[5], self::processEscapes($match[6] ?? ''));
-            } elseif (($match[7] ?? '') !== '') {
                 // key=unquoted
-                $node->setAttribute($match[7], $match[8] ?? '');
+                $node->setAttribute($match[5], $match[6] ?? '');
             }
         }
 
