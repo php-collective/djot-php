@@ -96,6 +96,68 @@ class AttributeParser
     }
 
     /**
+     * Parse attribute string preserving source order
+     *
+     * @param string $attrStr The attribute string to parse
+     *
+     * @return array<string, string> Parsed attributes in source order
+     */
+    public static function parseOrdered(string $attrStr): array
+    {
+        // Remove comments before parsing
+        $attrStr = self::removeComments($attrStr);
+
+        $attributes = [];
+
+        // Single-pass regex that matches all token types in source order.
+        // Order matters: quoted values and invalid unquoted values must be matched/skipped
+        // first to prevent dots/hashes inside them from being matched as .class or #id.
+        $pattern = '/'
+            // Group 1,2: key="double quoted value"
+            . '(?:(?<=\s)|^)([a-zA-Z0-9_:-]+)="((?:[^"\\\\]|\\\\.)*)"|'
+            // Group 3,4: key='single quoted value'
+            . '(?:(?<=\s)|^)([a-zA-Z0-9_:-]+)=\'((?:[^\'\\\\]|\\\\.)*)\'|'
+            // Group 5,6: key=unquoted (must end at whitespace/}/end, not invalid chars)
+            . '(?:(?<=\s)|^)([a-zA-Z0-9_:-]+)=([a-zA-Z0-9_:-]+)(?=\s|}|$)|'
+            // Skip invalid unquoted values (e.g. key=foo.bar) - consume but don't capture
+            . '(?:(?<=\s)|^)[a-zA-Z0-9_:-]+=[^\s}]+|'
+            // Group 7: .class shorthand
+            . '\.([^\s.#=}]+)|'
+            // Group 8: #id shorthand
+            . '#([^\s.#=}]+)|'
+            // Group 9: boolean attribute (bareword)
+            . '(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|}|$)'
+            . '/';
+
+        preg_match_all($pattern, $attrStr, $matches, PREG_SET_ORDER);
+
+        foreach ($matches as $match) {
+            if (($match[1] ?? '') !== '') {
+                // key="double quoted value"
+                $attributes[$match[1]] = self::processEscapes($match[2] ?? '');
+            } elseif (($match[3] ?? '') !== '') {
+                // key='single quoted value'
+                $attributes[$match[3]] = self::processEscapes($match[4] ?? '');
+            } elseif (($match[5] ?? '') !== '') {
+                // key=unquoted
+                $attributes[$match[5]] = $match[6] ?? '';
+            } elseif (($match[7] ?? '') !== '') {
+                // .class shorthand - accumulate classes
+                $existing = $attributes['class'] ?? '';
+                $attributes['class'] = $existing !== '' ? $existing . ' ' . $match[7] : $match[7];
+            } elseif (($match[8] ?? '') !== '') {
+                // #id shorthand
+                $attributes['id'] = $match[8];
+            } elseif (($match[9] ?? '') !== '') {
+                // boolean attribute
+                $attributes[$match[9]] = '';
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
      * Parse attribute string and merge with existing attributes
      *
      * @param array<string, string> $existing Existing attributes to merge with
@@ -105,7 +167,7 @@ class AttributeParser
      */
     public static function parseAndMerge(array $existing, string $attrStr): array
     {
-        $parsed = self::parse($attrStr);
+        $parsed = self::parseOrdered($attrStr);
 
         // Special handling for class: merge rather than replace
         if (isset($parsed['class']) && isset($existing['class'])) {
