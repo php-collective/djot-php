@@ -121,4 +121,19 @@ class MentionsExtensionTest extends TestCase
         $this->assertStringContainsString('@support', $html);
         $this->assertStringNotContainsString('href="/users/view/support"', $html);
     }
+
+    public function testRepeatedRenderDoesNotDuplicateMentionClasses(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new MentionsExtension(cssClass: 'mention user-link'));
+
+        $document = $converter->parse('Hello @johndoe!');
+
+        $first = $converter->render($document);
+        $second = $converter->render($document);
+
+        $this->assertStringContainsString('class="mention user-link"', $first);
+        $this->assertStringContainsString('class="mention user-link"', $second);
+        $this->assertStringNotContainsString('mention user-link mention user-link', $second);
+    }
 }
