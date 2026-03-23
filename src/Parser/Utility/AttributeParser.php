@@ -113,37 +113,37 @@ class AttributeParser
     /**
      * Apply attributes from a string directly to a node
      *
+     * Parses all attribute tokens in source order to preserve attribute ordering
+     * in the rendered output (matching the reference JS implementation behavior).
+     *
      * @param \Djot\Node\Node $node The node to apply attributes to
      * @param string $attrStr The attribute string to parse
      */
     public static function applyToNode(Node $node, string $attrStr): void
     {
-        // Strip quoted values and unquoted key=value pairs before matching .class and #id
-        // to avoid matching dots/hashes inside attribute values like key="file.txt"
-        // or partial matches from invalid unquoted values like key=foo.bar
-        $strippedForShorthand = preg_replace('/"(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
-        $strippedForShorthand = preg_replace("/'(?:[^'\\\\]|\\\\.)*'/", '', $strippedForShorthand) ?? $strippedForShorthand;
-        // Strip unquoted key=value tokens entirely (up to whitespace) to prevent
-        // invalid chars like dots from being misinterpreted as .class shorthand
-        $strippedForShorthand = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}]+/', '', $strippedForShorthand) ?? $strippedForShorthand;
-
-        // Parse .class and #id on stripped string
-        if (preg_match_all('/\.([^\s.#=}]+)/', $strippedForShorthand, $classMatches)) {
-            foreach ($classMatches[1] as $class) {
-                $node->addClass($class);
-            }
-        }
-
-        if (preg_match('/#([^\s.#=}]+)/', $strippedForShorthand, $idMatch)) {
-            $node->setAttribute('id', $idMatch[1]);
-        }
-
-        // Parse key=value on original string (needs quoted values intact)
+        // Single-pass regex that matches all token types in source order.
+        // Order matters: quoted values and invalid unquoted values must be matched/skipped
+        // first to prevent dots/hashes inside them from being matched as .class or #id.
         // Per djot spec, unquoted values may only contain: alphanumerics, underscore, colon, hyphen
-        // Unquoted values must be followed by whitespace or } to be valid (not invalid chars like dots)
-        $kvPattern = '/([^\s.#=}]+)="((?:[^"\\\\]|\\\\.)*)"|([^\s.#=}]+)=\'((?:[^\'\\\\]|\\\\.)*)\''
-            . '|([^\s.#=}]+)=([a-zA-Z0-9_:-]+)(?=\s|}|$)/';
-        preg_match_all($kvPattern, $attrStr, $matches, PREG_SET_ORDER);
+        $pattern = '/'
+            // Group 1,2: key="double quoted value"
+            . '([a-zA-Z_][a-zA-Z0-9_-]*)="((?:[^"\\\\]|\\\\.)*)"|'
+            // Group 3,4: key='single quoted value'
+            . '([a-zA-Z_][a-zA-Z0-9_-]*)=\'((?:[^\'\\\\]|\\\\.)*)\'|'
+            // Group 5,6: key=unquoted (must end at whitespace/}/end, not invalid chars)
+            . '([a-zA-Z_][a-zA-Z0-9_-]*)=([a-zA-Z0-9_:-]+)(?=\s|}|$)|'
+            // Skip invalid unquoted values (e.g. key=foo.bar) - consume but don't capture
+            // This prevents .bar from being matched as a class
+            . '[a-zA-Z_][a-zA-Z0-9_-]*=[^\s}]+|'
+            // Group 7: .class shorthand
+            . '\.([^\s.#=}]+)|'
+            // Group 8: #id shorthand
+            . '#([^\s.#=}]+)|'
+            // Group 9: boolean attribute (bareword)
+            . '(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|}|$)'
+            . '/';
+
+        preg_match_all($pattern, $attrStr, $matches, PREG_SET_ORDER);
 
         foreach ($matches as $match) {
             if (($match[1] ?? '') !== '') {
@@ -155,17 +155,15 @@ class AttributeParser
             } elseif (($match[5] ?? '') !== '') {
                 // key=unquoted
                 $node->setAttribute($match[5], $match[6] ?? '');
-            }
-        }
-
-        // Parse boolean attributes
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*="(?:[^"\\\\]|\\\\.)*"/', '', $attrStr) ?? $attrStr;
-        $strippedAttr = preg_replace("/[a-zA-Z_][a-zA-Z0-9_-]*='(?:[^'\\\\]|\\\\.)*'/", '', $strippedAttr) ?? $strippedAttr;
-        $strippedAttr = preg_replace('/[a-zA-Z_][a-zA-Z0-9_-]*=[a-zA-Z0-9_:-]+/', '', $strippedAttr) ?? $strippedAttr;
-
-        if (preg_match_all('/(?:^|\s)([a-zA-Z][a-zA-Z0-9_-]*)(?=\s|$)/', $strippedAttr, $boolMatches)) {
-            foreach ($boolMatches[1] as $boolAttr) {
-                $node->setAttribute($boolAttr, '');
+            } elseif (($match[7] ?? '') !== '') {
+                // .class shorthand
+                $node->addClass($match[7]);
+            } elseif (($match[8] ?? '') !== '') {
+                // #id shorthand
+                $node->setAttribute('id', $match[8]);
+            } elseif (($match[9] ?? '') !== '') {
+                // boolean attribute
+                $node->setAttribute($match[9], '');
             }
         }
     }
