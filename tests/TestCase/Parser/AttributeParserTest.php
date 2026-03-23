@@ -404,4 +404,143 @@ class AttributeParserTest extends TestCase
 
         $this->assertStringContainsString('title="100% done"', $result);
     }
+
+    /**
+     * Tests for curly braces inside quoted attribute values.
+     *
+     * Curly braces inside quoted strings should be treated as literal
+     * characters, not as attribute block delimiters.
+     */
+    public function testCurlyBraceInDoubleQuotedValue(): void
+    {
+        $result = $this->converter->convert('[text]{code="{foo}"}');
+
+        $this->assertStringContainsString('code="{foo}"', $result);
+    }
+
+    public function testCurlyBraceInSingleQuotedValue(): void
+    {
+        $result = $this->converter->convert("[text]{code='{bar}'}");
+
+        $this->assertStringContainsString('code="{bar}"', $result);
+    }
+
+    public function testCurlyBraceInLinkAttributes(): void
+    {
+        $result = $this->converter->convert('[link](http://example.com){data="{json}"}');
+
+        $this->assertStringContainsString('data="{json}"', $result);
+    }
+
+    public function testMultipleCurlyBracesInValue(): void
+    {
+        $result = $this->converter->convert('[text]{template="{{name}}"}');
+
+        $this->assertStringContainsString('template="{{name}}"', $result);
+    }
+
+    /**
+     * Tests for colon in attribute keys (xml:lang, data:foo, etc.).
+     *
+     * Colons should be allowed in attribute key names to support
+     * namespaced attributes like xml:lang.
+     */
+    public function testColonInAttributeKey(): void
+    {
+        $result = AttributeParser::parse('xml:lang=en');
+
+        $this->assertSame('en', $result['xml:lang']);
+    }
+
+    public function testColonInAttributeKeyQuoted(): void
+    {
+        $result = AttributeParser::parse('xmlns:xlink="http://example.com"');
+
+        $this->assertSame('http://example.com', $result['xmlns:xlink']);
+    }
+
+    public function testColonInAttributeKeyConvertedOutput(): void
+    {
+        $result = $this->converter->convert('[text]{xml:lang=en}');
+
+        $this->assertStringContainsString('xml:lang="en"', $result);
+    }
+
+    public function testUnderscoreKeyAfterWhitespace(): void
+    {
+        // Underscore-prefixed keys are valid after whitespace (matching JS reference)
+        $result = $this->converter->convert('[text]{a=1 _b=2}');
+
+        $this->assertStringContainsString('a="1"', $result);
+        $this->assertStringContainsString('_b="2"', $result);
+    }
+
+    public function testHyphenKeyAfterWhitespace(): void
+    {
+        // Hyphen-prefixed keys are valid after whitespace (matching JS reference)
+        $result = $this->converter->convert('[text]{a=1 -b=2}');
+
+        $this->assertStringContainsString('a="1"', $result);
+        $this->assertStringContainsString('-b="2"', $result);
+    }
+
+    /**
+     * Tests for backslash escape handling in attribute values.
+     *
+     * Per djot spec, backslash escapes ASCII punctuation:
+     * - \\ -> \ (escaped backslash)
+     * - \" -> " (escaped quote)
+     * - \* -> * (escaped asterisk)
+     *
+     * But NOT alphanumeric characters:
+     * - \n remains \n (not newline)
+     * - \t remains \t (not tab)
+     */
+    public function testBackslashBeforeLetterPreserved(): void
+    {
+        // \n and \t should remain literal (not processed as escapes)
+        $result = AttributeParser::parse('desc="line1\\nline2"');
+
+        $this->assertSame('line1\nline2', $result['desc']);
+    }
+
+    public function testDoubleBackslashEscaped(): void
+    {
+        // Double backslash should become single backslash
+        $result = AttributeParser::parse('path="C:\\\\Users\\\\test"');
+
+        $this->assertSame('C:\Users\test', $result['path']);
+    }
+
+    public function testEscapedQuoteInValue(): void
+    {
+        // Escaped quote should become literal quote
+        $result = AttributeParser::parse('title="say \\"hello\\""');
+
+        $this->assertSame('say "hello"', $result['title']);
+    }
+
+    public function testEscapedAsterisk(): void
+    {
+        // \* should become just *
+        $result = AttributeParser::parse('key="\\*"');
+
+        $this->assertSame('*', $result['key']);
+    }
+
+    public function testEscapedPunctuation(): void
+    {
+        // Various punctuation escapes
+        $result = AttributeParser::parse('key="\\{\\}\\[\\]"');
+
+        $this->assertSame('{}[]', $result['key']);
+    }
+
+    public function testMixedEscapes(): void
+    {
+        // \\\* = \\ + * (after escape processing) = \*
+        $result = AttributeParser::parse('key="\\\\\\*"');
+
+        $this->assertSame('\*', $result['key']);
+    }
 }
