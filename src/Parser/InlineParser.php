@@ -1744,6 +1744,7 @@ class InlineParser
             // Check for escape sequence
             if ($char === '\\' && $pos + 1 < $length) {
                 $pos += 2; // Skip escaped character
+
                 continue;
             }
 
@@ -1752,8 +1753,10 @@ class InlineParser
                 // Make sure it's not %%% (fenced comment marker)
                 if ($pos + 2 < $length && $line[$pos + 2] === '%') {
                     $pos++;
+
                     continue;
                 }
+
                 // Found line comment - strip rest of line
                 return rtrim(substr($line, 0, $pos));
             }
@@ -1761,24 +1764,28 @@ class InlineParser
             // Skip backtick spans (code)
             if ($char === '`') {
                 $pos = $this->skipBacktickSpan($line, $pos, $length);
+
                 continue;
             }
 
             // Skip dollar signs (math) - $...$ or $$...$$
             if ($char === '$') {
                 $pos = $this->skipMathSpan($line, $pos, $length);
+
                 continue;
             }
 
             // Skip parenthesized content (link destinations/titles)
             if ($char === '(') {
                 $pos = $this->skipParenthesized($line, $pos, $length);
+
                 continue;
             }
 
             // Skip curly braces (attributes) - handle quoted values inside
             if ($char === '{') {
                 $pos = $this->skipAttributeBlock($line, $pos, $length);
+
                 continue;
             }
 
@@ -1833,6 +1840,7 @@ class InlineParser
         while ($pos <= $length - $delimLen) {
             if ($line[$pos] === '\\' && $pos + 1 < $length) {
                 $pos += 2; // Skip escaped character
+
                 continue;
             }
             if (substr($line, $pos, $delimLen) === $delimiter) {
@@ -1857,12 +1865,14 @@ class InlineParser
 
             if ($char === '\\' && $pos + 1 < $length) {
                 $pos += 2; // Skip escaped character
+
                 continue;
             }
 
             // Handle quoted strings inside parentheses (link titles)
             if ($char === '"' || $char === "'") {
                 $pos = $this->skipQuotedString($line, $pos, $length, $char);
+
                 continue;
             }
 
@@ -1890,12 +1900,14 @@ class InlineParser
 
             if ($char === '\\' && $pos + 1 < $length) {
                 $pos += 2; // Skip escaped character
+
                 continue;
             }
 
             // Handle quoted attribute values
             if ($char === '"' || $char === "'") {
                 $pos = $this->skipQuotedString($line, $pos, $length, $char);
+
                 continue;
             }
 
@@ -1922,6 +1934,7 @@ class InlineParser
 
             if ($char === '\\' && $pos + 1 < $length) {
                 $pos += 2; // Skip escaped character
+
                 continue;
             }
 
