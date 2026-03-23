@@ -673,15 +673,10 @@ class InlineParser
 
             $code = new Code($content);
 
-            // Check for trailing attributes: `code`{.class}
+            // Check for trailing attributes: `code`{.class}{.more}
             // But NOT if there was a {= pattern (failed raw inline attempt should be literal)
             if (!$hasRawInlineAttempt && $endPos < $length && $text[$endPos] === '{') {
-                $attrEnd = $this->findAttributeEnd($text, $endPos);
-                if ($attrEnd !== null) {
-                    $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
-                    $this->applyAttributesToNode($code, $attrStr);
-                    $endPos = $attrEnd + 1;
-                }
+                $endPos = $this->applyConsecutiveAttributes($code, $text, $endPos);
             }
 
             return [
@@ -759,14 +754,9 @@ class InlineParser
 
                 $endPos = $urlEnd + 1;
 
-                // Check for attributes after link: [text](url){.class}
+                // Check for attributes after link: [text](url){.class}{.more}
                 if ($endPos < $length && $text[$endPos] === '{') {
-                    $attrEnd = $this->findAttributeEnd($text, $endPos);
-                    if ($attrEnd !== null) {
-                        $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
-                        $this->applyAttributesToNode($link, $attrStr);
-                        $endPos = $attrEnd + 1;
-                    }
+                    $endPos = $this->applyConsecutiveAttributes($link, $text, $endPos);
                 }
 
                 return [
@@ -826,12 +816,7 @@ class InlineParser
 
                     // Check for attributes after reference link (override definition attrs)
                     if ($endPos < $length && $text[$endPos] === '{') {
-                        $attrEnd = $this->findAttributeEnd($text, $endPos);
-                        if ($attrEnd !== null) {
-                            $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
-                            $this->applyAttributesToNode($link, $attrStr);
-                            $endPos = $attrEnd + 1;
-                        }
+                        $endPos = $this->applyConsecutiveAttributes($link, $text, $endPos);
                     }
 
                     return [
@@ -850,12 +835,7 @@ class InlineParser
 
                 // Check for attributes after reference link
                 if ($endPos < $length && $text[$endPos] === '{') {
-                    $attrEnd = $this->findAttributeEnd($text, $endPos);
-                    if ($attrEnd !== null) {
-                        $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
-                        $this->applyAttributesToNode($link, $attrStr);
-                        $endPos = $attrEnd + 1;
-                    }
+                    $endPos = $this->applyConsecutiveAttributes($link, $text, $endPos);
                 }
 
                 return [
@@ -865,18 +845,18 @@ class InlineParser
             }
         }
 
-        // Check for attribute span: [text]{.class}
+        // Check for attribute span: [text]{.class} or [text]{.foo}{.bar}
         if ($afterBracket < $length && $text[$afterBracket] === '{') {
             $attrEnd = $this->findAttributeEnd($text, $afterBracket);
             if ($attrEnd !== null) {
-                $attrStr = substr($text, $afterBracket + 1, $attrEnd - $afterBracket - 1);
                 $span = new Span();
-                $this->applyAttributesToNode($span, $attrStr);
+                // Apply all consecutive attribute blocks
+                $endPos = $this->applyConsecutiveAttributes($span, $text, $afterBracket);
                 $this->parseInlines($span, $linkText);
 
                 return [
                     'node' => $span,
-                    'pos' => $attrEnd + 1,
+                    'pos' => $endPos,
                 ];
             }
         }
@@ -1101,14 +1081,9 @@ class InlineParser
 
                     $endPos = $actualClose + 1;
 
-                    // Check for trailing attributes: _text_{.class}
+                    // Check for trailing attributes: _text_{.class}{.more}
                     if ($endPos < $length && $text[$endPos] === '{') {
-                        $attrEnd = $this->findAttributeEnd($text, $endPos);
-                        if ($attrEnd !== null) {
-                            $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
-                            $this->applyAttributesToNode($node, $attrStr);
-                            $endPos = $attrEnd + 1;
-                        }
+                        $endPos = $this->applyConsecutiveAttributes($node, $text, $endPos);
                     }
 
                     return [
@@ -1203,14 +1178,9 @@ class InlineParser
 
                 $endPos = $searchPos + 2;
 
-                // Check for trailing attributes: {=text=}{.class}
+                // Check for trailing attributes: {=text=}{.class}{.more}
                 if ($endPos < $length && $text[$endPos] === '{') {
-                    $attrEnd = $this->findAttributeEnd($text, $endPos);
-                    if ($attrEnd !== null) {
-                        $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
-                        $this->applyAttributesToNode($node, $attrStr);
-                        $endPos = $attrEnd + 1;
-                    }
+                    $endPos = $this->applyConsecutiveAttributes($node, $text, $endPos);
                 }
 
                 return [
@@ -1730,6 +1700,33 @@ class InlineParser
     }
 
     /**
+     * Apply all consecutive attribute blocks to a node
+     *
+     * Per djot spec, multiple consecutive attribute blocks like {.foo}{.bar}
+     * should merge. Classes combine, later values override earlier ones.
+     *
+     * @return int The final position after all attribute blocks
+     */
+    protected function applyConsecutiveAttributes(Node $node, string $text, int $startPos): int
+    {
+        $length = strlen($text);
+        $pos = $startPos;
+
+        while ($pos < $length && $text[$pos] === '{') {
+            $attrEnd = $this->findAttributeEnd($text, $pos);
+            if ($attrEnd === null) {
+                break;
+            }
+
+            $attrStr = substr($text, $pos + 1, $attrEnd - $pos - 1);
+            $this->applyAttributesToNode($node, $attrStr);
+            $pos = $attrEnd + 1;
+        }
+
+        return $pos;
+    }
+
+    /**
      * Parse footnote reference [^label]
      *
      * @return array{node: \Djot\Node\Inline\FootnoteRef, pos: int}|null
@@ -1822,14 +1819,9 @@ class InlineParser
         $endPos = $pos + strlen($matches[0]);
         $length = strlen($text);
 
-        // Check for trailing attributes: :symbol:{.class}
+        // Check for trailing attributes: :symbol:{.class}{.more}
         if ($endPos < $length && $text[$endPos] === '{') {
-            $attrEnd = $this->findAttributeEnd($text, $endPos);
-            if ($attrEnd !== null) {
-                $attrStr = substr($text, $endPos + 1, $attrEnd - $endPos - 1);
-                $this->applyAttributesToNode($symbol, $attrStr);
-                $endPos = $attrEnd + 1;
-            }
+            $endPos = $this->applyConsecutiveAttributes($symbol, $text, $endPos);
         }
 
         return [
