@@ -2567,6 +2567,42 @@ DJOT;
         $this->assertSame("<p>hello world</p>\n", $result);
     }
 
+    /**
+     * Leading whitespace in paragraphs should be stripped (matching JS reference)
+     */
+    public function testParagraphStripsLeadingWhitespace(): void
+    {
+        // Single space
+        $this->assertSame("<p>text</p>\n", $this->converter->convert(' text'));
+
+        // Multiple spaces
+        $this->assertSame("<p>text</p>\n", $this->converter->convert('   text'));
+
+        // Tab
+        $this->assertSame("<p>text</p>\n", $this->converter->convert("\ttext"));
+
+        // Mixed spaces and tabs
+        $this->assertSame("<p>text</p>\n", $this->converter->convert("  \t text"));
+    }
+
+    /**
+     * Leading whitespace on continuation lines should also be stripped
+     */
+    public function testParagraphStripsLeadingWhitespaceOnContinuation(): void
+    {
+        // First line has leading space, second doesn't
+        $result = $this->converter->convert("   first line\nsecond line");
+        $this->assertSame("<p>first line\nsecond line</p>\n", $result);
+
+        // Both lines have leading whitespace
+        $result = $this->converter->convert("   first line\n   second line");
+        $this->assertSame("<p>first line\nsecond line</p>\n", $result);
+
+        // Tab on continuation
+        $result = $this->converter->convert("first\n\tsecond");
+        $this->assertSame("<p>first\nsecond</p>\n", $result);
+    }
+
     // ==================== Raw Inline with Mixed Attributes ====================
 
     public function testRawInlineWithMixedAttributesIsLiteral(): void
