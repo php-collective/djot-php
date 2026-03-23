@@ -100,7 +100,8 @@ class AttributeParserTest extends TestCase
         $result = $this->converter->convert('[link]{ref="/guides/setup.html"}');
 
         $this->assertStringContainsString('ref="/guides/setup.html"', $result);
-        $this->assertStringNotContainsString('class', $result);
+        // Use 'class="' to avoid false-fails if "class" appears in content
+        $this->assertStringNotContainsString('class="', $result);
     }
 
     /**
@@ -191,5 +192,96 @@ class AttributeParserTest extends TestCase
 
         $this->assertSame('myclass', $result['class']);
         $this->assertArrayNotHasKey('key', $result);
+    }
+
+    /**
+     * Tests for attribute source order preservation.
+     *
+     * The reference JS implementation preserves the order of attributes
+     * as they appear in the source. This is important for consistent output.
+     */
+    public function testAttributeOrderKeyThenClass(): void
+    {
+        // key=val before .class - should preserve this order
+        $result = $this->converter->convert('[text]{key=val .foo}');
+
+        // key should appear before class in the output
+        $keyPos = strpos($result, 'key="val"');
+        $classPos = strpos($result, 'class="foo"');
+
+        $this->assertNotFalse($keyPos);
+        $this->assertNotFalse($classPos);
+        $this->assertLessThan($classPos, $keyPos, 'key should appear before class');
+    }
+
+    public function testAttributeOrderClassThenKey(): void
+    {
+        // .class before key=val - should preserve this order
+        $result = $this->converter->convert('[text]{.foo key=val}');
+
+        // class should appear before key in the output
+        $classPos = strpos($result, 'class="foo"');
+        $keyPos = strpos($result, 'key="val"');
+
+        $this->assertNotFalse($classPos);
+        $this->assertNotFalse($keyPos);
+        $this->assertLessThan($keyPos, $classPos, 'class should appear before key');
+    }
+
+    public function testAttributeOrderWithQuotedValue(): void
+    {
+        // Quoted value with dot, followed by class
+        $result = $this->converter->convert('[text]{src="image.png" .thumbnail}');
+
+        $srcPos = strpos($result, 'src="image.png"');
+        $classPos = strpos($result, 'class="thumbnail"');
+
+        $this->assertNotFalse($srcPos);
+        $this->assertNotFalse($classPos);
+        $this->assertLessThan($classPos, $srcPos, 'src should appear before class');
+    }
+
+    public function testAttributeOrderClassThenQuotedValue(): void
+    {
+        // Class before quoted value
+        $result = $this->converter->convert('[text]{.thumbnail src="image.png"}');
+
+        $classPos = strpos($result, 'class="thumbnail"');
+        $srcPos = strpos($result, 'src="image.png"');
+
+        $this->assertNotFalse($classPos);
+        $this->assertNotFalse($srcPos);
+        $this->assertLessThan($srcPos, $classPos, 'class should appear before src');
+    }
+
+    public function testAttributeOrderMultipleAttributes(): void
+    {
+        // Multiple attributes in specific order
+        $result = $this->converter->convert('[text]{role=button .primary title="Click me"}');
+
+        $rolePos = strpos($result, 'role="button"');
+        $classPos = strpos($result, 'class="primary"');
+        $titlePos = strpos($result, 'title="Click me"');
+
+        $this->assertNotFalse($rolePos);
+        $this->assertNotFalse($classPos);
+        $this->assertNotFalse($titlePos);
+        $this->assertLessThan($classPos, $rolePos, 'role should appear before class');
+        $this->assertLessThan($titlePos, $classPos, 'class should appear before title');
+    }
+
+    public function testInvalidUnquotedValueDoesNotAffectOrder(): void
+    {
+        // Invalid unquoted value should be skipped, not affect ordering of valid attrs
+        $result = $this->converter->convert('[text]{.myclass invalid=foo.bar data-x=valid}');
+
+        $classPos = strpos($result, 'class="myclass"');
+        $dataPos = strpos($result, 'data-x="valid"');
+
+        $this->assertNotFalse($classPos);
+        $this->assertNotFalse($dataPos);
+        // invalid=foo.bar should be skipped entirely
+        $this->assertStringNotContainsString('invalid=', $result);
+        $this->assertLessThan($dataPos, $classPos, 'class should appear before data-x');
     }
 }
