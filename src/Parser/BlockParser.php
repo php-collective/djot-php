@@ -2760,7 +2760,8 @@ class BlockParser
     protected function tryParseParagraph(Node $parent, array $lines, int $start): int
     {
         $line = $lines[$start];
-        $content = $line;
+        // Strip leading whitespace from first line (matching JS reference)
+        $content = ltrim($line);
 
         $i = $start + 1;
         $count = count($lines);
@@ -2780,8 +2781,8 @@ class BlockParser
                 break;
             }
 
-            // Strip leading indentation from continuation lines (up to 3 spaces)
-            $nextLine = preg_replace('/^   /', '', $nextLine) ?? $nextLine;
+            // Strip leading whitespace from continuation lines (matching JS reference)
+            $nextLine = ltrim($nextLine);
             $content .= "\n" . $nextLine;
             $i++;
         }
