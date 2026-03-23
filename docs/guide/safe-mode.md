@@ -54,8 +54,7 @@ $converter = new DjotConverter(safeMode: SafeMode::strict());
 
 Strict mode additionally:
 - Strips raw HTML entirely (instead of escaping)
-- Blocks all non-http(s) URL schemes
-- Removes all custom attributes
+- Blocks `style` attribute (prevents CSS-based attacks like `expression()`, `-moz-binding`)
 
 ## Custom Configuration
 
