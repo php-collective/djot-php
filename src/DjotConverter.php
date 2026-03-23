@@ -149,30 +149,14 @@ class DjotConverter
 
     /**
      * Convert Djot markup to HTML
-     *
-     * @throws \LengthException If input exceeds profile's max length
      */
     public function convert(string $djot): string
     {
         // Check max length before parsing
-        if ($this->profile !== null && $this->profile->getMaxLength() > 0) {
-            if (strlen($djot) > $this->profile->getMaxLength()) {
-                throw new LengthException(
-                    sprintf(
-                        'Input length (%d bytes) exceeds maximum allowed (%d bytes)',
-                        strlen($djot),
-                        $this->profile->getMaxLength(),
-                    ),
-                );
-            }
-        }
+        $this->enforceProfileMaxLength($djot);
 
         $document = $this->parse($djot);
-
-        // Apply profile filter after parsing
-        if ($this->profile !== null && $this->profileFilter !== null) {
-            $document = $this->profileFilter->filter($document, $this->profile);
-        }
+        $document = $this->applyProfile($document);
 
         $html = $this->render($document);
 
@@ -186,10 +170,24 @@ class DjotConverter
 
     /**
      * Convert a Djot file to HTML
+     *
+     * @throws \RuntimeException
      */
     public function convertFile(string $path): string
     {
-        $document = $this->parseFile($path);
+        if (!is_file($path)) {
+            throw new RuntimeException("File not found: {$path}");
+        }
+
+        $content = file_get_contents($path);
+        if ($content === false) {
+            throw new RuntimeException("Failed to read file: {$path}");
+        }
+
+        $this->enforceProfileMaxLength($content);
+
+        $document = $this->parse($content);
+        $document = $this->applyProfile($document);
 
         $html = $this->render($document);
 
@@ -393,5 +391,36 @@ class DjotConverter
     public function hasProfileViolations(): bool
     {
         return count($this->getProfileViolations()) > 0;
+    }
+
+    /**
+     * @throws \LengthException If input exceeds profile's max length
+     */
+    protected function enforceProfileMaxLength(string $input): void
+    {
+        if ($this->profile !== null && $this->profile->getMaxLength() > 0) {
+            if (strlen($input) > $this->profile->getMaxLength()) {
+                throw new LengthException(
+                    sprintf(
+                        'Input length (%d bytes) exceeds maximum allowed (%d bytes)',
+                        strlen($input),
+                        $this->profile->getMaxLength(),
+                    ),
+                );
+            }
+        }
+    }
+
+    protected function applyProfile(Document $document): Document
+    {
+        if ($this->profileFilter !== null) {
+            $this->profileFilter->clearViolations();
+        }
+
+        if ($this->profile !== null && $this->profileFilter !== null) {
+            return $this->profileFilter->filter($document, $this->profile);
+        }
+
+        return $document;
     }
 }
