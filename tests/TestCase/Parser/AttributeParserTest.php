@@ -345,4 +345,63 @@ class AttributeParserTest extends TestCase
         $this->assertStringNotContainsString('this', $result);
         $this->assertStringNotContainsString('comment', $result);
     }
+
+    /**
+     * Tests for percent signs inside quoted values.
+     *
+     * Percent signs are used as comment markers in djot attributes,
+     * but when they appear inside quoted strings, they should be
+     * treated as literal characters, not comment markers.
+     */
+    public function testPercentInDoubleQuotedValue(): void
+    {
+        $result = AttributeParser::parse('title="100% done"');
+
+        $this->assertSame('100% done', $result['title']);
+    }
+
+    public function testPercentAtEndOfDoubleQuotedValue(): void
+    {
+        $result = AttributeParser::parse('title="100%"');
+
+        $this->assertSame('100%', $result['title']);
+    }
+
+    public function testPercentInSingleQuotedValue(): void
+    {
+        $result = AttributeParser::parse("title='50% off'");
+
+        $this->assertSame('50% off', $result['title']);
+    }
+
+    public function testPercentInQuotedValueWithClass(): void
+    {
+        $result = AttributeParser::parse('.class title="50% off"');
+
+        $this->assertSame('class', $result['class']);
+        $this->assertSame('50% off', $result['title']);
+    }
+
+    public function testMultiplePercentsInQuotedValue(): void
+    {
+        $result = AttributeParser::parse('desc="10% to 20% discount"');
+
+        $this->assertSame('10% to 20% discount', $result['desc']);
+    }
+
+    public function testPercentInQuotedValueFollowedByComment(): void
+    {
+        // The % inside quotes is literal, the % outside starts a comment
+        $result = AttributeParser::parse('title="100% done" % this is a comment');
+
+        $this->assertSame('100% done', $result['title']);
+        $this->assertArrayNotHasKey('this', $result);
+    }
+
+    public function testPercentInQuotedValueInConvertedOutput(): void
+    {
+        $result = $this->converter->convert('[text]{title="100% done"}');
+
+        $this->assertStringContainsString('title="100% done"', $result);
+    }
 }
