@@ -13,8 +13,8 @@ hero:
       text: Get Started
       link: /guide/
     - theme: alt
-      text: Playground
-      link: /playground
+      text: Syntax Reference
+      link: /guide/syntax
     - theme: alt
       text: View on GitHub
       link: https://github.com/php-collective/djot-php
