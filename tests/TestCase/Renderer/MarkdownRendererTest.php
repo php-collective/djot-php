@@ -266,7 +266,7 @@ class MarkdownRendererTest extends TestCase
 
     public function testDefinitionList(): void
     {
-        $djot = "Term\n: Definition";
+        $djot = ": Term\n\n  Definition";
         $document = $this->converter->parse($djot);
         $result = $this->renderer->render($document);
 
