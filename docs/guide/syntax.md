@@ -394,17 +394,36 @@ The underscore notation `[_]` is useful on mobile devices or in editors without 
 
 ### Definition Lists
 
-Terms followed by `: ` definitions.
+Terms are prefixed with `: ` and definitions are indented below.
 
-**Input:**
-```djot
-Term 1
-: Definition of term 1
+::: code-group
+```djot [Basic]
+: Term 1
 
-Term 2
-: Definition of term 2
-: Alternative definition
+  Definition of term 1
+
+: Term 2
+
+  Definition of term 2
 ```
+
+```djot [Multiple Terms]
+: color
+: colour
+
+  The visual property of objects.
+```
+
+```djot [Multiple Definitions]
+: word
+
+  First meaning.
+
+: +
+
+  Second meaning (separate dd).
+```
+:::
 
 <OutputTabs>
 <template #output>
@@ -412,10 +431,9 @@ Term 2
 ```html
 <dl>
 <dt>Term 1</dt>
-<dd>Definition of term 1</dd>
+<dd><p>Definition of term 1</p></dd>
 <dt>Term 2</dt>
-<dd>Definition of term 2</dd>
-<dd>Alternative definition</dd>
+<dd><p>Definition of term 2</p></dd>
 </dl>
 ```
 
@@ -423,13 +441,20 @@ Term 2
 <template #result>
 <dl>
 <dt>Term 1</dt>
-<dd>Definition of term 1</dd>
+<dd><p>Definition of term 1</p></dd>
 <dt>Term 2</dt>
-<dd>Definition of term 2</dd>
-<dd>Alternative definition</dd>
+<dd><p>Definition of term 2</p></dd>
 </dl>
 </template>
 </OutputTabs>
+
+::: tip Enhancements
+- **Multiple terms**: Consecutive `: term` lines share a definition
+- **Multiple definitions**: Use `: +` continuation for separate `<dd>` elements
+- **Attributes**: Add `{.class}` to terms or definitions
+
+See [definition list enhancements](/reference/enhancements#multiple-definition-terms) for full details.
+:::
 
 ### Tables
 
