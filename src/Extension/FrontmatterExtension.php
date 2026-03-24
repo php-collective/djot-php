@@ -104,7 +104,9 @@ class FrontmatterExtension implements ExtensionInterface
                     return null;
                 }
 
-                preg_match('/^---(\w+)(\s+\{([^}]+)\})?\s*$/', $lines[$start], $matches);
+                if (!preg_match('/^---(\w+)(\s+\{([^}]+)\})?\s*$/', $lines[$start], $matches)) {
+                    return null; // @codeCoverageIgnore - pattern already matched
+                }
                 $format = $matches[1];
                 $attrString = $matches[3] ?? null;
 
