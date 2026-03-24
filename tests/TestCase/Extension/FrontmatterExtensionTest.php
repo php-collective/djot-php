@@ -407,4 +407,95 @@ DJOT;
         $this->assertStringContainsString('&#45;&#45;', $html);
         $this->assertStringNotContainsString('-- dashes', $html);
     }
+
+    public function testUnclosedFrontmatterNotParsed(): void
+    {
+        $ext = new FrontmatterExtension();
+        $converter = new DjotConverter();
+        $converter->addExtension($ext);
+
+        // Frontmatter without closing ---
+        $djot = <<<'DJOT'
+---yaml
+title: Missing Closer
+
+# This should be content, not frontmatter
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Should NOT be parsed as frontmatter since closing --- is missing
+        $this->assertFalse($ext->hasFrontmatter());
+
+        // Content should appear in output (as paragraph since ---yaml line isn't valid block)
+        $this->assertStringContainsString('title:', $html);
+    }
+
+    public function testExtensionReuseAutoClearsState(): void
+    {
+        $ext = new FrontmatterExtension();
+        $converter = new DjotConverter();
+        $converter->addExtension($ext);
+
+        // First document with frontmatter
+        $djot1 = <<<'DJOT'
+---yaml
+doc: first
+---
+
+First document.
+DJOT;
+
+        $converter->convert($djot1);
+        $this->assertTrue($ext->hasFrontmatter());
+        $this->assertStringContainsString('first', $ext->getContent());
+
+        // Second document WITHOUT frontmatter (no explicit reset)
+        $djot2 = <<<'DJOT'
+# Second Document
+
+No frontmatter here.
+DJOT;
+
+        $converter->convert($djot2);
+
+        // State should be automatically cleared - should NOT retain first document's frontmatter
+        $this->assertFalse($ext->hasFrontmatter());
+        $this->assertNull($ext->getContent());
+    }
+
+    public function testExtensionReuseWithNewFrontmatter(): void
+    {
+        $ext = new FrontmatterExtension();
+        $converter = new DjotConverter();
+        $converter->addExtension($ext);
+
+        // First document
+        $djot1 = <<<'DJOT'
+---yaml
+doc: first
+---
+
+First.
+DJOT;
+
+        $converter->convert($djot1);
+        $this->assertStringContainsString('first', $ext->getContent());
+
+        // Second document with different frontmatter (no explicit reset)
+        $djot2 = <<<'DJOT'
+---toml
+doc = "second"
+---
+
+Second.
+DJOT;
+
+        $converter->convert($djot2);
+
+        // Should have second document's frontmatter
+        $this->assertTrue($ext->hasFrontmatter());
+        $this->assertSame('toml', $ext->getFormat());
+        $this->assertStringContainsString('second', $ext->getContent());
+    }
 }

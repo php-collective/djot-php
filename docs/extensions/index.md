@@ -99,6 +99,7 @@ tags:
 **Basic usage:**
 
 ```php
+use Djot\DjotConverter;
 use Djot\Extension\FrontmatterExtension;
 
 $ext = new FrontmatterExtension();
@@ -139,6 +140,9 @@ echo $metadata['author']; // 'John Doe'
 By default, frontmatter produces no HTML output. You can change this:
 
 ```php
+use Djot\Extension\Frontmatter;
+use Djot\Extension\FrontmatterExtension;
+
 // Render as HTML comment (useful for debugging)
 $ext = new FrontmatterExtension(renderAsComment: true);
 
@@ -169,7 +173,7 @@ $converter->convert($anotherDocument);
 
 **Attributes:**
 
-You can add djot attributes to frontmatter blocks:
+You can add djot attributes to frontmatter blocks using *inline syntax* on the same line:
 
 ```djot
 ---yaml {.meta}
@@ -180,6 +184,10 @@ title: Document with meta class
 import flight
 ---
 ```
+
+::: warning
+Attributes must be on the same line as `---format`. Block-style attributes on a preceding line (like `{.meta}` alone before `---yaml`) will *not* be applied to the frontmatter - they will be applied to the next content block instead.
+:::
 
 Access attributes via the Frontmatter node:
 

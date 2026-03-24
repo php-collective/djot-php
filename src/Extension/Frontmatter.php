@@ -27,7 +27,7 @@ class Frontmatter extends BlockNode
 {
     public function __construct(
         protected string $content = '',
-        protected ?string $format = null,
+        protected string $format = 'yaml',
     ) {
     }
 
@@ -50,7 +50,7 @@ class Frontmatter extends BlockNode
     /**
      * Get the format identifier (yaml, toml, json, etc.)
      */
-    public function getFormat(): ?string
+    public function getFormat(): string
     {
         return $this->format;
     }
@@ -58,7 +58,7 @@ class Frontmatter extends BlockNode
     /**
      * Set the format identifier
      */
-    public function setFormat(?string $format): void
+    public function setFormat(string $format): void
     {
         $this->format = $format;
     }

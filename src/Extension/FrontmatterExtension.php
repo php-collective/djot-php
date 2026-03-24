@@ -114,17 +114,24 @@ class FrontmatterExtension implements ExtensionInterface
                 $i = $start + 1;
                 $count = count($lines);
                 $contentLines = [];
+                $closed = false;
 
                 while ($i < $count) {
                     $line = $lines[$i];
                     // Closing delimiter is just ---
                     if (preg_match('/^---\s*$/', $line)) {
                         $i++;
+                        $closed = true;
 
                         break;
                     }
                     $contentLines[] = $line;
                     $i++;
+                }
+
+                // If no closing delimiter found, don't treat as frontmatter
+                if (!$closed) {
+                    return null;
                 }
 
                 $content = implode("\n", $contentLines);
@@ -143,6 +150,40 @@ class FrontmatterExtension implements ExtensionInterface
                 return $i - $start;
             },
         );
+
+        // Track which document we've processed to clear stale state
+        $processedDoc = null;
+
+        // Clear state when rendering a new document (using wildcard to catch first child)
+        $converter->on('render.*', function (RenderEvent $event) use (&$processedDoc): void {
+            $node = $event->getNode();
+            $parent = $node->getParent();
+
+            // Only process when we see a direct child of Document
+            if (!($parent instanceof Document)) {
+                return;
+            }
+
+            // If this is a new document (different from last processed), check for frontmatter
+            if ($processedDoc !== $parent) {
+                $processedDoc = $parent;
+
+                // Check if this document has a Frontmatter node
+                $hasFrontmatter = false;
+                foreach ($parent->getChildren() as $child) {
+                    if ($child instanceof Frontmatter) {
+                        $hasFrontmatter = true;
+
+                        break;
+                    }
+                }
+
+                // Clear stale state if no frontmatter in this document
+                if (!$hasFrontmatter) {
+                    $this->frontmatter = null;
+                }
+            }
+        });
 
         // Register render event to control output
         $converter->on('render.frontmatter', function (RenderEvent $event): void {
@@ -234,7 +275,7 @@ class FrontmatterExtension implements ExtensionInterface
 
         return $parser(
             $this->frontmatter->getContent(),
-            $this->frontmatter->getFormat() ?? 'yaml',
+            $this->frontmatter->getFormat(),
         );
     }
 
