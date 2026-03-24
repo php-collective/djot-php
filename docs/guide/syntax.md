@@ -392,6 +392,42 @@ The underscore notation `[_]` is useful on mobile devices or in editors without 
 </template>
 </OutputTabs>
 
+#### List Item Attributes (Extension)
+
+Attributes can be added to list items on the following indented line:
+
+**Input:**
+```djot
+- item 1
+  {.highlight #id1}
+- item 2
+  {data-value="test"}
+- item 3
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<ul>
+<li class="highlight" id="id1">item 1</li>
+<li data-value="test">item 2</li>
+<li>item 3</li>
+</ul>
+```
+
+</template>
+<template #result>
+<ul>
+<li class="highlight" id="id1">item 1</li>
+<li data-value="test">item 2</li>
+<li>item 3</li>
+</ul>
+</template>
+</OutputTabs>
+
+Works with all list types (unordered, ordered, and task lists). The attribute line must be indented to the content indentation level.
+
 ### Definition Lists
 
 Terms are prefixed with `: ` and definitions are indented below.
@@ -451,10 +487,55 @@ Terms are prefixed with `: ` and definitions are indented below.
 ::: tip Enhancements
 - **Multiple terms**: Consecutive `: term` lines share a definition
 - **Multiple definitions**: Use `: +` continuation for separate `<dd>` elements
-- **Attributes**: Add `{.class}` to terms or definitions
+- **Attributes**: Add `{.class}` to `<dl>`, `<dt>`, or `<dd>` elements
 
 See [definition list enhancements](/reference/enhancements#multiple-definition-terms) for full details.
 :::
+
+#### Definition List Attributes (Extension)
+
+Attributes can be attached to individual definition list elements:
+
+**Input:**
+```djot
+{.vocabulary}
+: color
+{.american}
+: colour
+{.british}
+
+  The visual property of objects.
+  {.primary}
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<dl class="vocabulary">
+<dt class="american">color</dt>
+<dt class="british">colour</dt>
+<dd class="primary">
+<p>The visual property of objects.</p>
+</dd>
+</dl>
+```
+
+</template>
+<template #result>
+<dl class="vocabulary">
+<dt class="american">color</dt>
+<dt class="british">colour</dt>
+<dd class="primary">
+<p>The visual property of objects.</p>
+</dd>
+</dl>
+</template>
+</OutputTabs>
+
+- `{...}` before first term → applies to `<dl>`
+- `{...}` on line after term → applies to that `<dt>`
+- `{...}` as last line in definition block → applies to that `<dd>`
 
 ### Tables
 
@@ -575,6 +656,128 @@ Use `^` after the table for a caption.
 </table>
 </template>
 </OutputTabs>
+
+#### Table Row and Cell Attributes (Extension)
+
+Attributes can be added to table rows and individual cells:
+
+**Row attributes** (after final pipe):
+```djot
+| Name | Age |{.header-row}
+|------|-----|
+| John | 30  |{.highlight}
+```
+
+**Cell attributes** (after opening pipe):
+```djot
+|{.name} Name |{.age} Age |
+|-------------|-----------|
+|{.emphasis} John | 30 |
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<table>
+<tr class="header-row">
+<th class="name">Name</th>
+<th class="age">Age</th>
+</tr>
+<tr class="highlight">
+<td class="emphasis">John</td>
+<td>30</td>
+</tr>
+</table>
+```
+
+</template>
+<template #result>
+<table>
+<tr class="header-row">
+<th class="name">Name</th>
+<th class="age">Age</th>
+</tr>
+<tr class="highlight">
+<td class="emphasis">John</td>
+<td>30</td>
+</tr>
+</table>
+</template>
+</OutputTabs>
+
+#### Table Multi-line Cells, Rowspan, and Colspan (Extension)
+
+**Multi-line cell content** uses `+` prefix for continuation rows:
+
+```djot
+| Name | Description      |
+|------|------------------|
+| Item | Long description |
++      | continued here   |
+```
+
+**Rowspan** uses `^` marker (points UP to cell above):
+
+```djot
+| Category | Item   |
+|----------|--------|
+| Fruits   | Apple  |
+| ^        | Banana |
+| ^        | Orange |
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<table>
+<tr><th>Category</th><th>Item</th></tr>
+<tr><td rowspan="3">Fruits</td><td>Apple</td></tr>
+<tr><td>Banana</td></tr>
+<tr><td>Orange</td></tr>
+</table>
+```
+
+</template>
+<template #result>
+<table>
+<tr><th>Category</th><th>Item</th></tr>
+<tr><td rowspan="3">Fruits</td><td>Apple</td></tr>
+<tr><td>Banana</td></tr>
+<tr><td>Orange</td></tr>
+</table>
+</template>
+</OutputTabs>
+
+**Colspan** uses `<` marker (points LEFT to cell before):
+
+```djot
+| Name  | Contact Info | <     |
+|-------|--------------|-------|
+| Alice | alice@ex.com | x5234 |
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<table>
+<tr><th>Name</th><th colspan="2">Contact Info</th></tr>
+<tr><td>Alice</td><td>alice@ex.com</td><td>x5234</td></tr>
+</table>
+```
+
+</template>
+<template #result>
+<table>
+<tr><th>Name</th><th colspan="2">Contact Info</th></tr>
+<tr><td>Alice</td><td>alice@ex.com</td><td>x5234</td></tr>
+</table>
+</template>
+</OutputTabs>
+
+Use `\^` or `\<` for literal characters. Content like `a < b` is NOT treated as colspan.
 
 ### Thematic Breaks
 
@@ -868,6 +1071,45 @@ This is a note.
 <p class="note" data-version="2.0">This is a note.</p>
 </template>
 </OutputTabs>
+
+#### Boolean Attribute Shorthand (Extension)
+
+Boolean/flag attributes can be specified without a value:
+
+**Input:**
+```djot
+{reversed}
+1. Third
+2. Second
+3. First
+
+[Download](file.zip){download .btn}
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<ol reversed="">
+<li>Third</li>
+<li>Second</li>
+<li>First</li>
+</ol>
+<p><a href="file.zip" class="btn" download="">Download</a></p>
+```
+
+</template>
+<template #result>
+<ol reversed="">
+<li>Third</li>
+<li>Second</li>
+<li>First</li>
+</ol>
+<p><a href="file.zip" class="btn" download="">Download</a></p>
+</template>
+</OutputTabs>
+
+Common boolean attributes: `{reversed}` (lists), `{open}` (details), `{hidden}`, `{download}` (links).
 
 ## Inline Elements
 
@@ -1475,7 +1717,29 @@ Definitions can span multiple lines if continuation lines are indented:
   designed to be displayed in a web browser
 ```
 
-**Note:** This feature works alongside the inline span approach documented in the [cookbook](/cookbook/#abbreviations). The definition-based approach automatically applies to all matching text, while the inline `[HTML]{abbr="..."}` approach allows overriding specific occurrences.
+### Inline Abbreviations
+
+For one-off abbreviations or to override a definition, use the inline span syntax:
+
+**Input:**
+```djot
+The [HTML]{abbr="Hyper Text Markup Language"} specification.
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<p>The <abbr title="Hyper Text Markup Language">HTML</abbr> specification.</p>
+```
+
+</template>
+<template #result>
+<p>The <abbr title="Hyper Text Markup Language">HTML</abbr> specification.</p>
+</template>
+</OutputTabs>
+
+The definition-based approach (`*[ABBR]: ...`) automatically applies to all matching text, while the inline `[ABBR]{abbr="..."}` approach allows marking specific occurrences.
 
 ## Escaping
 
