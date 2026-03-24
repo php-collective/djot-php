@@ -472,7 +472,7 @@ DJOT;
 
     public function testDefinitionList(): void
     {
-        $djot = "Term\n: Definition of the term";
+        $djot = ": Term\n\n  Definition of the term";
 
         $result = $this->converter->convert($djot);
 
@@ -552,7 +552,7 @@ DJOT;
 
     public function testDefinitionListMultiple(): void
     {
-        $djot = "Apple\n: A fruit\n\nBanana\n: Another fruit";
+        $djot = ": Apple\n\n  A fruit\n\n: Banana\n\n  Another fruit";
 
         $result = $this->converter->convert($djot);
 
@@ -1200,7 +1200,8 @@ DJOT;
 
     public function testDefinitionListWithMultipleDefinitions(): void
     {
-        $djot = "Term\n: First definition\n: Second definition";
+        // Use `: +` continuation marker to create multiple dd elements
+        $djot = ": Term\n\n  First definition\n\n: +\n\n  Second definition";
 
         $result = $this->converter->convert($djot);
 
@@ -2141,7 +2142,8 @@ DJOT;
 
     public function testDefinitionListWithMultipleTerms(): void
     {
-        $djot = "Term 1\n: Definition 1\n\nTerm 2\n: Definition 2a\n: Definition 2b";
+        // Two separate terms, second with multiple definitions using `: +` continuation
+        $djot = ": Term 1\n\n  Definition 1\n\n: Term 2\n\n  Definition 2a\n\n: +\n\n  Definition 2b";
         $result = $this->converter->convert($djot);
 
         $this->assertStringContainsString('<dt>Term 1</dt>', $result);

@@ -678,7 +678,6 @@ class BlockParser
                 ?? $this->tryParseHeading($parent, $lines, $i)
                 ?? $this->tryParseThematicBreak($parent, $line, $i)
                 ?? $this->tryParseBlockQuote($parent, $lines, $i)
-                ?? $this->tryParseDefinitionList($parent, $lines, $i)
                 ?? $this->tryParseList($parent, $lines, $i)
                 ?? $this->tryParseLineBlock($parent, $lines, $i)
                 ?? $this->tryParseTable($parent, $lines, $i)
@@ -1325,110 +1324,6 @@ class BlockParser
             $blockQuote->setAttributes($quoteAttributes);
         }
         $parent->appendChild($blockQuote);
-
-        return $i - $start;
-    }
-
-    /**
-     * Try to parse a definition list
-     *
-     * Term
-     * : Definition
-     *
-     * @param \Djot\Node\Node $parent
-     * @param array<string> $lines
-     * @param int $start
-     */
-    protected function tryParseDefinitionList(Node $parent, array $lines, int $start): ?int
-    {
-        // Look ahead: need a term line followed by : definition
-        if ($start + 1 >= count($lines)) {
-            return null;
-        }
-
-        $termLine = $lines[$start];
-        $defLine = $lines[$start + 1];
-
-        // Term must not start with special characters
-        if (preg_match('/^[>#\-*+\d`:|]/', $termLine) || IndentationHelper::isBlankLine($termLine)) {
-            return null;
-        }
-
-        // Next line must start with : (definition marker)
-        if (!preg_match('/^: +(.*)$/', $defLine)) {
-            return null;
-        }
-
-        $defList = new DefinitionList();
-        $i = $start;
-        $count = count($lines);
-
-        while ($i < $count) {
-            $currentLine = $lines[$i];
-
-            // Skip blank lines between items
-            if (IndentationHelper::isBlankLine($currentLine)) {
-                $i++;
-
-                continue;
-            }
-
-            // Check if this line is a term (followed by : definition)
-            if ($i + 1 < $count && !preg_match('/^[>#\-*+\d`:|]/', $currentLine)) {
-                $nextLine = $lines[$i + 1];
-                if (preg_match('/^: +(.*)$/', $nextLine)) {
-                    // Parse term
-                    $term = new DefinitionTerm();
-                    $this->inlineParser->parse($term, trim($currentLine), $i);
-                    $defList->appendChild($term);
-                    $i++;
-
-                    // Parse definitions (can have multiple)
-                    while ($i < $count) {
-                        $defLineContent = $lines[$i];
-                        if (preg_match('/^: +(.*)$/', $defLineContent, $defMatch)) {
-                            $defContent = $defMatch[1];
-
-                            // Collect continuation lines
-                            $defLines = [$defContent];
-                            $i++;
-                            while ($i < $count) {
-                                $contLine = $lines[$i];
-                                if (IndentationHelper::isBlankLine($contLine)) {
-                                    break;
-                                }
-                                if (preg_match('/^\s+(.+)$/', $contLine, $contMatch)) {
-                                    $defLines[] = $contMatch[1];
-                                    $i++;
-                                } elseif (preg_match('/^: +/', $contLine)) {
-                                    // Another definition
-                                    break;
-                                } else {
-                                    break;
-                                }
-                            }
-
-                            $def = new DefinitionDescription();
-                            $this->parseBlocks($def, $defLines, 0);
-                            $defList->appendChild($def);
-                        } else {
-                            break;
-                        }
-                    }
-
-                    continue;
-                }
-            }
-
-            break;
-        }
-
-        if (count($defList->getChildren()) === 0) {
-            return null;
-        }
-
-        $this->applyPendingAttributes($defList);
-        $parent->appendChild($defList);
 
         return $i - $start;
     }

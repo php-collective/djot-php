@@ -135,7 +135,7 @@ class PlainTextRendererTest extends TestCase
 
     public function testDefinitionList(): void
     {
-        $djot = "Term\n: Definition here";
+        $djot = ": Term\n\n  Definition here";
         $document = $this->converter->parse($djot);
 
         $expected = "Term\n  Definition here\n";
