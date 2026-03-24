@@ -9,6 +9,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [AutolinkExtension](#autolinkextension) | Auto-links bare URLs and email addresses |
 | [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
+| [FrontmatterExtension](#frontmatterextension) | Parses YAML/TOML/JSON frontmatter at document start |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
@@ -74,6 +75,133 @@ Visit [Example](https://example.com) or [Home](/home).
 ```html
 <p>Visit <a href="https://example.com" target="_blank" rel="noopener noreferrer">Example</a> or <a href="/home">Home</a>.</p>
 ```
+
+## FrontmatterExtension
+
+Parses frontmatter blocks at the start of documents. Supports YAML, TOML, JSON, or any other format. The extension parses the frontmatter syntax but does not interpret the content — applications should use their preferred library (symfony/yaml, etc.) to parse the raw content.
+
+> **Note:** The format identifier is required (`---yaml`, `---toml`, `---json`) to distinguish from thematic breaks (`---`). This follows the approach used by the [tree-sitter-djot](https://github.com/treeman/tree-sitter-djot) grammar.
+
+**Syntax:**
+
+```djot
+---yaml
+title: My Document
+author: John Doe
+tags:
+  - php
+  - djot
+---
+
+# Document content starts here
+```
+
+**Basic usage:**
+
+```php
+use Djot\Extension\FrontmatterExtension;
+
+$ext = new FrontmatterExtension();
+$converter = new DjotConverter();
+$converter->addExtension($ext);
+
+$html = $converter->convert($djot);
+
+// Access the frontmatter after parsing
+if ($ext->hasFrontmatter()) {
+    echo $ext->getFormat();  // 'yaml'
+    echo $ext->getContent(); // Raw YAML string
+}
+```
+
+**Parsing frontmatter content:**
+
+Use `getParsedContent()` with your preferred parser library:
+
+```php
+use Symfony\Component\Yaml\Yaml;
+
+$metadata = $ext->getParsedContent(function (string $content, string $format) {
+    return match ($format) {
+        'yaml' => Yaml::parse($content),
+        'json' => json_decode($content, true),
+        'toml' => \Yosymfony\Toml\Toml::parse($content),
+        default => null,
+    };
+});
+
+echo $metadata['title'];  // 'My Document'
+echo $metadata['author']; // 'John Doe'
+```
+
+**Rendering options:**
+
+By default, frontmatter produces no HTML output. You can change this:
+
+```php
+// Render as HTML comment (useful for debugging)
+$ext = new FrontmatterExtension(renderAsComment: true);
+
+// Custom render callback
+$ext = new FrontmatterExtension(
+    renderCallback: fn (Frontmatter $fm) =>
+        '<script type="application/ld+json">' .
+        htmlspecialchars($fm->getContent()) .
+        '</script>',
+);
+```
+
+**Output with `renderAsComment: true`:**
+
+```html
+<!-- frontmatter (yaml)
+title: My Document
+author: John Doe
+-->
+```
+
+**Reusing for multiple documents:**
+
+```php
+$ext->reset();  // Clear frontmatter state
+$converter->convert($anotherDocument);
+```
+
+**Attributes:**
+
+You can add djot attributes to frontmatter blocks:
+
+```djot
+---yaml {.meta}
+title: Document with meta class
+---
+
+---python {kernel="myproject" #cell-1}
+import flight
+---
+```
+
+Access attributes via the Frontmatter node:
+
+```php
+$frontmatter = $ext->getFrontmatter();
+$class = $frontmatter->getAttribute('class');   // 'meta'
+$kernel = $frontmatter->getAttribute('kernel'); // 'myproject'
+$id = $frontmatter->getAttribute('id');         // 'cell-1'
+```
+
+**Supported formats:**
+
+Any word can be used as the format identifier. Common ones:
+
+| Format | Example |
+|--------|---------|
+| `yaml` | `---yaml` |
+| `toml` | `---toml` |
+| `json` | `---json` |
+| `neon` | `---neon` |
+| `lua`  | `---lua`  |
+| `python` | `---python` |
 
 ## HeadingPermalinksExtension
 
