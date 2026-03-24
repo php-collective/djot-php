@@ -337,14 +337,15 @@ DJOT;
         $this->assertSame('frontmatter', $frontmatter->getType());
     }
 
-    public function testFrontmatterWithAttributesSyntax(): void
+    public function testFrontmatterWithBlockAttributes(): void
     {
         $ext = new FrontmatterExtension();
         $converter = new DjotConverter();
         $converter->addExtension($ext);
 
         $djot = <<<'DJOT'
----yaml {.meta}
+{.meta}
+---yaml
 title: Test
 ---
 
@@ -360,16 +361,15 @@ DJOT;
         $this->assertSame('meta', $frontmatter->getAttribute('class'));
     }
 
-    public function testFrontmatterWithMultipleAttributes(): void
+    public function testFrontmatterWithMultipleBlockAttributes(): void
     {
         $ext = new FrontmatterExtension();
         $converter = new DjotConverter();
         $converter->addExtension($ext);
 
-        // Note: djot attribute syntax is .class #id key="value"
-        // NOT .key="value" which would be an invalid class name
         $djot = <<<'DJOT'
----python {kernel="myproject" #cell-1}
+{kernel="myproject" #cell-1}
+---python
 import flight
 ---
 

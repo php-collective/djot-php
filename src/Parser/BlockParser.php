@@ -821,6 +821,36 @@ class BlockParser
     }
 
     /**
+     * Consume and return pending block attributes
+     *
+     * This allows custom block pattern callbacks to retrieve any block attributes
+     * that were defined on the line(s) before the block started. The attributes
+     * are cleared after retrieval.
+     *
+     * Example usage in a custom block callback:
+     * ```php
+     * $parser->addBlockPattern('/^---(\w+)/', function($lines, $start, $parent, $parser) {
+     *     $myNode = new MyCustomNode();
+     *     $attrs = $parser->consumePendingAttributes();
+     *     if (!empty($attrs)) {
+     *         $myNode->setAttributes($attrs);
+     *     }
+     *     $parent->appendChild($myNode);
+     *     return 1;
+     * });
+     * ```
+     *
+     * @return array<string, string> The pending attributes (empty array if none)
+     */
+    public function consumePendingAttributes(): array
+    {
+        $attrs = $this->pendingAttributes;
+        $this->pendingAttributes = [];
+
+        return $attrs;
+    }
+
+    /**
      * @param \Djot\Node\Node $parent
      * @param array<string> $lines
      * @param int $start

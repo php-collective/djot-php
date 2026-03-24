@@ -8,7 +8,6 @@ use Closure;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Document;
-use Djot\Parser\Utility\AttributeParser;
 
 /**
  * Parses frontmatter blocks at the start of documents
@@ -26,6 +25,14 @@ use Djot\Parser\Utility\AttributeParser;
  * ---
  *
  * # Document content starts here
+ * ```
+ *
+ * Block attributes are placed above (standard djot style):
+ * ```
+ * {.meta #frontmatter}
+ * ---yaml
+ * title: My Document
+ * ---
  * ```
  *
  * The format identifier (yaml, toml, json) is required to distinguish
@@ -94,21 +101,19 @@ class FrontmatterExtension implements ExtensionInterface
 
         // Register block pattern for frontmatter
         // Must be ---format where format is at least one word character
-        // Optionally followed by attributes like {.class key="value"}
         // This distinguishes from thematic breaks (---)
         $parser->addBlockPattern(
-            '/^---(\w+)(\s+\{[^}]+\})?\s*$/',
+            '/^---(\w+)\s*$/',
             function (array $lines, int $start, $parent, $blockParser) {
                 // Only match at document start (first block of Document)
                 if (!($parent instanceof Document) || $parent->hasChildren()) {
                     return null;
                 }
 
-                if (!preg_match('/^---(\w+)(\s+\{([^}]+)\})?\s*$/', $lines[$start], $matches)) {
+                if (!preg_match('/^---(\w+)\s*$/', $lines[$start], $matches)) {
                     return null; // @codeCoverageIgnore - pattern already matched
                 }
                 $format = $matches[1];
-                $attrString = $matches[3] ?? null;
 
                 // Find closing ---
                 $i = $start + 1;
@@ -138,10 +143,10 @@ class FrontmatterExtension implements ExtensionInterface
 
                 $frontmatter = new Frontmatter($content, $format);
 
-                // Apply attributes if present
-                if ($attrString !== null) {
-                    $attributes = AttributeParser::parse($attrString);
-                    $frontmatter->setAttributes($attributes);
+                // Apply block attributes from preceding line (standard djot style)
+                $attrs = $blockParser->consumePendingAttributes();
+                if ($attrs !== []) {
+                    $frontmatter->setAttributes($attrs);
                 }
 
                 $this->frontmatter = $frontmatter;
