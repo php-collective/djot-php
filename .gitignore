@@ -5,6 +5,7 @@
 /tmp/
 /composer.lock
 /composer.phar
+.phpcs.cache
 # IDE and editor specific files #
 #################################
 /nbproject/
