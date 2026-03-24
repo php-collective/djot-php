@@ -173,21 +173,19 @@ $converter->convert($anotherDocument);
 
 **Attributes:**
 
-You can add djot attributes to frontmatter blocks using *inline syntax* on the same line:
+Block attributes are placed on the preceding line (standard djot style):
 
 ```djot
----yaml {.meta}
+{.meta #frontmatter}
+---yaml
 title: Document with meta class
 ---
 
----python {kernel="myproject" #cell-1}
+{kernel="myproject" #cell-1}
+---python
 import flight
 ---
 ```
-
-::: warning
-Attributes must be on the same line as `---format`. Block-style attributes on a preceding line (like `{.meta}` alone before `---yaml`) will *not* be applied to the frontmatter - they will be applied to the next content block instead.
-:::
 
 Access attributes via the Frontmatter node:
 
