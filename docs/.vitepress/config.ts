@@ -43,6 +43,7 @@ export default defineConfig({
         text: 'Links',
         items: [
           { text: 'Sandbox', link: 'https://sandbox.dereuromark.de/sandbox/djot' },
+          { text: 'WYSIWYG Editor', link: 'https://sandbox.dereuromark.de/sandbox/djot/wysiwyg' },
           { text: 'Djot Spec', link: 'https://djot.net/' },
           { text: 'Changelog', link: 'https://github.com/php-collective/djot-php/releases' },
           { text: 'Packagist', link: 'https://packagist.org/packages/php-collective/djot' },
