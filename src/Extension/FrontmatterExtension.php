@@ -12,7 +12,7 @@ use Djot\Node\Document;
 /**
  * Parses frontmatter blocks at the start of documents
  *
- * Supports YAML, TOML, JSON, or any other format. The extension parses
+ * Supports YAML, NEON, TOML, JSON, or any other format. The extension parses
  * the frontmatter syntax but does not interpret the content - applications
  * should use their preferred library (symfony/yaml, etc.) to parse the
  * raw content.

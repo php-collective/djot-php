@@ -80,7 +80,7 @@ Visit [Example](https://example.com) or [Home](/home).
 
 Parses frontmatter blocks at the start of documents. Supports YAML, NEON, TOML, JSON, or any other format. The extension parses the frontmatter syntax but does not interpret the content — applications should use their preferred library (symfony/yaml, etc.) to parse the raw content.
 
-> **Note:** The format identifier is required (`---yaml`, `---neon`, `---toml`, `---json`) to distinguish from thematic breaks (`---`). This follows the approach used by the [tree-sitter-djot](https://github.com/treeman/tree-sitter-djot) grammar.
+> **Note:** The format identifier is required (`---yaml`, `---neon`, `---toml`, `---json`, ...) to distinguish from thematic breaks (`---`). This follows the approach used by the [tree-sitter-djot](https://github.com/treeman/tree-sitter-djot) grammar.
 
 **Syntax:**
 
@@ -125,8 +125,9 @@ use Symfony\Component\Yaml\Yaml;
 $metadata = $ext->getParsedContent(function (string $content, string $format) {
     return match ($format) {
         'yaml' => Yaml::parse($content),
-        'json' => json_decode($content, true),
+        'neon' => \Nette\Neon\Neon::decode($content),
         'toml' => \Yosymfony\Toml\Toml::parse($content),
+        'json' => json_decode($content, true),
         default => null,
     };
 });
