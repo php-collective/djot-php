@@ -1683,7 +1683,11 @@ class BlockParser
                     while ($i < $count) {
                         $subLine = $lines[$i];
                         if (IndentationHelper::isBlankLine($subLine)) {
-                            break;
+                            // Continue across blank lines (same as standard nesting path)
+                            $subLines[] = '';
+                            $i++;
+
+                            continue;
                         }
                         $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
                         if ($lineIndent >= $contentIndent) {

@@ -21,6 +21,7 @@ public function __construct(
     bool|SafeMode|null $safeMode = null,
     ?Profile $profile = null,
     bool $significantNewlines = false,
+    ?SoftBreakMode $softBreakMode = null,
 )
 ```
 
@@ -30,6 +31,7 @@ public function __construct(
 - `$safeMode`: When `true` or a `SafeMode` instance, enables XSS protection (see [Safe Mode](#safe-mode)).
 - `$profile`: A `Profile` instance for feature restriction (see [Profiles](/guide/profiles)).
 - `$significantNewlines`: When `true`, enables markdown-like parsing where block elements can interrupt paragraphs (see [Significant Newlines Mode](#significant-newlines-mode)).
+- `$softBreakMode`: Override how soft breaks are rendered (see [Soft Break Behavior](#soft-break-behavior)). When `null`, defaults to `<br>` if `significantNewlines` is enabled, otherwise newline.
 
 ### Factory Methods
 
@@ -42,10 +44,13 @@ public static function withSignificantNewlines(
     bool $strict = false,
     bool|SafeMode|null $safeMode = null,
     ?Profile $profile = null,
+    ?SoftBreakMode $softBreakMode = null,
 ): self
 ```
 
 Creates a converter with significant newlines mode enabled. See [Significant Newlines Mode](#significant-newlines-mode).
+
+The `$softBreakMode` parameter allows overriding the default `<br>` soft break behavior when you want relaxed parsing without visible line breaks.
 
 ### Methods
 
@@ -872,14 +877,28 @@ Steps:
 
 ### Soft Break Behavior
 
-When `significantNewlines` is enabled, soft breaks automatically render as `<br>`. You can override this after construction:
+When `significantNewlines` is enabled, soft breaks automatically render as `<br>` by default. You can override this behavior:
 
 ```php
 use Djot\Renderer\SoftBreakMode;
 
+// Option 1: Override via parameter (recommended)
+$converter = DjotConverter::withSignificantNewlines(
+    softBreakMode: SoftBreakMode::Space,
+);
+
+// Option 2: Override via constructor
+$converter = new DjotConverter(
+    significantNewlines: true,
+    softBreakMode: SoftBreakMode::Space,
+);
+
+// Option 3: Override after construction
 $converter = DjotConverter::withSignificantNewlines();
 $converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space);
 ```
+
+This is useful for WYSIWYG editors where you want relaxed parsing (nested lists without blank lines) but don't want every line break to become a `<br>`.
 
 See [enhancements.md](./enhancements#significant-newlines-mode) for upstream tracking.
 

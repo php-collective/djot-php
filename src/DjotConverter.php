@@ -53,6 +53,7 @@ class DjotConverter
      * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode (true for defaults, SafeMode instance for custom config)
      * @param \Djot\Profile|null $profile Profile for feature restriction (null = all features allowed)
      * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (null = auto based on significantNewlines)
      */
     public function __construct(
         bool $xhtml = false,
@@ -61,6 +62,7 @@ class DjotConverter
         bool|SafeMode|null $safeMode = null,
         ?Profile $profile = null,
         bool $significantNewlines = false,
+        ?SoftBreakMode $softBreakMode = null,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
@@ -74,8 +76,12 @@ class DjotConverter
             $this->renderer->setSafeMode($safeMode);
         }
 
-        // In significant newlines mode, soft breaks become visible <br>
-        if ($significantNewlines) {
+        // Configure soft break mode
+        // If explicitly provided, use that; otherwise default based on significantNewlines
+        if ($softBreakMode !== null) {
+            $this->renderer->setSoftBreakMode($softBreakMode);
+        } elseif ($significantNewlines) {
+            // Backwards compatible: significantNewlines implies <br> soft breaks
             $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
         }
 
@@ -91,10 +97,17 @@ class DjotConverter
      *
      * In this mode:
      * - Block elements (lists, blockquotes, code) can interrupt paragraphs
-     * - Soft breaks render as visible <br> tags
+     * - Soft breaks render as visible <br> tags (unless overridden)
      * - Nested blocks in lists don't need blank lines
      *
      * Ideal for chat messages, comments, and quick notes.
+     *
+     * @param bool $xhtml Whether to use XHTML-compatible output
+     * @param bool $warnings Whether to collect warnings during parsing
+     * @param bool $strict Whether to throw exceptions on parse errors
+     * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode
+     * @param \Djot\Profile|null $profile Profile for feature restriction
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode Override the default <br> soft break behavior
      */
     public static function withSignificantNewlines(
         bool $xhtml = false,
@@ -102,8 +115,9 @@ class DjotConverter
         bool $strict = false,
         bool|SafeMode|null $safeMode = null,
         ?Profile $profile = null,
+        ?SoftBreakMode $softBreakMode = null,
     ): self {
-        return new self($xhtml, $warnings, $strict, $safeMode, $profile, true);
+        return new self($xhtml, $warnings, $strict, $safeMode, $profile, true, $softBreakMode);
     }
 
     /**
