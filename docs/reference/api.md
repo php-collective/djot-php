@@ -33,7 +33,7 @@ public function __construct(
 
 ### Factory Methods
 
-#### withSignificantNewlines
+#### withSignificantNewlines()
 
 ```php
 public static function withSignificantNewlines(
@@ -49,7 +49,7 @@ Creates a converter with significant newlines mode enabled. See [Significant New
 
 ### Methods
 
-#### convert
+#### convert()
 
 ```php
 public function convert(string $input): string
@@ -57,7 +57,7 @@ public function convert(string $input): string
 
 Converts Djot markup to HTML.
 
-#### convertFile
+#### convertFile()
 
 ```php
 public function convertFile(string $path): string
@@ -69,7 +69,7 @@ Converts a Djot file to HTML. Throws `RuntimeException` if the file cannot be re
 $html = $converter->convertFile('/path/to/document.djot');
 ```
 
-#### parse
+#### parse()
 
 ```php
 public function parse(string $input): Document
@@ -77,7 +77,7 @@ public function parse(string $input): Document
 
 Parses Djot markup into an AST Document without rendering.
 
-#### parseFile
+#### parseFile()
 
 ```php
 public function parseFile(string $path): Document
@@ -91,7 +91,7 @@ $document = $converter->parseFile('/path/to/document.djot');
 $html = $converter->render($document);
 ```
 
-#### render
+#### render()
 
 ```php
 public function render(Document $document): string
@@ -101,7 +101,7 @@ Renders an AST Document to HTML.
 
 Registered extensions are reset before each render, so repeated `convert()` calls on the same converter start with fresh per-document extension state.
 
-#### getParser
+#### getParser()
 
 ```php
 public function getParser(): BlockParser
@@ -109,7 +109,7 @@ public function getParser(): BlockParser
 
 Returns the block parser for direct access (useful for custom pattern registration).
 
-#### getRenderer
+#### getRenderer()
 
 ```php
 public function getRenderer(): HtmlRenderer
@@ -117,7 +117,7 @@ public function getRenderer(): HtmlRenderer
 
 Returns the HTML renderer for direct configuration.
 
-#### on
+#### on()
 
 ```php
 public function on(string $event, Closure $listener): self
@@ -125,7 +125,7 @@ public function on(string $event, Closure $listener): self
 
 Register a listener for render events. See [Event System](#event-system) below.
 
-#### off
+#### off()
 
 ```php
 public function off(?string $event = null): self
@@ -133,7 +133,7 @@ public function off(?string $event = null): self
 
 Remove listeners. Pass event name to remove specific listeners, or `null` to remove all.
 
-#### getWarnings
+#### getWarnings()
 
 ```php
 public function getWarnings(): array
@@ -141,7 +141,7 @@ public function getWarnings(): array
 
 Returns an array of `ParseWarning` objects from the last parse operation. Only populated when `warnings: true` is set.
 
-#### hasWarnings
+#### hasWarnings()
 
 ```php
 public function hasWarnings(): bool
@@ -149,7 +149,7 @@ public function hasWarnings(): bool
 
 Returns `true` if there were any warnings during the last parse operation.
 
-#### clearWarnings
+#### clearWarnings()
 
 ```php
 public function clearWarnings(): self
@@ -157,7 +157,7 @@ public function clearWarnings(): self
 
 Clears any collected warnings.
 
-#### setSafeMode
+#### setSafeMode()
 
 ```php
 public function setSafeMode(bool|SafeMode|null $safeMode): self
