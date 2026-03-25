@@ -9,7 +9,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [AutolinkExtension](#autolinkextension) | Auto-links bare URLs and email addresses |
 | [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
-| [FrontmatterExtension](#frontmatterextension) | Parses YAML/TOML/JSON frontmatter at document start |
+| [FrontmatterExtension](#frontmatterextension) | Parses YAML/NEON/TOML/JSON frontmatter at document start |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
@@ -78,9 +78,9 @@ Visit [Example](https://example.com) or [Home](/home).
 
 ## FrontmatterExtension
 
-Parses frontmatter blocks at the start of documents. Supports YAML, TOML, JSON, or any other format. The extension parses the frontmatter syntax but does not interpret the content — applications should use their preferred library (symfony/yaml, etc.) to parse the raw content.
+Parses frontmatter blocks at the start of documents. Supports YAML, NEON, TOML, JSON, or any other format. The extension parses the frontmatter syntax but does not interpret the content — applications should use their preferred library (symfony/yaml, etc.) to parse the raw content.
 
-> **Note:** The format identifier is required (`---yaml`, `---toml`, `---json`) to distinguish from thematic breaks (`---`). This follows the approach used by the [tree-sitter-djot](https://github.com/treeman/tree-sitter-djot) grammar.
+> **Note:** The format identifier is required (`---yaml`, `---neon`, `---toml`, `---json`) to distinguish from thematic breaks (`---`). This follows the approach used by the [tree-sitter-djot](https://github.com/treeman/tree-sitter-djot) grammar.
 
 **Syntax:**
 
