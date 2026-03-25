@@ -64,6 +64,12 @@ use Djot\Node\Document;
  *
  * Configuration:
  * ```php
+ * // Bare --- opening (no format specified) falls back to 'yaml' by default
+ * $ext = new FrontmatterExtension();
+ *
+ * // Configure a different default format (e.g. for TOML-first projects)
+ * $ext = new FrontmatterExtension(defaultFormat: 'toml');
+ *
  * // Output frontmatter as HTML comment
  * $ext = new FrontmatterExtension(renderAsComment: true);
  *
@@ -72,12 +78,6 @@ use Djot\Node\Document;
  *     renderCallback: fn(Frontmatter $fm) => '<script type="application/json">' .
  *         htmlspecialchars($fm->getContent()) . '</script>'
  * );
- *
- * // Bare --- opening (no format specified) falls back to 'yaml' by default
- * $ext = new FrontmatterExtension();
- *
- * // Configure a different default format (e.g. for TOML-first projects)
- * $ext = new FrontmatterExtension(defaultFormat: 'toml');
  * ```
  */
 class FrontmatterExtension implements ExtensionInterface
@@ -91,14 +91,14 @@ class FrontmatterExtension implements ExtensionInterface
     protected ?Closure $renderCallback = null;
 
     /**
+     * @param string $defaultFormat Format to use when the opening delimiter has no format identifier (e.g. bare ---)
      * @param bool $renderAsComment If true, render frontmatter as HTML comment
      * @param (\Closure(\Djot\Extension\Frontmatter): string)|null $renderCallback Custom render callback
-     * @param string $defaultFormat Format to use when the opening delimiter has no format identifier (e.g. bare ---)
      */
     public function __construct(
+        protected string $defaultFormat = 'yaml',
         protected bool $renderAsComment = false,
         ?Closure $renderCallback = null,
-        protected string $defaultFormat = 'yaml',
     ) {
         $this->renderCallback = $renderCallback;
     }
