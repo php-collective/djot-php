@@ -108,8 +108,8 @@ class FrontmatterExtension implements ExtensionInterface
         $parser = $converter->getParser();
 
         // Register block pattern for frontmatter
-        // Must be ---format where format is at least one word character
-        // This distinguishes from thematic breaks (---)
+        // Matches --- optionally followed by a format identifier (e.g. ---yaml, ---toml)
+        // When no identifier is present, $defaultFormat is used as the fallback
         $parser->addBlockPattern(
             '/^---(\w*)\s*$/',
             function (array $lines, int $start, $parent, $blockParser) {
