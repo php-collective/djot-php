@@ -72,6 +72,12 @@ use Djot\Node\Document;
  *     renderCallback: fn(Frontmatter $fm) => '<script type="application/json">' .
  *         htmlspecialchars($fm->getContent()) . '</script>'
  * );
+ *
+ * // Bare --- opening (no format specified) falls back to 'yaml' by default
+ * $ext = new FrontmatterExtension();
+ *
+ * // Configure a different default format (e.g. for TOML-first projects)
+ * $ext = new FrontmatterExtension(defaultFormat: 'toml');
  * ```
  */
 class FrontmatterExtension implements ExtensionInterface
@@ -87,10 +93,12 @@ class FrontmatterExtension implements ExtensionInterface
     /**
      * @param bool $renderAsComment If true, render frontmatter as HTML comment
      * @param (\Closure(\Djot\Extension\Frontmatter): string)|null $renderCallback Custom render callback
+     * @param string $defaultFormat Format to use when the opening delimiter has no format identifier (e.g. bare ---)
      */
     public function __construct(
         protected bool $renderAsComment = false,
         ?Closure $renderCallback = null,
+        protected string $defaultFormat = 'yaml',
     ) {
         $this->renderCallback = $renderCallback;
     }
@@ -100,20 +108,20 @@ class FrontmatterExtension implements ExtensionInterface
         $parser = $converter->getParser();
 
         // Register block pattern for frontmatter
-        // Must be ---format where format is at least one word character
-        // This distinguishes from thematic breaks (---)
+        // Matches --- optionally followed by a format identifier (e.g. ---yaml, ---toml)
+        // When no identifier is present, $defaultFormat is used as the fallback
         $parser->addBlockPattern(
-            '/^---(\w+)\s*$/',
+            '/^---(\w*)\s*$/',
             function (array $lines, int $start, $parent, $blockParser) {
                 // Only match at document start (first block of Document)
                 if (!($parent instanceof Document) || $parent->hasChildren()) {
                     return null;
                 }
 
-                if (!preg_match('/^---(\w+)\s*$/', $lines[$start], $matches)) {
+                if (!preg_match('/^---(\w*)\s*$/', $lines[$start], $matches)) {
                     return null; // @codeCoverageIgnore - pattern already matched
                 }
-                $format = $matches[1];
+                $format = $matches[1] !== '' ? $matches[1] : $this->defaultFormat;
 
                 // Find closing ---
                 $i = $start + 1;

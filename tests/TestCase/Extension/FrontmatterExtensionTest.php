@@ -498,4 +498,69 @@ DJOT;
         $this->assertSame('toml', $ext->getFormat());
         $this->assertStringContainsString('second', $ext->getContent());
     }
+
+    public function testDefaultFormatUsedWhenNoFormatSpecified(): void
+    {
+        // Bare --- opening (no format identifier) falls back to the default 'yaml'
+        $ext = new FrontmatterExtension();
+        $converter = new DjotConverter();
+        $converter->addExtension($ext);
+
+        $djot = <<<'DJOT'
+---
+title: My Document
+---
+
+# Hello
+DJOT;
+
+        $converter->convert($djot);
+
+        $this->assertTrue($ext->hasFrontmatter());
+        $this->assertSame('yaml', $ext->getFormat());
+        $this->assertStringContainsString('title: My Document', $ext->getContent());
+    }
+
+    public function testCustomDefaultFormatIsUsedForBareOpening(): void
+    {
+        // A bare --- should use the configured defaultFormat instead of 'yaml'
+        $ext = new FrontmatterExtension(defaultFormat: 'toml');
+        $converter = new DjotConverter();
+        $converter->addExtension($ext);
+
+        $djot = <<<'DJOT'
+---
+title = "My Document"
+---
+
+# Hello
+DJOT;
+
+        $converter->convert($djot);
+
+        $this->assertTrue($ext->hasFrontmatter());
+        $this->assertSame('toml', $ext->getFormat());
+        $this->assertStringContainsString('title = "My Document"', $ext->getContent());
+    }
+
+    public function testExplicitFormatOverridesDefaultFormat(): void
+    {
+        // An explicit format on the delimiter always takes precedence over defaultFormat
+        $ext = new FrontmatterExtension(defaultFormat: 'toml');
+        $converter = new DjotConverter();
+        $converter->addExtension($ext);
+
+        $djot = <<<'DJOT'
+---json
+{"title": "My Document"}
+---
+
+# Hello
+DJOT;
+
+        $converter->convert($djot);
+
+        $this->assertTrue($ext->hasFrontmatter());
+        $this->assertSame('json', $ext->getFormat());
+    }
 }

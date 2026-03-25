@@ -80,7 +80,7 @@ Visit [Example](https://example.com) or [Home](/home).
 
 Parses frontmatter blocks at the start of documents. Supports YAML, NEON, TOML, JSON, or any other format. The extension parses the frontmatter syntax but does not interpret the content — applications should use their preferred library (symfony/yaml, etc.) to parse the raw content.
 
-> **Note:** The format identifier is required (`---yaml`, `---neon`, `---toml`, `---json`, ...) to distinguish from thematic breaks (`---`). This follows the approach used by the [tree-sitter-djot](https://github.com/treeman/tree-sitter-djot) grammar.
+> **Note:** A format identifier (`---yaml`, `---toml`, `---json`, ...) distinguishes frontmatter from a bare thematic break (`---`). When no identifier is present, the extension falls back to a configurable default format (`yaml` by default). This follows the approach used by the [tree-sitter-djot](https://github.com/treeman/tree-sitter-djot) grammar.
 
 **Syntax:**
 
@@ -91,6 +91,16 @@ author: John Doe
 tags:
   - php
   - djot
+---
+
+# Document content starts here
+```
+
+A bare `---` opening is also accepted and uses the configured default format:
+
+```djot
+---
+title: My Document
 ---
 
 # Document content starts here
@@ -134,6 +144,26 @@ $metadata = $ext->getParsedContent(function (string $content, string $format) {
 
 echo $metadata['title'];  // 'My Document'
 echo $metadata['author']; // 'John Doe'
+```
+
+**Default format:**
+
+When a frontmatter block opens with a bare `---` (no format identifier), the `defaultFormat` parameter controls which format is assumed:
+
+```php
+// Falls back to 'yaml' (the built-in default)
+$ext = new FrontmatterExtension();
+
+// Use 'toml' as the default for bare --- blocks
+$ext = new FrontmatterExtension(defaultFormat: 'toml');
+```
+
+Blocks that include an explicit identifier always take precedence over `defaultFormat`:
+
+```djot
+---json
+{"title": "always json, regardless of defaultFormat"}
+---
 ```
 
 **Rendering options:**
@@ -201,14 +231,14 @@ $id = $frontmatter->getAttribute('id');         // 'cell-1'
 
 Any word can be used as the format identifier. Common ones:
 
-| Format | Example |
-|--------|---------|
-| `yaml` | `---yaml` |
-| `toml` | `---toml` |
-| `json` | `---json` |
-| `neon` | `---neon` |
-| `lua`  | `---lua`  |
-| `python` | `---python` |
+| Format | Example | Notes |
+|--------|---------|-------|
+| `yaml` | `---yaml` | Built-in default for bare `---` |
+| `toml` | `---toml` | |
+| `json` | `---json` | |
+| `neon` | `---neon` | |
+| `lua`  | `---lua`  | |
+| `python` | `---python` | |
 
 ## HeadingPermalinksExtension
 
