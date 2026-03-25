@@ -428,6 +428,97 @@ Attributes can be added to list items on the following indented line:
 
 Works with all list types (unordered, ordered, and task lists). The attribute line must be indented to the content indentation level.
 
+#### Tight vs Loose Lists
+
+Lists in Djot can be *tight* or *loose*, which affects how list items are rendered.
+
+**Tight lists** have no blank lines between items. List item content is rendered directly without `<p>` tags:
+
+**Input:**
+```djot
+- Item one
+- Item two
+- Item three
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<ul>
+<li>Item one</li>
+<li>Item two</li>
+<li>Item three</li>
+</ul>
+```
+
+</template>
+<template #result>
+<ul>
+<li>Item one</li>
+<li>Item two</li>
+<li>Item three</li>
+</ul>
+</template>
+</OutputTabs>
+
+**Loose lists** have blank lines between items. Each item's content is wrapped in `<p>` tags:
+
+**Input:**
+```djot
+- Item one
+
+- Item two
+
+- Item three
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<ul>
+<li><p>Item one</p></li>
+<li><p>Item two</p></li>
+<li><p>Item three</p></li>
+</ul>
+```
+
+</template>
+<template #result>
+<ul>
+<li><p>Item one</p></li>
+<li><p>Item two</p></li>
+<li><p>Item three</p></li>
+</ul>
+</template>
+</OutputTabs>
+
+The tight/loose distinction affects visual spacing. Loose lists typically have more vertical space between items due to paragraph margins in CSS.
+
+::: tip Mixed Lists
+A list is loose if *any* item is separated by a blank line. One blank line makes the entire list loose.
+:::
+
+**Nested lists** require a blank line before the nested content in standard Djot:
+
+```djot
+- Parent item
+
+  - Nested item A
+  - Nested item B
+```
+
+With `significantNewlines` mode enabled, nested lists can appear immediately without a blank line:
+
+```djot
+- Parent item
+  - Nested item A
+  - Nested item B
+```
+
+See the [API Reference](/reference/api#significant-newlines-mode) for more on `significantNewlines` mode.
+
 ### Definition Lists
 
 Terms are prefixed with `: ` and definitions are indented below.
