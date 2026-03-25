@@ -216,4 +216,57 @@ DJOT;
         $looseResult = $converter->convert($looseDjot);
         $this->assertStringContainsString('<p>Item', $looseResult);
     }
+
+    /**
+     * Blank lines within nested lists should not split them into separate lists.
+     *
+     * This tests that both nesting paths (immediate and standard) handle
+     * blank lines consistently.
+     */
+    public function testBlankLinesInNestedListsDoNotSplit(): void
+    {
+        $converter = DjotConverter::withSignificantNewlines(
+            softBreakMode: SoftBreakMode::Space,
+        );
+
+        // Case 1: Immediate nesting (no blank line after parent)
+        $djot1 = <<<'DJOT'
+- Item one
+  - Nested A
+  - Nested B
+
+  - Nested C
+DJOT;
+
+        $result1 = $converter->convert($djot1);
+
+        // Should have exactly 2 <ul> tags (outer + one nested)
+        $this->assertEquals(2, substr_count($result1, '<ul>'));
+        // All nested items should be in the same list
+        $this->assertStringContainsString('Nested A', $result1);
+        $this->assertStringContainsString('Nested B', $result1);
+        $this->assertStringContainsString('Nested C', $result1);
+
+        // Case 2: Standard nesting (blank line after parent)
+        $djot2 = <<<'DJOT'
+- Item one
+
+  - Nested A
+  - Nested B
+
+  - Nested C
+DJOT;
+
+        $result2 = $converter->convert($djot2);
+
+        // Should also have exactly 2 <ul> tags
+        $this->assertEquals(2, substr_count($result2, '<ul>'));
+
+        // Both cases should produce the same nested list structure
+        $this->assertEquals(
+            substr_count($result1, '<ul>'),
+            substr_count($result2, '<ul>'),
+            'Both nesting paths should produce same number of lists',
+        );
+    }
 }
