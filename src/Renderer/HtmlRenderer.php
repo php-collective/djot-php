@@ -281,6 +281,7 @@ class HtmlRenderer implements RendererInterface
                 // Dispatch render event for heading - allows custom rendering
                 $eventName = 'render.' . $child->getType();
                 $event = new RenderEvent($child);
+                $event->setChildrenRenderer(fn (): string => $this->renderChildren($child));
                 $this->dispatchEvent($eventName, $event);
                 $this->dispatchEvent('render.*', $event);
 
