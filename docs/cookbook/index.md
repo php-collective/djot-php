@@ -4,17 +4,14 @@ Common recipes and customizations for djot-php.
 
 ## Table of Contents
 
-- [External Links](#external-links)
+- [Custom Link Attributes](#custom-link-attributes)
 - [Custom Emoji/Symbols](#custom-emojisymbols)
 - [Unicode Codepoints](#unicode-codepoints)
-- [Abbreviations](#abbreviations)
-- [Table of Contents Generation](#table-of-contents-generation)
 - [Image Processing](#image-processing)
-- [Custom Admonitions](#custom-admonitions)
-- [Heading Anchors](#heading-anchors)
+- [Custom Heading IDs](#custom-heading-ids)
 - [Link Validation](#link-validation)
 - [Content Security](#content-security)
-- [Lazy Loading Images](#lazy-loading-images)
+- [Conditional Image Attributes](#conditional-image-attributes)
 - [Custom Footnotes](#custom-footnotes)
 - [Extended Task List States](#extended-task-list-states)
 - [Math Rendering](#math-rendering)
@@ -28,27 +25,11 @@ Common recipes and customizations for djot-php.
 - [Social Meta Tags](#social-meta-tags)
 - [Video Embeds](#video-embeds)
 
-## External Links
+## Custom Link Attributes
 
-> **Tip:** Use the built-in [ExternalLinksExtension](/extensions/#externallinksextension) for common cases.
+For standard external link handling (target="_blank", rel="noopener"), use [ExternalLinksExtension](/extensions/#externallinksextension).
 
-Open external links in a new tab with security attributes:
-
-```php
-use Djot\Extension\ExternalLinksExtension;
-
-$converter = new DjotConverter();
-$converter->addExtension(new ExternalLinksExtension());
-
-echo $converter->convert('[External](https://example.com) and [internal](/page)');
-```
-
-Output:
-```html
-<p><a href="https://example.com" target="_blank" rel="noopener noreferrer">External</a> and <a href="/page">internal</a></p>
-```
-
-For more control (custom logic, different attributes), use the event system directly:
+For custom logic based on specific domains or conditions, use events:
 
 ```php
 use Djot\DjotConverter;
@@ -65,7 +46,7 @@ $converter->on('render.link', function (RenderEvent $event): void {
 
     $href = $link->getDestination();
 
-    // Custom logic: only external links to specific domains
+    // Custom logic: specific domains get different attributes
     if (str_contains($href, 'untrusted-domain.com')) {
         $link->setAttribute('rel', 'nofollow noopener');
     }
@@ -282,95 +263,6 @@ The codepoint approach above is most useful when you need:
 - Characters without named HTML entities
 - A consistent syntax for all special characters
 
-## Abbreviations
-
-Convert spans with `abbr` attribute to semantic `<abbr>` elements:
-
-```php
-use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Inline\Span;
-
-$converter = new DjotConverter();
-
-$converter->on('render.span', function (RenderEvent $event): void {
-    $span = $event->getNode();
-    if (!$span instanceof Span) {
-        return;
-    }
-
-    $abbrTitle = $span->getAttribute('abbr');
-    if ($abbrTitle !== null) {
-        // Remove abbr from attributes, use as title
-        $span->removeAttribute('abbr');
-
-        // Build abbr element with remaining attributes
-        $attrs = '';
-        foreach ($span->getAttributes() as $key => $value) {
-            $attrs .= ' ' . $key . '="' . htmlspecialchars($value) . '"';
-        }
-
-        $event->setHtml(
-            '<abbr title="' . htmlspecialchars($abbrTitle) . '"' . $attrs . '>'
-            . $event->getChildrenHtml()
-            . '</abbr>'
-        );
-    }
-});
-
-echo $converter->convert('The [HTML]{abbr="HyperText Markup Language"} standard.');
-```
-
-Output:
-```html
-<p>The <abbr title="HyperText Markup Language">HTML</abbr> standard.</p>
-```
-
-This uses standard djot span syntax with attributes, so no custom parsing is needed.
-You can combine with other attributes: `[CSS]{abbr="Cascading Style Sheets" .tech-term}`.
-
-## Table of Contents Generation
-
-> **Tip:** Use the built-in [TableOfContentsExtension](/extensions/#tableofcontentsextension) for common cases.
-
-Generate a table of contents from headings:
-
-```php
-use Djot\DjotConverter;
-use Djot\Extension\TableOfContentsExtension;
-
-$converter = new DjotConverter();
-$tocExtension = new TableOfContentsExtension(
-    minLevel: 2,      // Skip h1
-    maxLevel: 3,      // Only h2 and h3
-    position: 'top',  // Auto-insert at top of output
-);
-$converter->addExtension($tocExtension);
-
-$html = $converter->convert($djot);
-```
-
-For manual placement:
-
-```php
-$tocExtension = new TableOfContentsExtension();
-$converter->addExtension($tocExtension);
-
-$html = $converter->convert($djot);
-$toc = $tocExtension->getTocHtml();
-
-// Place TOC wherever you want
-echo $toc;
-echo $html;
-```
-
-For fully custom TOC rendering, access the raw data:
-
-```php
-$tocData = $tocExtension->getToc();
-// Returns: [['level' => 2, 'text' => 'Getting Started', 'id' => 'Getting-Started'], ...]
-```
-
 ## Image Processing
 
 Add lazy loading, responsive images, or wrap images in figures:
@@ -421,85 +313,18 @@ Output:
 <figure><img src="sunset.jpg" alt="A beautiful sunset" loading="lazy"><figcaption>A beautiful sunset</figcaption></figure>
 ```
 
-## Custom Admonitions
+## Custom Heading IDs
 
-Style div blocks as admonitions (note, warning, tip, etc.):
+For permalink anchors with clickable links, use [HeadingPermalinksExtension](/extensions/#headingpermalinksextension).
+
+For custom ID generation logic, use events:
 
 ```php
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
-use Djot\Node\Block\Div;
 
 $converter = new DjotConverter();
 
-$admonitionIcons = [
-    'note' => 'ℹ️',
-    'tip' => '💡',
-    'warning' => '⚠️',
-    'danger' => '🚨',
-    'success' => '✅',
-];
-
-$converter->on('render.div', function (RenderEvent $event) use ($admonitionIcons): void {
-    $div = $event->getNode();
-    if (!$div instanceof Div) {
-        return;
-    }
-
-    $class = $div->getAttribute('class') ?? '';
-    foreach ($admonitionIcons as $type => $icon) {
-        if (str_contains($class, $type)) {
-            $div->setAttribute('class', 'admonition ' . $class);
-            $div->setAttribute('data-icon', $icon);
-
-            return;
-        }
-    }
-});
-
-$djot = <<<'DJOT'
-::: warning
-Be careful with this operation!
-:::
-
-::: tip
-Here's a helpful hint.
-:::
-DJOT;
-
-echo $converter->convert($djot);
-```
-
-## Heading Anchors
-
-> **Tip:** Use the built-in [HeadingPermalinksExtension](/extensions/#headingpermalinksextension) for clickable permalink anchors.
-
-Add anchor links to headings:
-
-```php
-use Djot\DjotConverter;
-use Djot\Extension\HeadingPermalinksExtension;
-
-$converter = new DjotConverter();
-$converter->addExtension(new HeadingPermalinksExtension(
-    symbol: '#',         // Or '¶', '🔗', etc.
-    position: 'after',   // 'before' or 'after'
-    cssClass: 'anchor',
-));
-
-echo $converter->convert('## Getting Started');
-```
-
-Output:
-```html
-<section id="Getting-Started">
-<h2>Getting Started <span class="permalink-wrapper"><a href="#Getting-Started" class="anchor" aria-label="Permalink">#</a></span></h2>
-</section>
-```
-
-For custom anchor logic without the permalink link, use events:
-
-```php
 $converter->on('render.heading', function (RenderEvent $event): void {
     $heading = $event->getNode();
     // Custom ID generation logic
@@ -590,25 +415,18 @@ $converter->on('render.raw_inline', function (RenderEvent $event) use ($allowedT
 });
 ```
 
-## Lazy Loading Images
+## Conditional Image Attributes
 
-> **Tip:** Use the built-in [DefaultAttributesExtension](/extensions/#defaultattributesextension) for this.
+For static attributes on all images, use [DefaultAttributesExtension](/extensions/#defaultattributesextension).
 
-Add native lazy loading to all images:
+For conditional logic based on image source, use events:
 
 ```php
 use Djot\DjotConverter;
-use Djot\Extension\DefaultAttributesExtension;
+use Djot\Event\RenderEvent;
 
 $converter = new DjotConverter();
-$converter->addExtension(new DefaultAttributesExtension([
-    'image' => ['loading' => 'lazy', 'decoding' => 'async'],
-]));
-```
 
-For more complex logic (e.g., different attributes based on image source), use events:
-
-```php
 $converter->on('render.image', function (RenderEvent $event): void {
     $image = $event->getNode();
     $src = $image->getDestination();
@@ -1247,31 +1065,14 @@ Extend Djot with custom inline syntax by registering patterns on the InlineParse
 
 ### @Mentions
 
-> **Tip:** Use the built-in [MentionsExtension](/extensions/#mentionsextension) for common cases.
+For standard @mention handling, use [MentionsExtension](/extensions/#mentionsextension).
 
-Convert `@username` to profile links:
-
-```php
-use Djot\DjotConverter;
-use Djot\Extension\MentionsExtension;
-
-$converter = new DjotConverter();
-$converter->addExtension(new MentionsExtension(
-    urlTemplate: '/users/{username}',
-    cssClass: 'mention',
-));
-
-echo $converter->convert('Hello @john_doe, meet @jane_smith!');
-```
-
-Output:
-```html
-<p>Hello <a href="/users/john_doe" class="mention">@john_doe</a>, meet <a href="/users/jane_smith" class="mention">@jane_smith</a>!</p>
-```
-
-For custom mention logic, use inline patterns directly:
+For custom mention logic (user lookup, validation, etc.), use inline patterns:
 
 ```php
+use Djot\Node\Inline\Link;
+use Djot\Node\Inline\Text;
+
 $parser = $converter->getParser()->getInlineParser();
 
 $parser->addInlinePattern('/@([a-zA-Z0-9_]+)/', function ($match, $groups) {
