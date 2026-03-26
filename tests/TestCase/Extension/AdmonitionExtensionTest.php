@@ -297,7 +297,7 @@ DJOT;
 
         $html = $converter->convert("::: note\nContent.\n:::");
 
-        $this->assertStringContainsString('<span class="admonition-icon">ℹ️</span> Note', $html);
+        $this->assertStringContainsString('<span class="admonition-icon">📝</span> Note', $html);
     }
 
     public function testDefaultIconsForAllTypes(): void
@@ -306,7 +306,7 @@ DJOT;
         $converter->addExtension(new AdmonitionExtension(icons: true));
 
         $expectations = [
-            'note' => 'ℹ️',
+            'note' => '📝',
             'tip' => '💡',
             'warning' => '⚠️',
             'danger' => '🚨',
@@ -362,7 +362,7 @@ DJOT;
 
         $html = $converter->convert("::: note\nContent.\n:::");
 
-        $this->assertStringContainsString('<span class="custom-icon">ℹ️</span> Note', $html);
+        $this->assertStringContainsString('<span class="custom-icon">📝</span> Note', $html);
         $this->assertStringNotContainsString('admonition-icon', $html);
     }
 
@@ -388,7 +388,7 @@ DJOT;
 
     public function testIconsPreserveDefaultConstants(): void
     {
-        $this->assertSame('ℹ️', AdmonitionExtension::DEFAULT_ICONS['note']);
+        $this->assertSame('📝', AdmonitionExtension::DEFAULT_ICONS['note']);
         $this->assertSame('💡', AdmonitionExtension::DEFAULT_ICONS['tip']);
         $this->assertSame('⚠️', AdmonitionExtension::DEFAULT_ICONS['warning']);
         $this->assertSame('🚨', AdmonitionExtension::DEFAULT_ICONS['danger']);

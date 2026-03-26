@@ -96,7 +96,7 @@ class AdmonitionExtension implements ExtensionInterface
      * @var array<string, string>
      */
     public const DEFAULT_ICONS = [
-        'note' => 'ℹ️',
+        'note' => '📝',
         'tip' => '💡',
         'warning' => '⚠️',
         'danger' => '🚨',

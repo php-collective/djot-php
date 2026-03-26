@@ -166,7 +166,7 @@ $converter->addExtension(new AdmonitionExtension(
 
 | Type | Icon |
 |------|------|
-| `note` | ℹ️ |
+| `note` | 📝 |
 | `tip` | 💡 |
 | `warning` | ⚠️ |
 | `danger` | 🚨 |
