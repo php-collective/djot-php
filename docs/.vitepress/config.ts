@@ -82,7 +82,8 @@ export default defineConfig({
         {
           text: 'Cookbook',
           items: [
-            { text: 'HTML Customization', link: '/cookbook/' },
+            { text: 'Rendering Recipes', link: '/cookbook/' },
+            { text: 'Custom Syntax Patterns', link: '/cookbook/custom-patterns' },
             { text: 'Syntax Highlighting', link: '/cookbook/syntax-highlighting' },
             { text: 'PlainText Renderer', link: '/cookbook/plaintext' },
             { text: 'Markdown Renderer', link: '/cookbook/markdown' },
