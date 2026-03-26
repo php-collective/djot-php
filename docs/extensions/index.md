@@ -58,7 +58,7 @@ $converter->addExtension(new AdmonitionExtension());
 
 // Custom configuration
 $converter->addExtension(new AdmonitionExtension(
-    types: ['note', 'tip', 'warning', 'danger', 'info', 'success', 'caution'],
+    types: ['note', 'tip', 'warning', 'danger', 'info', 'success'],
     defaultTitle: true,
     titleTag: 'p',
     titleClass: 'admonition-title',
@@ -129,17 +129,66 @@ This is expanded by default.
 
 The extension automatically adds appropriate ARIA roles:
 - `role="note"` for informational types: `note`, `tip`, `info`, `success`
-- `role="alert"` for warning types: `warning`, `danger`, `caution`
+- `role="alert"` for warning types: `warning`, `danger`
 
 **Configuration options:**
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `types` | `array` | `['note', 'tip', 'warning', 'danger', 'info', 'success', 'caution']` | Admonition types to recognize |
+| `types` | `array` | `['note', 'tip', 'warning', 'danger', 'info', 'success']` | Admonition types to recognize |
 | `defaultTitle` | `bool` | `true` | Auto-generate title from type name |
 | `titleTag` | `string` | `'p'` | HTML tag for the title element |
 | `titleClass` | `string` | `'admonition-title'` | CSS class for the title element |
 | `containerClass` | `string` | `'admonition'` | Base CSS class for the container |
+| `icons` | `bool\|array` | `false` | Enable icons: `true` for defaults, or array for custom |
+| `iconClass` | `string` | `'admonition-icon'` | CSS class for the icon wrapper span |
+
+**Icons:**
+
+Add emoji icons to admonition titles using the `icons` parameter:
+
+```php
+// Enable default icons
+$converter->addExtension(new AdmonitionExtension(icons: true));
+
+// Custom icons
+$converter->addExtension(new AdmonitionExtension(
+    icons: [
+        'note' => '🗒️',
+        'tip' => '🌟',
+        'warning' => '🔶',
+        'danger' => '☠️',
+    ],
+));
+```
+
+**Default icons** (when `icons: true`):
+
+| Type | Icon |
+|------|------|
+| `note` | 📝 |
+| `tip` | 💡 |
+| `warning` | ⚠️ |
+| `danger` | 🚨 |
+| `info` | ℹ️ |
+| `success` | ✅ |
+
+**Output with icons:**
+
+```html
+<div class="admonition note" role="note">
+  <p class="admonition-title"><span class="admonition-icon">ℹ️</span> Note</p>
+  <p>This is a note.</p>
+</div>
+```
+
+**Styling icons:**
+
+```css
+.admonition-icon {
+  margin-right: 0.25em;
+}
+```
 
 **Custom types:**
 

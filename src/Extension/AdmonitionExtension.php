@@ -19,9 +19,17 @@ use Djot\Node\Block\Div;
  * $converter = new DjotConverter();
  * $converter->addExtension(new AdmonitionExtension());
  *
+ * // With icons enabled (uses default emoji icons):
+ * $converter->addExtension(new AdmonitionExtension(icons: true));
+ *
+ * // With custom icons:
+ * $converter->addExtension(new AdmonitionExtension(
+ *     icons: ['note' => '📝', 'tip' => '💡', 'warning' => '⚠️'],
+ * ));
+ *
  * // Or with custom settings:
  * $converter->addExtension(new AdmonitionExtension(
- *     types: ['note', 'tip', 'warning', 'danger', 'info', 'success', 'caution'],
+ *     types: ['note', 'tip', 'warning', 'danger', 'info', 'success'],
  *     defaultTitle: true,
  *     titleTag: 'p',
  *     titleClass: 'admonition-title',
@@ -50,25 +58,25 @@ use Djot\Node\Block\Div;
  * :::
  * ```
  *
- * Output HTML:
+ * Output HTML (with icons: true):
  * ```html
  * <div class="admonition note" role="note">
- *   <p class="admonition-title">Note</p>
+ *   <p class="admonition-title"><span class="admonition-icon">ℹ️</span> Note</p>
  *   <p>This is a note.</p>
  * </div>
  *
  * <div class="admonition warning" role="alert">
- *   <p class="admonition-title">Watch Out!</p>
+ *   <p class="admonition-title"><span class="admonition-icon">⚠️</span> Watch Out!</p>
  *   <p>Be careful here.</p>
  * </div>
  *
  * <details class="admonition tip">
- *   <summary>Tip</summary>
+ *   <summary><span class="admonition-icon">💡</span> Tip</summary>
  *   <p>Click to expand this tip.</p>
  * </details>
  *
  * <details class="admonition danger" open>
- *   <summary>Danger</summary>
+ *   <summary><span class="admonition-icon">🚨</span> Danger</summary>
  *   <p>This is expanded by default.</p>
  * </details>
  * ```
@@ -80,14 +88,35 @@ class AdmonitionExtension implements ExtensionInterface
      *
      * @var array<string>
      */
-    public const DEFAULT_TYPES = ['note', 'tip', 'warning', 'danger', 'info', 'success', 'caution'];
+    public const DEFAULT_TYPES = ['note', 'tip', 'warning', 'danger', 'info', 'success'];
+
+    /**
+     * Default icons for each admonition type (used when icons: true)
+     *
+     * @var array<string, string>
+     */
+    public const DEFAULT_ICONS = [
+        'note' => '📝',
+        'tip' => '💡',
+        'warning' => '⚠️',
+        'danger' => '🚨',
+        'info' => 'ℹ️',
+        'success' => '✅',
+    ];
 
     /**
      * Types that should use role="alert" for screen readers
      *
      * @var array<string>
      */
-    protected const ALERT_TYPES = ['warning', 'danger', 'caution'];
+    protected const ALERT_TYPES = ['warning', 'danger'];
+
+    /**
+     * Resolved icons map (empty if icons disabled)
+     *
+     * @var array<string, string>
+     */
+    protected array $resolvedIcons = [];
 
     /**
      * @param array<string> $types Admonition types to recognize
@@ -95,6 +124,8 @@ class AdmonitionExtension implements ExtensionInterface
      * @param string $titleTag HTML tag for the title element
      * @param string $titleClass CSS class for the title element
      * @param string $containerClass Base CSS class for the container
+     * @param array<string, string>|bool $icons Enable icons (true = default icons, array = custom icons, false = disabled)
+     * @param string $iconClass CSS class for the icon wrapper span
      */
     public function __construct(
         protected array $types = self::DEFAULT_TYPES,
@@ -102,7 +133,38 @@ class AdmonitionExtension implements ExtensionInterface
         protected string $titleTag = 'p',
         protected string $titleClass = 'admonition-title',
         protected string $containerClass = 'admonition',
+        bool|array $icons = false,
+        protected string $iconClass = 'admonition-icon',
     ) {
+        $this->resolvedIcons = $this->resolveIcons($icons);
+    }
+
+    /**
+     * Resolve the icons configuration to a map
+     *
+     * @param array<string, string>|bool $icons
+     *
+     * @return array<string, string>
+     */
+    protected function resolveIcons(bool|array $icons): array
+    {
+        if ($icons === false) {
+            return [];
+        }
+
+        if ($icons === true) {
+            return self::DEFAULT_ICONS;
+        }
+
+        return $icons;
+    }
+
+    /**
+     * Get icon for a specific admonition type
+     */
+    protected function getIcon(string $type): ?string
+    {
+        return $this->resolvedIcons[$type] ?? null;
     }
 
     public function register(DjotConverter $converter): void
@@ -168,24 +230,44 @@ class AdmonitionExtension implements ExtensionInterface
         // Build additional attributes (excluding class, title, collapsible)
         $extraAttrs = $this->buildExtraAttributes($node);
 
+        $icon = $this->getIcon($type);
+
         if ($isCollapsible) {
-            return $this->renderCollapsible($classAttr, $extraAttrs, $title, $childrenHtml, $isOpen);
+            return $this->renderCollapsible($classAttr, $extraAttrs, $title, $childrenHtml, $isOpen, $icon);
         }
 
-        return $this->renderStatic($type, $classAttr, $extraAttrs, $title, $childrenHtml);
+        return $this->renderStatic($type, $classAttr, $extraAttrs, $title, $childrenHtml, $icon);
+    }
+
+    /**
+     * Render the title content with optional icon
+     */
+    protected function renderTitleContent(?string $title, ?string $icon): string
+    {
+        if ($title === null) {
+            return '';
+        }
+
+        $content = '';
+        if ($icon !== null) {
+            $content .= '<span class="' . $this->escape($this->iconClass) . '">' . $icon . '</span> ';
+        }
+        $content .= $this->escape($title);
+
+        return $content;
     }
 
     /**
      * Render a static (non-collapsible) admonition
      */
-    protected function renderStatic(string $type, string $classAttr, string $extraAttrs, ?string $title, string $childrenHtml): string
+    protected function renderStatic(string $type, string $classAttr, string $extraAttrs, ?string $title, string $childrenHtml, ?string $icon): string
     {
         $role = in_array($type, self::ALERT_TYPES, true) ? 'alert' : 'note';
         $html = '<div class="' . $this->escape($classAttr) . '" role="' . $role . '"' . $extraAttrs . ">\n";
 
         if ($title !== null) {
             $html .= '<' . $this->titleTag . ' class="' . $this->escape($this->titleClass) . '">';
-            $html .= $this->escape($title);
+            $html .= $this->renderTitleContent($title, $icon);
             $html .= '</' . $this->titleTag . ">\n";
         }
 
@@ -198,13 +280,13 @@ class AdmonitionExtension implements ExtensionInterface
     /**
      * Render a collapsible admonition using details/summary
      */
-    protected function renderCollapsible(string $classAttr, string $extraAttrs, ?string $title, string $childrenHtml, bool $isOpen): string
+    protected function renderCollapsible(string $classAttr, string $extraAttrs, ?string $title, string $childrenHtml, bool $isOpen, ?string $icon): string
     {
         $openAttr = $isOpen ? ' open' : '';
         $html = '<details class="' . $this->escape($classAttr) . '"' . $openAttr . $extraAttrs . ">\n";
 
         if ($title !== null) {
-            $html .= '<summary>' . $this->escape($title) . "</summary>\n";
+            $html .= '<summary>' . $this->renderTitleContent($title, $icon) . "</summary>\n";
         }
 
         $html .= $childrenHtml;
