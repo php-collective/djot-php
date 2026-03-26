@@ -124,7 +124,7 @@ class AdmonitionExtension implements ExtensionInterface
      * @param string $titleTag HTML tag for the title element
      * @param string $titleClass CSS class for the title element
      * @param string $containerClass Base CSS class for the container
-     * @param bool|array<string, string> $icons Enable icons (true = default icons, array = custom icons, false = disabled)
+     * @param array<string, string>|bool $icons Enable icons (true = default icons, array = custom icons, false = disabled)
      * @param string $iconClass CSS class for the icon wrapper span
      */
     public function __construct(
@@ -142,7 +142,8 @@ class AdmonitionExtension implements ExtensionInterface
     /**
      * Resolve the icons configuration to a map
      *
-     * @param bool|array<string, string> $icons
+     * @param array<string, string>|bool $icons
+     *
      * @return array<string, string>
      */
     protected function resolveIcons(bool|array $icons): array
