@@ -25,8 +25,8 @@ use Djot\Node\Block\Heading;
  * $converter->addExtension(new HeadingLevelShiftExtension(shift: 2));
  * ```
  *
- * Note: Heading levels are capped at h6. Section nesting (when enabled)
- * still uses the original document structure.
+ * Note: Heading levels are capped at h6. When this extension shifts a heading,
+ * it outputs the heading directly without automatic `<section>` wrapping.
  */
 class HeadingLevelShiftExtension implements ExtensionInterface
 {
@@ -45,9 +45,10 @@ class HeadingLevelShiftExtension implements ExtensionInterface
         }
 
         $tracker = $converter->getHeadingIdTracker();
+        $renderer = $converter->getRenderer();
         $shift = $this->shift;
 
-        $converter->on('render.heading', function (RenderEvent $event) use ($tracker, $shift): void {
+        $converter->on('render.heading', function (RenderEvent $event) use ($tracker, $renderer, $shift): void {
             $node = $event->getNode();
             if (!$node instanceof Heading) {
                 return;
@@ -61,40 +62,13 @@ class HeadingLevelShiftExtension implements ExtensionInterface
             }
 
             $id = $tracker->getIdForHeading($node);
-            $attrs = $this->renderAttributes($node, ['id']);
+            $attrs = $renderer->renderAttributesExcluding($node, ['id']);
 
-            $html = '<h' . $newLevel . ' id="' . $this->escapeAttr($id) . '"' . $attrs . '>'
+            $html = '<h' . $newLevel . ' id="' . $renderer->escapeAttribute($id) . '"' . $attrs . '>'
                 . $event->getChildrenHtml()
                 . '</h' . $newLevel . ">\n";
 
             $event->setHtml($html);
         });
-    }
-
-    /**
-     * Render node attributes as HTML string
-     *
-     * @param \Djot\Node\Block\Heading $node
-     * @param array<string> $exclude Attribute names to exclude
-     */
-    protected function renderAttributes(Heading $node, array $exclude = []): string
-    {
-        $attrs = $node->getAttributes();
-        foreach ($exclude as $key) {
-            unset($attrs[$key]);
-        }
-
-        $html = '';
-        foreach ($attrs as $key => $value) {
-            $html .= ' ' . htmlspecialchars($key, ENT_QUOTES | ENT_HTML5)
-                . '="' . $this->escapeAttr((string)$value) . '"';
-        }
-
-        return $html;
-    }
-
-    protected function escapeAttr(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5);
     }
 }
