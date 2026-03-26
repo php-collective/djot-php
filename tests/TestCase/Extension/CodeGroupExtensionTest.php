@@ -227,8 +227,7 @@ DJOT;
     {
         $converter = new DjotConverter();
         $converter->addExtension(new CodeGroupExtension(
-            highlighter: fn(string $code, ?string $lang) =>
-                '<div class="highlighted" data-lang="' . ($lang ?? 'none') . '">' . htmlspecialchars($code) . '</div>',
+            highlighter: fn (string $code, ?string $lang) => '<div class="highlighted" data-lang="' . ($lang ?? 'none') . '">' . htmlspecialchars($code) . '</div>',
         ));
 
         $djot = <<<'DJOT'
