@@ -12,6 +12,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [FrontmatterExtension](#frontmatterextension) | Parses YAML/NEON/TOML/JSON frontmatter at document start |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
+| [MermaidExtension](#mermaidextension) | Transforms mermaid code blocks into diagrams |
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
 | [SmartQuotesExtension](#smartquotesextension) | Configures locale-specific smart quote characters |
 | [TableOfContentsExtension](#tableofcontentsextension) | Generates a table of contents from headings |
@@ -298,6 +299,163 @@ Thanks @johndoe for the help!
 ```html
 <p>Thanks <a href="/users/view/johndoe" data-username="johndoe" class="mention">@johndoe</a> for the help!</p>
 ```
+
+## MermaidExtension
+
+Transforms code blocks with language `mermaid` into Mermaid.js-compatible markup for rendering diagrams. Mermaid supports flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, Gantt charts, pie charts, git graphs, and more.
+
+```php
+use Djot\Extension\MermaidExtension;
+
+// Default configuration
+$converter->addExtension(new MermaidExtension());
+
+// Custom configuration
+$converter->addExtension(new MermaidExtension(
+    tag: 'pre',           // or 'div'
+    cssClass: 'mermaid',
+    wrapInFigure: false,
+    figureClass: 'mermaid-figure',
+));
+```
+
+**Basic flowchart:**
+
+````djot
+``` mermaid
+graph TD;
+    A-->B;
+    A-->C;
+    B-->D;
+    C-->D;
+```
+````
+
+**Output:**
+
+```html
+<pre class="mermaid">graph TD;
+    A-->B;
+    A-->C;
+    B-->D;
+    C-->D;
+</pre>
+```
+
+**Sequence diagram:**
+
+````djot
+``` mermaid
+sequenceDiagram
+    Alice->>Bob: Hello Bob
+    Bob-->>Alice: Hi Alice
+```
+````
+
+**Class diagram:**
+
+````djot
+``` mermaid
+classDiagram
+    Animal <|-- Duck
+    Animal <|-- Fish
+    Animal : +int age
+    Animal: +isMammal()
+```
+````
+
+**Configuration options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `tag` | `string` | `'pre'` | HTML tag to use (`'pre'` or `'div'`) |
+| `cssClass` | `string` | `'mermaid'` | CSS class for Mermaid.js detection |
+| `wrapInFigure` | `bool` | `false` | Wrap in a `<figure>` element |
+| `figureClass` | `string` | `'mermaid-figure'` | CSS class for the figure wrapper |
+
+**With figure wrapper:**
+
+```php
+$converter->addExtension(new MermaidExtension(wrapInFigure: true));
+```
+
+```html
+<figure class="mermaid-figure">
+  <pre class="mermaid">graph TD;
+      A-->B;
+  </pre>
+</figure>
+```
+
+**Block attributes:**
+
+Custom attributes are preserved on the output element:
+
+````djot
+{#my-diagram .custom-diagram data-theme="dark"}
+``` mermaid
+graph LR;
+    A-->B;
+```
+````
+
+```html
+<pre class="mermaid custom-diagram" id="my-diagram" data-theme="dark">graph LR;
+    A-->B;
+</pre>
+```
+
+### Required JavaScript
+
+Include Mermaid.js in your page to render the diagrams:
+
+**Via CDN (ES module):**
+
+```html
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true });
+</script>
+```
+
+**Via npm:**
+
+```javascript
+import mermaid from 'mermaid';
+mermaid.initialize({ startOnLoad: true });
+```
+
+**For dynamic content:**
+
+If diagrams are loaded after page load (AJAX, SPA), call Mermaid manually:
+
+```javascript
+import mermaid from 'mermaid';
+
+// After inserting new mermaid blocks into the DOM
+await mermaid.run({
+  querySelector: '.mermaid',
+});
+```
+
+### Supported Diagram Types
+
+Mermaid supports many diagram types:
+
+| Type | Syntax Start |
+|------|--------------|
+| Flowchart | `graph TD` or `graph LR` |
+| Sequence | `sequenceDiagram` |
+| Class | `classDiagram` |
+| State | `stateDiagram-v2` |
+| ER | `erDiagram` |
+| Gantt | `gantt` |
+| Pie | `pie` |
+| Git | `gitGraph` |
+| Mindmap | `mindmap` |
+| Timeline | `timeline` |
+
+See <https://mermaid.js.org/> for full documentation and syntax.
 
 ## SemanticSpanExtension
 
