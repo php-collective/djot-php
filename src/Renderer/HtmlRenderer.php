@@ -375,6 +375,7 @@ class HtmlRenderer implements RendererInterface
      *
      * Respects safe mode filtering when enabled.
      *
+     * @param \Djot\Node\Node $node
      * @param array<string> $exclude Attribute names to exclude
      */
     public function renderAttributesExcluding(Node $node, array $exclude): string
