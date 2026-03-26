@@ -6,6 +6,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 
 | Extension | Description |
 |-----------|-------------|
+| [AdmonitionExtension](#admonitionextension) | Transforms divs into semantic admonition markup with accessibility support |
 | [AutolinkExtension](#autolinkextension) | Auto-links bare URLs and email addresses |
 | [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
@@ -43,6 +44,129 @@ Extensions are applied in registration order. Generally, order doesn't matter, b
 - **TableOfContentsExtension** should be registered before **HeadingPermalinksExtension** if you want clean heading text in the TOC (without permalink symbols)
 
 Extensions are reset per render, so reusing the same `DjotConverter` across multiple `convert()` calls will not carry per-document extension state such as collected TOC entries into the next output.
+
+## AdmonitionExtension
+
+Transforms fenced divs with admonition type classes into semantic HTML with proper accessibility attributes. Inspired by Python-Markdown/Material for MkDocs admonition syntax, using djot's native fenced div syntax.
+
+```php
+use Djot\Extension\AdmonitionExtension;
+
+// Default configuration
+$converter->addExtension(new AdmonitionExtension());
+
+// Custom configuration
+$converter->addExtension(new AdmonitionExtension(
+    types: ['note', 'tip', 'warning', 'danger', 'info', 'success', 'caution'],
+    defaultTitle: true,
+    titleTag: 'p',
+    titleClass: 'admonition-title',
+    containerClass: 'admonition',
+));
+```
+
+**Basic admonition:**
+
+```djot
+::: note
+This is a note.
+:::
+```
+
+```html
+<div class="admonition note" role="note">
+  <p class="admonition-title">Note</p>
+  <p>This is a note.</p>
+</div>
+```
+
+**With custom title:**
+
+```djot
+{title="Watch Out!"}
+::: warning
+Be careful here.
+:::
+```
+
+```html
+<div class="admonition warning" role="alert">
+  <p class="admonition-title">Watch Out!</p>
+  <p>Be careful here.</p>
+</div>
+```
+
+**Collapsible admonitions:**
+
+Use `{collapsible}` for a collapsed state or `{collapsible=open}` for expanded by default:
+
+```djot
+{collapsible}
+::: tip
+Click to expand this tip.
+:::
+
+{collapsible=open}
+::: danger
+This is expanded by default.
+:::
+```
+
+```html
+<details class="admonition tip">
+  <summary>Tip</summary>
+  <p>Click to expand this tip.</p>
+</details>
+
+<details class="admonition danger" open>
+  <summary>Danger</summary>
+  <p>This is expanded by default.</p>
+</details>
+```
+
+**ARIA roles:**
+
+The extension automatically adds appropriate ARIA roles:
+- `role="note"` for informational types: `note`, `tip`, `info`, `success`
+- `role="alert"` for warning types: `warning`, `danger`, `caution`
+
+**Configuration options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `types` | `array` | `['note', 'tip', 'warning', 'danger', 'info', 'success', 'caution']` | Admonition types to recognize |
+| `defaultTitle` | `bool` | `true` | Auto-generate title from type name |
+| `titleTag` | `string` | `'p'` | HTML tag for the title element |
+| `titleClass` | `string` | `'admonition-title'` | CSS class for the title element |
+| `containerClass` | `string` | `'admonition'` | Base CSS class for the container |
+
+**Custom types:**
+
+```php
+// Only recognize custom types
+$converter->addExtension(new AdmonitionExtension(
+    types: ['important', 'example', 'exercise'],
+));
+```
+
+**Styling for MkDocs/Material compatibility:**
+
+```php
+// Use div with class for title (common in documentation systems)
+$converter->addExtension(new AdmonitionExtension(
+    titleTag: 'div',
+    titleClass: 'admonition-title',
+));
+```
+
+**Disable auto-generated titles:**
+
+```php
+// Only show titles when explicitly set via {title="..."}
+$converter->addExtension(new AdmonitionExtension(
+    defaultTitle: false,
+));
+```
 
 ## ExternalLinksExtension
 
