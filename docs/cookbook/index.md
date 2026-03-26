@@ -29,6 +29,7 @@ Common recipes for customizing HTML output using events.
 
 - [Multipart Email](#multipart-email)
 - [Video Embeds](#video-embeds)
+- [Progress Bars](#progress-bars)
 
 ## Boolean Attributes
 
@@ -1291,4 +1292,154 @@ Usage:
 ```php
 $converter = new DjotConverter();
 $converter->addExtension(new VideoExtension());
+```
+
+## Progress Bars
+
+Render progress bars using spans with a `progress` attribute:
+
+```djot
+Project completion: [75%]{progress}
+Loading: [50%]{progress="Half done"}
+Status: [100%]{progress .success}
+```
+
+### Native HTML5 Progress
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Inline\Span;
+
+$converter = new DjotConverter();
+
+$converter->on('render.span', function (RenderEvent $event): void {
+    $node = $event->getNode();
+    if (!$node instanceof Span || !$node->hasAttribute('progress')) {
+        return;
+    }
+
+    $text = $node->getTextContent();
+    $value = (int) filter_var($text, FILTER_SANITIZE_NUMBER_INT);
+    $value = max(0, min(100, $value)); // Clamp 0-100
+
+    // Use attribute value as label, or fall back to text content
+    $attrValue = $node->getAttribute('progress');
+    $label = is_string($attrValue) && $attrValue !== '' ? $attrValue : $text;
+
+    // Collect CSS classes
+    $classAttr = $node->getAttribute('class');
+    $classHtml = '';
+    if (is_string($classAttr) && $classAttr !== '') {
+        $classHtml = ' class="' . htmlspecialchars($classAttr) . '"';
+    }
+
+    $html = sprintf(
+        '<progress value="%d" max="100"%s title="%s">%s</progress>',
+        $value,
+        $classHtml,
+        htmlspecialchars($label),
+        htmlspecialchars($label),
+    );
+
+    $event->setHtml($html);
+});
+
+echo $converter->convert('Project: [75%]{progress}');
+// <p>Project: <progress value="75" max="100" title="75%">75%</progress></p>
+```
+
+**CSS for styled variants:**
+
+```css
+progress.success::-webkit-progress-value { background: #28a745; }
+progress.warning::-webkit-progress-value { background: #ffc107; }
+progress.danger::-webkit-progress-value { background: #dc3545; }
+
+/* Firefox */
+progress.success::-moz-progress-bar { background: #28a745; }
+progress.warning::-moz-progress-bar { background: #ffc107; }
+progress.danger::-moz-progress-bar { background: #dc3545; }
+```
+
+### Custom Div-Based Progress
+
+For more styling control, render as a div-based progress bar:
+
+```php
+$converter->on('render.span', function (RenderEvent $event): void {
+    $node = $event->getNode();
+    if (!$node instanceof Span || !$node->hasAttribute('progress')) {
+        return;
+    }
+
+    $text = $node->getTextContent();
+    $value = (int) filter_var($text, FILTER_SANITIZE_NUMBER_INT);
+    $value = max(0, min(100, $value));
+
+    $attrValue = $node->getAttribute('progress');
+    $label = is_string($attrValue) && $attrValue !== '' ? $attrValue : $text;
+
+    $classes = ['progress'];
+    $classAttr = $node->getAttribute('class');
+    if (is_string($classAttr) && $classAttr !== '') {
+        $classes = array_merge($classes, preg_split('/\s+/', $classAttr));
+    }
+
+    $html = sprintf(
+        '<div class="%s" role="progressbar" aria-valuenow="%d" aria-valuemin="0" aria-valuemax="100">' .
+        '<div class="progress-fill" style="width: %d%%">%s</div>' .
+        '</div>',
+        htmlspecialchars(implode(' ', $classes)),
+        $value,
+        $value,
+        htmlspecialchars($label),
+    );
+
+    $event->setHtml($html);
+});
+```
+
+**CSS:**
+
+```css
+.progress {
+  width: 100%;
+  height: 1.5em;
+  background: #e9ecef;
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #0d6efd;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875em;
+  transition: width 0.3s ease;
+}
+
+.progress.success .progress-fill { background: #28a745; }
+.progress.warning .progress-fill { background: #ffc107; color: #000; }
+.progress.danger .progress-fill { background: #dc3545; }
+```
+
+### Integration Example
+
+```djot
+# Project Status
+
+| Feature | Progress |
+|---------|----------|
+| Backend API | [100%]{progress .success} |
+| Frontend UI | [75%]{progress} |
+| Documentation | [50%]{progress .warning} |
+| Testing | [25%]{progress .danger} |
+
+## Sprint Progress
+
+Current sprint: [60%]{progress="6 of 10 tasks complete"}
 ```
