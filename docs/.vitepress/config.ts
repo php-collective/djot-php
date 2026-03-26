@@ -68,6 +68,7 @@ export default defineConfig({
             { text: 'Safe Mode', link: '/guide/safe-mode' },
             { text: 'Validation', link: '/guide/validation' },
             { text: 'Profiles', link: '/guide/profiles' },
+            { text: 'Parser Options', link: '/guide/parser-options' },
             { text: 'Converters', link: '/guide/converters' },
           ],
         },
@@ -82,7 +83,8 @@ export default defineConfig({
         {
           text: 'Cookbook',
           items: [
-            { text: 'HTML Customization', link: '/cookbook/' },
+            { text: 'Rendering Recipes', link: '/cookbook/' },
+            { text: 'Custom Syntax Patterns', link: '/cookbook/custom-patterns' },
             { text: 'Syntax Highlighting', link: '/cookbook/syntax-highlighting' },
             { text: 'PlainText Renderer', link: '/cookbook/plaintext' },
             { text: 'Markdown Renderer', link: '/cookbook/markdown' },
