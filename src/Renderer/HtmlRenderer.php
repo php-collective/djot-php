@@ -277,12 +277,20 @@ class HtmlRenderer implements RendererInterface
 
             if ($child instanceof Heading) {
                 $level = $child->getLevel();
+                $customHtml = null;
 
                 // Dispatch render event for heading - allows custom rendering
-                $eventName = 'render.' . $child->getType();
-                $event = new RenderEvent($child);
-                $this->dispatchEvent($eventName, $event);
-                $this->dispatchEvent('render.*', $event);
+                if ($this->hasAnyListeners()) {
+                    $eventName = 'render.' . $child->getType();
+                    $event = new RenderEvent($child);
+                    $event->setChildrenRenderer(fn (): string => $this->renderChildren($child));
+                    $this->dispatchEvent($eventName, $event);
+                    $this->dispatchEvent('render.*', $event);
+
+                    if ($event->isDefaultPrevented()) {
+                        $customHtml = $event->getHtml();
+                    }
+                }
 
                 // Close any sections at same or deeper level
                 for ($l = 6; $l >= $level; $l--) {
@@ -293,8 +301,8 @@ class HtmlRenderer implements RendererInterface
                 }
 
                 // If event provided custom HTML, use it (without section wrapper)
-                if ($event->isDefaultPrevented()) {
-                    $html .= $event->getHtml() ?? '';
+                if ($customHtml !== null) {
+                    $html .= $customHtml;
 
                     continue;
                 }
@@ -363,12 +371,14 @@ class HtmlRenderer implements RendererInterface
     }
 
     /**
-     * Render attributes excluding specified ones
+     * Render node attributes as HTML string, excluding specified attributes
+     *
+     * Respects safe mode filtering when enabled.
      *
      * @param \Djot\Node\Node $node
-     * @param array<string> $exclude
+     * @param array<string> $exclude Attribute names to exclude
      */
-    protected function renderAttributesExcluding(Node $node, array $exclude): string
+    public function renderAttributesExcluding(Node $node, array $exclude): string
     {
         return $this->renderAttributeArray($this->getRenderableAttributes($node, $exclude));
     }
@@ -896,7 +906,7 @@ class HtmlRenderer implements RendererInterface
      *
      * Unlike escape(), this DOES escape quotes since they're in attribute context
      */
-    protected function escapeAttribute(string $text): string
+    public function escapeAttribute(string $text): string
     {
         // ENT_QUOTES: Escape both single and double quotes for attribute values
         $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
