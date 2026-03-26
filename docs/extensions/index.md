@@ -154,9 +154,9 @@ $converter->addExtension(new AdmonitionExtension(icons: true));
 // Custom icons
 $converter->addExtension(new AdmonitionExtension(
     icons: [
-        'note' => '📝',
+        'note' => '🗒️',
         'tip' => '🌟',
-        'warning' => '⚠️',
+        'warning' => '🔶',
         'danger' => '☠️',
     ],
 ));
