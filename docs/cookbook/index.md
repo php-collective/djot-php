@@ -890,7 +890,7 @@ $converter->on('render.image', function (RenderEvent $event): void {
         return;
     }
 
-    $src = htmlspecialchars($image->getDestination(), ENT_QUOTES, 'UTF-8');
+    $src = htmlspecialchars($image->getSource(), ENT_QUOTES, 'UTF-8');
     $alt = htmlspecialchars($image->getAlt(), ENT_QUOTES, 'UTF-8');
 
     $html = '<figure>';
@@ -944,7 +944,7 @@ $converter = new DjotConverter();
 
 $converter->on('render.image', function (RenderEvent $event): void {
     $image = $event->getNode();
-    $src = $image->getDestination();
+    $src = $image->getSource();
 
     // Only lazy load external images
     if (str_starts_with($src, 'http')) {
