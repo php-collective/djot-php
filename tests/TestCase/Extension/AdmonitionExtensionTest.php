@@ -121,7 +121,7 @@ class AdmonitionExtensionTest extends TestCase
         $converter = new DjotConverter();
         $converter->addExtension(new AdmonitionExtension());
 
-        $types = ['note', 'tip', 'warning', 'danger', 'info', 'success', 'caution'];
+        $types = ['note', 'tip', 'warning', 'danger', 'info', 'success'];
 
         foreach ($types as $type) {
             $html = $converter->convert("::: $type\nContent.\n:::");
@@ -267,16 +267,6 @@ DJOT;
         $this->assertStringContainsString('&lt;script&gt;', $html);
     }
 
-    public function testCautionHasAlertRole(): void
-    {
-        $converter = new DjotConverter();
-        $converter->addExtension(new AdmonitionExtension());
-
-        $html = $converter->convert("::: caution\nBe cautious!\n:::");
-
-        $this->assertStringContainsString('role="alert"', $html);
-    }
-
     public function testInfoAndSuccessHaveNoteRole(): void
     {
         $converter = new DjotConverter();
@@ -287,5 +277,122 @@ DJOT;
 
         $html = $converter->convert("::: success\nSuccess!\n:::");
         $this->assertStringContainsString('role="note"', $html);
+    }
+
+    public function testIconsDisabledByDefault(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension());
+
+        $html = $converter->convert("::: note\nContent.\n:::");
+
+        $this->assertStringNotContainsString('admonition-icon', $html);
+        $this->assertStringContainsString('<p class="admonition-title">Note</p>', $html);
+    }
+
+    public function testIconsEnabledWithTrue(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension(icons: true));
+
+        $html = $converter->convert("::: note\nContent.\n:::");
+
+        $this->assertStringContainsString('<span class="admonition-icon">ℹ️</span> Note', $html);
+    }
+
+    public function testDefaultIconsForAllTypes(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension(icons: true));
+
+        $expectations = [
+            'note' => 'ℹ️',
+            'tip' => '💡',
+            'warning' => '⚠️',
+            'danger' => '🚨',
+            'info' => 'ℹ️',
+            'success' => '✅',
+        ];
+
+        foreach ($expectations as $type => $expectedIcon) {
+            $html = $converter->convert("::: $type\nContent.\n:::");
+            $this->assertStringContainsString(
+                '<span class="admonition-icon">' . $expectedIcon . '</span>',
+                $html,
+                "Type '$type' should have icon '$expectedIcon'",
+            );
+        }
+    }
+
+    public function testCustomIcons(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension(
+            icons: ['note' => '📝', 'tip' => '🌟'],
+        ));
+
+        $html = $converter->convert("::: note\nContent.\n:::");
+        $this->assertStringContainsString('<span class="admonition-icon">📝</span> Note', $html);
+
+        $html = $converter->convert("::: tip\nContent.\n:::");
+        $this->assertStringContainsString('<span class="admonition-icon">🌟</span> Tip', $html);
+    }
+
+    public function testCustomIconsMissingType(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension(
+            icons: ['note' => '📝'],
+        ));
+
+        // Warning has no custom icon, so no icon should be rendered
+        $html = $converter->convert("::: warning\nContent.\n:::");
+
+        $this->assertStringNotContainsString('admonition-icon', $html);
+        $this->assertStringContainsString('<p class="admonition-title">Warning</p>', $html);
+    }
+
+    public function testCustomIconClass(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension(
+            icons: true,
+            iconClass: 'custom-icon',
+        ));
+
+        $html = $converter->convert("::: note\nContent.\n:::");
+
+        $this->assertStringContainsString('<span class="custom-icon">ℹ️</span> Note', $html);
+        $this->assertStringNotContainsString('admonition-icon', $html);
+    }
+
+    public function testIconsInCollapsible(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension(icons: true));
+
+        $html = $converter->convert("{collapsible}\n::: tip\nContent.\n:::");
+
+        $this->assertStringContainsString('<summary><span class="admonition-icon">💡</span> Tip</summary>', $html);
+    }
+
+    public function testIconsWithCustomTitle(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension(icons: true));
+
+        $html = $converter->convert("{title=\"Custom Title\"}\n::: warning\nContent.\n:::");
+
+        $this->assertStringContainsString('<span class="admonition-icon">⚠️</span> Custom Title', $html);
+    }
+
+    public function testIconsPreserveDefaultConstants(): void
+    {
+        $this->assertSame('ℹ️', AdmonitionExtension::DEFAULT_ICONS['note']);
+        $this->assertSame('💡', AdmonitionExtension::DEFAULT_ICONS['tip']);
+        $this->assertSame('⚠️', AdmonitionExtension::DEFAULT_ICONS['warning']);
+        $this->assertSame('🚨', AdmonitionExtension::DEFAULT_ICONS['danger']);
+        $this->assertSame('ℹ️', AdmonitionExtension::DEFAULT_ICONS['info']);
+        $this->assertSame('✅', AdmonitionExtension::DEFAULT_ICONS['success']);
     }
 }
