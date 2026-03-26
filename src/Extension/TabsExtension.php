@@ -27,9 +27,10 @@ use Djot\Node\Node;
  * $converter->addExtension(new TabsExtension(mode: 'aria'));
  * ```
  *
- * Input djot:
+ * Input djot (note: outer container uses `::::` to allow nested `:::` divs):
  * ```
- * ::: tabs
+ * :::: tabs
+ *
  * ::: tab
  * ### First Tab
  *
@@ -41,12 +42,14 @@ use Djot\Node\Node;
  *
  * Content for the second tab.
  * :::
- * :::
+ *
+ * ::::
  * ```
  *
  * Or with attributes:
  * ```
- * ::: tabs
+ * :::: tabs
+ *
  * {label="First Tab"}
  * ::: tab
  * Content here.
@@ -56,7 +59,8 @@ use Djot\Node\Node;
  * ::: tab
  * This tab is selected by default.
  * :::
- * :::
+ *
+ * ::::
  * ```
  *
  * ## Output Modes
