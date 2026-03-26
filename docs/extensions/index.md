@@ -15,6 +15,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
 | [SmartQuotesExtension](#smartquotesextension) | Configures locale-specific smart quote characters |
 | [TableOfContentsExtension](#tableofcontentsextension) | Generates a table of contents from headings |
+| [TabsExtension](#tabsextension) | Transforms divs into accessible tabbed content interfaces |
 | [WikilinksExtension](#wikilinksextension) | Converts `[[Page Name]]` patterns to wiki-style links |
 
 ## Basic Usage
@@ -606,6 +607,198 @@ $converter->addExtension(new DefaultAttributesExtension([
     'block_quote' => ['class' => 'border-l-4 pl-4 italic'],
 ]));
 ```
+
+## TabsExtension
+
+Transforms nested divs into accessible tabbed content interfaces. Supports two output modes: CSS-only (no JavaScript required) and ARIA mode (with JavaScript for full accessibility).
+
+```php
+use Djot\Extension\TabsExtension;
+
+// Default: CSS-only mode
+$converter->addExtension(new TabsExtension());
+
+// ARIA mode (requires JavaScript)
+$converter->addExtension(new TabsExtension(mode: 'aria'));
+
+// Custom configuration
+$converter->addExtension(new TabsExtension(
+    mode: 'css',
+    wrapperClass: 'tabs',
+    tabClass: 'tabs-panel',
+    labelClass: 'tabs-label',
+    idPrefix: 'tabset',
+));
+```
+
+**Basic syntax using headings:**
+
+```djot
+:::: tabs
+::: tab
+### First Tab
+
+Content for the first tab.
+:::
+
+::: tab
+### Second Tab
+
+Content for the second tab.
+:::
+::::
+```
+
+**Using label attributes:**
+
+```djot
+:::: tabs
+{label="First Tab"}
+::: tab
+Content here.
+:::
+
+{label="Second Tab" selected}
+::: tab
+This tab is selected by default.
+:::
+::::
+```
+
+Note: Use 4 colons (`::::`) for the outer `tabs` wrapper and 3 colons (`:::`) for inner `tab` divs. This is required for djot to parse nested fenced divs correctly.
+
+**Configuration options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `mode` | `string` | `'css'` | Output mode: `'css'` or `'aria'` |
+| `wrapperClass` | `string` | `'tabs'` | CSS class for the tabs container |
+| `tabClass` | `string` | `'tabs-panel'` | CSS class for individual tab panels |
+| `labelClass` | `string` | `'tabs-label'` | CSS class for tab labels/buttons |
+| `radioClass` | `string` | `'tabs-radio'` | CSS class for radio inputs (CSS mode only) |
+| `idPrefix` | `string` | `'tabset'` | Prefix for generated IDs |
+
+### CSS-Only Mode
+
+Uses radio inputs and CSS sibling selectors. No JavaScript required.
+
+**Output:**
+
+```html
+<div class="tabs">
+  <input type="radio" name="tabset-1" id="tabset-1-tab-1" checked class="tabs-radio">
+  <label for="tabset-1-tab-1" class="tabs-label">First Tab</label>
+  <input type="radio" name="tabset-1" id="tabset-1-tab-2" class="tabs-radio">
+  <label for="tabset-1-tab-2" class="tabs-label">Second Tab</label>
+  <div class="tabs-panel">Content for the first tab.</div>
+  <div class="tabs-panel">Content for the second tab.</div>
+</div>
+```
+
+**Required CSS:**
+
+```css
+.tabs { display: flex; flex-wrap: wrap; }
+.tabs-radio { display: none; }
+.tabs-label {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.tabs-radio:checked + .tabs-label {
+  border-bottom-color: currentColor;
+  font-weight: bold;
+}
+.tabs-panel {
+  display: none;
+  width: 100%;
+  order: 1;
+  padding: 1rem 0;
+}
+/* Show active panel based on checked radio */
+.tabs-radio:nth-of-type(1):checked ~ .tabs-panel:nth-of-type(1),
+.tabs-radio:nth-of-type(2):checked ~ .tabs-panel:nth-of-type(2),
+.tabs-radio:nth-of-type(3):checked ~ .tabs-panel:nth-of-type(3),
+.tabs-radio:nth-of-type(4):checked ~ .tabs-panel:nth-of-type(4),
+.tabs-radio:nth-of-type(5):checked ~ .tabs-panel:nth-of-type(5) {
+  display: block;
+}
+```
+
+### ARIA Mode
+
+Uses semantic ARIA roles with button/tabpanel structure. Requires JavaScript for tab switching.
+
+**Output:**
+
+```html
+<div class="tabs" role="tablist">
+  <button role="tab" id="tabset-1-tab-1" aria-selected="true"
+          aria-controls="tabset-1-panel-1" class="tabs-label">First Tab</button>
+  <button role="tab" id="tabset-1-tab-2" aria-selected="false"
+          aria-controls="tabset-1-panel-2" class="tabs-label" tabindex="-1">Second Tab</button>
+  <div role="tabpanel" id="tabset-1-panel-1" aria-labelledby="tabset-1-tab-1"
+       class="tabs-panel">Content for the first tab.</div>
+  <div role="tabpanel" id="tabset-1-panel-2" aria-labelledby="tabset-1-tab-2"
+       class="tabs-panel" hidden>Content for the second tab.</div>
+</div>
+```
+
+**Required JavaScript:**
+
+```javascript
+// Tab click handler
+document.addEventListener('click', function(e) {
+  const tab = e.target.closest('[role="tab"]');
+  if (!tab) return;
+
+  const tablist = tab.closest('[role="tablist"]');
+  const tabs = tablist.querySelectorAll('[role="tab"]');
+  const panels = tablist.querySelectorAll('[role="tabpanel"]');
+
+  tabs.forEach(t => {
+    t.setAttribute('aria-selected', 'false');
+    t.setAttribute('tabindex', '-1');
+  });
+  panels.forEach(p => p.hidden = true);
+
+  tab.setAttribute('aria-selected', 'true');
+  tab.removeAttribute('tabindex');
+  const panel = tablist.querySelector('#' + tab.getAttribute('aria-controls'));
+  if (panel) panel.hidden = false;
+});
+
+// Keyboard navigation (arrow keys, Home, End)
+document.addEventListener('keydown', function(e) {
+  const tab = e.target.closest('[role="tab"]');
+  if (!tab) return;
+
+  const tablist = tab.closest('[role="tablist"]');
+  const tabs = Array.from(tablist.querySelectorAll('[role="tab"]'));
+  const index = tabs.indexOf(tab);
+
+  let newIndex;
+  if (e.key === 'ArrowRight') newIndex = (index + 1) % tabs.length;
+  else if (e.key === 'ArrowLeft') newIndex = (index - 1 + tabs.length) % tabs.length;
+  else if (e.key === 'Home') newIndex = 0;
+  else if (e.key === 'End') newIndex = tabs.length - 1;
+  else return;
+
+  e.preventDefault();
+  tabs[newIndex].click();
+  tabs[newIndex].focus();
+});
+```
+
+### Choosing a Mode
+
+| Feature | CSS Mode | ARIA Mode |
+|---------|----------|-----------|
+| JavaScript required | No | Yes |
+| Keyboard navigation | Tab only | Arrow keys, Home, End |
+| Screen reader support | Basic | Full ARIA |
+| Browser support | All modern | All modern |
+| Best for | Simple sites | Accessible apps |
 
 ## WikilinksExtension
 
