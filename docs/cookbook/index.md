@@ -26,6 +26,7 @@ Common recipes and customizations for djot-php.
 - [Soft Break Modes](#soft-break-modes)
 - [Significant Newlines Mode](#significant-newlines-mode)
 - [Social Meta Tags](#social-meta-tags)
+- [Video Embeds](./video-embeds) - Embed YouTube, Vimeo, and 50+ providers
 
 ## External Links
 

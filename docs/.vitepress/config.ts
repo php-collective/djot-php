@@ -84,6 +84,7 @@ export default defineConfig({
           items: [
             { text: 'HTML Customization', link: '/cookbook/' },
             { text: 'Syntax Highlighting', link: '/cookbook/syntax-highlighting' },
+            { text: 'Video Embeds', link: '/cookbook/video-embeds' },
             { text: 'PlainText Renderer', link: '/cookbook/plaintext' },
             { text: 'Markdown Renderer', link: '/cookbook/markdown' },
             { text: 'ANSI Renderer', link: '/cookbook/ansi' },
