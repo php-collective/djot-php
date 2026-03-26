@@ -68,6 +68,7 @@ export default defineConfig({
             { text: 'Safe Mode', link: '/guide/safe-mode' },
             { text: 'Validation', link: '/guide/validation' },
             { text: 'Profiles', link: '/guide/profiles' },
+            { text: 'Parser Options', link: '/guide/parser-options' },
             { text: 'Converters', link: '/guide/converters' },
           ],
         },

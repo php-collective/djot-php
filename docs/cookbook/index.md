@@ -4,436 +4,143 @@ Common recipes for customizing HTML output using events.
 
 ## Table of Contents
 
+**Built-in Features**
+
+- [Boolean Attributes](#boolean-attributes)
+
+**Render Customization**
+
+- [Custom Footnotes](#custom-footnotes)
+- [Extended Task List States](#extended-task-list-states)
 - [Custom Link Attributes](#custom-link-attributes)
-- [Custom Emoji/Symbols](#custom-emojisymbols)
+- [Custom Emoji/Symbols](#custom-emoji-symbols)
 - [Unicode Codepoints](#unicode-codepoints)
 - [Image Processing](#image-processing)
 - [Custom Heading IDs](#custom-heading-ids)
-- [Link Validation](#link-validation)
-- [Content Security](#content-security)
 - [Conditional Image Attributes](#conditional-image-attributes)
-- [Custom Footnotes](#custom-footnotes)
-- [Extended Task List States](#extended-task-list-states)
 - [Math Rendering](#math-rendering)
-- [Boolean Attributes](#boolean-attributes)
-- [Alternative Output Formats](#alternative-output-formats)
-- [Soft Break Modes](#soft-break-modes)
-- [Significant Newlines Mode](#significant-newlines-mode)
-- [Social Meta Tags](#social-meta-tags)
+
+**Security**
+
+- [Link Validation](#link-validation)
+- [Content Sanitization](#content-sanitization)
+
+**Integrations**
+
+- [Multipart Email](#multipart-email)
 - [Video Embeds](#video-embeds)
 
-## Custom Link Attributes
+## Boolean Attributes
 
-For standard external link handling (target="_blank", rel="noopener"), use [ExternalLinksExtension](/extensions/#externallinksextension).
+HTML boolean attributes (like `reversed`, `hidden`, `disabled`) can be specified as bare words in djot attribute blocks.
 
-For custom logic based on specific domains or conditions, use events:
+### Reversed Ordered Lists
 
-```php
-use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Inline\Link;
-
-$converter = new DjotConverter();
-
-$converter->on('render.link', function (RenderEvent $event): void {
-    $link = $event->getNode();
-    if (!$link instanceof Link) {
-        return;
-    }
-
-    $href = $link->getDestination();
-
-    // Custom logic: specific domains get different attributes
-    if (str_contains($href, 'untrusted-domain.com')) {
-        $link->setAttribute('rel', 'nofollow noopener');
-    }
-});
-```
-
-## Custom Emoji/Symbols
-
-Convert `:name:` symbols to emoji or custom HTML:
+Use `{reversed}` to create a descending ordered list:
 
 ```php
 use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Inline\Symbol;
+
+$djot = <<<'DJOT'
+{reversed}
+3. Bronze medal
+2. Silver medal
+1. Gold medal
+DJOT;
 
 $converter = new DjotConverter();
-
-$emojis = [
-    'heart' => '❤️',
-    'star' => '⭐',
-    'check' => '✅',
-    'x' => '❌',
-    'warning' => '⚠️',
-    'info' => 'ℹ️',
-    'fire' => '🔥',
-    'rocket' => '🚀',
-];
-
-$converter->on('render.symbol', function (RenderEvent $event) use ($emojis): void {
-    $symbol = $event->getNode();
-    if (!$symbol instanceof Symbol) {
-        return;
-    }
-
-    $name = $symbol->getName();
-    if (isset($emojis[$name])) {
-        $event->setHtml('<span class="emoji" title="' . $name . '">' . $emojis[$name] . '</span>');
-    } else {
-        // Keep original for unknown symbols
-        $event->setHtml(':' . $name . ':');
-    }
-});
-
-echo $converter->convert('I :heart: this :rocket: feature!');
+echo $converter->convert($djot);
 ```
 
 Output:
 ```html
-<p>I <span class="emoji" title="heart">❤️</span> this <span class="emoji" title="rocket">🚀</span> feature!</p>
+<ol start="3" reversed="">
+<li>Bronze medal</li>
+<li>Silver medal</li>
+<li>Gold medal</li>
+</ol>
 ```
 
-## Unicode Codepoints
+The browser displays this as:
+```
+3. Bronze medal
+2. Silver medal
+1. Gold medal
+```
 
-Insert Unicode characters by codepoint using the `:symbol:` syntax. This is useful for
-hard-to-type characters like directional marks, variation selectors, zero-width joiners,
-and other invisible or special Unicode characters.
+### Hidden Content
 
-See [djot issue #44](https://github.com/jgm/djot/issues/44) for background on this use case.
+Use `{hidden}` to hide elements:
 
-### Supported Formats
-
-```php
-use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Inline\Symbol;
-
-$converter = new DjotConverter();
-
-$converter->on('render.symbol', function (RenderEvent $event): void {
-    $symbol = $event->getNode();
-    if (!$symbol instanceof Symbol) {
-        return;
-    }
-
-    $name = $symbol->getName();
-
-    // Hex with U+ prefix: :U+2192: → "→"
-    if (preg_match('/^U\+([0-9A-Fa-f]+)$/', $name, $m)) {
-        $codepoint = hexdec($m[1]);
-        if ($codepoint >= 0 && $codepoint <= 0x10FFFF) {
-            $event->setHtml(mb_chr($codepoint, 'UTF-8'));
-
-            return;
-        }
-    }
-
-    // Hex with 0x prefix: :0x14b: → "ŋ"
-    if (preg_match('/^0x([0-9A-Fa-f]+)$/', $name, $m)) {
-        $codepoint = hexdec($m[1]);
-        if ($codepoint >= 0 && $codepoint <= 0x10FFFF) {
-            $event->setHtml(mb_chr($codepoint, 'UTF-8'));
-
-            return;
-        }
-    }
-
-    // Decimal: :331: → "ŋ"
-    if (preg_match('/^[0-9]+$/', $name)) {
-        $codepoint = (int) $name;
-        if ($codepoint >= 0 && $codepoint <= 0x10FFFF) {
-            $event->setHtml(mb_chr($codepoint, 'UTF-8'));
-
-            return;
-        }
-    }
-
-    // Unknown symbol - keep original
-    $event->setHtml(':' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ':');
-});
-
-echo $converter->convert('Arrow: :U+2192: Eng: :0x14b: or :331:');
+```djot
+{hidden}
+This paragraph is hidden.
 ```
 
 Output:
 ```html
-<p>Arrow: → Eng: ŋ or ŋ</p>
+<p hidden="">This paragraph is hidden.</p>
 ```
 
-### Use Cases
+### Combining Boolean Attributes
 
-**Bidirectional text markers** (essential for mixed RTL/LTR content):
+Boolean attributes can be combined with classes, IDs, and key-value attributes:
+
 ```djot
-English text :U+200F: متن فارسی :U+200E: more English
-```
-
-- `:U+200E:` - Left-to-right mark (LRM)
-- `:U+200F:` - Right-to-left mark (RLM)
-- `:U+200B:` - Zero-width space (allows line breaks)
-- `:U+2060:` - Word joiner (prevents line breaks)
-
-**Variation selectors** (control glyph variants):
-```djot
-The character 㐂:U+E0102: uses the third registered variant.
-```
-
-**Soft hyphens** (invisible until line break needed):
-```djot
-super:U+AD:cali:U+AD:fragi:U+AD:listic
-```
-
-### Combining with Emoji
-
-Handle both emoji names and codepoints:
-
-```php
-$emojis = [
-    'heart' => '❤️',
-    'star' => '⭐',
-];
-
-$converter->on('render.symbol', function (RenderEvent $event) use ($emojis): void {
-    $symbol = $event->getNode();
-    if (!$symbol instanceof Symbol) {
-        return;
-    }
-
-    $name = $symbol->getName();
-
-    // Check emoji map first
-    if (isset($emojis[$name])) {
-        $event->setHtml($emojis[$name]);
-
-        return;
-    }
-
-    // Then try codepoint formats
-    $codepoint = null;
-    if (preg_match('/^U\+([0-9A-Fa-f]+)$/', $name, $m)) {
-        $codepoint = hexdec($m[1]);
-    } elseif (preg_match('/^0x([0-9A-Fa-f]+)$/', $name, $m)) {
-        $codepoint = hexdec($m[1]);
-    } elseif (preg_match('/^[0-9]+$/', $name)) {
-        $codepoint = (int) $name;
-    }
-
-    if ($codepoint !== null && $codepoint >= 0 && $codepoint <= 0x10FFFF) {
-        $event->setHtml(mb_chr($codepoint, 'UTF-8'));
-
-        return;
-    }
-
-    // Unknown - keep original
-    $event->setHtml(':' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ':');
-});
-
-echo $converter->convert('I :heart: arrows :U+2192: and :star:');
+{#countdown .fancy reversed}
+3. Third
+2. Second
+1. First
 ```
 
 Output:
 ```html
-<p>I ❤️ arrows → and ⭐</p>
+<ol id="countdown" class="fancy" start="3" reversed="">
+<li>Third</li>
+<li>Second</li>
+<li>First</li>
+</ol>
 ```
 
-### Alternatives
+### Inline Boolean Attributes
 
-For simpler cases, djot provides built-in alternatives:
+Boolean attributes also work on inline spans and links:
 
-**Non-breaking space** - use escaped space (`\ `):
 ```djot
-100\ km
-```
+[Download PDF](report.pdf){download .btn}
 
-Output: `<p>100&nbsp;km</p>`
-
-**HTML entities** - use raw HTML syntax:
-```djot
-`&mdash;`{=html} for em-dash, `&copy;`{=html} for ©
-```
-
-Output: `<p>— for em-dash, © for ©</p>`
-
-The codepoint approach above is most useful when you need:
-- Invisible Unicode characters (directional marks, joiners)
-- Characters without named HTML entities
-- A consistent syntax for all special characters
-
-## Image Processing
-
-Add lazy loading, responsive images, or wrap images in figures:
-
-```php
-use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Inline\Image;
-
-$converter = new DjotConverter();
-
-// Lazy loading
-$converter->on('render.image', function (RenderEvent $event): void {
-    $image = $event->getNode();
-    if (!$image instanceof Image) {
-        return;
-    }
-
-    $image->setAttribute('loading', 'lazy');
-    $image->setAttribute('decoding', 'async');
-});
-
-// Or wrap in figure with caption
-$converter->on('render.image', function (RenderEvent $event): void {
-    $image = $event->getNode();
-    if (!$image instanceof Image) {
-        return;
-    }
-
-    $src = htmlspecialchars($image->getDestination(), ENT_QUOTES, 'UTF-8');
-    $alt = htmlspecialchars($image->getAlt(), ENT_QUOTES, 'UTF-8');
-
-    $html = '<figure>';
-    $html .= '<img src="' . $src . '" alt="' . $alt . '" loading="lazy">';
-    if ($alt) {
-        $html .= '<figcaption>' . $alt . '</figcaption>';
-    }
-    $html .= '</figure>';
-
-    $event->setHtml($html);
-});
-
-echo $converter->convert('![A beautiful sunset](sunset.jpg)');
+[Hidden text]{hidden}
 ```
 
 Output:
 ```html
-<figure><img src="sunset.jpg" alt="A beautiful sunset" loading="lazy"><figcaption>A beautiful sunset</figcaption></figure>
+<p><a href="report.pdf" class="btn" download="">Download PDF</a></p>
+<p><span hidden="">Hidden text</span></p>
 ```
 
-## Custom Heading IDs
+### Syntax Reference
 
-For permalink anchors with clickable links, use [HeadingPermalinksExtension](/extensions/#headingpermalinksextension).
+| Syntax | Result |
+|--------|--------|
+| `{.class}` | `class="class"` |
+| `{#id}` | `id="id"` |
+| `{key=value}` | `key="value"` |
+| `{key="value"}` | `key="value"` (quoted) |
+| `{reversed}` | `reversed=""` (boolean) |
+| `{hidden}` | `hidden=""` (boolean) |
 
-For custom ID generation logic, use events:
+Boolean attributes are rendered as `attr=""` which is valid HTML5. Browsers treat this identically to `attr` or `attr="attr"`.
 
-```php
-use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
+### Common HTML Boolean Attributes
 
-$converter = new DjotConverter();
+Useful boolean attributes for djot elements:
 
-$converter->on('render.heading', function (RenderEvent $event): void {
-    $heading = $event->getNode();
-    // Custom ID generation logic
-    $heading->setAttribute('id', 'custom-' . uniqid());
-});
-```
-
-## Link Validation
-
-Validate or transform links:
-
-```php
-use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Inline\Link;
-
-$converter = new DjotConverter();
-
-// Add UTM parameters to external links
-$converter->on('render.link', function (RenderEvent $event): void {
-    $link = $event->getNode();
-    if (!$link instanceof Link) {
-        return;
-    }
-
-    $href = $link->getDestination();
-
-    if (str_starts_with($href, 'https://')) {
-        $separator = str_contains($href, '?') ? '&' : '?';
-        $link->setDestination($href . $separator . 'utm_source=docs&utm_medium=link');
-    }
-});
-
-// Or warn about potentially broken links
-$brokenLinks = [];
-
-$converter->on('render.link', function (RenderEvent $event) use (&$brokenLinks): void {
-    $link = $event->getNode();
-    if (!$link instanceof Link) {
-        return;
-    }
-
-    $href = $link->getDestination();
-
-    // Check for common issues
-    if (str_starts_with($href, 'http://')) {
-        $brokenLinks[] = "Insecure HTTP link: $href";
-    }
-    if (preg_match('/\s/', $href)) {
-        $brokenLinks[] = "Link contains whitespace: $href";
-    }
-});
-```
-
-## Content Security
-
-Sanitize or restrict certain content:
-
-```php
-use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-use Djot\Node\Block\RawBlock;
-use Djot\Node\Inline\RawInline;
-
-$converter = new DjotConverter();
-
-// Disable raw HTML entirely
-$converter->on('render.raw_block', function (RenderEvent $event): void {
-    $event->setHtml('<!-- raw HTML disabled -->');
-});
-
-$converter->on('render.raw_inline', function (RenderEvent $event): void {
-    $event->setHtml('<!-- raw HTML disabled -->');
-});
-
-// Or allow only certain tags
-$allowedTags = ['span', 'div', 'p', 'br', 'strong', 'em'];
-
-$converter->on('render.raw_inline', function (RenderEvent $event) use ($allowedTags): void {
-    $raw = $event->getNode();
-    if (!$raw instanceof RawInline) {
-        return;
-    }
-
-    $content = $raw->getContent();
-    $sanitized = strip_tags($content, $allowedTags);
-    $event->setHtml($sanitized);
-});
-```
-
-## Conditional Image Attributes
-
-For static attributes on all images, use [DefaultAttributesExtension](/extensions/#defaultattributesextension).
-
-For conditional logic based on image source, use events:
-
-```php
-use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
-
-$converter = new DjotConverter();
-
-$converter->on('render.image', function (RenderEvent $event): void {
-    $image = $event->getNode();
-    $src = $image->getDestination();
-
-    // Only lazy load external images
-    if (str_starts_with($src, 'http')) {
-        $image->setAttribute('loading', 'lazy');
-    }
-});
-```
+| Attribute | Elements | Effect |
+|-----------|----------|--------|
+| `reversed` | `<ol>` | Count down instead of up |
+| `hidden` | Any | Hide element from display |
+| `open` | `<details>` | Show details content by default |
+| `download` | `<a>` (links) | Download linked resource |
 
 ## Custom Footnotes
 
@@ -916,6 +623,336 @@ if ($marker === '/') {
 }
 ```
 
+## Custom Link Attributes
+
+For standard external link handling (target="_blank", rel="noopener"), use [ExternalLinksExtension](/extensions/#externallinksextension).
+
+For custom logic based on specific domains or conditions, use events:
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Inline\Link;
+
+$converter = new DjotConverter();
+
+$converter->on('render.link', function (RenderEvent $event): void {
+    $link = $event->getNode();
+    if (!$link instanceof Link) {
+        return;
+    }
+
+    $href = $link->getDestination();
+
+    // Custom logic: specific domains get different attributes
+    if (str_contains($href, 'untrusted-domain.com')) {
+        $link->setAttribute('rel', 'nofollow noopener');
+    }
+});
+```
+
+## Custom Emoji/Symbols
+
+Convert `:name:` symbols to emoji or custom HTML:
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Inline\Symbol;
+
+$converter = new DjotConverter();
+
+$emojis = [
+    'heart' => '❤️',
+    'star' => '⭐',
+    'check' => '✅',
+    'x' => '❌',
+    'warning' => '⚠️',
+    'info' => 'ℹ️',
+    'fire' => '🔥',
+    'rocket' => '🚀',
+];
+
+$converter->on('render.symbol', function (RenderEvent $event) use ($emojis): void {
+    $symbol = $event->getNode();
+    if (!$symbol instanceof Symbol) {
+        return;
+    }
+
+    $name = $symbol->getName();
+    if (isset($emojis[$name])) {
+        $event->setHtml('<span class="emoji" title="' . $name . '">' . $emojis[$name] . '</span>');
+    } else {
+        // Keep original for unknown symbols
+        $event->setHtml(':' . $name . ':');
+    }
+});
+
+echo $converter->convert('I :heart: this :rocket: feature!');
+```
+
+Output:
+```html
+<p>I <span class="emoji" title="heart">❤️</span> this <span class="emoji" title="rocket">🚀</span> feature!</p>
+```
+
+## Unicode Codepoints
+
+Insert Unicode characters by codepoint using the `:symbol:` syntax. This is useful for
+hard-to-type characters like directional marks, variation selectors, zero-width joiners,
+and other invisible or special Unicode characters.
+
+See [djot issue #44](https://github.com/jgm/djot/issues/44) for background on this use case.
+
+### Supported Formats
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Inline\Symbol;
+
+$converter = new DjotConverter();
+
+$converter->on('render.symbol', function (RenderEvent $event): void {
+    $symbol = $event->getNode();
+    if (!$symbol instanceof Symbol) {
+        return;
+    }
+
+    $name = $symbol->getName();
+
+    // Hex with U+ prefix: :U+2192: → "→"
+    if (preg_match('/^U\+([0-9A-Fa-f]+)$/', $name, $m)) {
+        $codepoint = hexdec($m[1]);
+        if ($codepoint >= 0 && $codepoint <= 0x10FFFF) {
+            $event->setHtml(mb_chr($codepoint, 'UTF-8'));
+
+            return;
+        }
+    }
+
+    // Hex with 0x prefix: :0x14b: → "ŋ"
+    if (preg_match('/^0x([0-9A-Fa-f]+)$/', $name, $m)) {
+        $codepoint = hexdec($m[1]);
+        if ($codepoint >= 0 && $codepoint <= 0x10FFFF) {
+            $event->setHtml(mb_chr($codepoint, 'UTF-8'));
+
+            return;
+        }
+    }
+
+    // Decimal: :331: → "ŋ"
+    if (preg_match('/^[0-9]+$/', $name)) {
+        $codepoint = (int) $name;
+        if ($codepoint >= 0 && $codepoint <= 0x10FFFF) {
+            $event->setHtml(mb_chr($codepoint, 'UTF-8'));
+
+            return;
+        }
+    }
+
+    // Unknown symbol - keep original
+    $event->setHtml(':' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ':');
+});
+
+echo $converter->convert('Arrow: :U+2192: Eng: :0x14b: or :331:');
+```
+
+Output:
+```html
+<p>Arrow: → Eng: ŋ or ŋ</p>
+```
+
+### Use Cases
+
+**Bidirectional text markers** (essential for mixed RTL/LTR content):
+```djot
+English text :U+200F: متن فارسی :U+200E: more English
+```
+
+- `:U+200E:` - Left-to-right mark (LRM)
+- `:U+200F:` - Right-to-left mark (RLM)
+- `:U+200B:` - Zero-width space (allows line breaks)
+- `:U+2060:` - Word joiner (prevents line breaks)
+
+**Variation selectors** (control glyph variants):
+```djot
+The character 㐂:U+E0102: uses the third registered variant.
+```
+
+**Soft hyphens** (invisible until line break needed):
+```djot
+super:U+AD:cali:U+AD:fragi:U+AD:listic
+```
+
+### Combining with Emoji
+
+Handle both emoji names and codepoints:
+
+```php
+$emojis = [
+    'heart' => '❤️',
+    'star' => '⭐',
+];
+
+$converter->on('render.symbol', function (RenderEvent $event) use ($emojis): void {
+    $symbol = $event->getNode();
+    if (!$symbol instanceof Symbol) {
+        return;
+    }
+
+    $name = $symbol->getName();
+
+    // Check emoji map first
+    if (isset($emojis[$name])) {
+        $event->setHtml($emojis[$name]);
+
+        return;
+    }
+
+    // Then try codepoint formats
+    $codepoint = null;
+    if (preg_match('/^U\+([0-9A-Fa-f]+)$/', $name, $m)) {
+        $codepoint = hexdec($m[1]);
+    } elseif (preg_match('/^0x([0-9A-Fa-f]+)$/', $name, $m)) {
+        $codepoint = hexdec($m[1]);
+    } elseif (preg_match('/^[0-9]+$/', $name)) {
+        $codepoint = (int) $name;
+    }
+
+    if ($codepoint !== null && $codepoint >= 0 && $codepoint <= 0x10FFFF) {
+        $event->setHtml(mb_chr($codepoint, 'UTF-8'));
+
+        return;
+    }
+
+    // Unknown - keep original
+    $event->setHtml(':' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ':');
+});
+
+echo $converter->convert('I :heart: arrows :U+2192: and :star:');
+```
+
+Output:
+```html
+<p>I ❤️ arrows → and ⭐</p>
+```
+
+### Alternatives
+
+For simpler cases, djot provides built-in alternatives:
+
+**Non-breaking space** - use escaped space (`\ `):
+```djot
+100\ km
+```
+
+Output: `<p>100&nbsp;km</p>`
+
+**HTML entities** - use raw HTML syntax:
+```djot
+`&mdash;`{=html} for em-dash, `&copy;`{=html} for ©
+```
+
+Output: `<p>— for em-dash, © for ©</p>`
+
+The codepoint approach above is most useful when you need:
+- Invisible Unicode characters (directional marks, joiners)
+- Characters without named HTML entities
+- A consistent syntax for all special characters
+
+## Image Processing
+
+Add lazy loading, responsive images, or wrap images in figures:
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+use Djot\Node\Inline\Image;
+
+$converter = new DjotConverter();
+
+// Lazy loading
+$converter->on('render.image', function (RenderEvent $event): void {
+    $image = $event->getNode();
+    if (!$image instanceof Image) {
+        return;
+    }
+
+    $image->setAttribute('loading', 'lazy');
+    $image->setAttribute('decoding', 'async');
+});
+
+// Or wrap in figure with caption
+$converter->on('render.image', function (RenderEvent $event): void {
+    $image = $event->getNode();
+    if (!$image instanceof Image) {
+        return;
+    }
+
+    $src = htmlspecialchars($image->getDestination(), ENT_QUOTES, 'UTF-8');
+    $alt = htmlspecialchars($image->getAlt(), ENT_QUOTES, 'UTF-8');
+
+    $html = '<figure>';
+    $html .= '<img src="' . $src . '" alt="' . $alt . '" loading="lazy">';
+    if ($alt) {
+        $html .= '<figcaption>' . $alt . '</figcaption>';
+    }
+    $html .= '</figure>';
+
+    $event->setHtml($html);
+});
+
+echo $converter->convert('![A beautiful sunset](sunset.jpg)');
+```
+
+Output:
+```html
+<figure><img src="sunset.jpg" alt="A beautiful sunset" loading="lazy"><figcaption>A beautiful sunset</figcaption></figure>
+```
+
+## Custom Heading IDs
+
+For permalink anchors with clickable links, use [HeadingPermalinksExtension](/extensions/#headingpermalinksextension).
+
+For custom ID generation logic, use events:
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+
+$converter = new DjotConverter();
+
+$converter->on('render.heading', function (RenderEvent $event): void {
+    $heading = $event->getNode();
+    // Custom ID generation logic
+    $heading->setAttribute('id', 'custom-' . uniqid());
+});
+```
+
+## Conditional Image Attributes
+
+For static attributes on all images, use [DefaultAttributesExtension](/extensions/#defaultattributesextension).
+
+For conditional logic based on image source, use events:
+
+```php
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
+
+$converter = new DjotConverter();
+
+$converter->on('render.image', function (RenderEvent $event): void {
+    $image = $event->getNode();
+    $src = $image->getDestination();
+
+    // Only lazy load external images
+    if (str_starts_with($src, 'http')) {
+        $image->setAttribute('loading', 'lazy');
+    }
+});
+```
+
 ## Math Rendering
 
 Integrate with MathJax or KaTeX:
@@ -950,164 +987,96 @@ $converter->on('render.math', function (RenderEvent $event): void {
 // <script>renderMathInElement(document.body);</script>
 ```
 
-## Boolean Attributes
+## Link Validation
 
-HTML boolean attributes (like `reversed`, `hidden`, `disabled`) can be specified as bare words in djot attribute blocks.
-
-### Reversed Ordered Lists
-
-Use `{reversed}` to create a descending ordered list:
+Validate or transform links:
 
 ```php
 use Djot\DjotConverter;
-
-$djot = <<<'DJOT'
-{reversed}
-3. Bronze medal
-2. Silver medal
-1. Gold medal
-DJOT;
+use Djot\Event\RenderEvent;
+use Djot\Node\Inline\Link;
 
 $converter = new DjotConverter();
-echo $converter->convert($djot);
+
+// Add UTM parameters to external links
+$converter->on('render.link', function (RenderEvent $event): void {
+    $link = $event->getNode();
+    if (!$link instanceof Link) {
+        return;
+    }
+
+    $href = $link->getDestination();
+
+    if (str_starts_with($href, 'https://')) {
+        $separator = str_contains($href, '?') ? '&' : '?';
+        $link->setDestination($href . $separator . 'utm_source=docs&utm_medium=link');
+    }
+});
+
+// Or warn about potentially broken links
+$brokenLinks = [];
+
+$converter->on('render.link', function (RenderEvent $event) use (&$brokenLinks): void {
+    $link = $event->getNode();
+    if (!$link instanceof Link) {
+        return;
+    }
+
+    $href = $link->getDestination();
+
+    // Check for common issues
+    if (str_starts_with($href, 'http://')) {
+        $brokenLinks[] = "Insecure HTTP link: $href";
+    }
+    if (preg_match('/\s/', $href)) {
+        $brokenLinks[] = "Link contains whitespace: $href";
+    }
+});
 ```
 
-Output:
-```html
-<ol start="3" reversed="">
-<li>Bronze medal</li>
-<li>Silver medal</li>
-<li>Gold medal</li>
-</ol>
-```
+## Content Sanitization
 
-The browser displays this as:
-```
-3. Bronze medal
-2. Silver medal
-1. Gold medal
-```
-
-### Hidden Content
-
-Use `{hidden}` to hide elements:
-
-```djot
-{hidden}
-This paragraph is hidden.
-```
-
-Output:
-```html
-<p hidden="">This paragraph is hidden.</p>
-```
-
-### Combining Boolean Attributes
-
-Boolean attributes can be combined with classes, IDs, and key-value attributes:
-
-```djot
-{#countdown .fancy reversed}
-3. Third
-2. Second
-1. First
-```
-
-Output:
-```html
-<ol id="countdown" class="fancy" start="3" reversed="">
-<li>Third</li>
-<li>Second</li>
-<li>First</li>
-</ol>
-```
-
-### Inline Boolean Attributes
-
-Boolean attributes also work on inline spans and links:
-
-```djot
-[Download PDF](report.pdf){download .btn}
-
-[Hidden text]{hidden}
-```
-
-Output:
-```html
-<p><a href="report.pdf" class="btn" download="">Download PDF</a></p>
-<p><span hidden="">Hidden text</span></p>
-```
-
-### Syntax Reference
-
-| Syntax | Result |
-|--------|--------|
-| `{.class}` | `class="class"` |
-| `{#id}` | `id="id"` |
-| `{key=value}` | `key="value"` |
-| `{key="value"}` | `key="value"` (quoted) |
-| `{reversed}` | `reversed=""` (boolean) |
-| `{hidden}` | `hidden=""` (boolean) |
-
-Boolean attributes are rendered as `attr=""` which is valid HTML5. Browsers treat this identically to `attr` or `attr="attr"`.
-
-### Common HTML Boolean Attributes
-
-Useful boolean attributes for djot elements:
-
-| Attribute | Elements | Effect |
-|-----------|----------|--------|
-| `reversed` | `<ol>` | Count down instead of up |
-| `hidden` | Any | Hide element from display |
-| `open` | `<details>` | Show details content by default |
-| `download` | `<a>` (links) | Download linked resource |
-
-## Alternative Output Formats
-
-For detailed customization of alternative renderers, see:
-- [PlainText Cookbook](./plaintext) - PlainTextRenderer customizations
-- [Markdown Cookbook](./markdown) - MarkdownRenderer customizations
-- [ANSI Cookbook](./ansi) - AnsiRenderer customizations
-
-### Plain Text Extraction
-
-Extract plain text for search indexing or SEO:
+Sanitize or restrict certain content:
 
 ```php
 use Djot\DjotConverter;
-use Djot\Renderer\PlainTextRenderer;
+use Djot\Event\RenderEvent;
+use Djot\Node\Block\RawBlock;
+use Djot\Node\Inline\RawInline;
 
 $converter = new DjotConverter();
-$renderer = new PlainTextRenderer();
 
-$djot = <<<'DJOT'
-# Welcome
+// Disable raw HTML entirely
+$converter->on('render.raw_block', function (RenderEvent $event): void {
+    $event->setHtml('<!-- raw HTML disabled -->');
+});
 
-This is *formatted* text. Visit [our website](https://example.com) for more.
+$converter->on('render.raw_inline', function (RenderEvent $event): void {
+    $event->setHtml('<!-- raw HTML disabled -->');
+});
 
-- Item one
-- Item two
-DJOT;
+// Or allow only certain tags
+$allowedTags = ['span', 'div', 'p', 'br', 'strong', 'em'];
 
-$document = $converter->parse($djot);
-$text = $renderer->render($document);
+$converter->on('render.raw_inline', function (RenderEvent $event) use ($allowedTags): void {
+    $raw = $event->getNode();
+    if (!$raw instanceof RawInline) {
+        return;
+    }
 
-echo $text;
+    $content = $raw->getContent();
+    $sanitized = strip_tags($content, $allowedTags);
+    $event->setHtml($sanitized);
+});
 ```
 
-Output:
-```
-Welcome
+::: tip Safe Mode
+For comprehensive content security, use [Safe Mode](/guide/safe-mode) which provides built-in protection against XSS and other security vulnerabilities.
+:::
 
-This is formatted text. Visit https://example.com for more.
+## Multipart Email
 
-- Item one
-- Item two
-```
-
-### Multipart Email (HTML + Plain Text)
-
-Parse once, render to multiple formats for email clients:
+Parse once and render both HTML and plain text for multipart email clients:
 
 ```php
 use Djot\DjotConverter;
@@ -1133,19 +1102,16 @@ Thank you for your order, **John**!
 Questions? Reply to this email or visit our [help center](https://example.com/help).
 DJOT;
 
-// Parse once
 $converter = new DjotConverter();
 $document = $converter->parse($template);
 
-// Render to HTML for rich email clients
-$htmlRenderer = new HtmlRenderer();
-$htmlBody = $htmlRenderer->render($document);
+// Render HTML for rich email clients
+$htmlBody = (new HtmlRenderer())->render($document);
 
-// Render to plain text for basic clients
-$textRenderer = new PlainTextRenderer();
-$textBody = $textRenderer->render($document);
+// Render plain text for fallback clients
+$textBody = (new PlainTextRenderer())->render($document);
 
-// Send multipart email (using your preferred mail library)
+// Send multipart email with your mailer
 $email = new YourMailer();
 $email->setSubject('Order Confirmation');
 $email->setHtmlBody($htmlBody);
@@ -1153,562 +1119,7 @@ $email->setTextBody($textBody);
 $email->send();
 ```
 
-HTML output (for rich clients):
-```html
-<h1>Order Confirmation</h1>
-<p>Thank you for your order, <strong>John</strong>!</p>
-<h2>Order Details</h2>
-<table>
-<tr><th>Item</th><th>Qty</th><th>Price</th></tr>
-<tr><td>Widget Pro</td><td>2</td><td>$49.99</td></tr>
-<tr><td>Gadget X</td><td>1</td><td>$29.99</td></tr>
-</table>
-...
-```
-
-Plain text output (for basic clients):
-```
-Order Confirmation
-
-Thank you for your order, John!
-
-Order Details
-
-Item | Qty | Price
-Widget Pro | 2 | $49.99
-Gadget X | 1 | $29.99
-
-Total: $79.98
-
-https://example.com/track/12345
-
-Questions? Reply to this email or visit our https://example.com/help.
-```
-
-### Markdown Conversion
-
-Convert Djot to CommonMark Markdown:
-
-```php
-use Djot\DjotConverter;
-use Djot\Renderer\MarkdownRenderer;
-
-$converter = new DjotConverter();
-$renderer = new MarkdownRenderer();
-
-$djot = <<<'DJOT'
-# Heading
-
-This has _emphasis_ and *strong* text.
-
-| Name | Age |
-|:-----|----:|
-| Alice | 30 |
-| Bob | 25 |
-DJOT;
-
-$document = $converter->parse($djot);
-$markdown = $renderer->render($document);
-
-echo $markdown;
-```
-
-Output:
-```markdown
-# Heading
-
-This has *emphasis* and **strong** text.
-
-| Name | Age |
-|:-----|----:|
-| Alice | 30 |
-| Bob | 25 |
-```
-
-### Converting Files
-
-Work directly with files:
-
-```php
-use Djot\DjotConverter;
-
-$converter = new DjotConverter();
-
-// Convert file to HTML
-$html = $converter->convertFile('/path/to/document.djot');
-
-// Or parse file to AST for manipulation
-$document = $converter->parseFile('/path/to/document.djot');
-// ... modify AST ...
-$html = $converter->render($document);
-```
-
-## Soft Break Modes
-
-Control how soft breaks (single newlines in source) are rendered in HTML output.
-
-### Available Modes
-
-```php
-use Djot\DjotConverter;
-use Djot\Renderer\SoftBreakMode;
-
-$converter = new DjotConverter();
-
-// Newline mode (default) - renders as "\n" in HTML source
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
-
-// Space mode - renders as a single space
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space);
-
-// Break mode - renders as <br> (visible line break)
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Break);
-```
-
-### Example: Poetry or Lyrics
-
-For content where line breaks should be visible (poetry, lyrics, addresses):
-
-```php
-use Djot\DjotConverter;
-use Djot\Renderer\SoftBreakMode;
-
-$converter = new DjotConverter();
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Break);
-
-$poem = "Roses are red
-Violets are blue
-Sugar is sweet
-And so are you";
-
-echo $converter->convert($poem);
-```
-
-Output:
-```html
-<p>Roses are red<br>
-Violets are blue<br>
-Sugar is sweet<br>
-And so are you</p>
-```
-
-### Comparison
-
-| Source | Mode | HTML Output | Browser Display |
-|--------|------|-------------|-----------------|
-| `Line 1↵Line 2` | Newline | `Line 1\nLine 2` | Line 1 Line 2 |
-| `Line 1↵Line 2` | Space | `Line 1 Line 2` | Line 1 Line 2 |
-| `Line 1↵Line 2` | Break | `Line 1<br>\nLine 2` | Line 1<br>Line 2 |
-
-Note: Use `\` at end of line for hard breaks (always renders as `<br>`) regardless of soft break mode.
-
-## Significant Newlines Mode
-
-By default, djot-php follows the djot specification where block elements (lists, blockquotes, headings) **cannot interrupt paragraphs** - they require a blank line before them.
-
-The "significant newlines" mode provides markdown-like behavior where block elements can interrupt paragraphs without blank lines. This is useful for chat messages, comments, and quick notes.
-
-### Enabling Significant Newlines Mode
-
-```php
-use Djot\DjotConverter;
-
-// Method 1: Factory method (also enables SoftBreakMode::Break)
-$converter = DjotConverter::withSignificantNewlines();
-
-// Method 2: Constructor parameter
-$converter = new DjotConverter(significantNewlines: true);
-
-// Method 3: Parser-level control
-use Djot\Parser\BlockParser;
-$parser = new BlockParser(significantNewlines: true);
-```
-
-### Behavior Comparison
-
-**Default mode (spec-compliant):**
-```php
-$converter = new DjotConverter();
-$result = $converter->convert("Here's a list:
-- Item one
-- Item two");
-```
-
-Output:
-```html
-<p>Here's a list:
-- Item one
-- Item two</p>
-```
-
-**Significant newlines mode:**
-```php
-$converter = DjotConverter::withSignificantNewlines();
-$result = $converter->convert("Here's a list:
-- Item one
-- Item two");
-```
-
-Output:
-```html
-<p>Here's a list:</p>
-<ul>
-<li>Item one</li>
-<li>Item two</li>
-</ul>
-```
-
-### What Changes in Significant Newlines Mode
-
-| Feature | Default Mode | Significant Newlines |
-|---------|-------------|---------------------|
-| Lists interrupt paragraphs | No | Yes |
-| Blockquotes interrupt paragraphs | No | Yes |
-| Headings interrupt paragraphs | No | Yes |
-| Code fences interrupt paragraphs | No | Yes |
-| Nested lists without blank lines | No | Yes |
-| Soft breaks render as | `\n` | `<br>` |
-
-### Preventing Block Interruption with Escaping
-
-In significant newlines mode, if you want to include literal block markers without triggering block parsing, escape the first character with a backslash:
-
-```php
-$converter = DjotConverter::withSignificantNewlines();
-
-// Without escaping - creates a list
-$result = $converter->convert("Price:
-- 10 dollars");
-// Output: <p>Price:</p><ul><li>10 dollars</li></ul>
-
-// With escaping - literal text
-$result = $converter->convert("Price:
-\\- 10 dollars");
-// Output: <p>Price:<br>- 10 dollars</p>
-```
-
-Common escapes:
-- `\-`, `\*`, `\+` - Prevent list interpretation
-- `\>` - Prevent blockquote interpretation
-- `\#` - Prevent heading interpretation
-- `\|` - Prevent table interpretation
-- `` \` `` - Prevent code fence interpretation
-
-### Use Cases
-
-**Chat/Messaging Applications:**
-```php
-$converter = DjotConverter::withSignificantNewlines();
-
-$message = "Check out this quote:
-> Important information here
-And here's the follow-up";
-
-echo $converter->convert($message);
-```
-
-**Quick Notes:**
-```php
-$converter = DjotConverter::withSignificantNewlines();
-
-$note = "TODO:
-- Buy groceries
-- Call mom
-- Finish report";
-
-echo $converter->convert($note);
-```
-
-### Automatic Soft Break Configuration
-
-When using `DjotConverter::withSignificantNewlines()` or the `significantNewlines` constructor parameter, the soft break mode is automatically set to `SoftBreakMode::Break` (renders as `<br>`). This is intentional since chat/messaging contexts typically expect visible line breaks.
-
-To override this behavior:
-
-```php
-use Djot\DjotConverter;
-use Djot\Renderer\SoftBreakMode;
-
-$converter = DjotConverter::withSignificantNewlines();
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space); // Override if needed
-```
-
-**Note:** When using the `BlockParser` directly with a custom renderer (like `PlainTextRenderer`), the soft break mode is not automatically configured. You'll need to set it manually:
-
-```php
-use Djot\Parser\BlockParser;
-use Djot\Renderer\PlainTextRenderer;
-use Djot\Renderer\SoftBreakMode;
-
-$parser = new BlockParser(significantNewlines: true);
-$renderer = new PlainTextRenderer();
-$renderer->setSoftBreakMode(SoftBreakMode::Newline); // Configure as needed
-
-$doc = $parser->parse($input);
-echo $renderer->render($doc);
-```
-
-### Combining with Other Options
-
-```php
-use Djot\DjotConverter;
-use Djot\SafeMode;
-
-// Significant newlines with safe mode for user-generated content
-$converter = new DjotConverter(
-    safeMode: new SafeMode(),
-    significantNewlines: true,
-);
-```
-
-## Social Meta Tags
-
-Extract metadata from Djot documents for Open Graph and Twitter Card tags, useful for social sharing previews.
-
-### Basic Extraction
-
-Extract title, description, and image from a parsed document:
-
-```php
-use Djot\DjotConverter;
-use Djot\Node\Block\Heading;
-use Djot\Node\Block\Paragraph;
-use Djot\Node\Document;
-use Djot\Node\Inline\HardBreak;
-use Djot\Node\Inline\Image;
-use Djot\Node\Inline\SoftBreak;
-use Djot\Node\Inline\Text;
-
-function extractSocialMeta(Document $document): array
-{
-    $meta = [
-        'title' => null,
-        'description' => null,
-        'image' => null,
-    ];
-
-    foreach ($document->getChildren() as $node) {
-        // First heading becomes title
-        if ($meta['title'] === null && $node instanceof Heading) {
-            $meta['title'] = getTextContent($node);
-        }
-
-        // First paragraph becomes description
-        if ($meta['description'] === null && $node instanceof Paragraph) {
-            $text = getTextContent($node);
-            $meta['description'] = mb_strlen($text) > 160
-                ? mb_substr($text, 0, 157) . '...'
-                : $text;
-        }
-
-        // First image becomes preview image
-        if ($meta['image'] === null) {
-            $meta['image'] = findFirstImage($node);
-        }
-
-        // Stop once we have everything
-        if ($meta['title'] !== null && $meta['description'] !== null && $meta['image'] !== null) {
-            break;
-        }
-    }
-
-    return $meta;
-}
-
-function getTextContent($node): string
-{
-    $text = '';
-    foreach ($node->getChildren() as $child) {
-        if ($child instanceof Text) {
-            $text .= $child->getContent();
-        } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
-            $text .= ' ';
-        } elseif (method_exists($child, 'getChildren')) {
-            $text .= getTextContent($child);
-        }
-    }
-    return trim($text);
-}
-
-function findFirstImage($node): ?string
-{
-    if ($node instanceof Image) {
-        return $node->getSource();
-    }
-    if (method_exists($node, 'getChildren')) {
-        foreach ($node->getChildren() as $child) {
-            $image = findFirstImage($child);
-            if ($image !== null) {
-                return $image;
-            }
-        }
-    }
-    return null;
-}
-
-// Usage
-$converter = new DjotConverter();
-$document = $converter->parse($djot);
-$meta = extractSocialMeta($document);
-```
-
-### Generating HTML Meta Tags
-
-Generate Open Graph and Twitter Card markup:
-
-```php
-function generateMetaTags(array $meta, string $url, string $siteName = ''): string
-{
-    $tags = [];
-    $title = $meta['title'] ?? null;
-    $description = $meta['description'] ?? null;
-    $image = $meta['image'] ?? null;
-
-    // Open Graph
-    if ($title) {
-        $title = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
-        $tags[] = "<meta property=\"og:title\" content=\"{$title}\">";
-        $tags[] = "<meta name=\"twitter:title\" content=\"{$title}\">";
-    }
-
-    if ($description) {
-        $desc = htmlspecialchars($description, ENT_QUOTES, 'UTF-8');
-        $tags[] = "<meta property=\"og:description\" content=\"{$desc}\">";
-        $tags[] = "<meta name=\"twitter:description\" content=\"{$desc}\">";
-        $tags[] = "<meta name=\"description\" content=\"{$desc}\">";
-    }
-
-    if ($image) {
-        $image = htmlspecialchars($image, ENT_QUOTES, 'UTF-8');
-        $tags[] = "<meta property=\"og:image\" content=\"{$image}\">";
-        $tags[] = "<meta name=\"twitter:image\" content=\"{$image}\">";
-        $tags[] = "<meta name=\"twitter:card\" content=\"summary_large_image\">";
-    } else {
-        $tags[] = "<meta name=\"twitter:card\" content=\"summary\">";
-    }
-
-    $url = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
-    $tags[] = "<meta property=\"og:url\" content=\"{$url}\">";
-    $tags[] = "<meta property=\"og:type\" content=\"article\">";
-
-    if ($siteName) {
-        $siteName = htmlspecialchars($siteName, ENT_QUOTES, 'UTF-8');
-        $tags[] = "<meta property=\"og:site_name\" content=\"{$siteName}\">";
-    }
-
-    return implode("\n", $tags);
-}
-
-// Usage
-$meta = extractSocialMeta($document);
-$metaTags = generateMetaTags($meta, 'https://example.com/article', 'My Blog');
-```
-
-Output:
-```html
-<meta property="og:title" content="Article Title">
-<meta name="twitter:title" content="Article Title">
-<meta property="og:description" content="First paragraph of the article...">
-<meta name="twitter:description" content="First paragraph of the article...">
-<meta name="description" content="First paragraph of the article...">
-<meta property="og:image" content="https://example.com/image.jpg">
-<meta name="twitter:image" content="https://example.com/image.jpg">
-<meta name="twitter:card" content="summary_large_image">
-<meta property="og:url" content="https://example.com/article">
-<meta property="og:type" content="article">
-<meta property="og:site_name" content="My Blog">
-```
-
-### Custom Extraction Rules
-
-Override the basic extraction with explicit div attributes:
-
-```php
-use Djot\Node\Block\Div;
-use Djot\Node\Document;
-
-function extractSocialMetaWithOverrides(Document $document): array
-{
-    // Start with basic content extraction
-    $meta = extractSocialMeta($document);
-
-    // Override with explicit div attributes if present
-    foreach ($document->getChildren() as $node) {
-        if ($node instanceof Div) {
-            // Use div attributes: ::: {og-title="Custom Title"}
-            if (($ogTitle = $node->getAttribute('og-title')) !== null) {
-                $meta['title'] = $ogTitle;
-            }
-            if (($ogDesc = $node->getAttribute('og-description')) !== null) {
-                $meta['description'] = $ogDesc;
-            }
-            if (($ogImage = $node->getAttribute('og-image')) !== null) {
-                $meta['image'] = $ogImage;
-            }
-            break;
-        }
-    }
-
-    return $meta;
-}
-```
-
-Usage in Djot:
-```djot
-::: {og-title="Custom Social Title" og-description="A custom description for social sharing"}
-
-# Article Title
-
-This is the article content...
-
-:::
-```
-
-### Fallback Values
-
-Provide fallbacks for missing metadata:
-
-```php
-$meta = extractSocialMeta($document);
-
-// Apply fallbacks
-$meta['title'] ??= 'Untitled';
-$meta['description'] ??= 'No description available.';
-$meta['image'] ??= 'https://example.com/default-og-image.jpg';
-
-echo generateMetaTags($meta, $currentUrl, 'My Site');
-```
-
-### Framework Integration
-
-Example controller pattern (adapt `loadArticle()`, `render()`, and `Response` to your framework):
-
-```php
-class ArticleController
-{
-    public function show(string $slug)
-    {
-        $djot = $this->loadArticle($slug); // Your article loading logic
-
-        $converter = new DjotConverter();
-        $document = $converter->parse($djot);
-        $html = $converter->render($document);
-
-        $meta = extractSocialMeta($document);
-        $metaTags = generateMetaTags(
-            $meta,
-            "https://example.com/articles/{$slug}",
-            'My Blog',
-        );
-
-        return $this->render('article.html', [
-            'content' => $html,
-            'metaTags' => $metaTags,
-            'title' => $meta['title'] ?? 'Article',
-        ]);
-    }
-}
-```
+This pattern keeps the HTML and plain-text versions synchronized because both are rendered from the same parsed document.
 
 ## Video Embeds
 
