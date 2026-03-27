@@ -263,8 +263,9 @@ class HtmlRenderer implements RendererInterface
         $this->footnoteCounter++;
         $number = $this->footnoteCounter;
 
-        // Use synthetic label to integrate with regular footnote tracking
-        $label = '_inline_' . $number;
+        // Use a synthetic label that cannot collide with user-supplied labels.
+        // Djot footnote labels cannot contain ']', so including it here ensures uniqueness.
+        $label = '_inline_]' . $number;
         $this->footnoteNumbers[$label] = $number;
         $this->footnoteRefCounts[$label] = 1;
 

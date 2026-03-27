@@ -129,8 +129,8 @@ Inline footnotes support [_formatting_ and `code`]{.fn} too.
 
 **Output:**
 ```html
-<p>Some text<sup class="footnote-ref"><a href="#fn1" id="fnref1" role="doc-noteref">1</a></sup> that continues here.</p>
-<p>Inline footnotes support <sup class="footnote-ref"><a href="#fn2" id="fnref2" role="doc-noteref">2</a></sup> too.</p>
+<p>Some text<a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a> that continues here.</p>
+<p>Inline footnotes support <a id="fnref2" href="#fn2" role="doc-noteref"><sup>2</sup></a> too.</p>
 <section role="doc-endnotes">
 <hr>
 <ol>

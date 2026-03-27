@@ -24,7 +24,7 @@ use Djot\Node\Inline\Span;
  *
  * The footnote content supports full inline formatting:
  * ```djot
- * Text[A footnote with *emphasis* and `code`]{.fn} here.
+ * Text[A footnote with _emphasis_ and `code`]{.fn} here.
  * ```
  *
  * Inline footnotes integrate seamlessly with regular footnotes - they share
@@ -61,20 +61,22 @@ class InlineFootnotesExtension implements ExtensionInterface
             // Get the rendered content of the span's children
             $content = $event->getChildrenHtml();
 
-            // Wrap content in a paragraph if it's not already block-level
-            // This ensures consistent rendering with regular footnotes
-            if (!str_starts_with(trim($content), '<')) {
-                $content = '<p>' . $content . '</p>';
+            // Normalize content to a paragraph to ensure consistent rendering
+            // with regular footnotes and reliable backlink insertion.
+            $trimmedContent = trim($content);
+            if (!(str_starts_with($trimmedContent, '<p>') && str_ends_with($trimmedContent, '</p>'))) {
+                $content = '<p>' . $trimmedContent . '</p>';
+            } else {
+                $content = $trimmedContent;
             }
 
             // Register with the renderer and get the footnote number
             $number = $renderer->registerInlineFootnote($content);
 
-            // Output the footnote reference superscript
-            $html = '<sup class="footnote-ref">';
-            $html .= '<a href="#fn' . $number . '" id="fnref' . $number . '" role="doc-noteref">';
-            $html .= $number;
-            $html .= '</a></sup>';
+            // Output the footnote reference in the same structure as regular footnotes
+            $html = '<a id="fnref' . $number . '" href="#fn' . $number . '" role="doc-noteref">';
+            $html .= '<sup>' . $number . '</sup>';
+            $html .= '</a>';
 
             $event->setHtml($html);
         });

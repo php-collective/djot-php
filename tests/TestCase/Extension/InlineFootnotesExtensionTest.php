@@ -27,10 +27,11 @@ class InlineFootnotesExtensionTest extends TestCase
         $djot = 'Some text[This is an inline footnote]{.fn} continues here.';
         $html = $this->converter->convert($djot);
 
-        // Check for footnote reference in text
-        $this->assertStringContainsString('fnref1', $html);
+        // Check for footnote reference in text (same structure as regular footnotes)
+        $this->assertStringContainsString('id="fnref1"', $html);
         $this->assertStringContainsString('href="#fn1"', $html);
-        $this->assertStringContainsString('<sup class="footnote-ref">', $html);
+        $this->assertStringContainsString('role="doc-noteref"', $html);
+        $this->assertStringContainsString('<sup>1</sup>', $html);
 
         // Check for footnote content in endnotes section
         $this->assertStringContainsString('id="fn1"', $html);
