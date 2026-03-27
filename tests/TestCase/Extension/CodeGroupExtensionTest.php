@@ -445,4 +445,47 @@ DJOT;
         // Special chars in label should be escaped
         $this->assertStringContainsString('>Config &amp; Setup</label>', $html);
     }
+
+    public function testClassMergingWithAttributes(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new CodeGroupExtension());
+
+        // When an attribute block specifies a class before a code-group div,
+        // both the 'code-group' class and the custom class should be present
+        $djot = <<<'DJOT'
+{.custom-style #my-code}
+::: code-group
+``` php
+test
+```
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Should have both the code-group class and custom class
+        $this->assertStringContainsString('class="code-group custom-style"', $html);
+        $this->assertStringContainsString('id="my-code"', $html);
+    }
+
+    public function testClassMergingMultipleClasses(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+{.extra-class .another-class}
+::: code-group
+``` php
+test
+```
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Should have all classes merged
+        $this->assertStringContainsString('class="code-group extra-class another-class"', $html);
+    }
 }

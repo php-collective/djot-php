@@ -1179,9 +1179,16 @@ class BlockParser
         $this->parseBlocks($div, $innerLines, 0);
         $this->lineOffset = $previousOffset;
 
-        // Apply the saved attributes to the div
-        if ($divAttributes !== []) {
-            $div->setAttributes($divAttributes);
+        // Apply the saved attributes to the div, merging classes instead of replacing
+        foreach ($divAttributes as $name => $value) {
+            if ($name === 'class') {
+                // Merge class attributes instead of replacing
+                foreach (preg_split('/\s+/', trim((string)$value)) ?: [] as $class) {
+                    $div->addClass($class);
+                }
+            } else {
+                $div->setAttribute($name, $value);
+            }
         }
         $parent->appendChild($div);
 
