@@ -183,8 +183,8 @@ class CodeGroupExtension implements ExtensionInterface
         $matchedLanguage = $matches['lang'] ?? null;
         $matchedLabel = $matches['label'] ?? null;
 
-        $resolvedLanguage = $matchedLanguage !== null && $matchedLanguage !== '' ? $matchedLanguage : null;
-        $resolvedLabel = $matchedLabel !== null && $matchedLabel !== '' ? trim($matchedLabel) : null;
+        $resolvedLanguage = $matchedLanguage !== '' ? $matchedLanguage : null;
+        $resolvedLabel = $matchedLabel !== null ? trim($matchedLabel) : null;
 
         // Fallback label to language name or position
         if ($resolvedLabel === null) {
