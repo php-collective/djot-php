@@ -529,4 +529,51 @@ DJOT;
         // Non-tab content should be ignored
         $this->assertStringNotContainsString('intro text', $html);
     }
+
+    public function testClassMergingWithAttributes(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TabsExtension());
+
+        // When an attribute block specifies a class before a tabs div,
+        // both the 'tabs' class and the custom class should be present
+        $djot = <<<'DJOT'
+{.custom-style #my-tabs}
+:::: tabs
+::: tab
+### Tab 1
+
+Content.
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Should have both the tabs class and custom class
+        $this->assertStringContainsString('class="tabs custom-style"', $html);
+        $this->assertStringContainsString('id="my-tabs"', $html);
+    }
+
+    public function testClassMergingMultipleClasses(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+{.extra-class .another-class}
+:::: tabs
+::: tab
+### Tab 1
+
+Content.
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Should have all classes merged
+        $this->assertStringContainsString('class="tabs extra-class another-class"', $html);
+    }
 }

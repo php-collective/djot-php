@@ -395,4 +395,43 @@ DJOT;
         $this->assertSame('ℹ️', AdmonitionExtension::DEFAULT_ICONS['info']);
         $this->assertSame('✅', AdmonitionExtension::DEFAULT_ICONS['success']);
     }
+
+    public function testClassMergingWithAttributes(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension());
+
+        // When an attribute block specifies a class before an admonition div,
+        // both the 'admonition' class, the type class, and the custom class should be present
+        $djot = <<<'DJOT'
+{.custom-style #my-note}
+::: note
+Content.
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Should have admonition, note, and custom class
+        $this->assertStringContainsString('class="admonition note custom-style"', $html);
+        $this->assertStringContainsString('id="my-note"', $html);
+    }
+
+    public function testClassMergingMultipleClasses(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new AdmonitionExtension());
+
+        $djot = <<<'DJOT'
+{.extra-class .another-class}
+::: warning
+Content.
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        // Should have all classes merged
+        $this->assertStringContainsString('class="admonition warning extra-class another-class"', $html);
+    }
 }

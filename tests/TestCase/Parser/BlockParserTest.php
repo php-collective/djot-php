@@ -289,6 +289,80 @@ class BlockParserTest extends TestCase
         $this->assertTrue(str_contains($class, 'warning'));
     }
 
+    public function testParseFencedDivMergesAttributeBlockWithFenceClass(): void
+    {
+        // When an attribute block specifies classes before a fenced div,
+        // both the fence class and attribute classes should be merged
+        $doc = $this->parser->parse("{.custom-style #my-div}\n::: info\nContent\n:::");
+
+        $div = $doc->getChildren()[0];
+        $this->assertInstanceOf(Div::class, $div);
+
+        // Should have both the fence class and the attribute class
+        $class = $div->getAttribute('class') ?? '';
+        $this->assertStringContainsString('info', $class);
+        $this->assertStringContainsString('custom-style', $class);
+
+        // ID should also be preserved
+        $this->assertSame('my-div', $div->getAttribute('id'));
+    }
+
+    public function testParseFencedDivMergesMultipleClasses(): void
+    {
+        $doc = $this->parser->parse("{.extra .another}\n::: note\nContent\n:::");
+
+        $div = $doc->getChildren()[0];
+        $this->assertInstanceOf(Div::class, $div);
+
+        $class = $div->getAttribute('class') ?? '';
+        $this->assertStringContainsString('note', $class);
+        $this->assertStringContainsString('extra', $class);
+        $this->assertStringContainsString('another', $class);
+    }
+
+    public function testNestedFencedDivsWithAttributeBlocks(): void
+    {
+        // When nested divs have attribute blocks, each div should merge
+        // its own attribute classes with its fence class
+        $djot = <<<'DJOT'
+:::: info
+
+Outer
+
+{.custom-nested}
+::: warning
+Nested
+:::
+
+::::
+DJOT;
+
+        $doc = $this->parser->parse($djot);
+
+        // Outer div should have only 'info' class
+        $outerDiv = $doc->getChildren()[0];
+        $this->assertInstanceOf(Div::class, $outerDiv);
+        $this->assertSame('info', $outerDiv->getAttribute('class'));
+
+        // Find nested div
+        $children = $outerDiv->getChildren();
+        $nestedDiv = null;
+        foreach ($children as $child) {
+            if ($child instanceof Div) {
+                $nestedDiv = $child;
+
+                break;
+            }
+        }
+
+        $this->assertNotNull($nestedDiv, 'Nested div should exist');
+        $nestedClass = $nestedDiv->getAttribute('class') ?? '';
+
+        // Nested div should have both 'warning' and 'custom-nested' merged
+        $this->assertStringContainsString('warning', $nestedClass);
+        $this->assertStringContainsString('custom-nested', $nestedClass);
+    }
+
     public function testParseTable(): void
     {
         $doc = $this->parser->parse("| A | B |\n|---|---|\n| 1 | 2 |");
