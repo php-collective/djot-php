@@ -327,8 +327,29 @@ DJOT;
         $html = $converter->convert($djot);
 
         // HTML should be escaped
-        $this->assertStringContainsString('&lt;div class=&quot;test&quot;&gt;', $html);
+        $this->assertStringContainsString('&lt;div class="test"&gt;', $html);
         $this->assertStringContainsString('&amp;amp;', $html);
+    }
+
+    public function testDefaultRenderingMatchesCoreCodeBlockBehavior(): void
+    {
+        $converter = new DjotConverter();
+        $converter->getRenderer()->setCodeBlockTabWidth(2);
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+::: code-group
+{#snippet selected}
+``` php
+	foo
+```
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('<pre id="snippet"><code class="language-php">  foo' . "\n" . '</code></pre>', $html);
+        $this->assertStringNotContainsString('selected=', $html);
     }
 
     public function testLanguageWithSpecialChars(): void
@@ -352,7 +373,28 @@ DJOT;
 
         // Labels should show the language
         $this->assertStringContainsString('>c++</label>', $html);
-        // Note: c# might be parsed differently, but the extension should handle it
+        $this->assertStringContainsString('>c#</label>', $html);
+        $this->assertStringContainsString('language-c++', $html);
+        $this->assertStringContainsString('language-c#', $html);
+    }
+
+    public function testLanguageWithSlashAndLabelParsesFully(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+::: code-group
+``` text/html [HTML]
+<div>test</div>
+```
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('>HTML</label>', $html);
+        $this->assertStringContainsString('language-text/html', $html);
     }
 
     public function testMixedContentIgnoresNonCodeBlocks(): void

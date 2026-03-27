@@ -9,6 +9,7 @@ use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Div;
+use Djot\Renderer\HtmlRenderer;
 
 /**
  * Transforms code-group divs into tabbed code block interfaces
@@ -99,7 +100,7 @@ class CodeGroupExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
-        $converter->on('render.div', function (RenderEvent $event): void {
+        $converter->on('render.div', function (RenderEvent $event) use ($converter): void {
             $node = $event->getNode();
             if (!$node instanceof Div) {
                 return;
@@ -114,7 +115,7 @@ class CodeGroupExtension implements ExtensionInterface
                 return;
             }
 
-            $html = $this->renderCodeGroup($node, $codeBlocks);
+            $html = $this->renderCodeGroup($node, $codeBlocks, $converter->getRenderer());
             $event->setHtml($html);
         });
     }
@@ -174,21 +175,23 @@ class CodeGroupExtension implements ExtensionInterface
             return ['language' => null, 'label' => 'Code ' . $position];
         }
 
-        // Match: optional language, optional [label]
-        if (preg_match('/^(?<lang>[A-Za-z0-9_+-]+)?(?:\s*\[(?<label>[^\]]+)\])?/', $raw, $matches)) {
-            // Use empty() to handle both unset and empty string (when optional group matches nothing)
-            $resolvedLanguage = !empty($matches['lang']) ? $matches['lang'] : null;
-            $resolvedLabel = !empty($matches['label']) ? trim($matches['label']) : null;
-
-            // Fallback label to language name or position
-            if ($resolvedLabel === null) {
-                $resolvedLabel = $resolvedLanguage ?? 'Code ' . $position;
-            }
-
-            return ['language' => $resolvedLanguage, 'label' => $resolvedLabel];
+        // Match the full hint: optional language token, optional [label]
+        if (preg_match('/^(?:(?<lang>[^\s\[]+)\s*)?(?:\[(?<label>[^\]]+)])?$/', $raw, $matches) !== 1) {
+            return ['language' => $raw, 'label' => $raw];
         }
 
-        return ['language' => $raw, 'label' => $raw];
+        $matchedLanguage = $matches['lang'] ?? null;
+        $matchedLabel = $matches['label'] ?? null;
+
+        $resolvedLanguage = $matchedLanguage !== null && $matchedLanguage !== '' ? $matchedLanguage : null;
+        $resolvedLabel = $matchedLabel !== null && $matchedLabel !== '' ? trim($matchedLabel) : null;
+
+        // Fallback label to language name or position
+        if ($resolvedLabel === null) {
+            $resolvedLabel = $resolvedLanguage ?? 'Code ' . $position;
+        }
+
+        return ['language' => $resolvedLanguage, 'label' => $resolvedLabel];
     }
 
     /**
@@ -196,8 +199,9 @@ class CodeGroupExtension implements ExtensionInterface
      *
      * @param \Djot\Node\Block\Div $wrapper
      * @param array<array{block: \Djot\Node\Block\CodeBlock, language: string|null, label: string, selected: bool}> $codeBlocks
+     * @param \Djot\Renderer\HtmlRenderer $renderer
      */
-    protected function renderCodeGroup(Div $wrapper, array $codeBlocks): string
+    protected function renderCodeGroup(Div $wrapper, array $codeBlocks, HtmlRenderer $renderer): string
     {
         $this->groupCounter++;
         $groupId = $this->idPrefix . '-' . $this->groupCounter;
@@ -226,7 +230,7 @@ class CodeGroupExtension implements ExtensionInterface
         // Render all code panels
         foreach ($codeBlocks as $item) {
             $html .= '<div class="' . $this->escape($this->panelClass) . '">';
-            $html .= $this->renderCodeBlock($item['block'], $item['language']);
+            $html .= $this->renderCodeBlock($item['block'], $item['language'], $renderer);
             $html .= "</div>\n";
         }
 
@@ -238,7 +242,7 @@ class CodeGroupExtension implements ExtensionInterface
     /**
      * Render a single code block, using highlighter if available
      */
-    protected function renderCodeBlock(CodeBlock $block, ?string $language): string
+    protected function renderCodeBlock(CodeBlock $block, ?string $language, HtmlRenderer $renderer): string
     {
         $code = rtrim($block->getContent(), "\n");
 
@@ -247,12 +251,17 @@ class CodeGroupExtension implements ExtensionInterface
             return ($this->highlighter)($code, $language);
         }
 
-        // Default: plain pre/code with language class
-        $langClass = $language !== null
-            ? ' class="language-' . $this->escape($language) . '"'
-            : '';
+        $renderBlock = new CodeBlock($block->getContent(), $language);
 
-        return '<pre><code' . $langClass . '>' . $this->escape($code) . "</code></pre>\n";
+        foreach ($block->getAttributes() as $name => $value) {
+            if ($name === 'selected') {
+                continue;
+            }
+
+            $renderBlock->setAttribute($name, $value);
+        }
+
+        return $renderer->renderNodeFragment($renderBlock);
     }
 
     /**
