@@ -262,6 +262,17 @@ class HtmlRenderer implements RendererInterface
     }
 
     /**
+     * Render a single node fragment using the current renderer configuration.
+     *
+     * This is intended for extensions that need core rendering behavior for an
+     * isolated node without re-rendering a full document.
+     */
+    public function renderNodeFragment(Node $node): string
+    {
+        return $this->renderNode($node);
+    }
+
+    /**
      * Render document with section wrapping around headings
      */
     protected function renderDocumentWithSections(Document $document): string

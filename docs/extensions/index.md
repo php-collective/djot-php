@@ -8,6 +8,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 |-----------|-------------|
 | [AdmonitionExtension](#admonitionextension) | Transforms divs into semantic admonition markup with accessibility support |
 | [AutolinkExtension](#autolinkextension) | Auto-links bare URLs and email addresses |
+| [CodeGroupExtension](#codegroupextension) | Transforms code-group divs into tabbed code block interfaces |
 | [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
 | [FrontmatterExtension](#frontmatterextension) | Parses YAML/NEON/TOML/JSON frontmatter at document start |
@@ -883,6 +884,180 @@ Visit https://example.com or email user@example.com for help.
 ```html
 <p>Visit <a href="https://example.com">https://example.com</a> or email <a href="mailto:user@example.com">user@example.com</a> for help.</p>
 ```
+
+## CodeGroupExtension
+
+Transforms code-group divs into tabbed code block interfaces. Ideal for showing the same code in multiple languages or installation methods.
+
+This extension is inspired by VitePress/MkDocs code groups, adapted to use djot's native fenced div syntax with labels extracted from language hints.
+
+```php
+use Djot\Extension\CodeGroupExtension;
+
+// Default configuration
+$converter->addExtension(new CodeGroupExtension());
+
+// With custom syntax highlighter
+$converter->addExtension(new CodeGroupExtension(
+    highlighter: fn(string $code, ?string $lang) => $myHighlighter->highlight($code, $lang),
+));
+
+// With custom classes (e.g., for VitePress compatibility)
+$converter->addExtension(new CodeGroupExtension(
+    wrapperClass: 'vp-code-group',
+    panelClass: 'vp-code-group-panel',
+    labelClass: 'vp-code-group-tab',
+));
+```
+
+**Basic syntax:**
+
+````djot
+::: code-group
+``` php
+composer require php-collective/djot
+```
+
+``` bash
+npm install @example/djot
+```
+:::
+````
+
+**With custom labels:**
+
+Labels can be specified using `[Label]` suffix in the language hint:
+
+````djot
+::: code-group
+``` php [Composer]
+composer require php-collective/djot
+```
+
+``` bash [NPM Alternative]
+npm install @example/djot
+```
+
+``` yaml [Config File]
+djot:
+  enabled: true
+```
+:::
+````
+
+**Output:**
+
+```html
+<div class="code-group">
+  <input type="radio" name="codegroup-1" id="codegroup-1-tab-1" class="code-group-radio" checked>
+  <label for="codegroup-1-tab-1" class="code-group-label">Composer</label>
+  <input type="radio" name="codegroup-1" id="codegroup-1-tab-2" class="code-group-radio">
+  <label for="codegroup-1-tab-2" class="code-group-label">NPM Alternative</label>
+  <input type="radio" name="codegroup-1" id="codegroup-1-tab-3" class="code-group-radio">
+  <label for="codegroup-1-tab-3" class="code-group-label">Config File</label>
+  <div class="code-group-panel">
+    <pre><code class="language-php">composer require php-collective/djot</code></pre>
+  </div>
+  <div class="code-group-panel">
+    <pre><code class="language-bash">npm install @example/djot</code></pre>
+  </div>
+  <div class="code-group-panel">
+    <pre><code class="language-yaml">djot:
+  enabled: true</code></pre>
+  </div>
+</div>
+```
+
+**Label resolution:**
+
+Labels are resolved in this order:
+1. `[Label]` suffix in language hint (e.g., `php [Installation]`)
+2. Language name (e.g., `php` → "php")
+3. Fallback to "Code N" for blocks without language
+
+**Configuration options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `wrapperClass` | `string` | `'code-group'` | CSS class for the container |
+| `panelClass` | `string` | `'code-group-panel'` | CSS class for code panels |
+| `labelClass` | `string` | `'code-group-label'` | CSS class for tab labels |
+| `radioClass` | `string` | `'code-group-radio'` | CSS class for radio inputs |
+| `idPrefix` | `string` | `'codegroup'` | Prefix for generated IDs |
+| `highlighter` | `Closure\|null` | `null` | Custom syntax highlighter callback |
+
+**Required CSS:**
+
+```css
+.code-group {
+  display: flex;
+  flex-wrap: wrap;
+}
+.code-group-radio {
+  display: none;
+}
+.code-group-label {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-family: monospace;
+}
+.code-group-radio:checked + .code-group-label {
+  border-bottom-color: currentColor;
+  font-weight: bold;
+}
+.code-group-panel {
+  display: none;
+  width: 100%;
+  order: 1;
+}
+.code-group-radio:nth-of-type(1):checked ~ .code-group-panel:nth-of-type(1),
+.code-group-radio:nth-of-type(2):checked ~ .code-group-panel:nth-of-type(2),
+.code-group-radio:nth-of-type(3):checked ~ .code-group-panel:nth-of-type(3),
+.code-group-radio:nth-of-type(4):checked ~ .code-group-panel:nth-of-type(4),
+.code-group-radio:nth-of-type(5):checked ~ .code-group-panel:nth-of-type(5) {
+  display: block;
+}
+```
+
+**Syntax highlighting integration:**
+
+```php
+// With Tempest Highlight
+use Tempest\Highlight\Highlighter;
+
+$highlighter = new Highlighter();
+$converter->addExtension(new CodeGroupExtension(
+    highlighter: fn(string $code, ?string $lang) =>
+        $highlighter->parse($code, $lang ?? 'txt'),
+));
+
+// With highlight.php
+use Highlight\Highlighter;
+
+$hl = new Highlighter();
+$converter->addExtension(new CodeGroupExtension(
+    highlighter: function(string $code, ?string $lang) use ($hl) {
+        try {
+            $result = $hl->highlight($lang ?? 'plaintext', $code);
+            return '<pre><code class="hljs ' . $result->language . '">' . $result->value . '</code></pre>';
+        } catch (Exception) {
+            return '<pre><code>' . htmlspecialchars($code) . '</code></pre>';
+        }
+    },
+));
+```
+
+### CodeGroupExtension vs TabsExtension
+
+| Feature | CodeGroupExtension | TabsExtension |
+|---------|-------------------|---------------|
+| Content type | Code blocks only | Any content |
+| Label source | Language hint `[Label]` | Headings or `{label="..."}` |
+| Nesting syntax | Single `:::` | Nested `::::` / `:::` |
+| Syntax highlighting | Built-in callback support | Manual |
+| Output modes | CSS-only | CSS or ARIA |
+| Best for | Multi-language code examples | General tabbed content |
 
 ## DefaultAttributesExtension
 
