@@ -108,6 +108,11 @@ class HeadingReferenceExtension implements ExtensionInterface
 
     public function clear(): void
     {
+        // Only clear heading state here. Placeholders are created during parse()
+        // but consumed by output transformers which run AFTER render(). Since
+        // clear() is called at the start of render(), clearing placeholders here
+        // would break reference resolution. Placeholders are reset at the end of
+        // resolveRenderedReferences() instead.
         $this->headingTargets = [];
         $this->headingTargetCounts = [];
     }
