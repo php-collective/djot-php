@@ -159,6 +159,22 @@ DJOT);
         $this->assertStringContainsString('href="#Say-Hello"', $html);
     }
 
+    public function testHeadingWithApostropheResolvesCorrectly(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $html = $converter->convert(<<<'DJOT'
+See [[Bob's Guide]].
+
+# Bob's Guide
+DJOT);
+
+        $this->assertStringContainsString('href="#Bob-s-Guide"', $html);
+        $this->assertStringContainsString('data-heading-ref="Bob&apos;s Guide"', $html);
+        $this->assertStringNotContainsString('[[Bob\'s Guide]]', $html);
+    }
+
     public function testCustomCssClassWithMultipleSpaces(): void
     {
         $converter = new DjotConverter();

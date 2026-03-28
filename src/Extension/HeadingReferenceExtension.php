@@ -146,6 +146,26 @@ class HeadingReferenceExtension implements ExtensionInterface
         );
     }
 
+    /**
+     * Mirror HtmlRenderer::escape() so replacement regexes match rendered output.
+     */
+    protected function escapeText(string $text): string
+    {
+        $escaped = htmlspecialchars($text, ENT_NOQUOTES | ENT_HTML5, 'UTF-8');
+
+        return str_replace("\u{E000}", '&nbsp;', $escaped);
+    }
+
+    /**
+     * Mirror HtmlRenderer::escapeAttribute() so replacement regexes match rendered output.
+     */
+    protected function escapeAttribute(string $text): string
+    {
+        $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return str_replace("\u{E000}", '&nbsp;', $escaped);
+    }
+
     protected function resolveRenderedReferences(string $html): string
     {
         foreach ($this->placeholders as $placeholder => $data) {
@@ -153,9 +173,9 @@ class HeadingReferenceExtension implements ExtensionInterface
             $displayText = $data['displayText'];
             $normalizedTarget = $this->normalizeQuotes($target);
             $count = $this->headingTargetCounts[$normalizedTarget] ?? 0;
-            $quotedPlaceholder = preg_quote(htmlspecialchars($placeholder, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/');
-            $quotedTarget = preg_quote(htmlspecialchars($target, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/');
-            $quotedDisplayText = preg_quote(htmlspecialchars($displayText, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/');
+            $quotedPlaceholder = preg_quote($this->escapeAttribute($placeholder), '/');
+            $quotedTarget = preg_quote($this->escapeAttribute($target), '/');
+            $quotedDisplayText = preg_quote($this->escapeText($displayText), '/');
 
             if ($count === 1 && isset($this->headingTargets[$normalizedTarget])) {
                 $html = (string)preg_replace_callback(
@@ -165,10 +185,10 @@ class HeadingReferenceExtension implements ExtensionInterface
                     function (array $matches) use ($displayText, $normalizedTarget): string {
                         return '<a'
                             . $matches['before']
-                            . 'href="#' . htmlspecialchars($this->headingTargets[$normalizedTarget], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"'
+                            . 'href="#' . $this->escapeAttribute($this->headingTargets[$normalizedTarget]) . '"'
                             . $matches['after']
                             . '>'
-                            . htmlspecialchars($displayText, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                            . $this->escapeText($displayText)
                             . '</a>';
                     },
                     $html,
@@ -190,7 +210,7 @@ class HeadingReferenceExtension implements ExtensionInterface
                 . '<\/a>/u';
             $html = (string)preg_replace(
                 $pattern,
-                htmlspecialchars($fallback, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+                $this->escapeText($fallback),
                 $html,
                 1,
             );
