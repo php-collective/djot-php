@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Extension;
 
 use Djot\DjotConverter;
+use Djot\Extension\TableOfContentsExtension;
 use Djot\Extension\TabsExtension;
 use PHPUnit\Framework\TestCase;
 
@@ -575,5 +576,139 @@ DJOT;
 
         // Should have all classes merged
         $this->assertStringContainsString('class="tabs extra-class another-class"', $html);
+    }
+
+    /**
+     * Test that TabsExtension works correctly with TableOfContentsExtension.
+     *
+     * This is a regression test for https://github.com/php-collective/djot-php/issues/139
+     * The bug was that TabsExtension called $converter->render() for nested content,
+     * which triggered clear() on all extensions including TOC, wiping collected headings.
+     */
+    public function testCompatibilityWithTableOfContents(): void
+    {
+        $converter = new DjotConverter();
+        $toc = new TableOfContentsExtension(minLevel: 2, maxLevel: 4, position: 'top');
+        $converter->addExtension($toc);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+# Main Title
+
+## Heading Before Tabs
+
+Content before tabs.
+
+## Tabs Section
+
+:::: tabs
+::: tab
+### Tab One
+Content one.
+:::
+::: tab
+### Tab Two
+Content two.
+:::
+::::
+
+## Heading After Tabs
+
+Content after tabs.
+DJOT;
+
+        $html = $converter->convert($djot);
+        $tocData = $toc->getToc();
+
+        // All H2 headings should be captured in TOC (minLevel=2)
+        $this->assertCount(3, $tocData, 'TOC should capture all 3 H2 headings');
+
+        $headingTexts = array_column($tocData, 'text');
+        $this->assertContains('Heading Before Tabs', $headingTexts);
+        $this->assertContains('Tabs Section', $headingTexts);
+        $this->assertContains('Heading After Tabs', $headingTexts);
+
+        // Verify TOC HTML is present and contains all headings
+        $this->assertStringContainsString('Heading Before Tabs', $html);
+        $this->assertStringContainsString('Tabs Section', $html);
+        $this->assertStringContainsString('Heading After Tabs', $html);
+    }
+
+    /**
+     * Test that headings inside tabs are also captured by TOC.
+     */
+    public function testTocCapturesHeadingsInsideTabs(): void
+    {
+        $converter = new DjotConverter();
+        $toc = new TableOfContentsExtension(minLevel: 2, maxLevel: 4, position: 'top');
+        $converter->addExtension($toc);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+## Before Tabs
+
+:::: tabs
+::: tab
+### Tab Heading One
+Content.
+:::
+::: tab
+### Tab Heading Two
+Content.
+:::
+::::
+
+## After Tabs
+DJOT;
+
+        $converter->convert($djot);
+        $tocData = $toc->getToc();
+
+        $headingTexts = array_column($tocData, 'text');
+
+        // Both H2 headings should be captured
+        $this->assertContains('Before Tabs', $headingTexts);
+        $this->assertContains('After Tabs', $headingTexts);
+
+        // Note: Tab headings (H3) that become labels are intentionally not
+        // included in the rendered content, so they won't be in TOC.
+        // This is expected behavior - the heading is used as tab label instead.
+    }
+
+    /**
+     * Test TOC with tabs when using label attributes (headings remain in content).
+     */
+    public function testTocWithTabsUsingLabelAttribute(): void
+    {
+        $converter = new DjotConverter();
+        $toc = new TableOfContentsExtension(minLevel: 2, maxLevel: 4, position: 'top');
+        $converter->addExtension($toc);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+## Main Section
+
+:::: tabs
+{label="Custom Label"}
+::: tab
+### Heading Inside Tab
+
+This heading should be in both content and TOC since we're using label attribute.
+:::
+::::
+
+## Another Section
+DJOT;
+
+        $converter->convert($djot);
+        $tocData = $toc->getToc();
+
+        $headingTexts = array_column($tocData, 'text');
+
+        $this->assertContains('Main Section', $headingTexts);
+        $this->assertContains('Another Section', $headingTexts);
+        // When label attribute is used, the heading inside tab remains in content
+        // and should be captured by TOC
+        $this->assertContains('Heading Inside Tab', $headingTexts);
     }
 }

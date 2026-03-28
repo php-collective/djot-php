@@ -11,6 +11,7 @@ use Djot\Node\Block\Heading;
 use Djot\Node\Document;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Renderer\HtmlRenderer;
 
 /**
  * Transforms nested divs into tabbed content interfaces
@@ -208,7 +209,12 @@ class TabsExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
-        $converter->on('render.div', function (RenderEvent $event) use ($converter): void {
+        // Use the renderer directly for nested content to avoid calling
+        // $converter->render() which clears all extensions including TOC.
+        // See: https://github.com/php-collective/djot-php/issues/139
+        $renderer = $converter->getRenderer();
+
+        $converter->on('render.div', function (RenderEvent $event) use ($renderer): void {
             $node = $event->getNode();
             if (!$node instanceof Div) {
                 return;
@@ -218,7 +224,7 @@ class TabsExtension implements ExtensionInterface
                 return;
             }
 
-            $tabs = $this->collectTabs($node, $converter);
+            $tabs = $this->collectTabs($node, $renderer);
             if ($tabs === []) {
                 return;
             }
@@ -236,7 +242,7 @@ class TabsExtension implements ExtensionInterface
      *
      * @return array<array{label: string, content: string, selected: bool, id: string|null}>
      */
-    protected function collectTabs(Div $wrapper, DjotConverter $converter): array
+    protected function collectTabs(Div $wrapper, HtmlRenderer $renderer): array
     {
         $tabs = [];
 
@@ -249,8 +255,8 @@ class TabsExtension implements ExtensionInterface
             $selected = $child->hasAttribute('selected');
             $id = $child->hasAttribute('id') ? (string)$child->getAttribute('id') : null;
 
-            // Render the tab content manually to bypass normal div rendering
-            $content = $this->renderTabContent($child, $converter);
+            // Render the tab content using the renderer directly
+            $content = $this->renderTabContent($child, $renderer);
 
             $tabs[] = [
                 'label' => $label,
@@ -294,8 +300,11 @@ class TabsExtension implements ExtensionInterface
 
     /**
      * Render tab content, removing the label heading if present
+     *
+     * Uses the renderer directly instead of $converter->render() to avoid
+     * clearing extension state (which would break TOC, etc.)
      */
-    protected function renderTabContent(Div $tab, DjotConverter $converter): string
+    protected function renderTabContent(Div $tab, HtmlRenderer $renderer): string
     {
         $skipFirstHeading = !$tab->hasAttribute('label');
         $skippedHeading = false;
@@ -314,7 +323,8 @@ class TabsExtension implements ExtensionInterface
             $tempDoc->appendChild($child);
         }
 
-        return $converter->render($tempDoc);
+        // Use renderer directly to avoid clear() call on extensions
+        return $renderer->render($tempDoc);
     }
 
     /**
