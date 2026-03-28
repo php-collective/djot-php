@@ -30,6 +30,10 @@ use Djot\Node\Inline\Span;
  * Inline footnotes integrate seamlessly with regular footnotes - they share
  * the same numbering sequence and appear together in the footnotes section.
  *
+ * Note: Additional attributes on the span (other classes, IDs, etc.) are not
+ * preserved on the generated footnote reference, consistent with regular
+ * footnote syntax which also doesn't support attributes.
+ *
  * @see https://github.com/jgm/djot/issues/286
  */
 class InlineFootnotesExtension implements ExtensionInterface

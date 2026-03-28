@@ -451,7 +451,7 @@ $converter->addExtension(new HeadingPermalinksExtension(
 
 ## InlineFootnotesExtension
 
-Converts spans with `.fn` class to inline footnotes. This allows footnote content to be written inline with the text, rather than requiring a separate footnote definition block.
+Converts spans with `.fn` class to inline footnotes. This allows footnote content to be written inline with the text, rather than requiring a separate footnote definition block. Additional attributes on the span (other classes, IDs, etc.) are not preserved on the generated footnote reference, consistent with regular footnote syntax.
 
 ```php
 use Djot\Extension\InlineFootnotesExtension;
