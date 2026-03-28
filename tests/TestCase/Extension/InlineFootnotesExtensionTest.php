@@ -55,6 +55,8 @@ class InlineFootnotesExtensionTest extends TestCase
         // Verify ordering - fn1 should come before fn2 in the endnotes
         $fn1Pos = strpos($html, 'id="fn1"');
         $fn2Pos = strpos($html, 'id="fn2"');
+        $this->assertNotFalse($fn1Pos);
+        $this->assertNotFalse($fn2Pos);
         $this->assertGreaterThan($fn1Pos, $fn2Pos);
     }
 
