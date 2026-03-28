@@ -13,6 +13,8 @@ use Djot\Node\Inline\Text;
 /**
  * Resolves [[Heading Text]] references to headings in the current document.
  *
+ * Supports custom display text: [[Heading Text|click here]]
+ *
  * This extension is intentionally limited to intra-document heading references.
  * It resolves links by heading text, not by author-guessed generated IDs, so
  * authors do not need to depend on the renderer's slug generation rules.
@@ -33,7 +35,7 @@ class HeadingReferenceExtension implements ExtensionInterface
     protected array $headingTargetCounts = [];
 
     /**
-     * @var array<string, string>
+     * @var array<string, array{target: string, displayText: string}>
      */
     protected array $placeholders = [];
 
@@ -71,15 +73,20 @@ class HeadingReferenceExtension implements ExtensionInterface
             }
         });
 
+        // Pattern: [[Heading Text]] or [[Heading Text|Display Text]]
         $inlineParser->addInlinePattern(
-            '/\[\[([^\]|#][^\]|]*)\]\]/',
+            '/\[\[([^\]|#][^\]|]*)(?:\|([^\]]+))?\]\]/',
             function (string $match, array $groups): Link {
                 $target = trim($groups[1]);
+                $displayText = isset($groups[2]) ? trim($groups[2]) : $target;
                 $placeholder = '__djot_heading_ref_' . $this->placeholderCounter++ . '__';
-                $this->placeholders[$placeholder] = $target;
+                $this->placeholders[$placeholder] = [
+                    'target' => $target,
+                    'displayText' => $displayText,
+                ];
 
                 $link = new Link($placeholder);
-                $link->appendChild(new Text($target));
+                $link->appendChild(new Text($displayText));
                 foreach (explode(' ', $this->cssClass) as $class) {
                     if ($class !== '') {
                         $link->addClass($class);
@@ -120,9 +127,12 @@ class HeadingReferenceExtension implements ExtensionInterface
 
     protected function resolveRenderedReferences(string $html): string
     {
-        foreach ($this->placeholders as $placeholder => $target) {
+        foreach ($this->placeholders as $placeholder => $data) {
+            $target = $data['target'];
+            $displayText = $data['displayText'];
             $normalizedTarget = $this->normalizeQuotes($target);
             $count = $this->headingTargetCounts[$normalizedTarget] ?? 0;
+
             if ($count === 1 && isset($this->headingTargets[$normalizedTarget])) {
                 $html = str_replace(
                     'href="' . htmlspecialchars($placeholder, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"',
@@ -133,14 +143,19 @@ class HeadingReferenceExtension implements ExtensionInterface
                 continue;
             }
 
+            // Fallback: replace link with literal [[target]] or [[target|text]] syntax
+            $fallback = $target === $displayText
+                ? '[[' . $target . ']]'
+                : '[[' . $target . '|' . $displayText . ']]';
+
             $pattern = '/<a\b[^>]*href="'
                 . preg_quote(htmlspecialchars($placeholder, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/')
                 . '"[^>]*>'
-                . preg_quote(htmlspecialchars($target, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/')
+                . preg_quote(htmlspecialchars($displayText, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/')
                 . '<\/a>/u';
             $html = (string)preg_replace(
                 $pattern,
-                htmlspecialchars('[[' . $target . ']]', ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+                htmlspecialchars($fallback, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'),
                 $html,
                 1,
             );

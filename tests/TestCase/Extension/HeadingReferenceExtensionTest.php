@@ -44,6 +44,33 @@ DJOT);
         $this->assertStringContainsString('href="#install"', $html);
     }
 
+    public function testCustomDisplayText(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $html = $converter->convert(<<<'DJOT'
+See [[Getting Started|the introduction]] for details.
+
+# Getting Started
+DJOT);
+
+        $this->assertStringContainsString('href="#Getting-Started"', $html);
+        $this->assertStringContainsString('>the introduction</a>', $html);
+        $this->assertStringContainsString('data-heading-ref="Getting Started"', $html);
+    }
+
+    public function testCustomDisplayTextFallbackOnMissing(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $html = $converter->convert('See [[Missing|click here]].');
+
+        // Falls back to literal syntax including display text
+        $this->assertStringContainsString('[[Missing|click here]]', $html);
+    }
+
     public function testDuplicateHeadingFallsBackToLiteralText(): void
     {
         $converter = new DjotConverter();
