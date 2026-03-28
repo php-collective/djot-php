@@ -24,6 +24,8 @@ use Djot\Node\Inline\Text;
  */
 class HeadingReferenceExtension implements ExtensionInterface
 {
+    protected string $placeholderPrefix = '';
+
     /**
      * @var array<string, string>
      */
@@ -79,7 +81,7 @@ class HeadingReferenceExtension implements ExtensionInterface
             function (string $match, array $groups): Link {
                 $target = trim($groups[1]);
                 $displayText = isset($groups[2]) ? trim($groups[2]) : $target;
-                $placeholder = '__djot_heading_ref_' . $this->placeholderCounter++ . '__';
+                $placeholder = $this->generatePlaceholder();
                 $this->placeholders[$placeholder] = [
                     'target' => $target,
                     'displayText' => $displayText,
@@ -109,6 +111,24 @@ class HeadingReferenceExtension implements ExtensionInterface
         $this->headingTargetCounts = [];
     }
 
+    protected function generatePlaceholder(): string
+    {
+        if ($this->placeholderPrefix === '') {
+            $this->placeholderPrefix = $this->generatePlaceholderPrefix();
+        }
+
+        return $this->placeholderPrefix . $this->placeholderCounter++ . '__';
+    }
+
+    protected function generatePlaceholderPrefix(): string
+    {
+        try {
+            return '__djot_heading_ref_' . bin2hex(random_bytes(8)) . '_';
+        } catch (\Random\RandomException) {
+            return '__djot_heading_ref_' . uniqid('', true) . '_';
+        }
+    }
+
     /**
      * Normalize quotes for comparison.
      *
@@ -132,12 +152,26 @@ class HeadingReferenceExtension implements ExtensionInterface
             $displayText = $data['displayText'];
             $normalizedTarget = $this->normalizeQuotes($target);
             $count = $this->headingTargetCounts[$normalizedTarget] ?? 0;
+            $quotedPlaceholder = preg_quote(htmlspecialchars($placeholder, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/');
+            $quotedTarget = preg_quote(htmlspecialchars($target, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/');
+            $quotedDisplayText = preg_quote(htmlspecialchars($displayText, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/');
 
             if ($count === 1 && isset($this->headingTargets[$normalizedTarget])) {
-                $html = str_replace(
-                    'href="' . htmlspecialchars($placeholder, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"',
-                    'href="#' . htmlspecialchars($this->headingTargets[$normalizedTarget], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"',
+                $html = (string)preg_replace_callback(
+                    '/<a\b(?=[^>]*\bhref="' . $quotedPlaceholder . '")(?=[^>]*\bdata-heading-ref="' . $quotedTarget . '")(?P<before>[^>]*)\bhref="' . $quotedPlaceholder . '"(?P<after>[^>]*)>'
+                    . $quotedDisplayText
+                    . '<\/a>/u',
+                    function (array $matches) use ($displayText, $normalizedTarget): string {
+                        return '<a'
+                            . $matches['before']
+                            . 'href="#' . htmlspecialchars($this->headingTargets[$normalizedTarget], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"'
+                            . $matches['after']
+                            . '>'
+                            . htmlspecialchars($displayText, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                            . '</a>';
+                    },
                     $html,
+                    1,
                 );
 
                 continue;
@@ -149,9 +183,9 @@ class HeadingReferenceExtension implements ExtensionInterface
                 : '[[' . $target . '|' . $displayText . ']]';
 
             $pattern = '/<a\b[^>]*href="'
-                . preg_quote(htmlspecialchars($placeholder, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/')
-                . '"[^>]*>'
-                . preg_quote(htmlspecialchars($displayText, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/')
+                . $quotedPlaceholder
+                . '"(?=[^>]*\bdata-heading-ref="' . $quotedTarget . '")[^>]*>'
+                . $quotedDisplayText
                 . '<\/a>/u';
             $html = (string)preg_replace(
                 $pattern,
@@ -163,6 +197,7 @@ class HeadingReferenceExtension implements ExtensionInterface
 
         $this->placeholders = [];
         $this->placeholderCounter = 0;
+        $this->placeholderPrefix = '';
 
         return $html;
     }

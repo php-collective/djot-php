@@ -193,6 +193,30 @@ DJOT);
         $this->assertStringContainsString('href="#Real-Heading"', $html);
     }
 
+    public function testUserAuthoredLinkWithMatchingPlaceholderIsNotRewritten(): void
+    {
+        $extension = new class('heading-ref') extends HeadingReferenceExtension {
+            protected function generatePlaceholderPrefix(): string
+            {
+                return 'collision-placeholder-';
+            }
+        };
+
+        $converter = new DjotConverter();
+        $converter->addExtension($extension);
+
+        $html = $converter->convert(<<<'DJOT'
+[outside](collision-placeholder-0__)
+
+See [[Test]].
+
+# Test
+DJOT);
+
+        $this->assertStringContainsString('<a href="collision-placeholder-0__">outside</a>', $html);
+        $this->assertStringContainsString('href="#Test"', $html);
+    }
+
     public function testConflictsWithWikilinksWhenAddedAfter(): void
     {
         $converter = new DjotConverter();
