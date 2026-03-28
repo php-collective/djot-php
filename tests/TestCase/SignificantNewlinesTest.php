@@ -12,6 +12,7 @@ use Djot\Node\Block\Heading;
 use Djot\Node\Block\ListBlock;
 use Djot\Node\Block\Paragraph;
 use Djot\Parser\BlockParser;
+use Djot\Renderer\SoftBreakMode;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -224,7 +225,7 @@ class SignificantNewlinesTest extends TestCase
     public function testConverterSoftBreaksWithExplicitBreakMode(): void
     {
         $converter = DjotConverter::withSignificantNewlines(
-            softBreakMode: \Djot\Renderer\SoftBreakMode::Break,
+            softBreakMode: SoftBreakMode::Break,
         );
 
         $djot = "Line one\nLine two";
@@ -249,7 +250,7 @@ class SignificantNewlinesTest extends TestCase
     {
         // For chat applications, combine significantNewlines with SoftBreakMode::Break
         $converter = DjotConverter::withSignificantNewlines(
-            softBreakMode: \Djot\Renderer\SoftBreakMode::Break,
+            softBreakMode: SoftBreakMode::Break,
         );
 
         $djot = <<<'DJOT'
