@@ -100,6 +100,24 @@ DJOT);
         $this->assertStringContainsString('class="permalink"', $html);
     }
 
+    public function testHeadingWithSmartQuotesMatchesStraightQuoteReference(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        // The parser converts straight quotes to smart quotes in heading text,
+        // but reference targets keep straight quotes. The extension normalizes
+        // quotes for matching so this should resolve correctly.
+        $html = $converter->convert(<<<'DJOT'
+See [[Say "Hello"]].
+
+# Say "Hello"
+DJOT);
+
+        $this->assertStringContainsString('href="#Say-Hello"', $html);
+        $this->assertStringNotContainsString('[[Say "Hello"]]', $html);
+    }
+
     public function testConflictsWithWikilinksWhenAddedAfter(): void
     {
         $converter = new DjotConverter();

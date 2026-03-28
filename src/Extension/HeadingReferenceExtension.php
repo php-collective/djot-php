@@ -9,7 +9,6 @@ use Djot\Event\RenderEvent;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Text;
-use Djot\Renderer\HeadingIdTracker;
 
 /**
  * Resolves [[Heading Text]] references to headings in the current document.
@@ -40,9 +39,8 @@ class HeadingReferenceExtension implements ExtensionInterface
 
     protected int $placeholderCounter = 0;
 
-    public function __construct(
-        protected string $cssClass = 'heading-ref',
-    ) {
+    public function __construct(protected string $cssClass = 'heading-ref')
+    {
     }
 
     public function register(DjotConverter $converter): void
@@ -61,17 +59,21 @@ class HeadingReferenceExtension implements ExtensionInterface
                 return;
             }
 
-            $id = $tracker->getIdForHeading($node);
-            $this->headingTargetCounts[$text] = ($this->headingTargetCounts[$text] ?? 0) + 1;
+            // Normalize quotes so headings with smart quotes can be matched
+            // by references using straight quotes
+            $normalizedText = $this->normalizeQuotes($text);
 
-            if (!isset($this->headingTargets[$text])) {
-                $this->headingTargets[$text] = $id;
+            $id = $tracker->getIdForHeading($node);
+            $this->headingTargetCounts[$normalizedText] = ($this->headingTargetCounts[$normalizedText] ?? 0) + 1;
+
+            if (!isset($this->headingTargets[$normalizedText])) {
+                $this->headingTargets[$normalizedText] = $id;
             }
         });
 
         $inlineParser->addInlinePattern(
             '/\[\[([^\]|#][^\]|]*)\]\]/',
-            function (string $match, array $groups) : Link {
+            function (string $match, array $groups): Link {
                 $target = trim($groups[1]);
                 $placeholder = '__djot_heading_ref_' . $this->placeholderCounter++ . '__';
                 $this->placeholders[$placeholder] = $target;
@@ -100,14 +102,31 @@ class HeadingReferenceExtension implements ExtensionInterface
         $this->headingTargetCounts = [];
     }
 
+    /**
+     * Normalize quotes for comparison.
+     *
+     * The parser converts straight quotes to smart quotes in heading text,
+     * but reference targets keep the original straight quotes. This method
+     * normalizes both to straight quotes for reliable matching.
+     */
+    protected function normalizeQuotes(string $text): string
+    {
+        return str_replace(
+            ["\u{201C}", "\u{201D}", "\u{2018}", "\u{2019}"],
+            ['"', '"', "'", "'"],
+            $text,
+        );
+    }
+
     protected function resolveRenderedReferences(string $html): string
     {
         foreach ($this->placeholders as $placeholder => $target) {
-            $count = $this->headingTargetCounts[$target] ?? 0;
-            if ($count === 1 && isset($this->headingTargets[$target])) {
+            $normalizedTarget = $this->normalizeQuotes($target);
+            $count = $this->headingTargetCounts[$normalizedTarget] ?? 0;
+            if ($count === 1 && isset($this->headingTargets[$normalizedTarget])) {
                 $html = str_replace(
                     'href="' . htmlspecialchars($placeholder, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"',
-                    'href="#' . htmlspecialchars($this->headingTargets[$target], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"',
+                    'href="#' . htmlspecialchars($this->headingTargets[$normalizedTarget], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"',
                     $html,
                 );
 
@@ -119,7 +138,7 @@ class HeadingReferenceExtension implements ExtensionInterface
                 . '"[^>]*>'
                 . preg_quote(htmlspecialchars($target, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'), '/')
                 . '<\/a>/u';
-            $html = (string) preg_replace(
+            $html = (string)preg_replace(
                 $pattern,
                 htmlspecialchars('[[' . $target . ']]', ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'),
                 $html,
