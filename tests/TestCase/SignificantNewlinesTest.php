@@ -210,9 +210,22 @@ class SignificantNewlinesTest extends TestCase
         $this->assertStringContainsString('<ul>', $result);
     }
 
-    public function testConverterSoftBreaksRenderAsBr(): void
+    public function testConverterSoftBreaksDefaultToNewline(): void
     {
         $converter = DjotConverter::withSignificantNewlines();
+
+        $djot = "Line one\nLine two";
+        $result = $converter->convert($djot);
+
+        // Default soft break mode is newline, not <br>
+        $this->assertStringNotContainsString('<br>', $result);
+    }
+
+    public function testConverterSoftBreaksWithExplicitBreakMode(): void
+    {
+        $converter = DjotConverter::withSignificantNewlines(
+            softBreakMode: \Djot\Renderer\SoftBreakMode::Break,
+        );
 
         $djot = "Line one\nLine two";
         $result = $converter->convert($djot);
@@ -234,7 +247,10 @@ class SignificantNewlinesTest extends TestCase
 
     public function testChatMessageExample(): void
     {
-        $converter = DjotConverter::withSignificantNewlines();
+        // For chat applications, combine significantNewlines with SoftBreakMode::Break
+        $converter = DjotConverter::withSignificantNewlines(
+            softBreakMode: \Djot\Renderer\SoftBreakMode::Break,
+        );
 
         $djot = <<<'DJOT'
 Hey!
@@ -248,11 +264,11 @@ DJOT;
 
         $result = $converter->convert($djot);
 
-        // Soft breaks should be <br>
+        // With explicit Break mode, soft breaks render as <br>
         $this->assertStringContainsString('<br>', $result);
-        // List should be separate
+        // List should be separate (significantNewlines feature)
         $this->assertStringContainsString('<ul>', $result);
-        // Blockquote should be separate
+        // Blockquote should be separate (significantNewlines feature)
         $this->assertStringContainsString('<blockquote>', $result);
     }
 
