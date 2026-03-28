@@ -440,6 +440,20 @@ DJOT;
         $this->assertStringContainsString('<h1>', $html);
     }
 
+    public function testDisablingProfileClearsStaleViolations(): void
+    {
+        $converter = new DjotConverter(profile: Profile::comment());
+        $converter->convert('# Heading');
+
+        $this->assertTrue($converter->hasProfileViolations());
+
+        $converter->setProfile(null);
+        $converter->convert('Plain text');
+
+        $this->assertFalse($converter->hasProfileViolations());
+        $this->assertSame([], $converter->getProfileViolations());
+    }
+
     // ==================== Combined with SafeMode Tests ====================
 
     public function testProfileAndSafeModeWorkTogether(): void

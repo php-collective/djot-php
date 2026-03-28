@@ -1,0 +1,356 @@
+:root {
+  --vp-c-brand-1: #7c3aed;
+  --vp-c-brand-2: #8b5cf6;
+  --vp-c-brand-3: #a78bfa;
+  --vp-c-brand-soft: rgba(124, 58, 237, 0.14);
+
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+
+  --vp-home-hero-image-background-image: linear-gradient(135deg, #7c3aed 0%, #ec4899 100%);
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+.dark {
+  --vp-c-brand-1: #a78bfa;
+  --vp-c-brand-2: #8b5cf6;
+  --vp-c-brand-3: #7c3aed;
+}
+
+/* Apply Shiki font-style and font-weight CSS variables */
+.vp-code span {
+  font-style: var(--shiki-light-font-style, inherit);
+  font-weight: var(--shiki-light-font-weight, inherit);
+}
+
+.dark .vp-code span {
+  font-style: var(--shiki-dark-font-style, inherit);
+  font-weight: var(--shiki-dark-font-weight, inherit);
+}
+
+/* Playground styles */
+.djot-playground {
+  margin: 2rem 0;
+}
+
+.djot-playground .input-section,
+.djot-playground .output-section {
+  margin-bottom: 1rem;
+}
+
+.djot-playground textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 1rem;
+  font-family: var(--vp-font-family-mono);
+  font-size: 14px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  resize: vertical;
+}
+
+.djot-playground textarea:focus {
+  outline: none;
+  border-color: var(--vp-c-brand-1);
+}
+
+.djot-playground .output-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.djot-playground .output-tabs button {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.djot-playground .output-tabs button:hover {
+  border-color: var(--vp-c-brand-1);
+}
+
+.djot-playground .output-tabs button.active {
+  background: var(--vp-c-brand-1);
+  color: white;
+  border-color: var(--vp-c-brand-1);
+}
+
+.djot-playground .output-content {
+  padding: 1rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg-soft);
+  min-height: 150px;
+  overflow: auto;
+}
+
+.djot-playground .output-content.source {
+  font-family: var(--vp-font-family-mono);
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.djot-playground .output-content.preview {
+  font-family: var(--vp-font-family-base);
+}
+
+.djot-playground .error {
+  color: var(--vp-c-danger-1);
+  padding: 1rem;
+  background: var(--vp-c-danger-soft);
+  border-radius: 8px;
+}
+
+.djot-playground .loading {
+  color: var(--vp-c-text-2);
+  font-style: italic;
+}
+
+.djot-playground .options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: var(--vp-c-bg-soft);
+  border-radius: 8px;
+}
+
+.djot-playground .options label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.djot-playground .options select {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 4px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+}
+
+.djot-playground .extension-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* Code blocks in playground preview */
+.djot-playground .preview pre {
+  position: relative;
+  background: var(--vp-code-block-bg);
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+  margin: 1.25rem 0;
+}
+
+.djot-playground .preview pre code {
+  display: block;
+  font-family: var(--vp-font-family-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--vp-c-text-1);
+  background: transparent;
+  padding: 0;
+}
+
+/* Language label for code blocks */
+.djot-playground .preview pre code[class*="language-"]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--vp-c-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.djot-playground .preview pre code.language-php::before {
+  content: 'php';
+}
+
+.djot-playground .preview pre code.language-js::before,
+.djot-playground .preview pre code.language-javascript::before {
+  content: 'js';
+}
+
+.djot-playground .preview pre code.language-html::before {
+  content: 'html';
+}
+
+.djot-playground .preview pre code.language-css::before {
+  content: 'css';
+}
+
+.djot-playground .preview pre code.language-bash::before,
+.djot-playground .preview pre code.language-shell::before {
+  content: 'sh';
+}
+
+.djot-playground .preview pre code.language-djot::before {
+  content: 'djot';
+}
+
+/* Inline code */
+.djot-playground .preview code:not(pre code) {
+  background: var(--vp-code-block-bg);
+  border: 1px solid var(--vp-c-divider);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.875em;
+  color: var(--vp-c-text-1);
+}
+
+/* highlight.js theme for playground */
+.djot-playground .preview .hljs-keyword,
+.djot-playground .preview .hljs-selector-tag,
+.djot-playground .preview .hljs-title,
+.djot-playground .preview .hljs-section,
+.djot-playground .preview .hljs-doctag,
+.djot-playground .preview .hljs-name {
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+.djot-playground .preview .hljs-strong {
+  font-weight: 700;
+}
+
+.djot-playground .preview .hljs-emphasis {
+  font-style: italic;
+}
+
+.djot-playground .preview .hljs-string,
+.djot-playground .preview .hljs-attr {
+  color: #22863a;
+}
+
+.dark .djot-playground .preview .hljs-string,
+.dark .djot-playground .preview .hljs-attr {
+  color: #7ee787;
+}
+
+.djot-playground .preview .hljs-variable,
+.djot-playground .preview .hljs-template-variable,
+.djot-playground .preview .hljs-type,
+.djot-playground .preview .hljs-selector-class,
+.djot-playground .preview .hljs-selector-attr,
+.djot-playground .preview .hljs-selector-pseudo,
+.djot-playground .preview .hljs-number {
+  color: #e36209;
+}
+
+.dark .djot-playground .preview .hljs-variable,
+.dark .djot-playground .preview .hljs-template-variable,
+.dark .djot-playground .preview .hljs-type,
+.dark .djot-playground .preview .hljs-selector-class,
+.dark .djot-playground .preview .hljs-selector-attr,
+.dark .djot-playground .preview .hljs-selector-pseudo,
+.dark .djot-playground .preview .hljs-number {
+  color: #ffa657;
+}
+
+.djot-playground .preview .hljs-comment,
+.djot-playground .preview .hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.dark .djot-playground .preview .hljs-comment,
+.dark .djot-playground .preview .hljs-quote {
+  color: #8b949e;
+}
+
+.djot-playground .preview .hljs-built_in {
+  color: #005cc5;
+}
+
+.dark .djot-playground .preview .hljs-built_in {
+  color: #79c0ff;
+}
+
+.djot-playground .preview .hljs-addition {
+  background-color: rgba(46, 160, 67, 0.15);
+  color: #22863a;
+}
+
+.dark .djot-playground .preview .hljs-addition {
+  background-color: rgba(46, 160, 67, 0.2);
+  color: #7ee787;
+}
+
+.djot-playground .preview .hljs-deletion {
+  background-color: rgba(248, 81, 73, 0.15);
+  color: #cb2431;
+}
+
+.dark .djot-playground .preview .hljs-deletion {
+  background-color: rgba(248, 81, 73, 0.2);
+  color: #f85149;
+}
+
+.djot-playground .preview .hljs-link {
+  color: #0366d6;
+  text-decoration: underline;
+}
+
+.dark .djot-playground .preview .hljs-link {
+  color: #58a6ff;
+}
+
+.djot-playground .preview .hljs-bullet {
+  color: var(--vp-c-brand-1);
+}
+
+.djot-playground .preview .hljs-code {
+  background: var(--vp-code-block-bg);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+.djot-playground .preview .hljs-meta {
+  color: #6a737d;
+}
+
+.dark .djot-playground .preview .hljs-meta {
+  color: #8b949e;
+}
+
+.djot-playground .preview .hljs-symbol {
+  color: #6f42c1;
+}
+
+.dark .djot-playground .preview .hljs-symbol {
+  color: #d2a8ff;
+}
+
+.djot-playground .preview .hljs-formula {
+  color: #005cc5;
+  font-style: italic;
+}
+
+.dark .djot-playground .preview .hljs-formula {
+  color: #79c0ff;
+}
+
+.djot-playground .preview .hljs-punctuation {
+  color: var(--vp-c-text-2);
+}

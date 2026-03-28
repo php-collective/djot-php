@@ -140,13 +140,37 @@ class FencedBlockParser
     /**
      * Check if a line opens a comment block.
      *
+     * Block-level comments are only recognized when:
+     * - The comment spans multiple lines (no closing %} on same line), OR
+     * - The comment is alone on the line (nothing meaningful after %})
+     *
+     * Single-line comments with content after them like `{% comment %} text`
+     * should be handled as inline comments by the inline parser.
+     *
      * @param string $line The line to check
      *
-     * @return bool True if this line opens a comment
+     * @return bool True if this line opens a block comment
      */
     public function isCommentOpener(string $line): bool
     {
-        return str_contains($line, '{%') && str_starts_with(trim($line), '{%');
+        $trimmed = trim($line);
+        if (!str_starts_with($trimmed, '{%')) {
+            return false;
+        }
+
+        // Check if there's a closing %} on the same line
+        $closePos = strpos($trimmed, '%}');
+        if ($closePos === false) {
+            // No closing on this line - it's a multi-line block comment
+            return true;
+        }
+
+        // There's a closing %} - check if there's content after it
+        $afterClose = trim(substr($trimmed, $closePos + 2));
+
+        // If nothing after the closing, treat as block comment
+        // If there's content after, let inline parser handle it
+        return $afterClose === '';
     }
 
     /**

@@ -75,6 +75,11 @@ class ProfileFilter
         return $this->violations;
     }
 
+    public function clearViolations(): void
+    {
+        $this->violations = [];
+    }
+
     protected function filterChildren(Node $parent, Profile $profile, int $depth): void
     {
         // Get a copy of children since we may modify during iteration

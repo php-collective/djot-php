@@ -74,6 +74,16 @@ class SafeModeTest extends TestCase
         $this->assertStringContainsString('href="https://example.com"', $result);
     }
 
+    public function testAllowedLinkUrlIsEscapedInAttributeContext(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = '[link](https://example.com " onclick="alert(1))';
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('href="https://example.com &quot; onclick=&quot;alert(1)"', $result);
+        $this->assertStringNotContainsString('" onclick="alert(1)"', $result);
+    }
+
     public function testRelativeUrlIsAllowed(): void
     {
         $converter = new DjotConverter(safeMode: true);
@@ -157,6 +167,17 @@ class SafeModeTest extends TestCase
         $this->assertStringContainsString('data-value="123"', $result);
     }
 
+    public function testImageAttributesAreEscapedInAttributeContext(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = '![alt "quoted"](image.png){title="title\" onerror=\"alert(1)"}';
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('alt="alt “quoted”"', $result);
+        $this->assertStringContainsString('title="title&quot; onerror=&quot;alert(1)"', $result);
+        $this->assertStringNotContainsString('" onerror="alert(1)"', $result);
+    }
+
     // ==================== Raw HTML Handling ====================
 
     public function testRawHtmlIsEscapedByDefault(): void
@@ -186,6 +207,25 @@ class SafeModeTest extends TestCase
         $result = $converter->convert($djot);
 
         $this->assertStringNotContainsString('script', $result);
+    }
+
+    public function testStyleAttributeIsBlockedInStrictMode(): void
+    {
+        $converter = new DjotConverter(safeMode: SafeMode::strict());
+        $djot = '[text]{style="background:expression(alert(1))"}';
+        $result = $converter->convert($djot);
+
+        $this->assertStringNotContainsString('style', $result);
+        $this->assertStringNotContainsString('expression', $result);
+    }
+
+    public function testStyleAttributeAllowedInDefaultSafeMode(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = '[text]{style="color:red"}';
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('style="color:red"', $result);
     }
 
     public function testRawHtmlAllowedWhenConfigured(): void
@@ -301,5 +341,87 @@ class SafeModeTest extends TestCase
         $this->assertArrayHasKey('id', $filtered);
         $this->assertArrayNotHasKey('onclick', $filtered);
         $this->assertArrayNotHasKey('onmouseover', $filtered);
+    }
+
+    // ==================== Whitespace Bypass Prevention ====================
+
+    public function testJavascriptUrlWithTabIsBlocked(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = "[click](java\tscript:alert(1))";
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('href=""', $result);
+        $this->assertStringNotContainsString('javascript', $result);
+    }
+
+    public function testJavascriptUrlWithVerticalTabIsBlocked(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = "[click](java\x0bscript:alert(1))";
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('href=""', $result);
+    }
+
+    public function testJavascriptUrlWithFormFeedIsBlocked(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = "[click](java\x0cscript:alert(1))";
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('href=""', $result);
+    }
+
+    public function testJavascriptUrlWithNullByteIsBlocked(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = "[click](java\x00script:alert(1))";
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('href=""', $result);
+    }
+
+    public function testJavascriptUrlWithSpaceBeforeColonIsBlocked(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = '[click](javascript :alert(1))';
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('href=""', $result);
+    }
+
+    public function testJavascriptUrlWithCarriageReturnIsBlocked(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = "[click](java\rscript:alert(1))";
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('href=""', $result);
+    }
+
+    public function testDataUrlWithWhitespaceIsBlocked(): void
+    {
+        $converter = new DjotConverter(safeMode: true);
+        $djot = "[click](da\tta:text/html,<script>)";
+        $result = $converter->convert($djot);
+
+        $this->assertStringContainsString('href=""', $result);
+    }
+
+    public function testSafeModeUrlWhitespaceBypasses(): void
+    {
+        $safeMode = SafeMode::defaults();
+
+        // All these should be detected as unsafe
+        $this->assertFalse($safeMode->isUrlSafe("java\tscript:alert(1)"), 'Tab in scheme');
+        $this->assertFalse($safeMode->isUrlSafe("java\x0bscript:alert(1)"), 'Vertical tab in scheme');
+        $this->assertFalse($safeMode->isUrlSafe("java\x0cscript:alert(1)"), 'Form feed in scheme');
+        $this->assertFalse($safeMode->isUrlSafe("java\x00script:alert(1)"), 'Null byte in scheme');
+        $this->assertFalse($safeMode->isUrlSafe('javascript :alert(1)'), 'Space before colon');
+        $this->assertFalse($safeMode->isUrlSafe("java\rscript:alert(1)"), 'CR in scheme');
+        $this->assertFalse($safeMode->isUrlSafe("java\nscript:alert(1)"), 'LF in scheme');
+        $this->assertFalse($safeMode->isUrlSafe("da\tta:text/html,<script>"), 'Tab in data scheme');
+        $this->assertFalse($safeMode->isUrlSafe("vb\x0bscript:alert(1)"), 'VT in vbscript scheme');
     }
 }

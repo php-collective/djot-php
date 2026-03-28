@@ -1,0 +1,13 @@
+{
+  "name": "djot-hljs-tests",
+  "version": "1.0.0",
+  "description": "Tests for Djot highlight.js grammar",
+  "type": "module",
+  "scripts": {
+    "test": "node test-hljs.mjs"
+  },
+  "devDependencies": {
+    "djot-grammars": "github:php-collective/djot-grammars",
+    "highlight.js": "^11.9.0"
+  }
+}

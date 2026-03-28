@@ -293,5 +293,5 @@ Djot is the better choice when:
 
 - [Official Djot Syntax Reference](https://djot.net/)
 - [Djot Playground](https://djot.net/playground/)
-- [Syntax Guide](syntax.md) - This library's syntax documentation
-- [Converters](converters.md) - Migration tools
+- [Syntax Guide](./syntax) - This library's syntax documentation
+- [Converters](./converters) - Migration tools

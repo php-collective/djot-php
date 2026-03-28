@@ -53,6 +53,7 @@ class DjotConverter
      * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode (true for defaults, SafeMode instance for custom config)
      * @param \Djot\Profile|null $profile Profile for feature restriction (null = all features allowed)
      * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (null = auto based on significantNewlines)
      */
     public function __construct(
         bool $xhtml = false,
@@ -61,6 +62,7 @@ class DjotConverter
         bool|SafeMode|null $safeMode = null,
         ?Profile $profile = null,
         bool $significantNewlines = false,
+        ?SoftBreakMode $softBreakMode = null,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
@@ -74,8 +76,12 @@ class DjotConverter
             $this->renderer->setSafeMode($safeMode);
         }
 
-        // In significant newlines mode, soft breaks become visible <br>
-        if ($significantNewlines) {
+        // Configure soft break mode
+        // If explicitly provided, use that; otherwise default based on significantNewlines
+        if ($softBreakMode !== null) {
+            $this->renderer->setSoftBreakMode($softBreakMode);
+        } elseif ($significantNewlines) {
+            // Backwards compatible: significantNewlines implies <br> soft breaks
             $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
         }
 
@@ -91,10 +97,17 @@ class DjotConverter
      *
      * In this mode:
      * - Block elements (lists, blockquotes, code) can interrupt paragraphs
-     * - Soft breaks render as visible <br> tags
+     * - Soft breaks render as visible <br> tags (unless overridden)
      * - Nested blocks in lists don't need blank lines
      *
      * Ideal for chat messages, comments, and quick notes.
+     *
+     * @param bool $xhtml Whether to use XHTML-compatible output
+     * @param bool $warnings Whether to collect warnings during parsing
+     * @param bool $strict Whether to throw exceptions on parse errors
+     * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode
+     * @param \Djot\Profile|null $profile Profile for feature restriction
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode Override the default <br> soft break behavior
      */
     public static function withSignificantNewlines(
         bool $xhtml = false,
@@ -102,8 +115,9 @@ class DjotConverter
         bool $strict = false,
         bool|SafeMode|null $safeMode = null,
         ?Profile $profile = null,
+        ?SoftBreakMode $softBreakMode = null,
     ): self {
-        return new self($xhtml, $warnings, $strict, $safeMode, $profile, true);
+        return new self($xhtml, $warnings, $strict, $safeMode, $profile, true, $softBreakMode);
     }
 
     /**
@@ -149,30 +163,14 @@ class DjotConverter
 
     /**
      * Convert Djot markup to HTML
-     *
-     * @throws \LengthException If input exceeds profile's max length
      */
     public function convert(string $djot): string
     {
         // Check max length before parsing
-        if ($this->profile !== null && $this->profile->getMaxLength() > 0) {
-            if (strlen($djot) > $this->profile->getMaxLength()) {
-                throw new LengthException(
-                    sprintf(
-                        'Input length (%d bytes) exceeds maximum allowed (%d bytes)',
-                        strlen($djot),
-                        $this->profile->getMaxLength(),
-                    ),
-                );
-            }
-        }
+        $this->enforceProfileMaxLength($djot);
 
         $document = $this->parse($djot);
-
-        // Apply profile filter after parsing
-        if ($this->profile !== null && $this->profileFilter !== null) {
-            $document = $this->profileFilter->filter($document, $this->profile);
-        }
+        $document = $this->applyProfile($document);
 
         $html = $this->render($document);
 
@@ -186,10 +184,24 @@ class DjotConverter
 
     /**
      * Convert a Djot file to HTML
+     *
+     * @throws \RuntimeException
      */
     public function convertFile(string $path): string
     {
-        $document = $this->parseFile($path);
+        if (!is_file($path)) {
+            throw new RuntimeException("File not found: {$path}");
+        }
+
+        $content = file_get_contents($path);
+        if ($content === false) {
+            throw new RuntimeException("Failed to read file: {$path}");
+        }
+
+        $this->enforceProfileMaxLength($content);
+
+        $document = $this->parse($content);
+        $document = $this->applyProfile($document);
 
         $html = $this->render($document);
 
@@ -233,6 +245,12 @@ class DjotConverter
      */
     public function render(Document $document): string
     {
+        foreach ($this->extensions as $extension) {
+            if (method_exists($extension, 'clear')) {
+                $extension->clear();
+            }
+        }
+
         return $this->renderer->render($document);
     }
 
@@ -387,5 +405,36 @@ class DjotConverter
     public function hasProfileViolations(): bool
     {
         return count($this->getProfileViolations()) > 0;
+    }
+
+    /**
+     * @throws \LengthException If input exceeds profile's max length
+     */
+    protected function enforceProfileMaxLength(string $input): void
+    {
+        if ($this->profile !== null && $this->profile->getMaxLength() > 0) {
+            if (strlen($input) > $this->profile->getMaxLength()) {
+                throw new LengthException(
+                    sprintf(
+                        'Input length (%d bytes) exceeds maximum allowed (%d bytes)',
+                        strlen($input),
+                        $this->profile->getMaxLength(),
+                    ),
+                );
+            }
+        }
+    }
+
+    protected function applyProfile(Document $document): Document
+    {
+        if ($this->profileFilter !== null) {
+            $this->profileFilter->clearViolations();
+        }
+
+        if ($this->profile !== null && $this->profileFilter !== null) {
+            return $this->profileFilter->filter($document, $this->profile);
+        }
+
+        return $document;
     }
 }

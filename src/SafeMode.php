@@ -80,11 +80,13 @@ class SafeMode
     }
 
     /**
-     * Create a strict safe mode (strips raw HTML completely)
+     * Create a strict safe mode (strips raw HTML and blocks style attribute)
      */
     public static function strict(): self
     {
-        return (new self())->setRawHtmlMode(self::RAW_HTML_STRIP);
+        return (new self())
+            ->setRawHtmlMode(self::RAW_HTML_STRIP)
+            ->setBlockedAttributes(['srcdoc', 'formaction', 'style']);
     }
 
     /**
@@ -207,6 +209,9 @@ class SafeMode
 
     /**
      * Check if a URL is safe
+     *
+     * This method normalizes URL schemes by stripping ASCII whitespace and control
+     * characters before comparison to prevent bypass attempts like "java\tscript:".
      */
     public function isUrlSafe(string $url): bool
     {
@@ -220,7 +225,12 @@ class SafeMode
         // Check for dangerous schemes
         $colonPos = strpos($url, ':');
         if ($colonPos !== false) {
-            $scheme = strtolower(substr($url, 0, $colonPos));
+            $scheme = substr($url, 0, $colonPos);
+
+            // Normalize scheme: strip ASCII whitespace and control characters (0x00-0x20)
+            // This prevents bypass attempts like "java\tscript:", "java\x0bscript:", etc.
+            $scheme = preg_replace('/[\x00-\x20]+/', '', $scheme) ?? $scheme;
+            $scheme = strtolower($scheme);
 
             // Check against dangerous schemes
             if (in_array($scheme, $this->dangerousSchemes, true)) {

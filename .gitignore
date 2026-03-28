@@ -5,6 +5,7 @@
 /tmp/
 /composer.lock
 /composer.phar
+.phpcs.cache
 # IDE and editor specific files #
 #################################
 /nbproject/
@@ -16,3 +17,10 @@
 # Fuzz testing artifacts
 /fuzz/crash-*
 /fuzz/minimized-*
+
+# Documentation
+/docs/node_modules/
+/docs/tests/node_modules/
+/docs/.vitepress/cache/
+/docs/.vitepress/dist/
+/docs/.vitepress/grammars/

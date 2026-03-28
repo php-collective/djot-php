@@ -21,6 +21,7 @@ public function __construct(
     bool|SafeMode|null $safeMode = null,
     ?Profile $profile = null,
     bool $significantNewlines = false,
+    ?SoftBreakMode $softBreakMode = null,
 )
 ```
 
@@ -28,12 +29,13 @@ public function __construct(
 - `$warnings`: When `true`, collects warnings during parsing (see [Error Handling](#error-handling)).
 - `$strict`: When `true`, throws `ParseException` on parse errors (see [Error Handling](#error-handling)).
 - `$safeMode`: When `true` or a `SafeMode` instance, enables XSS protection (see [Safe Mode](#safe-mode)).
-- `$profile`: A `Profile` instance for feature restriction (see [Profiles](profiles.md)).
+- `$profile`: A `Profile` instance for feature restriction (see [Profiles](/guide/profiles)).
 - `$significantNewlines`: When `true`, enables markdown-like parsing where block elements can interrupt paragraphs (see [Significant Newlines Mode](#significant-newlines-mode)).
+- `$softBreakMode`: Override how soft breaks are rendered (see [Soft Break Behavior](#soft-break-behavior)). When `null`, defaults to `<br>` if `significantNewlines` is enabled, otherwise newline.
 
 ### Factory Methods
 
-#### withSignificantNewlines
+#### withSignificantNewlines()
 
 ```php
 public static function withSignificantNewlines(
@@ -42,14 +44,17 @@ public static function withSignificantNewlines(
     bool $strict = false,
     bool|SafeMode|null $safeMode = null,
     ?Profile $profile = null,
+    ?SoftBreakMode $softBreakMode = null,
 ): self
 ```
 
 Creates a converter with significant newlines mode enabled. See [Significant Newlines Mode](#significant-newlines-mode).
 
+The `$softBreakMode` parameter allows overriding the default `<br>` soft break behavior when you want relaxed parsing without visible line breaks.
+
 ### Methods
 
-#### convert
+#### convert()
 
 ```php
 public function convert(string $input): string
@@ -57,7 +62,7 @@ public function convert(string $input): string
 
 Converts Djot markup to HTML.
 
-#### convertFile
+#### convertFile()
 
 ```php
 public function convertFile(string $path): string
@@ -69,7 +74,7 @@ Converts a Djot file to HTML. Throws `RuntimeException` if the file cannot be re
 $html = $converter->convertFile('/path/to/document.djot');
 ```
 
-#### parse
+#### parse()
 
 ```php
 public function parse(string $input): Document
@@ -77,7 +82,7 @@ public function parse(string $input): Document
 
 Parses Djot markup into an AST Document without rendering.
 
-#### parseFile
+#### parseFile()
 
 ```php
 public function parseFile(string $path): Document
@@ -91,7 +96,7 @@ $document = $converter->parseFile('/path/to/document.djot');
 $html = $converter->render($document);
 ```
 
-#### render
+#### render()
 
 ```php
 public function render(Document $document): string
@@ -99,7 +104,9 @@ public function render(Document $document): string
 
 Renders an AST Document to HTML.
 
-#### getParser
+Registered extensions are reset before each render, so repeated `convert()` calls on the same converter start with fresh per-document extension state.
+
+#### getParser()
 
 ```php
 public function getParser(): BlockParser
@@ -107,7 +114,7 @@ public function getParser(): BlockParser
 
 Returns the block parser for direct access (useful for custom pattern registration).
 
-#### getRenderer
+#### getRenderer()
 
 ```php
 public function getRenderer(): HtmlRenderer
@@ -115,7 +122,7 @@ public function getRenderer(): HtmlRenderer
 
 Returns the HTML renderer for direct configuration.
 
-#### on
+#### on()
 
 ```php
 public function on(string $event, Closure $listener): self
@@ -123,7 +130,7 @@ public function on(string $event, Closure $listener): self
 
 Register a listener for render events. See [Event System](#event-system) below.
 
-#### off
+#### off()
 
 ```php
 public function off(?string $event = null): self
@@ -131,7 +138,7 @@ public function off(?string $event = null): self
 
 Remove listeners. Pass event name to remove specific listeners, or `null` to remove all.
 
-#### getWarnings
+#### getWarnings()
 
 ```php
 public function getWarnings(): array
@@ -139,7 +146,7 @@ public function getWarnings(): array
 
 Returns an array of `ParseWarning` objects from the last parse operation. Only populated when `warnings: true` is set.
 
-#### hasWarnings
+#### hasWarnings()
 
 ```php
 public function hasWarnings(): bool
@@ -147,7 +154,7 @@ public function hasWarnings(): bool
 
 Returns `true` if there were any warnings during the last parse operation.
 
-#### clearWarnings
+#### clearWarnings()
 
 ```php
 public function clearWarnings(): self
@@ -155,7 +162,7 @@ public function clearWarnings(): self
 
 Clears any collected warnings.
 
-#### setSafeMode
+#### setSafeMode()
 
 ```php
 public function setSafeMode(bool|SafeMode|null $safeMode): self
@@ -710,6 +717,9 @@ All block nodes extend `Djot\Node\Block\BlockNode`:
 | `TableRow` | Table row |
 | `TableCell` | Table cell (th or td) |
 | `Div` | Generic div container |
+| `Section` | Section wrapper (used with HeadingPermalinksExtension) |
+| `Figure` | Figure container for images/blockquotes with captions |
+| `Caption` | Caption for figures and tables |
 | `LineBlock` | Line block (preserves line breaks) |
 | `ThematicBreak` | Horizontal rule |
 | `DefinitionList` | Definition list |
@@ -739,6 +749,7 @@ All inline nodes extend `Djot\Node\Inline\InlineNode`:
 | `Highlight` | Highlighted text |
 | `Insert` | Inserted text |
 | `Delete` | Deleted text |
+| `Abbreviation` | Abbreviation with title (`<abbr>`) |
 | `FootnoteRef` | Footnote reference |
 | `Math` | Math expression |
 | `Symbol` | Symbol (e.g., `:heart:`) |
@@ -866,13 +877,90 @@ Steps:
 
 ### Soft Break Behavior
 
-When `significantNewlines` is enabled, soft breaks automatically render as `<br>`. You can override this after construction:
+When `significantNewlines` is enabled, soft breaks automatically render as `<br>` by default. You can override this behavior:
 
 ```php
 use Djot\Renderer\SoftBreakMode;
 
+// Option 1: Override via parameter (recommended)
+$converter = DjotConverter::withSignificantNewlines(
+    softBreakMode: SoftBreakMode::Space,
+);
+
+// Option 2: Override via constructor
+$converter = new DjotConverter(
+    significantNewlines: true,
+    softBreakMode: SoftBreakMode::Space,
+);
+
+// Option 3: Override after construction
 $converter = DjotConverter::withSignificantNewlines();
 $converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space);
 ```
 
-See [enhancements.md](enhancements.md#significant-newlines-mode) for upstream tracking.
+This is useful for WYSIWYG editors where you want relaxed parsing (nested lists without blank lines) but don't want every line break to become a `<br>`.
+
+See [enhancements.md](./enhancements#significant-newlines-mode) for upstream tracking.
+
+## Feature Support Matrix
+
+This matrix shows which features are supported by each renderer.
+
+### Block Elements
+
+| Feature | HtmlRenderer | PlainTextRenderer | MarkdownRenderer | AnsiRenderer |
+|---------|:------------:|:-----------------:|:----------------:|:------------:|
+| Paragraph | ✓ | ✓ | ✓ | ✓ |
+| Heading | ✓ | ✓ | ✓ | ✓ (styled) |
+| Code Block | ✓ | ✓ | ✓ | ✓ (boxed) |
+| Block Quote | ✓ | ✓ (prefixed) | ✓ | ✓ (styled) |
+| Lists (ul/ol) | ✓ | ✓ | ✓ | ✓ |
+| Task Lists | ✓ | ✓ | ✓ (GFM) | ✓ |
+| Tables | ✓ | ✓ (tab-separated) | ✓ (GFM) | ✓ (boxed) |
+| Table Captions | ✓ (`<caption>`) | – | – | ✓ |
+| Definition Lists | ✓ | ✓ | ✓ (approximated) | ✓ |
+| Divs | ✓ | ✓ (content only) | – (content only) | ✓ |
+| Line Blocks | ✓ | ✓ | ✓ (hard breaks) | ✓ |
+| Thematic Break | ✓ | ✓ (dashes) | ✓ | ✓ |
+| Footnotes | ✓ | ✓ (numbered) | ✓ (GFM) | ✓ |
+| Figure/Caption | ✓ | – | – | ✓ |
+| Raw HTML | ✓ / escaped | – | ✓ | – |
+| Comments | – (stripped) | – | – | – |
+
+### Inline Elements
+
+| Feature | HtmlRenderer | PlainTextRenderer | MarkdownRenderer | AnsiRenderer |
+|---------|:------------:|:-----------------:|:----------------:|:------------:|
+| Emphasis | ✓ (`<em>`) | ✓ (content only) | ✓ (`*text*`) | ✓ (italic) |
+| Strong | ✓ (`<strong>`) | ✓ (content only) | ✓ (`**text**`) | ✓ (bold) |
+| Code | ✓ (`<code>`) | ✓ | ✓ (`` `code` ``) | ✓ (styled) |
+| Links | ✓ | ✓ (text + URL) | ✓ | ✓ (text + URL) |
+| Images | ✓ | ✓ (alt text) | ✓ | ✓ (alt text) |
+| Superscript | ✓ (`<sup>`) | ✓ (content only) | ✓ (`<sup>`) | ✓ (styled) |
+| Subscript | ✓ (`<sub>`) | ✓ (content only) | ✓ (`<sub>`) | ✓ (styled) |
+| Highlight | ✓ (`<mark>`) | ✓ (content only) | ✓ (`<mark>`) | ✓ (styled) |
+| Insert | ✓ (`<ins>`) | ✓ (content only) | ✓ (`<ins>`) | ✓ (styled) |
+| Delete | ✓ (`<del>`) | ✓ (content only) | ✓ (`~~text~~`) | ✓ (strikethrough) |
+| Abbreviation | ✓ (`<abbr>`) | ✓ (content only) | – | ✓ |
+| Spans | ✓ | ✓ (content only) | – (content only) | ✓ (content only) |
+| Math | ✓ (`$...$`) | ✓ (content only) | ✓ (`$...$`) | ✓ |
+| Symbols | ✓ (`:name:`) | ✓ (content only) | ✓ (`:name:`) | ✓ (mapped) |
+| Footnote Refs | ✓ | ✓ (`[n]`) | ✓ (`[^n]`) | ✓ |
+| Soft Break | ✓ (configurable) | ✓ | ✓ | ✓ |
+| Hard Break | ✓ (`<br>`) | ✓ (newline) | ✓ (`  \n`) | ✓ |
+| Raw HTML | ✓ / escaped | – | ✓ | – |
+
+### Legend
+
+- **✓** — Full support
+- **✓ (note)** — Supported with noted behavior
+- **–** — Not supported / stripped
+
+### Renderer Use Cases
+
+| Renderer | Primary Use Case |
+|----------|------------------|
+| **HtmlRenderer** | Web pages, HTML emails, CMS content |
+| **PlainTextRenderer** | Search indexing, SEO descriptions, email fallbacks, accessibility |
+| **MarkdownRenderer** | Converting Djot to CommonMark/GFM for Markdown-only systems |
+| **AnsiRenderer** | Terminal output, CLI tools, console applications |

@@ -10,8 +10,9 @@ They are either on the way to get incorporated upstream - or may be incorporated
 - [Tab Indentation Support](#tab-indentation-support)
 - [Multiple Footnote References](#multiple-footnote-references)
 - [Section ID Excludes Footnote Markers](#section-id-excludes-footnote-markers)
+- [CSS-Safe Heading IDs](#css-safe-heading-ids)
 - [Symbol Parsing in Time Formats](#symbol-parsing-in-time-formats)
-- [Em/En Dash with Unmatched Braces](#emen-dash-with-unmatched-braces)
+- [Em/En Dash with Unmatched Braces](#em-en-dash-with-unmatched-braces)
 - [Optional Modes](#optional-modes)
   - [Significant Newlines Mode](#significant-newlines-mode)
 - [Language Features Beyond Spec](#language-features-beyond-spec)
@@ -21,7 +22,7 @@ They are either on the way to get incorporated upstream - or may be incorporated
   - [Boolean Attribute Shorthand](#boolean-attribute-shorthand)
   - [Fenced Comment Blocks](#fenced-comment-blocks)
   - [Multiple Definition Terms](#multiple-definition-terms)
-  - [Multiple Definition Definitions](#multiple-definition-definitions---continuation)
+  - [Multiple Definition Definitions](#multiple-definition-definitions-continuation)
   - [Definition List Element Attributes](#definition-list-element-attributes)
   - [Table Multi-line Cells, Rowspan, and Colspan](#table-multi-line-cells-rowspan-and-colspan)
   - [Captions for Images, Tables, and Block Quotes](#captions-for-images-tables-and-block-quotes)
@@ -138,6 +139,83 @@ Auto-generated section IDs correctly exclude footnote reference markers:
 ```
 
 The ID is `Introduction`, not `Introduction1` or `Introduction[^1]`.
+
+---
+
+## CSS-Safe Heading IDs
+
+**Related:** [php-collective/djot-php#92](https://github.com/php-collective/djot-php/pull/92)
+
+**Status:** Implemented in djot-php
+
+Auto-generated heading IDs are normalized to be valid CSS selectors, ensuring compatibility with `querySelector()`, HTMX scroll restoration, and CSS attribute selectors.
+
+### Normalization Rules
+
+1. **Strip `#` characters** — Prevents invalid selectors
+2. **Trim whitespace** — Clean leading/trailing spaces
+3. **Whitespace to dashes** — Spaces become single `-`
+4. **Invalid characters to dashes** — Only Unicode letters (`\p{L}`), numbers (`\p{N}`), hyphens, and underscores are preserved
+5. **Collapse consecutive dashes** — `foo--bar` becomes `foo-bar`
+6. **Trim leading/trailing dashes** — `-foo-` becomes `foo`
+7. **Prefix digits** — IDs starting with a number get `h-` prefix (CSS requirement)
+8. **Fallback** — Empty results become `heading`
+
+### Examples
+
+| Heading | Generated ID |
+|---------|--------------|
+| `# Hello World` | `Hello-World` |
+| `# Hello World!` | `Hello-World` |
+| `# 日本語の見出し` | `日本語の見出し` |
+| `# Привет мир` | `Привет-мир` |
+| `# E=mc^2` | `E-mc-2` |
+| `# 123 Numbers First` | `h-123-Numbers-First` |
+| `# $this->method()` | `this-method` |
+| `# ###` | `heading` |
+
+### Unicode Preservation
+
+International characters are preserved while special characters are normalized:
+
+```djot
+# 日本語の見出し
+
+# Cześć świecie
+```
+
+**Output:**
+```html
+<h1 id="日本語の見出し">日本語の見出し</h1>
+<h1 id="Cześć-świecie">Cześć świecie</h1>
+```
+
+### Why This Matters
+
+Without CSS-safe normalization, headings with special characters would break:
+
+```js
+// This would throw SyntaxError with unsafe IDs
+document.querySelector('#E=mc^2');  // Invalid selector
+htmx.scrollToElement('#$this->foo'); // Invalid selector
+```
+
+With normalization, these work correctly:
+
+```js
+document.querySelector('#E-mc-2');  // Works
+htmx.scrollToElement('#this-foo');  // Works
+```
+
+### Explicit IDs
+
+You can always override with an explicit ID attribute:
+
+```djot
+# My Heading {#custom-id}
+```
+
+Explicit IDs are used as-is without normalization.
 
 ---
 
@@ -890,7 +968,7 @@ is maintained by the <abbr title="World Wide Web Consortium">W3C</abbr>.</p>
 - Case-sensitive matching (HTML ≠ html)
 - Word-boundary aware (HTML won't match HTMLElement or XHTML)
 - Multi-line definitions supported with indentation
-- Works alongside the inline span approach (`[HTML]{abbr="..."}`) from the [cookbook](cookbook.md#abbreviations)
+- Works alongside the inline span approach (`[HTML]{abbr="..."}`) from the [cookbook](/cookbook/#abbreviations)
 
 **Multi-line definition example:**
 ```djot

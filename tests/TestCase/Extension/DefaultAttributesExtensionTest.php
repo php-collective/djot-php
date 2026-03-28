@@ -172,4 +172,21 @@ class DefaultAttributesExtensionTest extends TestCase
 
         $this->assertStringContainsString('class="inline"', $html);
     }
+
+    public function testRepeatedRenderDoesNotDuplicateDefaultClasses(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new DefaultAttributesExtension([
+            'paragraph' => ['class' => 'prose'],
+        ]));
+
+        $document = $converter->parse('Hello world');
+
+        $first = $converter->render($document);
+        $second = $converter->render($document);
+
+        $this->assertStringContainsString('<p class="prose">', $first);
+        $this->assertStringContainsString('<p class="prose">', $second);
+        $this->assertStringNotContainsString('prose prose', $second);
+    }
 }

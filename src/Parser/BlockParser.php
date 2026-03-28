@@ -678,7 +678,6 @@ class BlockParser
                 ?? $this->tryParseHeading($parent, $lines, $i)
                 ?? $this->tryParseThematicBreak($parent, $line, $i)
                 ?? $this->tryParseBlockQuote($parent, $lines, $i)
-                ?? $this->tryParseDefinitionList($parent, $lines, $i)
                 ?? $this->tryParseList($parent, $lines, $i)
                 ?? $this->tryParseLineBlock($parent, $lines, $i)
                 ?? $this->tryParseTable($parent, $lines, $i)
@@ -819,6 +818,36 @@ class BlockParser
             $node->setAttributes($this->pendingAttributes);
             $this->pendingAttributes = [];
         }
+    }
+
+    /**
+     * Consume and return pending block attributes
+     *
+     * This allows custom block pattern callbacks to retrieve any block attributes
+     * that were defined on the line(s) before the block started. The attributes
+     * are cleared after retrieval.
+     *
+     * Example usage in a custom block callback:
+     * ```php
+     * $parser->addBlockPattern('/^---(\w+)/', function($lines, $start, $parent, $parser) {
+     *     $myNode = new MyCustomNode();
+     *     $attrs = $parser->consumePendingAttributes();
+     *     if (!empty($attrs)) {
+     *         $myNode->setAttributes($attrs);
+     *     }
+     *     $parent->appendChild($myNode);
+     *     return 1;
+     * });
+     * ```
+     *
+     * @return array<string, string> The pending attributes (empty array if none)
+     */
+    public function consumePendingAttributes(): array
+    {
+        $attrs = $this->pendingAttributes;
+        $this->pendingAttributes = [];
+
+        return $attrs;
     }
 
     /**
@@ -1150,9 +1179,16 @@ class BlockParser
         $this->parseBlocks($div, $innerLines, 0);
         $this->lineOffset = $previousOffset;
 
-        // Apply the saved attributes to the div
-        if ($divAttributes !== []) {
-            $div->setAttributes($divAttributes);
+        // Apply the saved attributes to the div, merging classes instead of replacing
+        foreach ($divAttributes as $name => $value) {
+            if ($name === 'class') {
+                // Merge class attributes instead of replacing
+                foreach (preg_split('/\s+/', trim((string)$value)) ?: [] as $class) {
+                    $div->addClass($class);
+                }
+            } else {
+                $div->setAttribute($name, $value);
+            }
         }
         $parent->appendChild($div);
 
@@ -1325,110 +1361,6 @@ class BlockParser
             $blockQuote->setAttributes($quoteAttributes);
         }
         $parent->appendChild($blockQuote);
-
-        return $i - $start;
-    }
-
-    /**
-     * Try to parse a definition list
-     *
-     * Term
-     * : Definition
-     *
-     * @param \Djot\Node\Node $parent
-     * @param array<string> $lines
-     * @param int $start
-     */
-    protected function tryParseDefinitionList(Node $parent, array $lines, int $start): ?int
-    {
-        // Look ahead: need a term line followed by : definition
-        if ($start + 1 >= count($lines)) {
-            return null;
-        }
-
-        $termLine = $lines[$start];
-        $defLine = $lines[$start + 1];
-
-        // Term must not start with special characters
-        if (preg_match('/^[>#\-*+\d`:|]/', $termLine) || IndentationHelper::isBlankLine($termLine)) {
-            return null;
-        }
-
-        // Next line must start with : (definition marker)
-        if (!preg_match('/^: +(.*)$/', $defLine)) {
-            return null;
-        }
-
-        $defList = new DefinitionList();
-        $i = $start;
-        $count = count($lines);
-
-        while ($i < $count) {
-            $currentLine = $lines[$i];
-
-            // Skip blank lines between items
-            if (IndentationHelper::isBlankLine($currentLine)) {
-                $i++;
-
-                continue;
-            }
-
-            // Check if this line is a term (followed by : definition)
-            if ($i + 1 < $count && !preg_match('/^[>#\-*+\d`:|]/', $currentLine)) {
-                $nextLine = $lines[$i + 1];
-                if (preg_match('/^: +(.*)$/', $nextLine)) {
-                    // Parse term
-                    $term = new DefinitionTerm();
-                    $this->inlineParser->parse($term, trim($currentLine), $i);
-                    $defList->appendChild($term);
-                    $i++;
-
-                    // Parse definitions (can have multiple)
-                    while ($i < $count) {
-                        $defLineContent = $lines[$i];
-                        if (preg_match('/^: +(.*)$/', $defLineContent, $defMatch)) {
-                            $defContent = $defMatch[1];
-
-                            // Collect continuation lines
-                            $defLines = [$defContent];
-                            $i++;
-                            while ($i < $count) {
-                                $contLine = $lines[$i];
-                                if (IndentationHelper::isBlankLine($contLine)) {
-                                    break;
-                                }
-                                if (preg_match('/^\s+(.+)$/', $contLine, $contMatch)) {
-                                    $defLines[] = $contMatch[1];
-                                    $i++;
-                                } elseif (preg_match('/^: +/', $contLine)) {
-                                    // Another definition
-                                    break;
-                                } else {
-                                    break;
-                                }
-                            }
-
-                            $def = new DefinitionDescription();
-                            $this->parseBlocks($def, $defLines, 0);
-                            $defList->appendChild($def);
-                        } else {
-                            break;
-                        }
-                    }
-
-                    continue;
-                }
-            }
-
-            break;
-        }
-
-        if (count($defList->getChildren()) === 0) {
-            return null;
-        }
-
-        $this->applyPendingAttributes($defList);
-        $parent->appendChild($defList);
 
         return $i - $start;
     }
@@ -1724,7 +1656,7 @@ class BlockParser
                     preg_match('/^\{([^{}]+)\}\s*$/', $trimmedAttrLine, $attrMatch) &&
                     IndentationHelper::getLeadingSpaces($potentialAttrLine) >= $contentIndent
                 ) {
-                    $itemAttributes = AttributeParser::parse($attrMatch[1]);
+                    $itemAttributes = AttributeParser::parseOrdered($attrMatch[1]);
                     $i++;
                 }
             }
@@ -1758,7 +1690,11 @@ class BlockParser
                     while ($i < $count) {
                         $subLine = $lines[$i];
                         if (IndentationHelper::isBlankLine($subLine)) {
-                            break;
+                            // Continue across blank lines (same as standard nesting path)
+                            $subLines[] = '';
+                            $i++;
+
+                            continue;
                         }
                         $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
                         if ($lineIndent >= $contentIndent) {
@@ -2760,7 +2696,8 @@ class BlockParser
     protected function tryParseParagraph(Node $parent, array $lines, int $start): int
     {
         $line = $lines[$start];
-        $content = $line;
+        // Strip leading whitespace from first line (matching JS reference)
+        $content = ltrim($line);
 
         $i = $start + 1;
         $count = count($lines);
@@ -2780,8 +2717,8 @@ class BlockParser
                 break;
             }
 
-            // Strip leading indentation from continuation lines (up to 3 spaces)
-            $nextLine = preg_replace('/^   /', '', $nextLine) ?? $nextLine;
+            // Strip leading whitespace from continuation lines (matching JS reference)
+            $nextLine = ltrim($nextLine);
             $content .= "\n" . $nextLine;
             $i++;
         }

@@ -9,7 +9,9 @@ use Djot\Event\RenderEvent;
 use Djot\Exception\ParseException;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Symbol;
+use Djot\Profile;
 use Djot\Renderer\SoftBreakMode;
+use LengthException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -79,6 +81,14 @@ class DjotConverterTest extends TestCase
     {
         $djot = "```php\necho 'hello';\n```";
         $expected = "<pre><code class=\"language-php\">echo 'hello';\n</code></pre>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    public function testCodeBlockLanguageEscapesQuotesInAttributeContext(): void
+    {
+        $djot = "``` php\" onclick=\"alert(1)\necho 1;\n```";
+        $expected = "<pre><code class=\"language-php&quot; onclick=&quot;alert(1)\">echo 1;\n</code></pre>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -159,6 +169,14 @@ class DjotConverterTest extends TestCase
         $this->assertStringContainsString('checked=""', $result);
         $this->assertStringContainsString('Unchecked', $result);
         $this->assertStringContainsString('Checked', $result);
+    }
+
+    public function testTaskListMergesExistingClasses(): void
+    {
+        $djot = "{.outer}\n- [ ] Task";
+        $expected = "<ul class=\"outer task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\nTask\n</li>\n</ul>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
     }
 
     public function testTaskListUnderscoreNotation(): void
@@ -454,7 +472,7 @@ DJOT;
 
     public function testDefinitionList(): void
     {
-        $djot = "Term\n: Definition of the term";
+        $djot = ": Term\n\n  Definition of the term";
 
         $result = $this->converter->convert($djot);
 
@@ -534,7 +552,7 @@ DJOT;
 
     public function testDefinitionListMultiple(): void
     {
-        $djot = "Apple\n: A fruit\n\nBanana\n: Another fruit";
+        $djot = ": Apple\n\n  A fruit\n\n: Banana\n\n  Another fruit";
 
         $result = $this->converter->convert($djot);
 
@@ -1182,7 +1200,8 @@ DJOT;
 
     public function testDefinitionListWithMultipleDefinitions(): void
     {
-        $djot = "Term\n: First definition\n: Second definition";
+        // Use `: +` continuation marker to create multiple dd elements
+        $djot = ": Term\n\n  First definition\n\n: +\n\n  Second definition";
 
         $result = $this->converter->convert($djot);
 
@@ -1244,6 +1263,14 @@ DJOT;
         $this->assertStringContainsString('Line one', $result);
         $this->assertStringContainsString('Line two', $result);
         $this->assertStringContainsString('<br>', $result);
+    }
+
+    public function testLineBlockMergesExistingClasses(): void
+    {
+        $djot = "{.mine}\n| Line one\n| Line two";
+        $expected = "<div class=\"mine line-block\">\n<p>Line one<br>\nLine two</p>\n</div>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
     }
 
     public function testLineBlockWithFormatting(): void
@@ -1379,6 +1406,38 @@ DJOT;
             $this->assertStringContainsString('<section id="Hello">', $result);
             $this->assertStringContainsString('<h1>Hello</h1>', $result);
             $this->assertStringContainsString('<p>World</p>', $result);
+        } finally {
+            unlink($tempFile);
+        }
+    }
+
+    public function testConvertFileAppliesProfileFiltering(): void
+    {
+        $tempFile = sys_get_temp_dir() . '/djot_test_' . uniqid() . '.djot';
+        file_put_contents($tempFile, "# Heading\n\n[link](https://example.com)");
+
+        try {
+            $converter = new DjotConverter(profile: Profile::comment());
+            $result = $converter->convertFile($tempFile);
+
+            $this->assertStringNotContainsString('<h1>', $result);
+            $this->assertStringContainsString('rel="nofollow ugc"', $result);
+            $this->assertTrue($converter->hasProfileViolations());
+        } finally {
+            unlink($tempFile);
+        }
+    }
+
+    public function testConvertFileEnforcesProfileMaxLength(): void
+    {
+        $tempFile = sys_get_temp_dir() . '/djot_test_' . uniqid() . '.djot';
+        file_put_contents($tempFile, str_repeat('a', 20));
+
+        try {
+            $converter = new DjotConverter(profile: Profile::minimal()->setMaxLength(5));
+
+            $this->expectException(LengthException::class);
+            $converter->convertFile($tempFile);
         } finally {
             unlink($tempFile);
         }
@@ -2083,7 +2142,8 @@ DJOT;
 
     public function testDefinitionListWithMultipleTerms(): void
     {
-        $djot = "Term 1\n: Definition 1\n\nTerm 2\n: Definition 2a\n: Definition 2b";
+        // Two separate terms, second with multiple definitions using `: +` continuation
+        $djot = ": Term 1\n\n  Definition 1\n\n: Term 2\n\n  Definition 2a\n\n: +\n\n  Definition 2b";
         $result = $this->converter->convert($djot);
 
         $this->assertStringContainsString('<dt>Term 1</dt>', $result);
@@ -2131,6 +2191,66 @@ DJOT;
         $this->assertStringContainsString('<p>Para 1</p>', $result);
         $this->assertStringContainsString('<p>Para 2</p>', $result);
         $this->assertStringNotContainsString('hidden', $result);
+    }
+
+    /**
+     * Inline comment at start of line should preserve text after it
+     */
+    public function testInlineCommentAtStartPreservesTextAfter(): void
+    {
+        $djot = '{% comment %} text after';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('text after', $result);
+        $this->assertStringNotContainsString('comment', $result);
+    }
+
+    /**
+     * Multiple inline comments on same line
+     */
+    public function testMultipleInlineComments(): void
+    {
+        $djot = '{% one %} text {% two %}';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('text', $result);
+        $this->assertStringNotContainsString('one', $result);
+        $this->assertStringNotContainsString('two', $result);
+    }
+
+    /**
+     * Inline comment in middle of text
+     */
+    public function testInlineCommentInMiddle(): void
+    {
+        $djot = 'before {% comment %} after';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('before', $result);
+        $this->assertStringContainsString('after', $result);
+        $this->assertStringNotContainsString('comment', $result);
+    }
+
+    /**
+     * Inline comment should not strip {% %} inside code spans
+     */
+    public function testInlineCommentNotInCodeSpan(): void
+    {
+        $djot = '`{% not a comment %}`';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('{% not a comment %}', $result);
+    }
+
+    /**
+     * Inline comment should not strip {% %} inside quoted attributes
+     */
+    public function testInlineCommentNotInQuotedAttribute(): void
+    {
+        $djot = '[text]{title="{% not %}"}';
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('{% not %}', $result);
     }
 
     // Edge cases: Raw content
@@ -2505,6 +2625,42 @@ DJOT;
 
         // Trailing spaces trimmed
         $this->assertSame("<p>hello world</p>\n", $result);
+    }
+
+    /**
+     * Leading whitespace in paragraphs should be stripped (matching JS reference)
+     */
+    public function testParagraphStripsLeadingWhitespace(): void
+    {
+        // Single space
+        $this->assertSame("<p>text</p>\n", $this->converter->convert(' text'));
+
+        // Multiple spaces
+        $this->assertSame("<p>text</p>\n", $this->converter->convert('   text'));
+
+        // Tab
+        $this->assertSame("<p>text</p>\n", $this->converter->convert("\ttext"));
+
+        // Mixed spaces and tabs
+        $this->assertSame("<p>text</p>\n", $this->converter->convert("  \t text"));
+    }
+
+    /**
+     * Leading whitespace on continuation lines should also be stripped
+     */
+    public function testParagraphStripsLeadingWhitespaceOnContinuation(): void
+    {
+        // First line has leading space, second doesn't
+        $result = $this->converter->convert("   first line\nsecond line");
+        $this->assertSame("<p>first line\nsecond line</p>\n", $result);
+
+        // Both lines have leading whitespace
+        $result = $this->converter->convert("   first line\n   second line");
+        $this->assertSame("<p>first line\nsecond line</p>\n", $result);
+
+        // Tab on continuation
+        $result = $this->converter->convert("first\n\tsecond");
+        $this->assertSame("<p>first\nsecond</p>\n", $result);
     }
 
     // ==================== Raw Inline with Mixed Attributes ====================

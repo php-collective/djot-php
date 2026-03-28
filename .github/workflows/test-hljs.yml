@@ -1,0 +1,33 @@
+name: Test Highlight.js Grammar
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs/tests/**'
+  pull_request:
+    paths:
+      - 'docs/tests/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docs/tests/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: docs/tests
+
+      - name: Run highlight.js grammar tests
+        run: npm test
+        working-directory: docs/tests

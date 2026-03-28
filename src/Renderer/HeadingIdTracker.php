@@ -87,18 +87,37 @@ class HeadingIdTracker
     }
 
     /**
-     * Normalize text into a valid ID string
+     * Normalize text into a valid CSS identifier string
      *
      * 1. Strip # characters entirely
      * 2. Trim whitespace
-     * 3. Replace whitespace sequences with single dashes
+     * 3. Replace whitespace sequences (including Unicode spaces) with single dashes
+     * 4. Replace any remaining characters that are invalid in CSS identifiers
+     *    (anything other than Unicode letters/numbers, hyphens, and underscores)
+     *    with dashes
+     * 5. Collapse consecutive dashes and trim leading/trailing dashes
+     * 6. Prefix with 'h-' if the result starts with a digit, ensuring a valid
+     *    CSS ident start (digits are not allowed as the first character)
+     *
+     * Producing a valid CSS identifier ensures that consumers such as HTMX,
+     * which call `querySelector` with the section ID for scroll-restoration,
+     * do not throw a SyntaxError when headings contain inline code or special
+     * characters (e.g. `$this->t($key, $params = [], $fallback = '')`).
      */
     public function normalizeId(string $text): string
     {
         $id = str_replace('#', '', $text);
         $id = trim($id);
+        $id = preg_replace('/\s+/u', '-', $id) ?? $id;
+        $id = preg_replace('/[^\p{L}\p{N}_-]+/u', '-', $id) ?? $id;
+        $id = preg_replace('/-{2,}/', '-', $id) ?? $id;
+        $id = trim($id, '-');
 
-        return preg_replace('/[\s]+/', '-', $id) ?? $id;
+        if ($id !== '' && preg_match('/^\p{N}/u', $id)) {
+            $id = 'h-' . $id;
+        }
+
+        return $id !== '' ? $id : 'heading';
     }
 
     /**

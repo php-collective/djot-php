@@ -157,6 +157,23 @@ DJOT;
         $this->assertFalse($tocExtension->hasToc());
     }
 
+    public function testTocResetsBetweenConversions(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension(position: 'top');
+        $converter->addExtension($tocExtension);
+
+        $converter->convert('# First');
+        $html = $converter->convert('# Second');
+
+        $toc = $tocExtension->getToc();
+
+        $this->assertCount(1, $toc);
+        $this->assertSame('Second', $toc[0]['text']);
+        $this->assertStringNotContainsString('>First<', $html);
+        $this->assertStringContainsString('>Second<', $html);
+    }
+
     public function testEmptyTocHtml(): void
     {
         $converter = new DjotConverter();
@@ -351,7 +368,7 @@ DJOT;
         $toc = $tocExtension->getToc();
 
         $this->assertSame('Equation E=mc^2', $toc[0]['text']);
-        $this->assertSame('Equation-E=mc^2', $toc[0]['id']);
+        $this->assertSame('Equation-E-mc-2', $toc[0]['id']);
     }
 
     public function testRawInlineIsExcludedFromTocEntry(): void
