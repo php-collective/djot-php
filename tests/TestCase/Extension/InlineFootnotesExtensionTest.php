@@ -191,4 +191,54 @@ DJOT;
         $this->assertStringContainsString('fnref1', $html);
         $this->assertStringContainsString('class="nested"', $html);
     }
+
+    public function testInlineFootnoteWithNestedFootnoteRef(): void
+    {
+        $djot = <<<'DJOT'
+Text[Inline with nested[^a] ref]{.fn} here.
+
+[^a]: Regular note.
+DJOT;
+        $html = $this->converter->convert($djot);
+
+        // Inline footnote appears first in text, so it should be fn1
+        // The nested [^a] ref inside it should be fn2
+        $this->assertStringContainsString('fnref1', $html);
+        $this->assertStringContainsString('fnref2', $html);
+
+        // Verify the inline footnote (fn1) contains a reference to fn2
+        $this->assertMatchesRegularExpression(
+            '/<li id="fn1">\s*<p>Inline with nested.*href="#fn2".*ref/',
+            $html,
+        );
+
+        // Verify fn2 is the regular footnote content
+        $this->assertMatchesRegularExpression(
+            '/<li id="fn2">\s*<p>Regular note\./',
+            $html,
+        );
+    }
+
+    public function testNestedInlineFootnotes(): void
+    {
+        $djot = 'Outer[Inner[nested inline]{.fn} content]{.fn} text.';
+        $html = $this->converter->convert($djot);
+
+        // Outer inline footnote appears first, should be fn1
+        // Inner nested inline footnote should be fn2
+        $this->assertStringContainsString('fnref1', $html);
+        $this->assertStringContainsString('fnref2', $html);
+
+        // Main text should have reference to fn1 (outer)
+        $this->assertMatchesRegularExpression(
+            '/<p>Outer<a id="fnref1" href="#fn1"/',
+            $html,
+        );
+
+        // fn1 content should contain reference to fn2 (inner)
+        $this->assertMatchesRegularExpression(
+            '/<li id="fn1">\s*<p>Inner<a.*href="#fn2".*content/',
+            $html,
+        );
+    }
 }

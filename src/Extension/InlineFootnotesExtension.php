@@ -58,20 +58,21 @@ class InlineFootnotesExtension implements ExtensionInterface
                 return;
             }
 
-            // Get the rendered content of the span's children
-            $content = $event->getChildrenHtml();
+            // Register with the renderer and get the footnote number.
+            // Content rendering is deferred to ensure this inline footnote's number
+            // is reserved before any nested footnotes in its content are rendered.
+            $number = $renderer->registerInlineFootnote(function () use ($event): string {
+                $content = $event->getChildrenHtml();
 
-            // Normalize content to a paragraph to ensure consistent rendering
-            // with regular footnotes and reliable backlink insertion.
-            $trimmedContent = trim($content);
-            if (!(str_starts_with($trimmedContent, '<p>') && str_ends_with($trimmedContent, '</p>'))) {
-                $content = '<p>' . $trimmedContent . '</p>';
-            } else {
-                $content = $trimmedContent;
-            }
+                // Normalize content to a paragraph to ensure consistent rendering
+                // with regular footnotes and reliable backlink insertion.
+                $trimmedContent = trim($content);
+                if (!(str_starts_with($trimmedContent, '<p>') && str_ends_with($trimmedContent, '</p>'))) {
+                    return '<p>' . $trimmedContent . '</p>';
+                }
 
-            // Register with the renderer and get the footnote number
-            $number = $renderer->registerInlineFootnote($content);
+                return $trimmedContent;
+            });
 
             // Output the footnote reference in the same structure as regular footnotes
             $html = '<a id="fnref' . $number . '" href="#fn' . $number . '" role="doc-noteref">';
