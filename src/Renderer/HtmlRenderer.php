@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
+use Closure;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\Caption;
@@ -95,6 +96,13 @@ class HtmlRenderer implements RendererInterface
      * @var array<string, \Djot\Node\Block\Footnote>
      */
     protected array $collectedFootnotes = [];
+
+    /**
+     * Deferred content renderers for inline footnotes (number => callback)
+     *
+     * @var array<int, \Closure(): string>
+     */
+    protected array $inlineFootnoteRenderers = [];
 
     /**
      * Dispatch table mapping node class names to render method names
@@ -241,6 +249,37 @@ class HtmlRenderer implements RendererInterface
         return $this->codeBlockTabWidth;
     }
 
+    /**
+     * Register an inline footnote and return its number
+     *
+     * Used by extensions like InlineFootnotesExtension to add footnotes
+     * without requiring a separate footnote definition block.
+     *
+     * The content renderer callback is invoked lazily during renderFootnotesSection(),
+     * ensuring the inline footnote's number is reserved before any nested footnotes
+     * in its content are rendered.
+     *
+     * @param \Closure(): string $contentRenderer Callback that returns the footnote HTML content
+     *
+     * @return int The assigned footnote number
+     */
+    public function registerInlineFootnote(Closure $contentRenderer): int
+    {
+        $this->footnoteCounter++;
+        $number = $this->footnoteCounter;
+
+        // Use a synthetic label that cannot collide with user-supplied labels.
+        // Djot footnote labels cannot contain ']', so including it here ensures uniqueness.
+        $label = '_inline_]' . $number;
+        $this->footnoteNumbers[$label] = $number;
+        $this->footnoteRefCounts[$label] = 1;
+
+        // Store deferred content renderer
+        $this->inlineFootnoteRenderers[$number] = $contentRenderer;
+
+        return $number;
+    }
+
     public function render(Document $document): string
     {
         // Reset state for each render
@@ -249,6 +288,7 @@ class HtmlRenderer implements RendererInterface
         $this->footnoteNumbers = [];
         $this->footnoteCounter = 0;
         $this->collectedFootnotes = [];
+        $this->inlineFootnoteRenderers = [];
 
         $html = $this->renderDocumentWithSections($document);
 
@@ -1027,8 +1067,11 @@ class HtmlRenderer implements RendererInterface
                 }
                 $processedNumbers[$number] = true;
 
-                if (isset($this->collectedFootnotes[$label])) {
-                    // Rendering may discover new footnote references
+                if (isset($this->inlineFootnoteRenderers[$number])) {
+                    // Inline footnote - invoke deferred renderer
+                    $renderedContents[$number] = trim(($this->inlineFootnoteRenderers[$number])());
+                } elseif (isset($this->collectedFootnotes[$label])) {
+                    // Regular footnote - rendering may discover new footnote references
                     $renderedContents[$number] = trim($this->renderChildren($this->collectedFootnotes[$label]));
                 } else {
                     $renderedContents[$number] = '';
