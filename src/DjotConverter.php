@@ -6,6 +6,8 @@ namespace Djot;
 
 use Closure;
 use Djot\Extension\ExtensionInterface;
+use Djot\Extension\HeadingReferenceExtension;
+use Djot\Extension\WikilinksExtension;
 use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
@@ -13,6 +15,7 @@ use Djot\Renderer\HeadingIdTracker;
 use Djot\Renderer\HtmlRenderer;
 use Djot\Renderer\SoftBreakMode;
 use LengthException;
+use LogicException;
 use RuntimeException;
 
 /**
@@ -328,10 +331,30 @@ class DjotConverter
      */
     public function addExtension(ExtensionInterface $extension): self
     {
+        $this->assertCompatibleExtension($extension);
         $this->extensions[] = $extension;
         $extension->register($this);
 
         return $this;
+    }
+
+    /**
+     * @throws \LogicException When the extension conflicts with an already registered extension
+     */
+    protected function assertCompatibleExtension(ExtensionInterface $extension): void
+    {
+        foreach ($this->extensions as $registered) {
+            $hasHeadingReferences = $extension instanceof HeadingReferenceExtension
+                || $registered instanceof HeadingReferenceExtension;
+            $hasWikilinks = $extension instanceof WikilinksExtension
+                || $registered instanceof WikilinksExtension;
+
+            if ($hasHeadingReferences && $hasWikilinks) {
+                throw new LogicException(
+                    'HeadingReferenceExtension cannot be used together with WikilinksExtension because both parse [[...]] syntax.',
+                );
+            }
+        }
     }
 
     /**
