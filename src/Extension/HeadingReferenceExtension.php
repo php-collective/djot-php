@@ -9,6 +9,7 @@ use Djot\Event\RenderEvent;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Text;
+use Random\RandomException;
 
 /**
  * Resolves [[Heading Text]] references to headings in the current document.
@@ -124,7 +125,7 @@ class HeadingReferenceExtension implements ExtensionInterface
     {
         try {
             return '__djot_heading_ref_' . bin2hex(random_bytes(8)) . '_';
-        } catch (\Random\RandomException) {
+        } catch (RandomException) {
             return '__djot_heading_ref_' . uniqid('', true) . '_';
         }
     }
