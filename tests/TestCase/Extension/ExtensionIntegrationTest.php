@@ -7,6 +7,7 @@ namespace Djot\Test\TestCase\Extension;
 use Djot\DjotConverter;
 use Djot\Extension\AutolinkExtension;
 use Djot\Extension\ExternalLinksExtension;
+use Djot\Extension\HeadingReferenceExtension;
 use Djot\Extension\HeadingPermalinksExtension;
 use Djot\Extension\MentionsExtension;
 use Djot\Extension\TableOfContentsExtension;
@@ -213,6 +214,28 @@ DJOT;
         // TOC links should also match section IDs
         $this->assertStringContainsString('href="#Final-Thoughts"', $tocHtml);
         $this->assertStringContainsString('href="#Final-Thoughts-1"', $tocHtml);
+    }
+
+    public function testHeadingReferencesShareIdsWithTocAndPermalinks(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+
+        $converter
+            ->addExtension(new HeadingReferenceExtension())
+            ->addExtension($tocExtension)
+            ->addExtension(new HeadingPermalinksExtension());
+
+        $html = $converter->convert(<<<'DJOT'
+See [[Getting Started]].
+
+## Getting Started
+DJOT);
+
+        $tocHtml = $tocExtension->getTocHtml();
+
+        $this->assertStringContainsString('href="#Getting-Started"', $html);
+        $this->assertStringContainsString('href="#Getting-Started"', $tocHtml);
     }
 
     public function testExternalLinksWithInternalHostsExcluded(): void

@@ -12,6 +12,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
 | [FrontmatterExtension](#frontmatterextension) | Parses YAML/NEON/TOML/JSON frontmatter at document start |
+| [HeadingReferenceExtension](#headingreferenceextension) | Resolves `[[Heading Text]]` links to headings in the current document |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [InlineFootnotesExtension](#inlinefootnotesextension) | Converts `[content]{.fn}` spans to inline footnotes |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
@@ -448,6 +449,43 @@ $converter->addExtension(new HeadingPermalinksExtension(
 <h2>Getting Started <span class="permalink-wrapper"><a href="#Getting-Started" class="permalink" aria-label="Permalink">¶</a></span></h2>
 </section>
 ```
+
+## HeadingReferenceExtension
+
+Resolves `[[Heading Text]]` references to headings in the current document.
+
+```php
+use Djot\Extension\HeadingReferenceExtension;
+
+$converter->addExtension(new HeadingReferenceExtension());
+```
+
+**Input:**
+```djot
+See [[Getting Started]] for setup steps.
+
+## Getting Started
+```
+
+**Output:**
+```html
+<p>See <a href="#Getting-Started" class="heading-ref" data-heading-ref="Getting Started">Getting Started</a> for setup steps.</p>
+<section id="Getting-Started">
+<h2>Getting Started</h2>
+</section>
+```
+
+### Resolution Rules
+
+- Matches headings by visible heading text in the current document
+- Uses the final rendered heading ID internally, including explicit heading IDs
+- Does not support `[[#id]]` syntax, so authors do not need to guess generated IDs
+- Leaves the original `[[...]]` text unchanged when no unique heading matches
+
+### Compatibility
+
+`HeadingReferenceExtension` cannot be used together with `WikilinksExtension`.
+Both extensions parse `[[...]]` syntax, and `DjotConverter::addExtension()` will throw a `LogicException` if both are registered on the same converter.
 
 ## InlineFootnotesExtension
 
