@@ -118,6 +118,54 @@ DJOT);
         $this->assertStringNotContainsString('[[Say "Hello"]]', $html);
     }
 
+    public function testHeadingWithFormattingMatchesPlainTextReference(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $html = $converter->convert(<<<'DJOT'
+See [[Say Hello]].
+
+# Say _Hello_
+DJOT);
+
+        $this->assertStringContainsString('href="#Say-Hello"', $html);
+    }
+
+    public function testCustomCssClassWithMultipleSpaces(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension('foo  bar'));
+
+        $html = $converter->convert(<<<'DJOT'
+See [[Test]].
+
+# Test
+DJOT);
+
+        // Multiple spaces should be handled, empty parts filtered out
+        $this->assertStringContainsString('class="foo bar"', $html);
+    }
+
+    public function testHeadingWithNoTextIsIgnored(): void
+    {
+        // Headings with no plain text (like image-only headings) are skipped
+        // and don't cause errors
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $html = $converter->convert(<<<'DJOT'
+See [[Real Heading]].
+
+# ![image](logo.png)
+
+# Real Heading
+DJOT);
+
+        // Reference resolves to the text heading, image heading is ignored
+        $this->assertStringContainsString('href="#Real-Heading"', $html);
+    }
+
     public function testConflictsWithWikilinksWhenAddedAfter(): void
     {
         $converter = new DjotConverter();
