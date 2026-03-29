@@ -48,6 +48,14 @@ use Djot\Renderer\Utility\EventDispatcherTrait;
 /**
  * Renders AST to Markdown (CommonMark compatible where possible)
  *
+ * This renderer converts Djot AST to Markdown syntax. The output is designed
+ * for consumption by Markdown parsers, not Djot parsers. For round-trip
+ * stability, the Markdown output should be re-parsed by a Markdown parser.
+ *
+ * Syntax mapping (Djot → Markdown):
+ * - Emphasis: `_text_` → `*text*`
+ * - Strong: `*text*` → `**text**`
+ *
  * Note: Some Djot features don't have direct Markdown equivalents
  * and will be rendered as HTML or approximated.
  */
