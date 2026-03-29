@@ -31,8 +31,8 @@ class TabIndentationTest extends TestCase
         $input = "```\n\tindented with tab\n\t\tdouble tab\n```";
         $result = $this->converter->convert($input);
 
-        $this->assertStringContainsString("    indented with tab", $result);
-        $this->assertStringContainsString("        double tab", $result);
+        $this->assertStringContainsString('    indented with tab', $result);
+        $this->assertStringContainsString('        double tab', $result);
     }
 
     /**
