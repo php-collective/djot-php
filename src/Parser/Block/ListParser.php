@@ -376,6 +376,18 @@ class ListParser
             return false;
         }
 
-        return $listStyle === $itemStyle;
+        if ($listStyle === $itemStyle) {
+            return true;
+        }
+
+        // Handle ambiguous markers (e.g., 'c' could be alpha or roman)
+        // If list is alphabetic and item could be alphabetic, continue the list
+        if (isset($itemInfo['ambiguous']) && isset($itemInfo['alpha_style'])) {
+            if ($listStyle === $itemInfo['alpha_style']) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

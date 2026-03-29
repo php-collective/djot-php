@@ -1043,6 +1043,19 @@ DJOT;
         $this->assertStringContainsString('third', $result);
     }
 
+    public function testAlphabeticListWithAmbiguousMarkers(): void
+    {
+        // 'c' could be alpha (3rd) or roman (100), but should continue as alpha after a, b
+        $djot = "a. first\nb. second\nc. third";
+
+        $result = $this->converter->convert($djot);
+
+        // Should be one list with 3 items starting at 'a', not two lists
+        $this->assertStringContainsString('<ol type="a">', $result);
+        $this->assertSame(1, substr_count($result, '<ol'));
+        $this->assertSame(3, substr_count($result, '<li>'));
+    }
+
     public function testThematicBreakDashes(): void
     {
         $djot = "Before\n\n---\n\nAfter";
