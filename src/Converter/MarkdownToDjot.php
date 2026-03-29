@@ -260,6 +260,9 @@ class MarkdownToDjot
         // <code>text</code> → `text`
         $line = preg_replace('/<code>([^<]+)<\/code>/i', '`$1`', $line) ?? $line;
 
+        // Convert $$math$$ to $$`math` (Djot display math) - must come before inline
+        $line = preg_replace('/\$\$([^$]+)\$\$/', '$$`$1`', $line) ?? $line;
+
         // Convert $math$ to $`math` (Djot inline math)
         // Only match $...$ that looks like math (not currency)
         $line = preg_replace_callback('/\$([^$\s][^$]*[^$\s]|\S)\$/', function ($match) {

@@ -527,29 +527,44 @@ DJOT;
     }
 
     /**
-     * Documents features that are lost or transformed in round-trip
+     * Tests elements that go through HTML but round-trip back to Djot
+     */
+    public function testRoundTripViaHtml(): void
+    {
+        $markdownToDjot = new MarkdownToDjot();
+
+        $cases = [
+            ['^superscript^', '^superscript^', 'Superscript via <sup>'],
+            ['~subscript~', '~subscript~', 'Subscript via <sub>'],
+            ['{=highlight=}', '{=highlight=}', 'Highlight via <mark>'],
+            ['{+insert+}', '{+insert+}', 'Insert via <ins>'],
+            [':smile:', ':smile:', 'Symbol preserved'],
+            ['$`x^2`', '$`x^2`', 'Inline math'],
+            ['$$`x^2`', '$$`x^2`', 'Display math'],
+        ];
+
+        foreach ($cases as [$djot, $expected, $description]) {
+            $document = $this->converter->parse($djot);
+            $markdown = $this->renderer->render($document);
+            $djotBack = trim($markdownToDjot->convert($markdown));
+
+            $this->assertSame($expected, $djotBack, $description);
+        }
+    }
+
+    /**
+     * Documents features that are truly lost in round-trip
      */
     public function testRoundTripLossy(): void
     {
         $markdownToDjot = new MarkdownToDjot();
 
-        $lossyCases = [
-            // [input djot, description of what changes]
-            ['Text with ^superscript^ here.', 'Superscript becomes HTML <sup>'],
-            ['Text with ~subscript~ here.', 'Subscript becomes HTML <sub>'],
-            ['Text with {=highlight=} here.', 'Highlight becomes HTML <mark>'],
-            ['Text with {+insert+} here.', 'Insert becomes HTML <ins>'],
-            [':smile:', 'Symbol preserved as :name:'],
-            ['Text with [span]{.class} here.', 'Span attributes lost'],
-        ];
+        // Span attributes are lost - no way to represent in Markdown
+        $djot = '[span text]{.class #id}';
+        $document = $this->converter->parse($djot);
+        $markdown = $this->renderer->render($document);
+        $djotBack = trim($markdownToDjot->convert($markdown));
 
-        foreach ($lossyCases as [$djot, $description]) {
-            $document = $this->converter->parse($djot);
-            $markdown = $this->renderer->render($document);
-            $djotBack = $markdownToDjot->convert($markdown);
-
-            // Just verify it doesn't crash - the output will differ
-            $this->assertIsString($djotBack, "Round-trip should complete: {$description}");
-        }
+        $this->assertSame('span text', $djotBack, 'Span attributes are lost');
     }
 }
