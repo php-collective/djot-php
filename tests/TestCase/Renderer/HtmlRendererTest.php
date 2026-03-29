@@ -387,8 +387,9 @@ class HtmlRendererTest extends TestCase
 
         $result = $this->renderer->render($doc);
 
-        // Default: tabs are preserved
-        $this->assertStringContainsString("\t", $result);
+        // Default: tabs are converted to 4 spaces
+        $this->assertStringNotContainsString("\t", $result);
+        $this->assertStringContainsString('    return;', $result);
     }
 
     public function testCodeBlockTabWidthConvertsToSpaces(): void
@@ -439,10 +440,11 @@ class HtmlRendererTest extends TestCase
 
     public function testGetCodeBlockTabWidth(): void
     {
-        $this->assertNull($this->renderer->getCodeBlockTabWidth());
-
-        $this->renderer->setCodeBlockTabWidth(4);
+        // Default is 4 spaces
         $this->assertSame(4, $this->renderer->getCodeBlockTabWidth());
+
+        $this->renderer->setCodeBlockTabWidth(2);
+        $this->assertSame(2, $this->renderer->getCodeBlockTabWidth());
 
         $this->renderer->setCodeBlockTabWidth(null);
         $this->assertNull($this->renderer->getCodeBlockTabWidth());

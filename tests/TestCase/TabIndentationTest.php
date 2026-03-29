@@ -24,15 +24,15 @@ class TabIndentationTest extends TestCase
     }
 
     /**
-     * Tabs inside code blocks should be preserved as-is.
+     * Tabs inside code blocks are converted to 4 spaces by default.
      */
-    public function testTabsInCodeBlockPreserved(): void
+    public function testTabsInCodeBlockConvertedToSpaces(): void
     {
         $input = "```\n\tindented with tab\n\t\tdouble tab\n```";
         $result = $this->converter->convert($input);
 
-        $this->assertStringContainsString("\tindented with tab", $result);
-        $this->assertStringContainsString("\t\tdouble tab", $result);
+        $this->assertStringContainsString("    indented with tab", $result);
+        $this->assertStringContainsString("        double tab", $result);
     }
 
     /**
@@ -209,7 +209,7 @@ class TabIndentationTest extends TestCase
     }
 
     /**
-     * Tab in inline verbatim/code span.
+     * Tab in inline verbatim/code span - converted to spaces by default.
      */
     public function testTabInInlineCode(): void
     {
@@ -217,8 +217,9 @@ class TabIndentationTest extends TestCase
         $result = $this->converter->convert($input);
 
         $this->assertStringContainsString('<code>code', $result);
-        // Tabs should be preserved in inline code
-        $this->assertStringContainsString("\t", $result);
+        // Tabs are converted to 4 spaces in inline code by default
+        $this->assertStringContainsString('    ', $result);
+        $this->assertStringNotContainsString("\t", $result);
     }
 
     /**

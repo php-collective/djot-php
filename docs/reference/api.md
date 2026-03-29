@@ -553,8 +553,8 @@ $html = $renderer->render($document);
 **Configuration:**
 
 ```php
-// Convert tabs in code blocks to spaces (default: null = preserve tabs)
-$renderer->setCodeBlockTabWidth(4);
+// Tabs in code blocks default to 4 spaces; use null to preserve tabs
+$renderer->setCodeBlockTabWidth(null);
 
 // Customize soft break rendering
 $renderer->setSoftBreakMode(SoftBreakMode::Space);
@@ -565,14 +565,14 @@ $renderer->setSafeMode(SafeMode::defaults());
 
 #### Tab Width in Code Blocks
 
-By default, tabs in code blocks are preserved as-is. This can lead to inconsistent display since browsers default to 8-space tabs, and CSS `tab-size` isn't supported in all contexts (email clients, RSS readers, etc.).
+By default, tabs in code blocks are converted to 4 spaces. This ensures consistent display across all contexts, since browsers default to 8-space tabs and CSS `tab-size` isn't supported everywhere (email clients, RSS readers, etc.).
 
 ```php
-// Convert tabs to 4 spaces in code blocks and inline code
-$renderer->setCodeBlockTabWidth(4);
-
-// Preserve tabs (default)
+// Preserve tabs instead of converting
 $renderer->setCodeBlockTabWidth(null);
+
+// Use different width (e.g., 2 spaces)
+$renderer->setCodeBlockTabWidth(2);
 ```
 
 This affects both fenced code blocks (`<pre><code>`) and inline code (`<code>`).
