@@ -76,7 +76,7 @@ class HtmlRenderer implements RendererInterface
     /**
      * Tab width for code blocks (null = preserve tabs, integer = convert to spaces)
      */
-    protected ?int $codeBlockTabWidth = null;
+    protected ?int $codeBlockTabWidth = 4;
 
     /**
      * Maps footnote labels to their assigned numbers (order of first reference)
