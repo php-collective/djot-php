@@ -124,7 +124,7 @@ class HtmlToDjot
             'a' => $this->processLink($node),
             'img' => $this->processImage($node),
             'br' => $this->inPre ? "\n" : "\\\n",
-            'hr' => "\n\n---\n\n",
+            'hr' => $this->processHr($node),
             'blockquote' => $this->processBlockquote($node),
             'ul', 'ol' => $this->processList($node),
             'li' => $this->processListItem($node),
@@ -322,6 +322,16 @@ class HtmlToDjot
         }
 
         return '![' . $alt . '](' . $src . ')' . $attrs;
+    }
+
+    protected function processHr(DOMNode $node): string
+    {
+        $char = '-';
+        if ($node instanceof DOMElement && $node->hasAttribute('data-char')) {
+            $char = $node->getAttribute('data-char');
+        }
+
+        return "\n\n" . str_repeat($char, 3) . "\n\n";
     }
 
     protected function processBlockquote(DOMElement $node): string

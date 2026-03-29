@@ -712,6 +712,24 @@ HTML;
         $this->assertStringContainsString('class="intro"', $htmlBack);
     }
 
+    public function testThematicBreakRoundtrip(): void
+    {
+        $djotConverter = new DjotConverter();
+
+        // Test dash (default)
+        $djot = '---';
+        $html = $djotConverter->convert($djot);
+        $back = trim($this->converter->convert($html));
+        $this->assertSame('---', $back, 'Dash thematic break should round-trip');
+
+        // Test asterisk (preserved via data-char)
+        $djot = '***';
+        $html = $djotConverter->convert($djot);
+        $this->assertStringContainsString('data-char="*"', $html);
+        $back = trim($this->converter->convert($html));
+        $this->assertSame('***', $back, 'Asterisk thematic break should round-trip');
+    }
+
     // ==================== Implicit Paragraphs ====================
 
     public function testInlineElementsAtBlockLevelAsImplicitParagraph(): void

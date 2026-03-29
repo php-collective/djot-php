@@ -611,6 +611,10 @@ class HtmlRenderer implements RendererInterface
     protected function renderThematicBreak(ThematicBreak $node): string
     {
         $attrs = $this->renderAttributes($node);
+        // Preserve character for round-trip (only if non-default)
+        if ($node->char !== '-') {
+            $attrs .= ' data-char="' . htmlspecialchars($node->char, ENT_QUOTES) . '"';
+        }
 
         return $this->xhtml ? '<hr' . $attrs . " />\n" : '<hr' . $attrs . ">\n";
     }
