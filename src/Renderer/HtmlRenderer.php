@@ -78,6 +78,7 @@ class HtmlRenderer implements RendererInterface
      */
     protected ?int $codeBlockTabWidth = 4;
 
+
     /**
      * Maps footnote labels to their assigned numbers (order of first reference)
      *
@@ -562,6 +563,7 @@ class HtmlRenderer implements RendererInterface
             $olAttrs = '';
             $start = $node->getStart();
             $style = $node->getStyle();
+            $marker = $node->getMarker();
 
             // Order: start, then type, then other attrs
             if ($start !== 1) {
@@ -569,6 +571,10 @@ class HtmlRenderer implements RendererInterface
             }
             if ($style !== null) {
                 $olAttrs .= ' type="' . $style . '"';
+            }
+            // Preserve marker for round-trip (only if non-default)
+            if ($marker !== null && $marker !== '.') {
+                $olAttrs .= ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES) . '"';
             }
 
             return '<ol' . $olAttrs . $this->renderAttributeArray($attrs) . ">\n" . $html . "</ol>\n";
@@ -578,7 +584,14 @@ class HtmlRenderer implements RendererInterface
             $attrs = $this->mergeAttribute($attrs, 'class', 'task-list');
         }
 
-        return '<ul' . $this->renderAttributeArray($attrs) . ">\n" . $html . "</ul>\n";
+        // Preserve marker for round-trip (only if non-default)
+        $marker = $node->getMarker();
+        $markerAttr = '';
+        if ($marker !== null && $marker !== '-') {
+            $markerAttr = ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES) . '"';
+        }
+
+        return '<ul' . $markerAttr . $this->renderAttributeArray($attrs) . ">\n" . $html . "</ul>\n";
     }
 
     protected function renderListItem(ListItem $node, bool $tight = true): string

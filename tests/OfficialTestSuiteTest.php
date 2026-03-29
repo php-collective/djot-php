@@ -167,9 +167,15 @@ class OfficialTestSuiteTest extends TestCase
 
     /**
      * Normalize output for comparison
+     *
+     * Strips data attributes used for round-trip fidelity (data-char, data-marker)
+     * since official djot.js tests don't expect these.
      */
     protected function normalizeOutput(string $output): string
     {
+        // Strip round-trip data attributes that official tests don't expect
+        $output = preg_replace('/ data-(?:char|marker)="[^"]*"/', '', $output) ?? $output;
+
         // Trim trailing whitespace from each line and normalize line endings
         $lines = explode("\n", $output);
         $lines = array_map('rtrim', $lines);

@@ -356,6 +356,7 @@ class HtmlToDjot
     {
         $this->listDepth++;
         $isOrdered = strtolower($node->tagName) === 'ol';
+        $isTaskList = $node->getAttribute('class') === 'task-list';
         $output = '';
         $counter = 1;
 
@@ -364,17 +365,37 @@ class HtmlToDjot
             $counter = (int)$node->getAttribute('start');
         }
 
+        // Get marker from data attribute (for round-trip fidelity)
+        $marker = $node->getAttribute('data-marker');
+        if ($isOrdered) {
+            $marker = $marker ?: '.';
+        } else {
+            $marker = $marker ?: '-';
+        }
+
         // Add leading newline for top-level lists to ensure blank line before
         if ($this->listDepth === 1) {
-            // Add list-level attributes (skip 'start' since it's in the syntax for ol)
-            $listAttrs = $this->formatBlockAttributes($node, $isOrdered ? ['start'] : []);
+            // Add list-level attributes (skip 'start', 'data-marker', 'class' for task-list)
+            $skipAttrs = $isOrdered ? ['start', 'data-marker'] : ['data-marker'];
+            if ($isTaskList) {
+                $skipAttrs[] = 'class';
+            }
+            $listAttrs = $this->formatBlockAttributes($node, $skipAttrs);
             $output .= $listAttrs . "\n";
         }
 
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement && strtolower($child->tagName) === 'li') {
                 $indent = str_repeat('  ', $this->listDepth - 1);
-                $prefix = $isOrdered ? $counter . '. ' : '- ';
+
+                // Check for task list item (has checkbox input)
+                $checkbox = '';
+                if ($isTaskList || $this->hasCheckbox($child)) {
+                    $isChecked = $this->isCheckboxChecked($child);
+                    $checkbox = $isChecked ? '[x] ' : '[ ] ';
+                }
+
+                $prefix = $isOrdered ? $counter . $marker . ' ' : $marker . ' ' . $checkbox;
 
                 // Process list item content, separating text from nested lists
                 $textContent = '';
@@ -386,6 +407,9 @@ class HtmlToDjot
                         if ($childTag === 'ul' || $childTag === 'ol') {
                             // Process nested list separately
                             $nestedContent .= $this->processNode($liChild);
+                        } elseif ($childTag === 'input' && $liChild->getAttribute('type') === 'checkbox') {
+                            // Skip checkbox inputs (handled via $checkbox prefix)
+                            continue;
                         } else {
                             $textContent .= $this->processNode($liChild);
                         }
@@ -434,6 +458,55 @@ class HtmlToDjot
     protected function processListItem(DOMElement $node): string
     {
         return $this->processChildren($node);
+    }
+
+    /**
+     * Check if a list item contains a checkbox input
+     */
+    protected function hasCheckbox(DOMElement $li): bool
+    {
+        $inputs = $li->getElementsByTagName('input');
+        foreach ($inputs as $input) {
+            if ($input instanceof DOMElement && $input->getAttribute('type') === 'checkbox') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a list item's checkbox is checked
+     */
+    protected function isCheckboxChecked(DOMElement $li): bool
+    {
+        $inputs = $li->getElementsByTagName('input');
+        foreach ($inputs as $input) {
+            if ($input instanceof DOMElement && $input->getAttribute('type') === 'checkbox') {
+                return $input->hasAttribute('checked');
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Remove checkbox input from content when processing task list items
+     */
+    protected function processListItemContent(DOMElement $li, bool $isTaskList): string
+    {
+        $content = '';
+        foreach ($li->childNodes as $child) {
+            // Skip checkbox inputs in task lists
+            if ($isTaskList && $child instanceof DOMElement) {
+                if ($child->tagName === 'input' && $child->getAttribute('type') === 'checkbox') {
+                    continue;
+                }
+            }
+            $content .= $this->processNode($child);
+        }
+
+        return $content;
     }
 
     protected function processTable(DOMElement $node): string
@@ -662,14 +735,16 @@ class HtmlToDjot
             $parts[] = '#' . $id;
         }
 
-        // Process class
-        $class = $node->getAttribute('class');
-        if ($class !== '') {
-            $classes = preg_split('/\s+/', trim($class));
-            if ($classes) {
-                foreach ($classes as $c) {
-                    if ($c !== '') {
-                        $parts[] = '.' . $c;
+        // Process class (if not skipped)
+        if (!in_array('class', $allSkip, true)) {
+            $class = $node->getAttribute('class');
+            if ($class !== '') {
+                $classes = preg_split('/\s+/', trim($class));
+                if ($classes) {
+                    foreach ($classes as $c) {
+                        if ($c !== '') {
+                            $parts[] = '.' . $c;
+                        }
                     }
                 }
             }

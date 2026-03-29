@@ -197,7 +197,7 @@ class DjotConverterTest extends TestCase
     public function testThematicBreak(): void
     {
         $djot = "Before\n\n***\n\nAfter";
-        $expected = "<p>Before</p>\n<hr>\n<p>After</p>\n";
+        $expected = "<p>Before</p>\n<hr data-char=\"*\">\n<p>After</p>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }
@@ -2428,7 +2428,7 @@ DJOT;
         $djot = "Above\n\n***\n\nBelow";
         $result = $converter->convert($djot);
 
-        $this->assertStringContainsString('<hr />', $result);
+        $this->assertStringContainsString('<hr data-char="*" />', $result);
     }
 
     // Edge cases: Reference links
@@ -2602,7 +2602,8 @@ DJOT;
         $result = $this->converter->convert($djot);
 
         // "cd" should be part of nested list item "b"
-        $expected = "<ul>\n<li>\na\n<ul>\n<li>\nb\ncd\n</li>\n</ul>\n</li>\n</ul>\n";
+        // Nested list uses * marker which gets preserved as data-marker
+        $expected = "<ul>\n<li>\na\n<ul data-marker=\"*\">\n<li>\nb\ncd\n</li>\n</ul>\n</li>\n</ul>\n";
         $this->assertSame($expected, $result);
     }
 
