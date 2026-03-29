@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Djot\Test\TestCase\Renderer;
 
+use Djot\Converter\MarkdownToDjot;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Inline\Symbol;
 use Djot\Renderer\MarkdownRenderer;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class MarkdownRendererTest extends TestCase
@@ -440,5 +442,114 @@ DJOT;
 
         $this->assertStringContainsString('CUSTOM_HEADING_TEXT', $result);
         $this->assertStringNotContainsString('Original Title', $result);
+    }
+
+    // ==================== Round-Trip Tests ====================
+    // Tests: Djot → MarkdownRenderer → MarkdownToDjot → Djot
+
+    #[DataProvider('roundTripProvider')]
+    public function testRoundTrip(string $djot, string $expected, string $description): void
+    {
+        $markdownToDjot = new MarkdownToDjot();
+
+        // Djot → AST → Markdown
+        $document = $this->converter->parse($djot);
+        $markdown = $this->renderer->render($document);
+
+        // Markdown → Djot
+        $djotBack = $markdownToDjot->convert($markdown);
+
+        $this->assertSame($expected, trim($djotBack), $description);
+    }
+
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function roundTripProvider(): array
+    {
+        return [
+            'paragraph' => [
+                'Hello world!',
+                'Hello world!',
+                'Simple paragraph should round-trip',
+            ],
+            'heading' => [
+                '# Heading 1',
+                '# Heading 1',
+                'Heading should round-trip',
+            ],
+            'emphasis' => [
+                'Text with _emphasis_ here.',
+                'Text with _emphasis_ here.',
+                'Emphasis should round-trip',
+            ],
+            'strong' => [
+                'Text with *strong* here.',
+                'Text with *strong* here.',
+                'Strong should round-trip',
+            ],
+            'link' => [
+                '[Example](https://example.com)',
+                '[Example](https://example.com)',
+                'Link should round-trip',
+            ],
+            'code_block' => [
+                "```php\necho 'hello';\n```",
+                "```php\necho 'hello';\n```",
+                'Code block should round-trip',
+            ],
+            'unordered_list' => [
+                "- Item 1\n- Item 2",
+                "- Item 1\n- Item 2",
+                'Unordered list should round-trip',
+            ],
+            'ordered_list' => [
+                "1. First\n2. Second",
+                "1. First\n2. Second",
+                'Ordered list should round-trip',
+            ],
+            'blockquote' => [
+                '> Quoted text here.',
+                '> Quoted text here.',
+                'Blockquote should round-trip',
+            ],
+            'thematic_break_dash' => [
+                "Above\n\n---\n\nBelow",
+                "Above\n\n---\n\nBelow",
+                'Thematic break with dashes should round-trip',
+            ],
+            'thematic_break_star' => [
+                "Above\n\n***\n\nBelow",
+                "Above\n\n***\n\nBelow",
+                'Thematic break with stars should round-trip',
+            ],
+        ];
+    }
+
+    /**
+     * Documents features that are lost or transformed in round-trip
+     */
+    public function testRoundTripLossy(): void
+    {
+        $markdownToDjot = new MarkdownToDjot();
+
+        $lossyCases = [
+            // [input djot, description of what changes]
+            ['Text with ^superscript^ here.', 'Superscript becomes HTML <sup>'],
+            ['Text with ~subscript~ here.', 'Subscript becomes HTML <sub>'],
+            ['Text with {=highlight=} here.', 'Highlight becomes HTML <mark>'],
+            ['Text with {+insert+} here.', 'Insert becomes HTML <ins>'],
+            [':smile:', 'Symbol preserved as :name:'],
+            ['Text with [span]{.class} here.', 'Span attributes lost'],
+        ];
+
+        foreach ($lossyCases as [$djot, $description]) {
+            $document = $this->converter->parse($djot);
+            $markdown = $this->renderer->render($document);
+            $djotBack = $markdownToDjot->convert($markdown);
+
+            // Just verify it doesn't crash - the output will differ
+            $this->assertIsString($djotBack, "Round-trip should complete: {$description}");
+        }
     }
 }
