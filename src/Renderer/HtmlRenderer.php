@@ -78,6 +78,11 @@ class HtmlRenderer implements RendererInterface
      */
     protected ?int $codeBlockTabWidth = 4;
 
+    /**
+     * Round-trip mode adds data attributes to preserve Djot-specific information
+     * for perfect HTML→Djot conversion (e.g., list markers, thematic break characters)
+     */
+    protected bool $roundTripMode = false;
 
     /**
      * Maps footnote labels to their assigned numbers (order of first reference)
@@ -248,6 +253,30 @@ class HtmlRenderer implements RendererInterface
     public function getCodeBlockTabWidth(): ?int
     {
         return $this->codeBlockTabWidth;
+    }
+
+    /**
+     * Enable round-trip mode to preserve Djot-specific information in HTML output
+     *
+     * When enabled, adds data attributes for:
+     * - List markers (data-marker for non-default markers like *, +, or ))
+     * - Thematic break characters (data-char for non-default like * or _)
+     *
+     * This allows HtmlToDjot to reconstruct the original Djot syntax perfectly.
+     */
+    public function setRoundTripMode(bool $enabled): self
+    {
+        $this->roundTripMode = $enabled;
+
+        return $this;
+    }
+
+    /**
+     * Check if round-trip mode is enabled
+     */
+    public function isRoundTripMode(): bool
+    {
+        return $this->roundTripMode;
     }
 
     /**
@@ -572,8 +601,8 @@ class HtmlRenderer implements RendererInterface
             if ($style !== null) {
                 $olAttrs .= ' type="' . $style . '"';
             }
-            // Preserve marker for round-trip (only if non-default)
-            if ($marker !== null && $marker !== '.') {
+            // Preserve marker for round-trip (only if non-default and round-trip mode enabled)
+            if ($this->roundTripMode && $marker !== null && $marker !== '.') {
                 $olAttrs .= ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES) . '"';
             }
 
@@ -584,10 +613,10 @@ class HtmlRenderer implements RendererInterface
             $attrs = $this->mergeAttribute($attrs, 'class', 'task-list');
         }
 
-        // Preserve marker for round-trip (only if non-default)
+        // Preserve marker for round-trip (only if non-default and round-trip mode enabled)
         $marker = $node->getMarker();
         $markerAttr = '';
-        if ($marker !== null && $marker !== '-') {
+        if ($this->roundTripMode && $marker !== null && $marker !== '-') {
             $markerAttr = ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES) . '"';
         }
 
@@ -624,8 +653,8 @@ class HtmlRenderer implements RendererInterface
     protected function renderThematicBreak(ThematicBreak $node): string
     {
         $attrs = $this->renderAttributes($node);
-        // Preserve character for round-trip (only if non-default)
-        if ($node->char !== '-') {
+        // Preserve character for round-trip (only if non-default and round-trip mode enabled)
+        if ($this->roundTripMode && $node->char !== '-') {
             $attrs .= ' data-char="' . htmlspecialchars($node->char, ENT_QUOTES) . '"';
         }
 

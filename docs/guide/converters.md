@@ -219,6 +219,39 @@ echo "Hello";
 - Handles nested lists
 - Handles tables with headers
 
+### Round-Trip Mode
+
+For perfect Djot→HTML→Djot round-trips, enable round-trip mode on the HtmlRenderer. This adds data attributes to preserve Djot-specific syntax that would otherwise be lost:
+
+```php
+use Djot\DjotConverter;
+use Djot\Converter\HtmlToDjot;
+
+$djotConverter = new DjotConverter();
+$djotConverter->getRenderer()->setRoundTripMode(true);
+
+$djot = '***';  // Asterisk thematic break
+$html = $djotConverter->convert($djot);
+// Output: <hr data-char="*">
+
+$htmlToDjot = new HtmlToDjot();
+$back = $htmlToDjot->convert($html);
+// Output: *** (preserved!)
+```
+
+**What round-trip mode preserves:**
+
+| Element | Data Attribute | Purpose |
+|---------|----------------|---------|
+| Thematic breaks | `data-char` | Preserves `*` vs `-` character |
+| Unordered lists | `data-marker` | Preserves `*`, `+`, or `-` marker |
+| Ordered lists | `data-marker` | Preserves `)` vs `.` delimiter |
+
+Without round-trip mode, these elements use defaults when converting back:
+- Thematic breaks → `---`
+- Unordered lists → `-` marker
+- Ordered lists → `.` delimiter
+
 **Use Cases:**
 - Importing content from WordPress or other CMS
 - Converting WYSIWYG editor output
