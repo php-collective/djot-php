@@ -1285,7 +1285,8 @@ class BlockParser
             return null;
         }
 
-        $thematicBreak = new ThematicBreak();
+        $char = $starCount >= $dashCount ? '*' : '-';
+        $thematicBreak = new ThematicBreak($char);
         $this->applyPendingAttributes($thematicBreak);
         $parent->appendChild($thematicBreak);
 

@@ -368,10 +368,10 @@ class BbcodeToDjot
         $text = preg_replace_callback(
             '/\[spoiler(?:=([^\]]+))?\](.*?)\[\/spoiler\]/is',
             function ($m) {
-                $title = !empty($m[1]) ? ' ' . trim($m[1]) : '';
+                $titleAttr = !empty($m[1]) ? '{title="' . trim($m[1]) . "\"}\n" : '';
                 $content = trim($m[2]);
 
-                return "::: spoiler{$title}\n{$content}\n:::\n";
+                return "{$titleAttr}::: spoiler\n{$content}\n:::\n";
             },
             $text,
         ) ?? $text;

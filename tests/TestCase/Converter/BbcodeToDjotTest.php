@@ -294,7 +294,9 @@ BBCODE;
     public function testSpoilerWithTitle(): void
     {
         $result = $this->converter->convert('[spoiler=Click to reveal]Hidden[/spoiler]');
-        $this->assertStringContainsString('::: spoiler Click to reveal', $result);
+        $this->assertStringContainsString('{title="Click to reveal"}', $result);
+        $this->assertStringContainsString('::: spoiler', $result);
+        $this->assertStringContainsString('Hidden', $result);
     }
 
     public function testYoutube(): void

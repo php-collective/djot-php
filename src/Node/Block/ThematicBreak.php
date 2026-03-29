@@ -9,6 +9,10 @@ namespace Djot\Node\Block;
  */
 class ThematicBreak extends BlockNode
 {
+    public function __construct(public readonly string $char = '-')
+    {
+    }
+
     public function getType(): string
     {
         return 'thematic_break';

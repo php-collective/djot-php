@@ -147,6 +147,13 @@ class MarkdownRendererTest extends TestCase
         $document = $this->converter->parse($djot);
         $result = $this->renderer->render($document);
 
+        $this->assertStringContainsString('***', $result);
+
+        // Test with dashes
+        $djot = "Above\n\n---\n\nBelow";
+        $document = $this->converter->parse($djot);
+        $result = $this->renderer->render($document);
+
         $this->assertStringContainsString('---', $result);
     }
 

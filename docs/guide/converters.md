@@ -82,6 +82,7 @@ $djot = $converter->convert($bbcodeText);
 | `[list=1][*]...[/list]` | `1. ...` |
 | `[hr]` | `---` |
 | `[spoiler]...[/spoiler]` | `::: spoiler` |
+| `[spoiler=Title]...[/spoiler]` | `{title="Title"}\n::: spoiler` |
 | `[table]...[/table]` | Djot table syntax |
 | `[youtube]ID[/youtube]` | `![YouTube](url)` |
 
