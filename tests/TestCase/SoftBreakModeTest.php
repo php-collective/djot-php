@@ -62,9 +62,13 @@ DJOT;
     }
 
     /**
-     * Standard significantNewlines mode DOES render soft breaks as <br>.
+     * significantNewlines mode does NOT automatically set soft break mode.
+     *
+     * The two features are independent:
+     * - significantNewlines: affects parsing (block interruption)
+     * - softBreakMode: affects rendering (how soft breaks appear)
      */
-    public function testSignificantNewlinesDefaultHasBrTags(): void
+    public function testSignificantNewlinesDoesNotChangeSoftBreakMode(): void
     {
         $converter = DjotConverter::withSignificantNewlines();
 
@@ -76,7 +80,28 @@ DJOT;
 
         $result = $converter->convert($djot);
 
-        // Should have <br> tags (backwards compatible behavior)
+        // Should NOT have <br> tags - default is newline mode, not break mode
+        $this->assertStringNotContainsString('<br', $result);
+    }
+
+    /**
+     * Explicitly setting SoftBreakMode::Break renders <br> tags.
+     */
+    public function testExplicitBreakModeHasBrTags(): void
+    {
+        $converter = DjotConverter::withSignificantNewlines(
+            softBreakMode: SoftBreakMode::Break,
+        );
+
+        $djot = <<<'DJOT'
+Line one
+Line two
+Line three
+DJOT;
+
+        $result = $converter->convert($djot);
+
+        // Should have <br> tags when explicitly requested
         $this->assertStringContainsString('<br', $result);
     }
 

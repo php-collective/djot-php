@@ -65,7 +65,7 @@ Note: Use `\` at end of line for hard breaks (always renders as `<br>`) regardle
 
 By default, djot-php follows the djot specification where block elements (lists, blockquotes, headings) **cannot interrupt paragraphs** - they require a blank line before them.
 
-The "significant newlines" mode provides markdown-like behavior where block elements can interrupt paragraphs without blank lines. This is useful for chat messages, comments, and quick notes.
+The "significant newlines" mode provides markdown-like behavior where block elements can interrupt paragraphs without blank lines. This is useful when you want markdown-compatible syntax without requiring blank lines before block elements.
 
 ### Enabling Significant Newlines Mode
 
@@ -126,7 +126,8 @@ Output:
 | Headings interrupt paragraphs | No | Yes |
 | Code fences interrupt paragraphs | No | Yes |
 | Nested lists without blank lines | No | Yes |
-| Soft breaks render as | `\n` | `<br>` |
+
+Note: Soft break rendering is controlled separately via `SoftBreakMode` - see the [Soft Break Modes](#soft-break-modes) section above.
 
 ### Preventing Block Interruption with Escaping
 
@@ -155,18 +156,7 @@ Common escapes:
 
 ### Use Cases
 
-**Chat/Messaging Applications:**
-```php
-$converter = DjotConverter::withSignificantNewlines();
-
-$message = "Check out this quote:
-> Important information here
-And here's the follow-up";
-
-echo $converter->convert($message);
-```
-
-**Quick Notes:**
+**Markdown-compatible syntax:**
 ```php
 $converter = DjotConverter::withSignificantNewlines();
 
@@ -178,33 +168,25 @@ $note = "TODO:
 echo $converter->convert($note);
 ```
 
-### Automatic Soft Break Configuration
+**Chat/messaging with visible line breaks:**
 
-When using `DjotConverter::withSignificantNewlines()` or the `significantNewlines` constructor parameter, the soft break mode is automatically set to `SoftBreakMode::Break` (renders as `<br>`). This is intentional since chat/messaging contexts typically expect visible line breaks.
-
-To override this behavior:
+For chat applications where users expect both markdown-style block elements AND visible line breaks when pressing Enter, combine both options:
 
 ```php
 use Djot\DjotConverter;
 use Djot\Renderer\SoftBreakMode;
 
-$converter = DjotConverter::withSignificantNewlines();
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space); // Override if needed
-```
+$converter = DjotConverter::withSignificantNewlines(
+    softBreakMode: SoftBreakMode::Break,
+);
 
-**Note:** When using the `BlockParser` directly with a custom renderer (like `PlainTextRenderer`), the soft break mode is not automatically configured. You'll need to set it manually:
+$message = "Hey!
+Check this out:
+- cool feature
+- another one";
 
-```php
-use Djot\Parser\BlockParser;
-use Djot\Renderer\PlainTextRenderer;
-use Djot\Renderer\SoftBreakMode;
-
-$parser = new BlockParser(significantNewlines: true);
-$renderer = new PlainTextRenderer();
-$renderer->setSoftBreakMode(SoftBreakMode::Newline); // Configure as needed
-
-$doc = $parser->parse($input);
-echo $renderer->render($doc);
+echo $converter->convert($message);
+// Renders with <br> for line breaks AND proper list formatting
 ```
 
 ### Combining with Other Options
@@ -212,10 +194,12 @@ echo $renderer->render($doc);
 ```php
 use Djot\DjotConverter;
 use Djot\SafeMode;
+use Djot\Renderer\SoftBreakMode;
 
 // Significant newlines with safe mode for user-generated content
 $converter = new DjotConverter(
     safeMode: new SafeMode(),
     significantNewlines: true,
+    softBreakMode: SoftBreakMode::Break, // Optional: visible line breaks
 );
 ```

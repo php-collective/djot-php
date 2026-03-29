@@ -56,7 +56,7 @@ class DjotConverter
      * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode (true for defaults, SafeMode instance for custom config)
      * @param \Djot\Profile|null $profile Profile for feature restriction (null = all features allowed)
      * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
-     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (null = auto based on significantNewlines)
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (null = renderer default)
      */
     public function __construct(
         bool $xhtml = false,
@@ -79,13 +79,9 @@ class DjotConverter
             $this->renderer->setSafeMode($safeMode);
         }
 
-        // Configure soft break mode
-        // If explicitly provided, use that; otherwise default based on significantNewlines
+        // Configure soft break mode if explicitly provided
         if ($softBreakMode !== null) {
             $this->renderer->setSoftBreakMode($softBreakMode);
-        } elseif ($significantNewlines) {
-            // Backwards compatible: significantNewlines implies <br> soft breaks
-            $this->renderer->setSoftBreakMode(SoftBreakMode::Break);
         }
 
         // Configure profile
@@ -99,18 +95,20 @@ class DjotConverter
      * Create a converter with significant newlines mode enabled
      *
      * In this mode:
-     * - Block elements (lists, blockquotes, code) can interrupt paragraphs
-     * - Soft breaks render as visible <br> tags (unless overridden)
+     * - Block elements (lists, blockquotes, code) can interrupt paragraphs without blank lines
      * - Nested blocks in lists don't need blank lines
      *
-     * Ideal for chat messages, comments, and quick notes.
+     * This provides markdown-like behavior for block interruption.
+     *
+     * Note: This does NOT change how soft breaks are rendered. Use setSoftBreakMode()
+     * or the softBreakMode parameter if you also want visible line breaks.
      *
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
      * @param bool $strict Whether to throw exceptions on parse errors
      * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode
      * @param \Djot\Profile|null $profile Profile for feature restriction
-     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode Override the default <br> soft break behavior
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks
      */
     public static function withSignificantNewlines(
         bool $xhtml = false,
