@@ -181,13 +181,21 @@ class MarkdownRenderer implements RendererInterface
                 $indent = str_repeat('  ', $this->listDepth - 1);
 
                 if ($node->getListType() === ListBlock::TYPE_ORDERED) {
-                    $prefix = $counter . '. ';
+                    // Normalize to standard Markdown: numeric with . or )
+                    // Roman/alpha styles and (n) format are Djot-specific
+                    $marker = $node->getMarker();
+                    if ($marker === '()' || $marker === null) {
+                        $marker = '.';
+                    }
+                    $prefix = $counter . $marker . ' ';
                     $counter++;
                 } elseif ($node->getListType() === ListBlock::TYPE_TASK) {
+                    $marker = $node->getMarker() ?? '-';
                     $checkbox = $child->getChecked() ? '[x] ' : '[ ] ';
-                    $prefix = '- ' . $checkbox;
+                    $prefix = $marker . ' ' . $checkbox;
                 } else {
-                    $prefix = '- ';
+                    $marker = $node->getMarker() ?? '-';
+                    $prefix = $marker . ' ';
                 }
 
                 $content = trim($this->renderChildren($child));
