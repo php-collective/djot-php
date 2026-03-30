@@ -53,6 +53,13 @@ class InlineParser
     protected array $customPatterns = [];
 
     /**
+     * Cached anchored patterns for custom inline patterns
+     *
+     * @var array<string, string>
+     */
+    protected array $anchoredPatternCache = [];
+
+    /**
      * Cached abbreviation regex pattern (built once per document)
      */
     protected ?string $abbreviationPattern = null;
@@ -557,17 +564,18 @@ class InlineParser
      */
     protected function tryCustomPatterns(string $text, int $pos): ?array
     {
-        if (!$this->customPatterns) {
+        if ($this->customPatterns === []) {
             return null;
         }
 
-        $remaining = substr($text, $pos);
-
         foreach ($this->customPatterns as $pattern => $callback) {
-            // Anchor pattern to start
-            $anchoredPattern = '/\A' . substr($pattern, 1, -1) . '/';
+            // Cache the anchored pattern (use \G to match at offset position)
+            if (!isset($this->anchoredPatternCache[$pattern])) {
+                $this->anchoredPatternCache[$pattern] = '/\G' . substr($pattern, 1, -1) . '/';
+            }
 
-            if (preg_match($anchoredPattern, $remaining, $matches)) {
+            // Use offset parameter to avoid substr() allocation
+            if (preg_match($this->anchoredPatternCache[$pattern], $text, $matches, 0, $pos)) {
                 $node = $callback($matches[0], $matches, $this);
                 if ($node !== null) {
                     return [
