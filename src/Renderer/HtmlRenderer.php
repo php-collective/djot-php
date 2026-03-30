@@ -1123,7 +1123,12 @@ class HtmlRenderer implements RendererInterface
         $html .= '<ol>' . "\n";
 
         foreach ($renderedContents as $number => $content) {
-            $html .= '<li id="fn' . $number . '">' . "\n";
+            $liAttrs = '';
+            if ($this->roundTripMode && isset($context->inlineFootnoteRenderers[$number])) {
+                $liAttrs = ' data-djot-inline-footnote="1"';
+            }
+
+            $html .= '<li id="fn' . $number . '"' . $liAttrs . '>' . "\n";
 
             // Find the label for this footnote number to get ref count
             $label = array_search($number, $context->footnoteNumbers, true);

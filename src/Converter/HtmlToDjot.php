@@ -108,6 +108,10 @@ class HtmlToDjot
 
         $tagName = strtolower($node->tagName);
 
+        if ($tagName === 'section' && $this->isInlineOnlyEndnotesSection($node)) {
+            return '';
+        }
+
         return match ($tagName) {
             'html', 'body', 'div', 'article', 'section', 'main', 'header', 'footer', 'nav', 'aside',
             'address', 'details', 'dialog', 'fieldset', 'form', 'hgroup', 'menu', 'search' => $this->processBlock($node),
@@ -216,9 +220,12 @@ class HtmlToDjot
     protected function processHeading(DOMElement $node): string
     {
         $level = (int)substr($node->tagName, 1);
+        if ($node->hasAttribute('data-djot-source-level')) {
+            $level = max(1, min(6, (int)$node->getAttribute('data-djot-source-level')));
+        }
         $content = trim($this->processChildren($node));
         $prefix = str_repeat('#', $level) . ' ';
-        $attrs = $this->formatBlockAttributes($node);
+        $attrs = $this->formatBlockAttributes($node, ['data-djot-source-level']);
 
         return $attrs . $prefix . $content . "\n\n";
     }
@@ -281,6 +288,17 @@ class HtmlToDjot
 
     protected function processLink(DOMElement $node): string
     {
+        if ($node->hasAttribute('data-djot-inline-footnote-html')) {
+            $html = $node->getAttribute('data-djot-inline-footnote-html');
+            $content = $this->convertInlineFragmentToDjot($html);
+            $cssClass = $node->getAttribute('data-djot-inline-footnote-class');
+            if ($cssClass === '') {
+                $cssClass = 'fn';
+            }
+
+            return '[' . trim($content) . ']{.' . $cssClass . '}';
+        }
+
         $href = $node->getAttribute('href');
         $text = trim($this->processChildren($node));
         $title = $node->getAttribute('title');
@@ -377,6 +395,10 @@ class HtmlToDjot
 
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement && strtolower($child->tagName) === 'li') {
+                if ($child->hasAttribute('data-djot-inline-footnote')) {
+                    continue;
+                }
+
                 $indent = str_repeat('  ', $this->listDepth - 1);
 
                 // Check for task list item (has checkbox input)
@@ -753,6 +775,9 @@ class HtmlToDjot
             if (in_array($name, $allSkip, true)) {
                 continue;
             }
+            if (str_starts_with($name, 'data-djot-')) {
+                continue;
+            }
 
             $value = $attr->value;
             if ($value === '') {
@@ -769,6 +794,33 @@ class HtmlToDjot
         }
 
         return implode(' ', $parts);
+    }
+
+    protected function convertInlineFragmentToDjot(string $html): string
+    {
+        $converter = new self();
+
+        return trim($converter->convert($html));
+    }
+
+    protected function isInlineOnlyEndnotesSection(DOMElement $node): bool
+    {
+        if ($node->getAttribute('role') !== 'doc-endnotes') {
+            return false;
+        }
+
+        $listItems = $node->getElementsByTagName('li');
+        if ($listItems->length === 0) {
+            return false;
+        }
+
+        foreach ($listItems as $listItem) {
+            if (!$listItem instanceof DOMElement || !$listItem->hasAttribute('data-djot-inline-footnote')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected function cleanup(string $djot): string
