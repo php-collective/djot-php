@@ -2,6 +2,46 @@
 
 Configure parser behavior for different use cases.
 
+## Quick Reference
+
+::: code-group
+
+```php [HTML (default)]
+use Djot\DjotConverter;
+
+// Simple - all defaults
+$converter = new DjotConverter();
+
+// With options
+$converter = new DjotConverter(
+    xhtml: true,
+    significantNewlines: true,
+);
+```
+
+```php [Other Formats]
+use Djot\DjotConverter;
+
+// Named constructors for other formats
+$converter = DjotConverter::markdown();
+$converter = DjotConverter::plainText();
+$converter = DjotConverter::ansi();
+```
+
+```php [Advanced]
+use Djot\DjotConverter;
+use Djot\Parser\BlockParser;
+use Djot\Renderer\HtmlRenderer;
+
+// Full control via create()
+$converter = DjotConverter::create(
+    new BlockParser(significantNewlines: true),
+    new HtmlRenderer(xhtml: true),
+);
+```
+
+:::
+
 ## Soft Break Modes
 
 Control how soft breaks (single newlines in source) are rendered in HTML output.
@@ -15,13 +55,13 @@ use Djot\Renderer\SoftBreakMode;
 $converter = new DjotConverter();
 
 // Newline mode (default) - renders as "\n" in HTML source
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
+$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
 
 // Space mode - renders as a single space
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space);
+$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Space);
 
 // Break mode - renders as <br> (visible line break)
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Break);
+$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Break);
 ```
 
 ### Example: Poetry or Lyrics
@@ -33,7 +73,7 @@ use Djot\DjotConverter;
 use Djot\Renderer\SoftBreakMode;
 
 $converter = new DjotConverter();
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Break);
+$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Break);
 
 $poem = "Roses are red
 Violets are blue
@@ -71,16 +111,18 @@ The "significant newlines" mode provides markdown-like behavior where block elem
 
 ```php
 use Djot\DjotConverter;
+use Djot\Parser\BlockParser;
 
-// Method 1: Factory method (also enables SoftBreakMode::Break)
+// Method 1: Factory method
 $converter = DjotConverter::withSignificantNewlines();
 
 // Method 2: Constructor parameter
 $converter = new DjotConverter(significantNewlines: true);
 
-// Method 3: Parser-level control
-use Djot\Parser\BlockParser;
-$parser = new BlockParser(significantNewlines: true);
+// Method 3: With other output formats
+$converter = DjotConverter::markdown(
+    new BlockParser(significantNewlines: true),
+);
 ```
 
 ### Behavior Comparison

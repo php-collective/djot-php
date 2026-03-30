@@ -17,9 +17,11 @@ class HeadingLevelShiftExtensionTest extends TestCase
 
         $result = $converter->convert("# Heading 1\n\n## Heading 2\n\n### Heading 3");
 
-        $this->assertStringContainsString('<h2 id="Heading-1">Heading 1</h2>', $result);
-        $this->assertStringContainsString('<h3 id="Heading-2">Heading 2</h3>', $result);
-        $this->assertStringContainsString('<h4 id="Heading-3">Heading 3</h4>', $result);
+        // Headings are shifted, section wrapping preserved
+        $this->assertStringContainsString('<h2>Heading 1</h2>', $result);
+        $this->assertStringContainsString('<h3>Heading 2</h3>', $result);
+        $this->assertStringContainsString('<h4>Heading 3</h4>', $result);
+        $this->assertStringContainsString('<section id="Heading-1">', $result);
     }
 
     public function testShiftByTwo(): void
@@ -29,8 +31,8 @@ class HeadingLevelShiftExtensionTest extends TestCase
 
         $result = $converter->convert("# Heading 1\n\n## Heading 2");
 
-        $this->assertStringContainsString('<h3 id="Heading-1">Heading 1</h3>', $result);
-        $this->assertStringContainsString('<h4 id="Heading-2">Heading 2</h4>', $result);
+        $this->assertStringContainsString('<h3>Heading 1</h3>', $result);
+        $this->assertStringContainsString('<h4>Heading 2</h4>', $result);
     }
 
     public function testCapsAtH6(): void
@@ -40,9 +42,8 @@ class HeadingLevelShiftExtensionTest extends TestCase
 
         $result = $converter->convert("##### Heading 5\n\n###### Heading 6");
 
-        // h5 + 2 = h6 (capped), h6 + 2 = h6 (capped, no change)
-        $this->assertStringContainsString('<h6 id="Heading-5">Heading 5</h6>', $result);
-        // h6 stays h6, so extension doesn't intercept - section wrapping applies
+        // h5 + 2 = h6 (capped), h6 + 2 = h6 (capped)
+        $this->assertStringContainsString('<h6>Heading 5</h6>', $result);
         $this->assertStringContainsString('<h6>Heading 6</h6>', $result);
     }
 
@@ -66,7 +67,8 @@ class HeadingLevelShiftExtensionTest extends TestCase
         // In djot, attributes go on line before the heading
         $result = $converter->convert("{.custom-class}\n# Heading");
 
-        $this->assertStringContainsString('<h2 id="Heading" class="custom-class">Heading</h2>', $result);
+        $this->assertStringContainsString('<h2 class="custom-class">Heading</h2>', $result);
+        $this->assertStringContainsString('<section id="Heading">', $result);
     }
 
     public function testPreservesExplicitId(): void
@@ -77,7 +79,8 @@ class HeadingLevelShiftExtensionTest extends TestCase
         // In djot, attributes go on line before the heading
         $result = $converter->convert("{#my-id}\n# Heading");
 
-        $this->assertStringContainsString('<h2 id="my-id">Heading</h2>', $result);
+        $this->assertStringContainsString('<h2>Heading</h2>', $result);
+        $this->assertStringContainsString('<section id="my-id">', $result);
     }
 
     public function testShiftClampedToValidRange(): void
@@ -89,7 +92,7 @@ class HeadingLevelShiftExtensionTest extends TestCase
         $result = $converter->convert('# Heading 1');
 
         // h1 + 5 = h6
-        $this->assertStringContainsString('<h6 id="Heading-1">Heading 1</h6>', $result);
+        $this->assertStringContainsString('<h6>Heading 1</h6>', $result);
     }
 
     public function testNegativeShiftClampedToZero(): void
@@ -109,11 +112,36 @@ class HeadingLevelShiftExtensionTest extends TestCase
         $converter = new DjotConverter();
         $converter->addExtension(new HeadingLevelShiftExtension(shift: 1));
 
-        // When extension intercepts, it provides its own HTML (no section wrapper)
-        // Section wrapping only happens when extension doesn't preventDefault
         $result = $converter->convert("# Heading 1\n\nContent");
 
-        $this->assertStringContainsString('<h2 id="Heading-1">Heading 1</h2>', $result);
+        // Section wrapping is preserved with shifted heading
+        $this->assertStringContainsString('<section id="Heading-1">', $result);
+        $this->assertStringContainsString('<h2>Heading 1</h2>', $result);
         $this->assertStringContainsString('<p>Content</p>', $result);
+    }
+
+    public function testWorksWithMarkdownRenderer(): void
+    {
+        $converter = DjotConverter::markdown();
+        $converter->addExtension(new HeadingLevelShiftExtension(shift: 1));
+
+        $result = $converter->convert("# Heading 1\n\n## Heading 2");
+
+        // Markdown output with shifted levels
+        $this->assertStringContainsString('## Heading 1', $result);
+        $this->assertStringContainsString('### Heading 2', $result);
+    }
+
+    public function testWorksWithPlainTextRenderer(): void
+    {
+        $converter = DjotConverter::plainText();
+        $converter->addExtension(new HeadingLevelShiftExtension(shift: 1));
+
+        $result = $converter->convert("# Heading 1\n\nSome text.");
+
+        // Plain text just renders content
+        $this->assertStringContainsString('Heading 1', $result);
+        $this->assertStringContainsString('Some text.', $result);
+        $this->assertStringNotContainsString('<', $result);
     }
 }

@@ -32,7 +32,7 @@ $html = $converter->convert('Hello *world*!');
 - **Inline elements**: Emphasis, strong, links, images, code, superscript, subscript, highlight, insert, delete
 - **Advanced**: Footnotes, math expressions, symbols, block attributes, raw HTML blocks, comments
 - **Smart typography**: Curly quotes, en/em dashes, ellipsis
-- **Multiple renderers**: HTML, plain text, Markdown output
+- **Multiple renderers**: HTML, plain text, Markdown, ANSI terminal output
 - **Extensions**: Built-in extensions for external links, TOC, heading permalinks, @mentions, autolinks, default attributes
 - **Extensible**: Custom inline/block patterns, render events
 - **File support**: Parse and convert files directly

@@ -7,9 +7,12 @@ namespace Djot\Test\TestCase;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Exception\ParseException;
+use Djot\Extension\HeadingLevelShiftExtension;
+use Djot\Extension\TabsExtension;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Symbol;
 use Djot\Profile;
+use Djot\Renderer\MarkdownRenderer;
 use Djot\Renderer\SoftBreakMode;
 use LengthException;
 use PHPUnit\Framework\TestCase;
@@ -2100,7 +2103,7 @@ DJOT;
      */
     public function testSmartQuotesConsecutiveOpenersAtLineStart(): void
     {
-        $this->converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
+        $this->converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
 
         $djot = "\"Hello,\" said the spider.\n\"'Shelob' is my name.\"";
         $result = $this->converter->convert($djot);
@@ -3018,5 +3021,94 @@ DJOT;
         $converter->convert("[target]{#my-target}\n\n[link](#my-target)");
 
         $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testExtensionsWithPlainTextRenderer(): void
+    {
+        // Extensions should gracefully degrade with non-HTML renderers
+        $converter = DjotConverter::plainText();
+        $converter->addExtension(new HeadingLevelShiftExtension(shift: 1));
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+# Main Title
+
+::: tabs
+::: tab
+### Tab 1
+
+Content 1
+:::
+
+::: tab
+### Tab 2
+
+Content 2
+:::
+:::
+
+Some paragraph.
+DJOT;
+
+        $result = $converter->convert($djot);
+
+        // Should render content without HTML-specific transforms
+        $this->assertStringContainsString('Main Title', $result);
+        $this->assertStringContainsString('Tab 1', $result);
+        $this->assertStringContainsString('Content 1', $result);
+        $this->assertStringContainsString('Some paragraph', $result);
+        // Should NOT contain HTML
+        $this->assertStringNotContainsString('<', $result);
+    }
+
+    public function testNamedConstructors(): void
+    {
+        $djot = "# Hello\n\nWorld";
+
+        // markdown()
+        $converter = DjotConverter::markdown();
+        $result = $converter->convert($djot);
+        $this->assertStringContainsString('# Hello', $result);
+        $this->assertStringNotContainsString('<h1>', $result);
+
+        // plainText()
+        $converter = DjotConverter::plainText();
+        $result = $converter->convert($djot);
+        $this->assertStringContainsString('Hello', $result);
+        $this->assertStringNotContainsString('#', $result);
+        $this->assertStringNotContainsString('<', $result);
+
+        // ansi()
+        $converter = DjotConverter::ansi();
+        $result = $converter->convert($djot);
+        $this->assertStringContainsString('Hello', $result);
+    }
+
+    public function testCreateWithCustomRenderer(): void
+    {
+        $converter = DjotConverter::create(
+            renderer: new MarkdownRenderer(),
+        );
+
+        $result = $converter->convert("# Hello\n\n*bold*");
+
+        $this->assertStringContainsString('# Hello', $result);
+        $this->assertStringContainsString('**bold**', $result);
+    }
+
+    public function testOnOffNoOpWithNonHtmlRenderer(): void
+    {
+        $converter = DjotConverter::plainText();
+
+        // Should not throw, just return $this
+        $result = $converter->on('render.paragraph', function () {
+        });
+        $this->assertSame($converter, $result);
+
+        $result = $converter->off('render.paragraph');
+        $this->assertSame($converter, $result);
+
+        $result = $converter->setSafeMode(true);
+        $this->assertSame($converter, $result);
     }
 }

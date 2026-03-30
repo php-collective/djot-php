@@ -18,6 +18,11 @@ class Heading extends BlockNode
         return $this->level;
     }
 
+    public function setLevel(int $level): void
+    {
+        $this->level = max(1, min(6, $level));
+    }
+
     public function getType(): string
     {
         return 'heading';

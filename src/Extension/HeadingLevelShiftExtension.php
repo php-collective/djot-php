@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Djot\Extension;
 
 use Djot\DjotConverter;
-use Djot\Event\RenderEvent;
 use Djot\Node\Block\Heading;
+use Djot\Node\Document;
+use Djot\Node\Node;
 
 /**
  * Shifts heading levels down (h1 → h2, h2 → h3, etc.)
@@ -25,8 +26,8 @@ use Djot\Node\Block\Heading;
  * $converter->addExtension(new HeadingLevelShiftExtension(shift: 2));
  * ```
  *
- * Note: Heading levels are capped at h6. When this extension shifts a heading,
- * it outputs the heading directly without automatic `<section>` wrapping.
+ * Note: Heading levels are capped at h6 (enforced by Heading::setLevel).
+ * Works with all renderers (HTML, Markdown, PlainText, ANSI).
  */
 class HeadingLevelShiftExtension implements ExtensionInterface
 {
@@ -40,35 +41,32 @@ class HeadingLevelShiftExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
+        // Registration not needed - we use beforeRender hook
+    }
+
+    /**
+     * Modify heading levels in the AST before rendering
+     */
+    public function beforeRender(Document $document): void
+    {
         if ($this->shift === 0) {
             return;
         }
 
-        $tracker = $converter->getHeadingIdTracker();
-        $renderer = $converter->getRenderer();
-        $shift = $this->shift;
+        $this->walkAndShift($document);
+    }
 
-        $converter->on('render.heading', function (RenderEvent $event) use ($tracker, $renderer, $shift): void {
-            $node = $event->getNode();
-            if (!$node instanceof Heading) {
-                return;
-            }
+    /**
+     * Recursively walk the AST and shift heading levels
+     */
+    protected function walkAndShift(Node $node): void
+    {
+        if ($node instanceof Heading) {
+            $node->setLevel($node->getLevel() + $this->shift);
+        }
 
-            $originalLevel = $node->getLevel();
-            $newLevel = min($originalLevel + $shift, 6);
-
-            if ($newLevel === $originalLevel) {
-                return;
-            }
-
-            $id = $tracker->getIdForHeading($node);
-            $attrs = $renderer->renderAttributesExcluding($node, ['id']);
-
-            $html = '<h' . $newLevel . ' id="' . $renderer->escapeAttribute($id) . '"' . $attrs . '>'
-                . $event->getChildrenHtml()
-                . '</h' . $newLevel . ">\n";
-
-            $event->setHtml($html);
-        });
+        foreach ($node->getChildren() as $child) {
+            $this->walkAndShift($child);
+        }
     }
 }

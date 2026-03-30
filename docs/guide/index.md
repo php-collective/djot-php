@@ -125,6 +125,20 @@ echo $renderer->render($document);
 
 :::
 
+### Alternative Output Formats
+
+Use named constructors for different output formats:
+
+```php
+use Djot\DjotConverter;
+
+$converter = DjotConverter::markdown();   // Djot → Markdown
+$converter = DjotConverter::plainText();  // Djot → Plain text
+$converter = DjotConverter::ansi();       // Djot → ANSI terminal
+```
+
+See [Parser Options](./parser-options) for advanced configuration.
+
 ## CLI Tool
 
 djot-php includes a command-line tool:

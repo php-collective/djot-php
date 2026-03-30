@@ -53,7 +53,7 @@ use Djot\Node\Node;
  * Produces colored, styled text suitable for display in terminals
  * that support ANSI escape codes.
  */
-class AnsiRenderer
+class AnsiRenderer implements RendererInterface
 {
     // ANSI escape codes
     /**

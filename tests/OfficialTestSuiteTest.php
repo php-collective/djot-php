@@ -45,7 +45,7 @@ class OfficialTestSuiteTest extends TestCase
     {
         $this->converter = new DjotConverter();
         // Official djot renders soft breaks as newlines
-        $this->converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
+        $this->converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
     }
 
     /**
