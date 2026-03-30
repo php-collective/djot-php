@@ -191,11 +191,7 @@ class AdmonitionExtension implements ExtensionInterface
     protected function getAdmonitionType(Div $node): ?string
     {
         $classAttr = (string)$node->getAttribute('class');
-        $classes = preg_split('/\s+/', trim($classAttr));
-
-        if (!is_array($classes)) {
-            return null;
-        }
+        $classes = preg_split('/\s+/', trim($classAttr)) ?: [];
 
         foreach ($classes as $class) {
             if (in_array($class, $this->types, true)) {

@@ -160,8 +160,7 @@ class HeadingPermalinksExtension implements ExtensionInterface
                 continue;
             }
 
-            $classes = preg_split('/\s+/', trim((string)$child->getAttribute('class')));
-            if (!is_array($classes) || !in_array('permalink-wrapper', $classes, true)) {
+            if (!$child->hasClass('permalink-wrapper')) {
                 continue;
             }
 
