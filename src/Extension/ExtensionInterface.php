@@ -13,6 +13,12 @@ use Djot\DjotConverter;
  * - Custom inline patterns (e.g., @mentions, [[wiki-links]])
  * - Custom block patterns (e.g., admonitions, spoilers)
  * - Render event listeners (e.g., external link handling, heading permalinks)
+ * - Optional `beforeRender()` hooks for AST preprocessing
+ *
+ * If an extension mutates the AST in `beforeRender()`, it should also implement
+ * `MutatesDocumentBeforeRenderInterface`. This tells `DjotConverter` to clone the
+ * caller-provided `Document` before running preprocessing hooks, keeping repeated
+ * `render()` calls on the same AST stable.
  *
  * Example:
  * ```php

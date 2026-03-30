@@ -43,7 +43,7 @@ use Djot\Renderer\HtmlRenderer;
  *
  * @see https://github.com/jgm/djot/issues/286
  */
-class InlineFootnotesExtension implements ExtensionInterface
+class InlineFootnotesExtension implements ExtensionInterface, MutatesDocumentBeforeRenderInterface
 {
     protected bool $isHtmlRenderer = false;
 

@@ -106,6 +106,11 @@ Renders an AST Document to HTML.
 
 Registered extensions are reset before each render, so repeated `convert()` calls on the same converter start with fresh per-document extension state.
 
+Extensions that mutate the AST in `beforeRender()` should implement
+`MutatesDocumentBeforeRenderInterface`. When such an extension is registered,
+the converter clones the provided `Document` before preprocessing so repeated
+`render()` calls do not mutate the caller-owned AST.
+
 #### getParser()
 
 ```php

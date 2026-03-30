@@ -7,6 +7,7 @@ namespace Djot;
 use Closure;
 use Djot\Extension\ExtensionInterface;
 use Djot\Extension\HeadingReferenceExtension;
+use Djot\Extension\MutatesDocumentBeforeRenderInterface;
 use Djot\Extension\WikilinksExtension;
 use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
@@ -334,7 +335,9 @@ class DjotConverter
      */
     public function render(Document $document): string
     {
-        $renderDocument = clone $document;
+        $renderDocument = $this->shouldCloneDocumentBeforeRender()
+            ? clone $document
+            : $document;
 
         foreach ($this->extensions as $extension) {
             if (method_exists($extension, 'clear')) {
@@ -346,6 +349,17 @@ class DjotConverter
         }
 
         return $this->renderer->render($renderDocument);
+    }
+
+    protected function shouldCloneDocumentBeforeRender(): bool
+    {
+        foreach ($this->extensions as $extension) {
+            if ($extension instanceof MutatesDocumentBeforeRenderInterface) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

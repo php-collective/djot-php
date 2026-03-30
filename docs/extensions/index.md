@@ -1532,6 +1532,11 @@ class HashtagExtension implements ExtensionInterface
 $converter->addExtension(new HashtagExtension(baseUrl: '/tags/'));
 ```
 
+If your extension mutates the AST in a `beforeRender(Document $document)` hook,
+also implement `MutatesDocumentBeforeRenderInterface`. This tells
+`DjotConverter` to clone the caller-provided `Document` before running
+preprocessing hooks, so repeated `render()` calls on the same AST remain stable.
+
 ## Using Multiple Extensions Together
 
 Here's a complete example using all extensions:

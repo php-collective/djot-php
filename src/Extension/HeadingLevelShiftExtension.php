@@ -29,7 +29,7 @@ use Djot\Node\Node;
  * Note: Heading levels are capped at h6 (enforced by Heading::setLevel).
  * Works with all renderers (HTML, Markdown, PlainText, ANSI).
  */
-class HeadingLevelShiftExtension implements ExtensionInterface
+class HeadingLevelShiftExtension implements ExtensionInterface, MutatesDocumentBeforeRenderInterface
 {
     /**
      * @param int $shift Number of levels to shift (1-5). Values are clamped to valid range.
