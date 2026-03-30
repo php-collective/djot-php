@@ -467,7 +467,7 @@ class HtmlToDjot
     {
         $inputs = $li->getElementsByTagName('input');
         foreach ($inputs as $input) {
-            if ($input instanceof DOMElement && $input->getAttribute('type') === 'checkbox') {
+            if ($input->getAttribute('type') === 'checkbox') {
                 return true;
             }
         }
@@ -482,7 +482,7 @@ class HtmlToDjot
     {
         $inputs = $li->getElementsByTagName('input');
         foreach ($inputs as $input) {
-            if ($input instanceof DOMElement && $input->getAttribute('type') === 'checkbox') {
+            if ($input->getAttribute('type') === 'checkbox') {
                 return $input->hasAttribute('checked');
             }
         }
