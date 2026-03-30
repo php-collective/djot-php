@@ -1232,6 +1232,7 @@ use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Extension\ExtensionInterface;
 use Djot\Node\Block\Div;
+use Djot\Util\StringUtil;
 use MediaEmbed\MediaEmbed;
 
 class VideoExtension implements ExtensionInterface
@@ -1263,7 +1264,7 @@ class VideoExtension implements ExtensionInterface
                 $object->setAttribute('loading', 'lazy');
             }
 
-            $html = '<figure class="' . $this->escape($this->figureClass) . "\">\n";
+            $html = '<figure class="' . StringUtil::escapeHtml($this->figureClass) . "\">\n";
             $html .= $object->getEmbedCode();
             $html .= "</figure>\n";
 
@@ -1276,11 +1277,6 @@ class VideoExtension implements ExtensionInterface
         $classes = preg_split('/\s+/', trim((string)$node->getAttribute('class')));
 
         return is_array($classes) && in_array($className, $classes, true);
-    }
-
-    protected function escape(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }
 ```

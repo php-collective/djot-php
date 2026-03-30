@@ -22,6 +22,9 @@ public function __construct(
     ?Profile $profile = null,
     bool $significantNewlines = false,
     ?SoftBreakMode $softBreakMode = null,
+    bool $roundTripMode = false,
+    ?BlockParser $parser = null,
+    ?RendererInterface $renderer = null,
 )
 ```
 
@@ -31,7 +34,10 @@ public function __construct(
 - `$safeMode`: When `true` or a `SafeMode` instance, enables XSS protection (see [Safe Mode](#safe-mode)).
 - `$profile`: A `Profile` instance for feature restriction (see [Profiles](/guide/profiles)).
 - `$significantNewlines`: When `true`, enables markdown-like parsing where block elements can interrupt paragraphs (see [Significant Newlines Mode](#significant-newlines-mode)).
-- `$softBreakMode`: Override how soft breaks are rendered (see [Soft Break Behavior](#soft-break-behavior)). When `null`, defaults to `<br>` if `significantNewlines` is enabled, otherwise newline.
+- `$softBreakMode`: Override how soft breaks are rendered. When `null`, uses the renderer's default (newline for HTML).
+- `$roundTripMode`: When `true`, adds round-trip metadata for Djot→HTML→Djot workflows (HTML renderer only).
+- `$parser`: Optional pre-configured parser. When provided, inline parser constructor flags such as `warnings`, `strict`, and `significantNewlines` are ignored.
+- `$renderer`: Optional pre-configured renderer. When provided, inline renderer constructor flags such as `xhtml`, `safeMode`, `softBreakMode`, and `roundTripMode` are ignored.
 
 ### Factory Methods
 
@@ -45,12 +51,11 @@ public static function withSignificantNewlines(
     bool|SafeMode|null $safeMode = null,
     ?Profile $profile = null,
     ?SoftBreakMode $softBreakMode = null,
+    bool $roundTripMode = false,
 ): self
 ```
 
 Creates a converter with significant newlines mode enabled. See [Significant Newlines Mode](#significant-newlines-mode).
-
-The `$softBreakMode` parameter allows overriding the default `<br>` soft break behavior when you want relaxed parsing without visible line breaks.
 
 ### Methods
 
@@ -153,10 +158,24 @@ Returns the block parser for direct access (useful for custom pattern registrati
 #### getRenderer()
 
 ```php
-public function getRenderer(): HtmlRenderer
+public function getRenderer(): RendererInterface
+```
+
+Returns the currently configured renderer.
+
+This may be `HtmlRenderer`, `MarkdownRenderer`, `PlainTextRenderer`,
+`AnsiRenderer`, or a custom renderer passed to `DjotConverter::create()` or the
+constructor.
+
+#### getHtmlRenderer()
+
+```php
+public function getHtmlRenderer(): HtmlRenderer
 ```
 
 Returns the HTML renderer for direct configuration.
+
+Throws `LogicException` if the converter is not using `HtmlRenderer`.
 
 #### on()
 
@@ -867,7 +886,8 @@ $parser->setSignificantNewlines(true);
 |---------|---------------|---------------------------|
 | Block elements interrupt paragraphs | No (blank line required) | Yes |
 | Nested lists need blank lines | Yes | No |
-| Soft breaks render as | `\n` or space | `<br>` |
+
+Note: Soft break rendering is controlled separately via `SoftBreakMode` - it is not affected by significant newlines mode.
 
 ### Example
 
@@ -911,32 +931,25 @@ Steps:
 \1. This is not an ordered list
 ```
 
-### Soft Break Behavior
+## Soft Break Behavior
 
-When `significantNewlines` is enabled, soft breaks automatically render as `<br>` by default. You can override this behavior:
+Soft break rendering is configured via `SoftBreakMode` and is independent of `significantNewlines` mode:
 
 ```php
+use Djot\DjotConverter;
 use Djot\Renderer\SoftBreakMode;
 
-// Option 1: Override via parameter (recommended)
-$converter = DjotConverter::withSignificantNewlines(
-    softBreakMode: SoftBreakMode::Space,
-);
+// Set via constructor
+$converter = new DjotConverter(softBreakMode: SoftBreakMode::Break);
 
-// Option 2: Override via constructor
+// Combine with significant newlines for chat-style input
 $converter = new DjotConverter(
     significantNewlines: true,
-    softBreakMode: SoftBreakMode::Space,
+    softBreakMode: SoftBreakMode::Break,
 );
-
-// Option 3: Override after construction
-$converter = DjotConverter::withSignificantNewlines();
-$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Space);
 ```
 
-This is useful for WYSIWYG editors where you want relaxed parsing (nested lists without blank lines) but don't want every line break to become a `<br>`.
-
-See [enhancements.md](./enhancements#significant-newlines-mode) for upstream tracking.
+Available modes: `Newline` (default for HTML/Markdown), `Space` (default for PlainText/ANSI), `Break` (visible line break). Output varies by renderer - see [Parser Options](/guide/parser-options#soft-break-modes) for details.
 
 ## Feature Support Matrix
 

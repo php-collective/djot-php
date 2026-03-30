@@ -44,7 +44,7 @@ $converter = DjotConverter::create(
 
 ## Soft Break Modes
 
-Control how soft breaks (single newlines in source) are rendered in HTML output.
+Control how soft breaks (single newlines in source) are rendered. This setting is available on all renderers.
 
 ### Available Modes
 
@@ -52,17 +52,17 @@ Control how soft breaks (single newlines in source) are rendered in HTML output.
 use Djot\DjotConverter;
 use Djot\Renderer\SoftBreakMode;
 
-$converter = new DjotConverter();
-
-// Newline mode (default) - renders as "\n" in HTML source
-$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
-
-// Space mode - renders as a single space
-$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Space);
-
-// Break mode - renders as <br> (visible line break)
-$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Break);
+// Set via constructor
+$converter = new DjotConverter(softBreakMode: SoftBreakMode::Space);
+$converter = new DjotConverter(softBreakMode: SoftBreakMode::Newline);
+$converter = new DjotConverter(softBreakMode: SoftBreakMode::Break);
 ```
+
+| Mode                             | HTML   | Markdown            | Plain Text |
+|----------------------------------|--------|---------------------|------------|
+| `Space` (default for Plain/ANSI) | ` `    | ` `                 | ` `        |
+| `Newline` (default for HTML)     | `\n`   | `\n`                | `\n`       |
+| `Break`                          | `<br>` | `  \n` (two spaces) | `\n`       |
 
 ### Example: Poetry or Lyrics
 
@@ -72,8 +72,7 @@ For content where line breaks should be visible (poetry, lyrics, addresses):
 use Djot\DjotConverter;
 use Djot\Renderer\SoftBreakMode;
 
-$converter = new DjotConverter();
-$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Break);
+$converter = new DjotConverter(softBreakMode: SoftBreakMode::Break);
 
 $poem = "Roses are red
 Violets are blue

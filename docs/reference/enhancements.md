@@ -291,7 +291,8 @@ $parser = new BlockParser(significantNewlines: true);
 |----------|---------------|---------------------------|
 | Block elements interrupt paragraphs | No (blank line required) | Yes |
 | Nested lists need blank lines | Yes | No |
-| Soft breaks render as | `\n` or space | `<br>` |
+
+Note: Soft break rendering is controlled separately via `SoftBreakMode` and is not affected by this setting.
 
 **Example:**
 ```djot

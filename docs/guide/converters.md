@@ -250,15 +250,19 @@ $back = $htmlToDjot->convert($html);
 | Thematic breaks | `data-char` | Preserves `*` vs `-` character |
 | Unordered lists | `data-marker` | Preserves `*`, `+`, or `-` marker |
 | Ordered lists | `data-marker` | Preserves `)` vs `.` delimiter |
+| Heading references | `data-djot-heading-ref*` | Preserves `[[Heading]]` / `[[Heading|Text]]` syntax |
 | Shifted headings | `data-djot-source-level` | Preserves original Djot heading level during HTML round-trips |
 | Inline footnotes | `data-djot-inline-footnote-*` | Preserves inline-footnote syntax and custom footnote class |
+| Table separator widths | `data-djot-col-widths` | Preserves original table separator widths during HTML round-trips |
 
 Without round-trip mode, these elements use defaults when converting back:
 - Thematic breaks → `---`
 - Unordered lists → `-` marker
 - Ordered lists → `.` delimiter
+- Heading references → ordinary links such as `[Text](#heading-id)`
 - Shifted headings → rendered heading level
 - Inline footnotes → regular footnote HTML without inline-footnote provenance
+- Tables → regenerated separator widths based on converted cell content
 
 When using explicit AST transforms through `DjotConverter::transform()`, renderer-aware transforms such as `HeadingLevelShiftTransform` automatically preserve round-trip metadata when the converter uses `HtmlRenderer` with round-trip mode enabled.
 
