@@ -39,7 +39,7 @@ class MarkdownToDjot
             // Track code blocks to avoid converting inside them
             if (!$inCodeBlock && preg_match('/^(`{3,}|~{3,})/', $line, $matches)) {
                 // Ensure blank line before code fence
-                if ($prevLineType !== 'blank' && count($result) > 0) {
+                if ($prevLineType !== 'blank' && $result !== []) {
                     $result[] = '';
                 }
                 $inCodeBlock = true;

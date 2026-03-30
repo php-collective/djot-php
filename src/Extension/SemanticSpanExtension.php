@@ -89,7 +89,7 @@ class SemanticSpanExtension implements ExtensionInterface
 
             // Wrap in <abbr> if abbr attribute present (with title)
             if ($abbr !== null && $abbr !== '') {
-                $html = '<abbr title="' . $this->escapeAttribute((string)$abbr) . '">' . $html . '</abbr>';
+                $html = '<abbr title="' . $this->escape((string)$abbr) . '">' . $html . '</abbr>';
             }
 
             // Wrap in <kbd> if kbd attribute present
@@ -100,7 +100,7 @@ class SemanticSpanExtension implements ExtensionInterface
             // Wrap in <dfn> if dfn attribute present (with optional title)
             if ($dfn !== null) {
                 if ($dfn !== '') {
-                    $html = '<dfn title="' . $this->escapeAttribute((string)$dfn) . '">' . $html . '</dfn>';
+                    $html = '<dfn title="' . $this->escape((string)$dfn) . '">' . $html . '</dfn>';
                 } else {
                     $html = '<dfn>' . $html . '</dfn>';
                 }
@@ -119,7 +119,7 @@ class SemanticSpanExtension implements ExtensionInterface
     /**
      * Escape a string for use in an HTML attribute
      */
-    protected function escapeAttribute(string $value): string
+    protected function escape(string $value): string
     {
         return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
@@ -134,7 +134,7 @@ class SemanticSpanExtension implements ExtensionInterface
         $html = '';
         foreach ($attrs as $key => $value) {
             $html .= ' ' . htmlspecialchars($key, ENT_QUOTES | ENT_HTML5, 'UTF-8')
-                . '="' . $this->escapeAttribute((string)$value) . '"';
+                . '="' . $this->escape((string)$value) . '"';
         }
 
         return $html;

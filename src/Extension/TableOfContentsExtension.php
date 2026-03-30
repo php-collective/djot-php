@@ -168,7 +168,7 @@ class TableOfContentsExtension implements ExtensionInterface
             return '';
         }
 
-        $html = '<nav class="' . htmlspecialchars($this->cssClass, ENT_QUOTES, 'UTF-8') . '">' . "\n";
+        $html = '<nav class="' . $this->escape($this->cssClass) . '">' . "\n";
         $html .= $this->renderTocList($headings);
         $html .= '</nav>' . "\n";
 
@@ -218,8 +218,8 @@ class TableOfContentsExtension implements ExtensionInterface
 
             // Render the item
             $html .= '<li>';
-            $html .= '<a href="#' . htmlspecialchars($heading['id'], ENT_QUOTES, 'UTF-8') . '">';
-            $html .= htmlspecialchars($heading['text'], ENT_QUOTES, 'UTF-8');
+            $html .= '<a href="#' . $this->escape($heading['id']) . '">';
+            $html .= $this->escape($heading['text']);
             $html .= '</a>';
         }
 
@@ -231,5 +231,13 @@ class TableOfContentsExtension implements ExtensionInterface
         }
 
         return $html;
+    }
+
+    /**
+     * Escape HTML special characters
+     */
+    protected function escape(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }

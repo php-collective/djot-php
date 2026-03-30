@@ -512,7 +512,7 @@ class DjotConverter
      */
     public function hasWarnings(): bool
     {
-        return count($this->parser->getWarnings()) > 0;
+        return $this->parser->getWarnings() !== [];
     }
 
     /**
@@ -540,7 +540,7 @@ class DjotConverter
      */
     public function hasProfileViolations(): bool
     {
-        return count($this->getProfileViolations()) > 0;
+        return $this->getProfileViolations() !== [];
     }
 
     /**

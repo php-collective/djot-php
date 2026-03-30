@@ -2111,7 +2111,7 @@ class BlockParser
 
                 // Mark previous row as header and apply alignments to it
                 $children = $table->getChildren();
-                if (count($children) > 0) {
+                if ($children !== []) {
                     $lastRow = $children[count($children) - 1];
                     if ($lastRow instanceof TableRow) {
                         // Recreate as header row with alignments

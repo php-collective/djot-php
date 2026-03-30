@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Converter;
 
+use Djot\Util\StringUtil;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
@@ -244,12 +245,7 @@ class HtmlToDjot
 
         $content = $node->textContent;
 
-        // Use enough backticks to avoid conflicts
-        $backticks = '`';
-        while (str_contains($content, $backticks)) {
-            $backticks .= '`';
-        }
-
+        $backticks = StringUtil::findSafeCodeFence($content, 1);
         $attrs = $this->formatInlineAttributes($node);
 
         return $backticks . $content . $backticks . $attrs;
@@ -274,12 +270,7 @@ class HtmlToDjot
             }
         }
 
-        // Use enough backticks
-        $backticks = '```';
-        while (str_contains($content, $backticks)) {
-            $backticks .= '`';
-        }
-
+        $backticks = StringUtil::findSafeCodeFence($content, 3);
         $this->inPre = false;
 
         // Get attributes from pre element (skip class on code since used for language)

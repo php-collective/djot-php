@@ -44,6 +44,7 @@ use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\Utility\EventDispatcherTrait;
+use Djot\Util\StringUtil;
 
 /**
  * Renders AST to Markdown (CommonMark compatible where possible)
@@ -182,11 +183,7 @@ class MarkdownRenderer implements RendererInterface
         $language = $node->getLanguage() ?? '';
         $content = $node->getContent();
 
-        // Use enough backticks to avoid conflicts
-        $backticks = '```';
-        while (str_contains($content, $backticks)) {
-            $backticks .= '`';
-        }
+        $backticks = StringUtil::findSafeCodeFence($content, 3);
 
         return $backticks . $language . "\n" . $content . "\n" . $backticks . "\n\n";
     }
@@ -367,11 +364,7 @@ class MarkdownRenderer implements RendererInterface
     {
         $content = $node->getContent();
 
-        // Use enough backticks to avoid conflicts
-        $backticks = '`';
-        while (str_contains($content, $backticks)) {
-            $backticks .= '`';
-        }
+        $backticks = StringUtil::findSafeCodeFence($content, 1);
 
         // Add spaces if content starts/ends with backtick
         if (str_starts_with($content, '`') || str_ends_with($content, '`')) {

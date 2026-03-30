@@ -48,7 +48,7 @@ abstract class Node
 
     public function hasChildren(): bool
     {
-        return count($this->children) > 0;
+        return $this->children !== [];
     }
 
     public function replaceChild(int $index, Node $child): void
