@@ -221,14 +221,18 @@ echo "Hello";
 
 ### Round-Trip Mode
 
-For perfect Djot→HTML→Djot round-trips, enable round-trip mode on the HtmlRenderer. This adds data attributes to preserve Djot-specific syntax that would otherwise be lost:
+For perfect Djot→HTML→Djot round-trips, enable round-trip mode. This adds data attributes to preserve Djot-specific syntax that would otherwise be lost:
 
 ```php
 use Djot\DjotConverter;
 use Djot\Converter\HtmlToDjot;
 
-$djotConverter = new DjotConverter();
-$djotConverter->getRenderer()->setRoundTripMode(true);
+// Via constructor
+$djotConverter = new DjotConverter(roundTripMode: true);
+
+// Or via renderer
+// $djotConverter = new DjotConverter();
+// $djotConverter->getRenderer()->setRoundTripMode(true);
 
 $djot = '***';  // Asterisk thematic break
 $html = $djotConverter->convert($djot);
