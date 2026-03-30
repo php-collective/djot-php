@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Djot\Extension;
 
 use Djot\DjotConverter;
-use Djot\Node\Block\Heading;
-use Djot\Node\Document;
-use Djot\Node\Node;
+use Djot\Renderer\AnsiRenderer;
+use Djot\Renderer\HtmlRenderer;
+use Djot\Renderer\MarkdownRenderer;
+use Djot\Renderer\PlainTextRenderer;
 
 /**
  * Shifts heading levels down (h1 → h2, h2 → h3, etc.)
@@ -26,8 +27,8 @@ use Djot\Node\Node;
  * $converter->addExtension(new HeadingLevelShiftExtension(shift: 2));
  * ```
  *
- * Note: Heading levels are capped at h6 (enforced by Heading::setLevel).
- * Works with all renderers (HTML, Markdown, PlainText, ANSI).
+ * Note: Rendered heading levels are capped at h6.
+ * Works with all built-in renderers (HTML, Markdown, PlainText, ANSI).
  */
 class HeadingLevelShiftExtension implements ExtensionInterface
 {
@@ -41,32 +42,19 @@ class HeadingLevelShiftExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
-        // Registration not needed - we use beforeRender hook
-    }
-
-    /**
-     * Modify heading levels in the AST before rendering
-     */
-    public function beforeRender(Document $document): void
-    {
         if ($this->shift === 0) {
             return;
         }
 
-        $this->walkAndShift($document);
-    }
+        $renderer = $converter->getRenderer();
 
-    /**
-     * Recursively walk the AST and shift heading levels
-     */
-    protected function walkAndShift(Node $node): void
-    {
-        if ($node instanceof Heading) {
-            $node->setLevel($node->getLevel() + $this->shift);
-        }
-
-        foreach ($node->getChildren() as $child) {
-            $this->walkAndShift($child);
+        if (
+            $renderer instanceof HtmlRenderer
+            || $renderer instanceof MarkdownRenderer
+            || $renderer instanceof PlainTextRenderer
+            || $renderer instanceof AnsiRenderer
+        ) {
+            $renderer->setHeadingLevelShift($this->shift);
         }
     }
 }

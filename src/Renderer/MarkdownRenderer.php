@@ -69,6 +69,8 @@ class MarkdownRenderer implements RendererInterface
 
     protected SoftBreakMode $softBreakMode = SoftBreakMode::Newline;
 
+    protected int $headingLevelShift = 0;
+
     /**
      * Set how soft breaks are rendered
      *
@@ -87,6 +89,16 @@ class MarkdownRenderer implements RendererInterface
     public function getSoftBreakMode(): SoftBreakMode
     {
         return $this->softBreakMode;
+    }
+
+    /**
+     * Shift rendered heading levels without mutating the AST.
+     */
+    public function setHeadingLevelShift(int $shift): self
+    {
+        $this->headingLevelShift = max(0, min($shift, 5));
+
+        return $this;
     }
 
     public function render(Document $document): string
@@ -172,7 +184,7 @@ class MarkdownRenderer implements RendererInterface
 
     protected function renderHeading(Heading $node): string
     {
-        $prefix = str_repeat('#', $node->getLevel()) . ' ';
+        $prefix = str_repeat('#', min($node->getLevel() + $this->headingLevelShift, 6)) . ' ';
 
         return $prefix . $this->renderChildren($node) . "\n\n";
     }

@@ -62,6 +62,8 @@ class PlainTextRenderer implements RendererInterface
 
     protected SoftBreakMode $softBreakMode = SoftBreakMode::Space;
 
+    protected int $headingLevelShift = 0;
+
     /**
      * Set how soft breaks are rendered
      *
@@ -83,6 +85,19 @@ class PlainTextRenderer implements RendererInterface
     public function getSoftBreakMode(): SoftBreakMode
     {
         return $this->softBreakMode;
+    }
+
+    /**
+     * Shift rendered heading levels without mutating the AST.
+     *
+     * Plain text output does not render heading levels explicitly, so this is a
+     * no-op kept for API symmetry with the other renderers.
+     */
+    public function setHeadingLevelShift(int $shift): self
+    {
+        $this->headingLevelShift = max(0, min($shift, 5));
+
+        return $this;
     }
 
     public function render(Document $document): string

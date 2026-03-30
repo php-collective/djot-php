@@ -191,10 +191,6 @@ Events are fired for each node type using the pattern `render.{node_type}`:
 
 See the [Cookbook](/cookbook/) for common customization recipes.
 
-For the longer-term direction on extension preprocessing and avoiding AST
-mutation during `render()`, see
-[Non-Mutating `beforeRender()` Plan](./non-mutating-before-render-plan.md).
-
 ### Adding New Syntax
 
 For entirely new syntax elements, extend the parser:

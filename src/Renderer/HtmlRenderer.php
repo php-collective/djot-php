@@ -69,6 +69,8 @@ class HtmlRenderer implements RendererInterface
      */
     protected ?int $codeBlockTabWidth = 4;
 
+    protected int $headingLevelShift = 0;
+
     /**
      * Round-trip mode adds data attributes to preserve Djot-specific information
      * for perfect HTML→Djot conversion (e.g., list markers, thematic break characters)
@@ -222,6 +224,16 @@ class HtmlRenderer implements RendererInterface
     public function getCodeBlockTabWidth(): ?int
     {
         return $this->codeBlockTabWidth;
+    }
+
+    /**
+     * Shift rendered heading levels without mutating the AST.
+     */
+    public function setHeadingLevelShift(int $shift): self
+    {
+        $this->headingLevelShift = max(0, min($shift, 5));
+
+        return $this;
     }
 
     /**
@@ -426,7 +438,7 @@ class HtmlRenderer implements RendererInterface
      */
     protected function renderHeadingContent(Heading $node): string
     {
-        $level = $node->getLevel();
+        $level = $this->getRenderedHeadingLevel($node);
 
         // Don't render id on heading since it's on section
         $attrs = $this->renderAttributesExcluding($node, ['id']);
@@ -507,7 +519,7 @@ class HtmlRenderer implements RendererInterface
         // This is called when a heading is rendered inside other blocks (blockquote, div, etc.)
         // Section wrapping is ONLY applied at document level by renderDocumentWithSections
         // Inside nested blocks, headings just get id attribute directly
-        $level = $node->getLevel();
+        $level = $this->getRenderedHeadingLevel($node);
         $sectionId = $this->getSectionId($node);
         $attrs = $this->renderAttributesExcluding($node, ['id']);
 
@@ -521,6 +533,11 @@ class HtmlRenderer implements RendererInterface
     protected function getPlainText(Node $node): string
     {
         return $this->getRenderContext()->headingIdTracker->getPlainText($node);
+    }
+
+    protected function getRenderedHeadingLevel(Heading $node): int
+    {
+        return min($node->getLevel() + $this->headingLevelShift, 6);
     }
 
     protected function renderCodeBlock(CodeBlock $node): string

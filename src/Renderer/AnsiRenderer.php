@@ -218,6 +218,8 @@ class AnsiRenderer implements RendererInterface
      */
     public const BG_BRIGHT_BLACK = "\033[100m";
 
+    protected int $headingLevelShift = 0;
+
     // Unicode box drawing characters
     /**
      * @var string
@@ -364,6 +366,16 @@ class AnsiRenderer implements RendererInterface
         return $this->softBreakMode;
     }
 
+    /**
+     * Shift rendered heading levels without mutating the AST.
+     */
+    public function setHeadingLevelShift(int $shift): self
+    {
+        $this->headingLevelShift = max(0, min($shift, 5));
+
+        return $this;
+    }
+
     public function render(Document $document): string
     {
         $output = $this->renderChildren($document);
@@ -444,7 +456,7 @@ class AnsiRenderer implements RendererInterface
 
     protected function renderHeading(Heading $node): string
     {
-        $level = $node->getLevel();
+        $level = min($node->getLevel() + $this->headingLevelShift, 6);
         $content = $this->renderChildren($node);
 
         // Color based on level
