@@ -8,7 +8,6 @@ use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\Div;
 use Djot\Node\Block\Heading;
-use Djot\Node\Document;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\HtmlRenderer;
@@ -312,9 +311,7 @@ class TabsExtension implements ExtensionInterface
     {
         $skipFirstHeading = !$tab->hasAttribute('label');
         $skippedHeading = false;
-
-        // Create a temporary document with only the children we want to render
-        $tempDoc = new Document();
+        $html = '';
 
         foreach ($tab->getChildren() as $child) {
             // Skip the first heading if we're using it as the label
@@ -324,11 +321,10 @@ class TabsExtension implements ExtensionInterface
                 continue;
             }
 
-            $tempDoc->appendChild($child);
+            $html .= $renderer->renderNodeFragment($child);
         }
 
-        // Use renderer directly to avoid clear() call on extensions
-        return $renderer->render($tempDoc);
+        return $html;
     }
 
     /**

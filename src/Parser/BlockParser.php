@@ -36,6 +36,7 @@ use Djot\Parser\Block\ListParser;
 use Djot\Parser\Block\TableParser;
 use Djot\Parser\Utility\AttributeParser;
 use Djot\Parser\Utility\IndentationHelper;
+use Djot\Renderer\HeadingIdTracker;
 
 /**
  * Block-level parser for Djot
@@ -562,7 +563,7 @@ class BlockParser
      */
     protected function extractHeadingReferences(array $lines): void
     {
-        $usedIds = [];
+        $headingIdTracker = new HeadingIdTracker();
         $pendingId = null;
         $count = count($lines);
 
@@ -596,28 +597,20 @@ class BlockParser
                     }
                 }
 
-                // Generate ID from heading text (same algorithm as renderer)
+                $heading = new Heading(strlen($matches[1]));
                 if ($pendingId !== null) {
-                    $id = $pendingId;
+                    $heading->setAttribute('id', $pendingId);
                     $pendingId = null;
-                } else {
-                    // Strip inline markup to get plain text for ID
-                    $plainText = preg_replace('/[*_`\[\]{}]/', '', $headingText) ?? $headingText;
-                    $id = str_replace(' ', '-', trim($plainText));
-                    // Handle duplicate IDs
-                    $baseId = $id;
-                    $counter = 1;
-                    while (isset($usedIds[$id])) {
-                        $id = $baseId . '-' . $counter;
-                        $counter++;
-                    }
                 }
-                $usedIds[$id] = true;
+                $this->inlineParser->parse($heading, $headingText, $i);
+
+                $plainText = $headingIdTracker->getPlainText($heading);
+                $id = $headingIdTracker->getIdForHeading($heading);
                 $this->headingIds[$id] = true;
 
                 // Register as reference if not already defined
-                // Use normalized heading text as the label (for [Heading][] style links)
-                $label = preg_replace('/\s+/', ' ', trim($headingText)) ?? $headingText;
+                // Use normalized plain text as the label (for [Heading][] style links)
+                $label = preg_replace('/\s+/', ' ', trim($plainText)) ?? $plainText;
                 if (!isset($this->references[$label])) {
                     $this->references[$label] = new ReferenceDefinition('#' . $id, [], $i);
                 }

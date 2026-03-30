@@ -2961,6 +2961,40 @@ DJOT;
         $this->assertFalse($converter->hasWarnings());
     }
 
+    public function testValidAnchorLinkToPunctuationHeadingNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("# Hello, world!\n\n[link](#Hello-world)");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testValidAnchorLinkToCodeHeadingNoWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("# `code()` heading\n\n[link](#code-heading)");
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testHeadingReferenceUsesRendererCompatibleIdForPunctuationHeading(): void
+    {
+        $converter = new DjotConverter();
+        $html = $converter->convert("# Hello, world!\n\n[Hello, world!][]");
+
+        $this->assertStringContainsString('id="Hello-world"', $html);
+        $this->assertStringContainsString('href="#Hello-world"', $html);
+    }
+
+    public function testHeadingReferenceUsesRendererCompatibleIdForCodeHeading(): void
+    {
+        $converter = new DjotConverter();
+        $html = $converter->convert("# `code()` heading\n\n[`code()` heading][]");
+
+        $this->assertStringContainsString('id="code-heading"', $html);
+        $this->assertStringContainsString('href="#code-heading"', $html);
+    }
+
     public function testNoAnchorWarningWithoutWarningsEnabled(): void
     {
         $converter = new DjotConverter(warnings: false);

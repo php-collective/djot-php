@@ -1854,9 +1854,9 @@ class InlineParser
      */
     protected function normalizeReferenceLabel(string $label): string
     {
-        // Strip inline formatting markers: _ * ~ ^ + = { }
+        // Strip inline formatting markers: _ * ~ ^ + = { } ` [ ]
         // But keep the content between them
-        $label = preg_replace('/[_*~^+={}]/', '', $label) ?? $label;
+        $label = preg_replace('/[_*~^+={}`\[\]]/', '', $label) ?? $label;
 
         // Normalize whitespace: collapse multiple spaces/newlines to single space
         $label = preg_replace('/\s+/', ' ', $label) ?? $label;
