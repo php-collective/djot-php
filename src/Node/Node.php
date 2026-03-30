@@ -211,5 +211,19 @@ abstract class Node
         return array_values(array_filter($classList, fn ($c) => $c !== ''));
     }
 
+    /**
+     * Deep-clone child nodes and repair parent links.
+     */
+    public function __clone(): void
+    {
+        $this->parent = null;
+
+        foreach ($this->children as $index => $child) {
+            $clonedChild = clone $child;
+            $clonedChild->parent = $this;
+            $this->children[$index] = $clonedChild;
+        }
+    }
+
     abstract public function getType(): string;
 }
