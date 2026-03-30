@@ -603,13 +603,31 @@ class HtmlToDjot
             }
         }
 
-        // Table-level attributes
-        $tableAttrs = $this->formatBlockAttributes($node);
+        // Table-level attributes (excluding data-djot-col-widths which is for round-trip)
+        $tableAttrs = $this->formatBlockAttributes($node, ['data-djot-col-widths']);
         $output = $tableAttrs . "\n";
 
         if ($headerRow !== null) {
             $output .= $headerRow . "\n";
-            $separator = array_fill(0, $columnCount, '---');
+
+            // Use original separator widths if available for round-trip
+            $separator = [];
+            $colWidthsAttr = $node->getAttribute('data-djot-col-widths');
+            if ($colWidthsAttr !== '') {
+                $colWidths = array_map('intval', explode(',', $colWidthsAttr));
+                foreach ($colWidths as $width) {
+                    $separator[] = str_repeat('-', max(3, $width));
+                }
+                // Fill remaining columns with default width
+                $separatorCount = count($separator);
+                while ($separatorCount < $columnCount) {
+                    $separator[] = '---';
+                    $separatorCount++;
+                }
+            } else {
+                $separator = array_fill(0, $columnCount, '---');
+            }
+
             $output .= '| ' . implode(' | ', $separator) . ' |' . "\n";
         }
 

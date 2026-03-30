@@ -690,6 +690,13 @@ class HtmlRenderer implements RendererInterface
     protected function renderTable(Table $node): string
     {
         $attrs = $this->renderAttributes($node);
+
+        // Add round-trip separator widths attribute if available and in round-trip mode
+        if ($this->roundTripMode && $node->getSeparatorWidths() !== null) {
+            $widths = implode(',', $node->getSeparatorWidths());
+            $attrs .= ' data-djot-col-widths="' . htmlspecialchars($widths, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
+        }
+
         $html = '<table' . $attrs . ">\n";
 
         // Render caption if present
