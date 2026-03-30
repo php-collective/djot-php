@@ -342,6 +342,9 @@ class DjotConverter
             if (method_exists($extension, 'clear')) {
                 $extension->clear();
             }
+            if (method_exists($extension, 'beforeRender')) {
+                $extension->beforeRender($document);
+            }
         }
 
         return $this->renderer->render($document);
