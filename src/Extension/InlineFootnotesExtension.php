@@ -66,7 +66,7 @@ class InlineFootnotesExtension implements ExtensionInterface
 
         // At this point we know it's HtmlRenderer
         $htmlRenderer = $renderer;
-        \assert($htmlRenderer instanceof HtmlRenderer);
+        assert($htmlRenderer instanceof HtmlRenderer);
 
         $cssClass = $this->cssClass;
 
