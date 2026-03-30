@@ -3,22 +3,22 @@
 Performance benchmarks for djot-php compared to other implementations.
 
 **Test Environment:**
-- PHP 8.4.15
+- PHP 8.4.18 (OPcache enabled)
 - Node.js v18.19.1
 - Python 3.12.3
 - Rust (jotdown 0.7)
 - Go (godjot)
-- Linux 6.8.0-88-generic
+- Linux 6.17.0-19-generic
 
 ## Quick Reference
 
 | Document Size | PHP Full | Throughput |
 |---------------|----------|------------|
-| 1 KB          | 0.36 ms  | ~3.0 MB/s  |
-| 10 KB         | 3.7 ms   | ~3.0 MB/s  |
-| 56 KB         | 18 ms    | ~3.0 MB/s  |
-| 225 KB        | 80 ms    | ~2.7 MB/s  |
-| 1 MB          | 456 ms   | ~2.4 MB/s  |
+| 1 KB          | 0.55 ms  | ~2.0 MB/s  |
+| 10 KB         | 4.9 ms   | ~2.2 MB/s  |
+| 56 KB         | 23 ms    | ~2.4 MB/s  |
+| 225 KB        | 115 ms   | ~1.9 MB/s  |
+| 1 MB          | 579 ms   | ~1.9 MB/s  |
 
 ## PHP Alternatives Comparison
 
@@ -42,11 +42,11 @@ Benchmarked on medium-sized documents (~56 KB):
 
 | Implementation      | Mean Time | Throughput | vs PHP    |
 |---------------------|-----------|------------|-----------|
-| Rust (jotdown)      | ~1-2 ms   | ~30+ MB/s  | ~10x faster |
-| Go (godjot)         | ~2-4 ms   | ~15+ MB/s  | ~5x faster |
-| JS (@djot/djot)     | 8.1 ms    | 5.2 MB/s   | 2.2x faster |
-| PHP (djot-php)      | 18 ms     | 3.0 MB/s   | baseline  |
-| Python-Markdown*    | 41.1 ms   | 1.0 MB/s   | 2.3x slower |
+| Rust (jotdown)      | ~1-2 ms   | ~30+ MB/s  | ~12x faster |
+| Go (godjot)         | ~2-4 ms   | ~15+ MB/s  | ~6x faster |
+| JS (@djot/djot)     | 8.1 ms    | 5.2 MB/s   | 2.8x faster |
+| PHP (djot-php)      | 23 ms     | 2.4 MB/s   | baseline  |
+| Python-Markdown*    | 41.1 ms   | 1.0 MB/s   | 1.8x slower |
 
 *Python libraries are Markdown parsers (no Djot implementation exists for Python).
 
@@ -56,11 +56,11 @@ PHP djot-php scales linearly with document size:
 
 | Size    | Input     | Mean Time | Throughput |
 |---------|-----------|-----------|------------|
-| tiny    | 1.1 KB    | 0.36 ms   | 3.0 MB/s   |
-| small   | 11.1 KB   | 3.68 ms   | 3.0 MB/s   |
-| medium  | 56.1 KB   | 18.44 ms  | 3.0 MB/s   |
-| large   | 225.5 KB  | 80.42 ms  | 2.7 MB/s   |
-| huge    | 1.1 MB    | 456.16 ms | 2.4 MB/s   |
+| tiny    | 1.1 KB    | 0.55 ms   | 2.0 MB/s   |
+| small   | 11.1 KB   | 4.88 ms   | 2.2 MB/s   |
+| medium  | 56.1 KB   | 23.24 ms  | 2.4 MB/s   |
+| large   | 225.5 KB  | 114.52 ms | 1.9 MB/s   |
+| huge    | 1.1 MB    | 579.20 ms | 1.9 MB/s   |
 
 ## Content Type Performance
 
@@ -68,11 +68,11 @@ Different content types have varying performance characteristics:
 
 | Content Type   | Size    | Mean Time | Throughput | Notes                     |
 |----------------|---------|-----------|------------|---------------------------|
-| code_heavy     | 5.8 KB  | 0.71 ms   | 8.0 MB/s   | Fastest - simple parsing  |
-| tables         | 9.2 KB  | 5.67 ms   | 1.6 MB/s   | Table parsing overhead    |
-| nested_lists   | 5.6 KB  | 2.37 ms   | 2.3 MB/s   | Average                   |
-| complex        | 8.9 KB  | 4.09 ms   | 2.1 MB/s   | Many features             |
-| inline_heavy   | 14.8 KB | 8.73 ms   | 1.7 MB/s   | Many inline elements      |
+| code_heavy     | 5.8 KB  | 1.18 ms   | 4.8 MB/s   | Fastest - simple parsing  |
+| nested_lists   | 5.6 KB  | 3.48 ms   | 1.6 MB/s   | Average                   |
+| complex        | 8.9 KB  | 6.18 ms   | 1.4 MB/s   | Many features             |
+| tables         | 9.2 KB  | 6.67 ms   | 1.3 MB/s   | Table parsing overhead    |
+| inline_heavy   | 14.8 KB | 11.25 ms  | 1.3 MB/s   | Many inline elements      |
 
 Code-heavy documents are fastest because code blocks require minimal parsing.
 
@@ -127,11 +127,11 @@ php benchmark.php
 
 ## Key Takeaways
 
-1. **Throughput**: PHP djot-php processes ~3.0 MB/s of djot content
+1. **Throughput**: PHP djot-php processes ~2.0-2.4 MB/s of djot content (with OPcache)
 2. **vs CommonMark (Full)**: djot-php is **2x faster** with equivalent features
 3. **vs Parsedown**: Parsedown is 6-7x faster but lacks advanced features
 4. **Scaling**: Performance scales linearly with document size (O(n))
-5. **vs Rust/Go**: Native implementations are 5-10x faster (as expected)
-6. **vs JavaScript**: Reference JS implementation is ~2x faster
+5. **vs Rust/Go**: Native implementations are 6-12x faster (as expected)
+6. **vs JavaScript**: Reference JS implementation is ~3x faster
 7. **Safe mode**: No significant performance penalty
-8. **31% optimization**: Recent optimizations improved from 26ms to 18ms (medium doc)
+8. **OPcache**: Enable OPcache for best performance (~2x improvement)
