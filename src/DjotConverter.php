@@ -11,8 +11,12 @@ use Djot\Extension\WikilinksExtension;
 use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
+use Djot\Renderer\AnsiRenderer;
 use Djot\Renderer\HeadingIdTracker;
 use Djot\Renderer\HtmlRenderer;
+use Djot\Renderer\MarkdownRenderer;
+use Djot\Renderer\PlainTextRenderer;
+use Djot\Renderer\RendererInterface;
 use Djot\Renderer\SoftBreakMode;
 use LengthException;
 use LogicException;
@@ -25,7 +29,7 @@ class DjotConverter
 {
     protected BlockParser $parser;
 
-    protected HtmlRenderer $renderer;
+    protected RendererInterface $renderer;
 
     protected bool $collectWarnings;
 
@@ -50,6 +54,65 @@ class DjotConverter
     protected array $outputTransformers = [];
 
     /**
+     * Create a converter with custom parser and/or renderer
+     *
+     * ```php
+     * // Different renderer
+     * $converter = DjotConverter::create(renderer: new MarkdownRenderer());
+     *
+     * // Custom parser
+     * $converter = DjotConverter::create(
+     *     parser: new BlockParser(significantNewlines: true),
+     *     renderer: new HtmlRenderer(xhtml: true),
+     * );
+     * ```
+     *
+     * @param \Djot\Parser\BlockParser|null $parser Custom parser (null = default)
+     * @param \Djot\Renderer\RendererInterface|null $renderer Custom renderer (null = HtmlRenderer)
+     * @param \Djot\Profile|null $profile Profile for feature restriction
+     */
+    public static function create(
+        ?BlockParser $parser = null,
+        ?RendererInterface $renderer = null,
+        ?Profile $profile = null,
+    ): self {
+        return new self(
+            parser: $parser ?? new BlockParser(),
+            renderer: $renderer ?? new HtmlRenderer(),
+            profile: $profile,
+        );
+    }
+
+    /**
+     * Create a converter that outputs Markdown
+     */
+    public static function markdown(?BlockParser $parser = null): self
+    {
+        return self::create($parser, new MarkdownRenderer());
+    }
+
+    /**
+     * Create a converter that outputs plain text
+     */
+    public static function plainText(?BlockParser $parser = null): self
+    {
+        return self::create($parser, new PlainTextRenderer());
+    }
+
+    /**
+     * Create a converter that outputs ANSI (terminal)
+     */
+    public static function ansi(?BlockParser $parser = null): self
+    {
+        return self::create($parser, new AnsiRenderer());
+    }
+
+    /**
+     * Convenience constructor with inline configuration
+     *
+     * For simple usage, pass configuration directly. For advanced usage with
+     * full control over parser/renderer, use DjotConverter::create() instead.
+     *
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
      * @param bool $strict Whether to throw exceptions on parse errors
@@ -58,6 +121,8 @@ class DjotConverter
      * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
      * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (HTML renderer only)
      * @param bool $roundTripMode Add data attributes for Djot→HTML→Djot round-trips (HTML renderer only)
+     * @param \Djot\Parser\BlockParser|null $parser Pre-configured parser (ignores warnings/strict/significantNewlines if set)
+     * @param \Djot\Renderer\RendererInterface|null $renderer Pre-configured renderer (ignores xhtml/safeMode/softBreakMode/roundTripMode if set)
      */
     public function __construct(
         bool $xhtml = false,
@@ -68,27 +133,41 @@ class DjotConverter
         bool $significantNewlines = false,
         ?SoftBreakMode $softBreakMode = null,
         bool $roundTripMode = false,
+        ?BlockParser $parser = null,
+        ?RendererInterface $renderer = null,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
-        $this->parser = new BlockParser($warnings, $strict, $significantNewlines);
-        $this->renderer = new HtmlRenderer($xhtml);
 
-        // Configure safe mode
-        if ($safeMode === true) {
-            $this->renderer->setSafeMode(SafeMode::defaults());
-        } elseif ($safeMode instanceof SafeMode) {
-            $this->renderer->setSafeMode($safeMode);
+        // Use provided parser or create one from parameters
+        if ($parser !== null) {
+            $this->parser = $parser;
+        } else {
+            $this->parser = new BlockParser($warnings, $strict, $significantNewlines);
         }
 
-        // Configure soft break mode if explicitly provided
-        if ($softBreakMode !== null) {
-            $this->renderer->setSoftBreakMode($softBreakMode);
-        }
+        // Use provided renderer or create one from parameters
+        if ($renderer !== null) {
+            $this->renderer = $renderer;
+        } else {
+            $this->renderer = new HtmlRenderer($xhtml);
 
-        // Configure round-trip mode
-        if ($roundTripMode) {
-            $this->renderer->setRoundTripMode(true);
+            // Configure safe mode
+            if ($safeMode === true) {
+                $this->renderer->setSafeMode(SafeMode::defaults());
+            } elseif ($safeMode instanceof SafeMode) {
+                $this->renderer->setSafeMode($safeMode);
+            }
+
+            // Configure soft break mode if explicitly provided
+            if ($softBreakMode !== null) {
+                $this->renderer->setSoftBreakMode($softBreakMode);
+            }
+
+            // Configure round-trip mode
+            if ($roundTripMode) {
+                $this->renderer->setRoundTripMode(true);
+            }
         }
 
         // Configure profile
@@ -131,12 +210,16 @@ class DjotConverter
     }
 
     /**
-     * Enable or disable safe mode
+     * Enable or disable safe mode (HtmlRenderer only)
      *
      * @param \Djot\SafeMode|bool|null $safeMode True for defaults, SafeMode for custom, null/false to disable
      */
     public function setSafeMode(bool|SafeMode|null $safeMode): self
     {
+        if (!$this->renderer instanceof HtmlRenderer) {
+            return $this;
+        }
+
         if ($safeMode === true) {
             $this->renderer->setSafeMode(SafeMode::defaults());
         } elseif ($safeMode instanceof SafeMode) {
@@ -284,7 +367,9 @@ class DjotConverter
      */
     public function on(string $event, Closure $listener): self
     {
-        $this->renderer->on($event, $listener);
+        if ($this->renderer instanceof HtmlRenderer) {
+            $this->renderer->on($event, $listener);
+        }
 
         return $this;
     }
@@ -294,24 +379,46 @@ class DjotConverter
      */
     public function off(?string $event = null): self
     {
-        $this->renderer->off($event);
+        if ($this->renderer instanceof HtmlRenderer) {
+            $this->renderer->off($event);
+        }
 
         return $this;
     }
 
     /**
-     * Get the HTML renderer for direct configuration
+     * Get the renderer
      */
-    public function getRenderer(): HtmlRenderer
+    public function getRenderer(): RendererInterface
     {
         return $this->renderer;
     }
 
     /**
-     * Get the heading ID tracker
+     * Get the HTML renderer for direct configuration
+     *
+     * @throws \LogicException If renderer is not HtmlRenderer
+     */
+    public function getHtmlRenderer(): HtmlRenderer
+    {
+        if (!$this->renderer instanceof HtmlRenderer) {
+            throw new LogicException('getHtmlRenderer() is only available when using HtmlRenderer');
+        }
+
+        return $this->renderer;
+    }
+
+    /**
+     * Get the heading ID tracker (HtmlRenderer only)
+     *
+     * @throws \LogicException If renderer is not HtmlRenderer
      */
     public function getHeadingIdTracker(): HeadingIdTracker
     {
+        if (!$this->renderer instanceof HtmlRenderer) {
+            throw new LogicException('getHeadingIdTracker() is only supported with HtmlRenderer');
+        }
+
         return $this->renderer->getHeadingIdTracker();
     }
 

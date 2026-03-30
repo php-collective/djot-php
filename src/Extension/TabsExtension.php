@@ -209,11 +209,15 @@ class TabsExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
+        // Only applies to HTML output - other renderers render tab divs normally
+        $renderer = $converter->getRenderer();
+        if (!$renderer instanceof HtmlRenderer) {
+            return;
+        }
+
         // Use the renderer directly for nested content to avoid calling
         // $converter->render() which clears all extensions including TOC.
         // See: https://github.com/php-collective/djot-php/issues/139
-        $renderer = $converter->getRenderer();
-
         $converter->on('render.div', function (RenderEvent $event) use ($renderer): void {
             $node = $event->getNode();
             if (!$node instanceof Div) {

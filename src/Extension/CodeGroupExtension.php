@@ -100,7 +100,13 @@ class CodeGroupExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
-        $converter->on('render.div', function (RenderEvent $event) use ($converter): void {
+        // Only applies to HTML output - other renderers render code blocks normally
+        $renderer = $converter->getRenderer();
+        if (!$renderer instanceof HtmlRenderer) {
+            return;
+        }
+
+        $converter->on('render.div', function (RenderEvent $event) use ($renderer): void {
             $node = $event->getNode();
             if (!$node instanceof Div) {
                 return;
@@ -115,7 +121,7 @@ class CodeGroupExtension implements ExtensionInterface
                 return;
             }
 
-            $html = $this->renderCodeGroup($node, $codeBlocks, $converter->getRenderer());
+            $html = $this->renderCodeGroup($node, $codeBlocks, $renderer);
             $event->setHtml($html);
         });
     }

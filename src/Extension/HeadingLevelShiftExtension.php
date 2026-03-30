@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\Heading;
+use Djot\Renderer\HtmlRenderer;
 
 /**
  * Shifts heading levels down (h1 → h2, h2 → h3, etc.)
@@ -44,8 +45,13 @@ class HeadingLevelShiftExtension implements ExtensionInterface
             return;
         }
 
-        $tracker = $converter->getHeadingIdTracker();
+        // Only applies to HTML output - other renderers use default heading rendering
         $renderer = $converter->getRenderer();
+        if (!$renderer instanceof HtmlRenderer) {
+            return;
+        }
+
+        $tracker = $converter->getHeadingIdTracker();
         $shift = $this->shift;
 
         $converter->on('render.heading', function (RenderEvent $event) use ($tracker, $renderer, $shift): void {

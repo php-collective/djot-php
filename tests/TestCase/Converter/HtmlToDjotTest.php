@@ -716,7 +716,7 @@ HTML;
     {
         $djotConverter = new DjotConverter();
         // Enable round-trip mode to preserve thematic break character
-        $djotConverter->getRenderer()->setRoundTripMode(true);
+        $djotConverter->getHtmlRenderer()->setRoundTripMode(true);
 
         // Test dash (default)
         $djot = '---';

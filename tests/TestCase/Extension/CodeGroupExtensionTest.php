@@ -334,7 +334,7 @@ DJOT;
     public function testDefaultRenderingMatchesCoreCodeBlockBehavior(): void
     {
         $converter = new DjotConverter();
-        $converter->getRenderer()->setCodeBlockTabWidth(2);
+        $converter->getHtmlRenderer()->setCodeBlockTabWidth(2);
         $converter->addExtension(new CodeGroupExtension());
 
         $djot = <<<'DJOT'

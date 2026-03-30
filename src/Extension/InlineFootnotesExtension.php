@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Inline\Span;
+use Djot\Renderer\HtmlRenderer;
 
 /**
  * Converts spans with `.fn` class to inline footnotes
@@ -47,7 +48,12 @@ class InlineFootnotesExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
+        // Only applies to HTML output - other renderers render span content inline
         $renderer = $converter->getRenderer();
+        if (!$renderer instanceof HtmlRenderer) {
+            return;
+        }
+
         $cssClass = $this->cssClass;
 
         $converter->on('render.span', function (RenderEvent $event) use ($renderer, $cssClass): void {

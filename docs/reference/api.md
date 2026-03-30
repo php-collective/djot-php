@@ -895,7 +895,7 @@ $converter = new DjotConverter(
 
 // Option 3: Override after construction
 $converter = DjotConverter::withSignificantNewlines();
-$converter->getRenderer()->setSoftBreakMode(SoftBreakMode::Space);
+$converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Space);
 ```
 
 This is useful for WYSIWYG editors where you want relaxed parsing (nested lists without blank lines) but don't want every line break to become a `<br>`.

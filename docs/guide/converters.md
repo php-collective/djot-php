@@ -232,7 +232,7 @@ $djotConverter = new DjotConverter(roundTripMode: true);
 
 // Or via renderer
 // $djotConverter = new DjotConverter();
-// $djotConverter->getRenderer()->setRoundTripMode(true);
+// $djotConverter->getHtmlRenderer()->setRoundTripMode(true);
 
 $djot = '***';  // Asterisk thematic break
 $html = $djotConverter->convert($djot);
