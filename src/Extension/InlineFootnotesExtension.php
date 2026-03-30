@@ -64,9 +64,13 @@ class InlineFootnotesExtension implements ExtensionInterface
             return;
         }
 
+        // At this point we know it's HtmlRenderer
+        $htmlRenderer = $renderer;
+        \assert($htmlRenderer instanceof HtmlRenderer);
+
         $cssClass = $this->cssClass;
 
-        $converter->on('render.span', function (RenderEvent $event) use ($renderer, $cssClass): void {
+        $converter->on('render.span', function (RenderEvent $event) use ($htmlRenderer, $cssClass): void {
             $node = $event->getNode();
             if (!$node instanceof Span) {
                 return;
@@ -81,7 +85,7 @@ class InlineFootnotesExtension implements ExtensionInterface
             // Register with the renderer and get the footnote number.
             // Content rendering is deferred to ensure this inline footnote's number
             // is reserved before any nested footnotes in its content are rendered.
-            $number = $renderer->registerInlineFootnote(function () use ($event): string {
+            $number = $htmlRenderer->registerInlineFootnote(function () use ($event): string {
                 $content = $event->getChildrenHtml();
 
                 // Normalize content to a paragraph to ensure consistent rendering
