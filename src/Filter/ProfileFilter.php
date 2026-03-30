@@ -21,6 +21,7 @@ use Djot\Node\Block\Table;
 use Djot\Node\Block\TableCell;
 use Djot\Node\Block\TableRow;
 use Djot\Node\Block\ThematicBreak;
+use Djot\Node\ContentNodeInterface;
 use Djot\Node\Document;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
@@ -262,10 +263,10 @@ class ProfileFilter
             return $node->getContent() === '';
         }
 
-        // Nodes with content property (like CodeBlock) are not empty if they have content
-        if (method_exists($node, 'getContent')) {
+        // Nodes that store raw content directly are not empty if they have content.
+        if ($node instanceof ContentNodeInterface) {
             $content = $node->getContent();
-            if ($content !== null && $content !== '') {
+            if ($content !== '') {
                 return false;
             }
         }
@@ -439,9 +440,9 @@ class ProfileFilter
         }
 
         // Handle nodes that store content directly (CodeBlock, RawBlock, etc.)
-        if (method_exists($node, 'getContent')) {
+        if ($node instanceof ContentNodeInterface) {
             $content = $node->getContent();
-            if ($content !== null && $content !== '') {
+            if ($content !== '') {
                 return $content;
             }
         }

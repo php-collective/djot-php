@@ -363,6 +363,27 @@ DJOT;
         $this->assertStringContainsString('name="tabset-2"', $html);
     }
 
+    public function testTabCountersResetBetweenConversions(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+::: tab
+Body
+:::
+::::
+DJOT;
+
+        $first = $converter->convert($djot);
+        $second = $converter->convert($djot);
+
+        $this->assertSame($first, $second);
+        $this->assertStringContainsString('name="tabset-1"', $first);
+        $this->assertStringContainsString('>Tab 1</label>', $first);
+    }
+
     public function testCustomClasses(): void
     {
         $converter = new DjotConverter();

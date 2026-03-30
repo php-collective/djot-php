@@ -387,4 +387,20 @@ DJOT;
         $this->assertSame('Hello ', $toc[0]['text']);
         $this->assertSame('Hello', $toc[0]['id']);
     }
+
+    public function testSkippedHeadingLevelsProduceValidNestedLists(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+        $converter->addExtension($tocExtension);
+
+        $converter->convert("# One\n\n### Three");
+
+        $html = $tocExtension->getTocHtml();
+
+        $this->assertSame(2, substr_count($html, '<ul>'));
+        $this->assertStringContainsString('<li><a href="#One">One</a>' . "\n<ul>", $html);
+        $this->assertStringContainsString('<li><a href="#Three">Three</a></li>', $html);
+        $this->assertStringContainsString("</ul>\n</li>\n</ul>", $html);
+    }
 }

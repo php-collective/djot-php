@@ -104,7 +104,7 @@ $converter->on('render.heading', function (RenderEvent $event): void {
     $heading = $event->getNode();
     $text = '';
     foreach ($heading->getChildren() as $child) {
-        if (method_exists($child, 'getContent')) {
+        if ($child instanceof \Djot\Node\ContentNodeInterface) {
             $text .= $child->getContent();
         }
     }
@@ -578,7 +578,7 @@ function getTextContent($node): string
             $text .= $child->getContent();
         } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
             $text .= ' ';
-        } elseif (method_exists($child, 'getChildren')) {
+        } else {
             $text .= getTextContent($child);
         }
     }
@@ -590,12 +590,10 @@ function findFirstImage($node): ?string
     if ($node instanceof Image) {
         return $node->getSource();
     }
-    if (method_exists($node, 'getChildren')) {
-        foreach ($node->getChildren() as $child) {
-            $image = findFirstImage($child);
-            if ($image !== null) {
-                return $image;
-            }
+    foreach ($node->getChildren() as $child) {
+        $image = findFirstImage($child);
+        if ($image !== null) {
+            return $image;
         }
     }
     return null;

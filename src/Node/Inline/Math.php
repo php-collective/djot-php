@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Djot\Node\Inline;
 
+use Djot\Node\ContentNodeInterface;
+
 /**
  * Math inline or display
  */
-class Math extends InlineNode
+class Math extends InlineNode implements ContentNodeInterface
 {
     public function __construct(
         protected string $content = '',

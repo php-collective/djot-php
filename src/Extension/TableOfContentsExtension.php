@@ -41,7 +41,7 @@ use Djot\Renderer\HtmlRenderer;
  * );
  * ```
  */
-class TableOfContentsExtension implements ExtensionInterface
+class TableOfContentsExtension implements ResettableExtensionInterface
 {
     /**
      * Collected TOC entries from last parse
@@ -186,49 +186,53 @@ class TableOfContentsExtension implements ExtensionInterface
             return '';
         }
 
-        // Find the minimum level in the actual headings
-        $minActualLevel = min(array_column($headings, 'level'));
-
         $html = '<' . $this->listType . '>' . "\n";
-        $currentLevel = $minActualLevel;
-        $openLists = 1;
+        $levelStack = [$headings[0]['level']];
 
-        foreach ($headings as $i => $heading) {
+        foreach ($headings as $index => $heading) {
             $level = $heading['level'];
+            $stackIndex = count($levelStack) - 1;
+            $currentLevel = $levelStack[$stackIndex];
 
-            // Open new lists for deeper levels
-            while ($currentLevel < $level) {
-                $html .= '<' . $this->listType . '>' . "\n";
-                $openLists++;
-                $currentLevel++;
+            if ($index > 0) {
+                if ($level > $currentLevel) {
+                    $html .= "\n<" . $this->listType . '>' . "\n";
+                    $levelStack[] = $level;
+                } else {
+                    $depth = count($levelStack);
+                    while ($depth > 1 && $level < $levelStack[$depth - 1]) {
+                        $html .= '</li>' . "\n";
+                        $html .= '</' . $this->listType . '>' . "\n";
+                        array_pop($levelStack);
+                        $depth--;
+                    }
+
+                    if ($level > $levelStack[$depth - 1]) {
+                        $html .= "\n<" . $this->listType . '>' . "\n";
+                        $levelStack[] = $level;
+                    } else {
+                        $html .= '</li>' . "\n";
+                    }
+                }
             }
 
-            // Close lists for shallower levels
-            while ($currentLevel > $level) {
-                $html .= '</li>' . "\n";
-                $html .= '</' . $this->listType . '>' . "\n";
-                $openLists--;
-                $currentLevel--;
-            }
-
-            // Close previous item at same level (except first)
-            if ($i > 0 && $headings[$i - 1]['level'] >= $level) {
-                $html .= '</li>' . "\n";
-            }
-
-            // Render the item
             $html .= '<li>';
             $html .= '<a href="#' . $this->escape($heading['id']) . '">';
             $html .= $this->escape($heading['text']);
             $html .= '</a>';
         }
 
-        // Close all remaining open elements
-        while ($openLists > 0) {
-            $html .= '</li>' . "\n";
+        $html .= '</li>' . "\n";
+
+        $depth = count($levelStack);
+        while ($depth > 1) {
             $html .= '</' . $this->listType . '>' . "\n";
-            $openLists--;
+            $html .= '</li>' . "\n";
+            array_pop($levelStack);
+            $depth--;
         }
+
+        $html .= '</' . $this->listType . '>' . "\n";
 
         return $html;
     }
