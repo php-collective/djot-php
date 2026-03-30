@@ -60,7 +60,7 @@ use Djot\Util\StringUtil;
  * Note: Some Djot features don't have direct Markdown equivalents
  * and will be rendered as HTML or approximated.
  */
-class MarkdownRenderer implements RendererInterface
+class MarkdownRenderer implements RendererInterface, RenderOptionsAwareInterface
 {
     use EventDispatcherTrait;
 
@@ -69,6 +69,8 @@ class MarkdownRenderer implements RendererInterface
     protected bool $inBlockQuote = false;
 
     protected SoftBreakMode $softBreakMode = SoftBreakMode::Newline;
+
+    protected ?RenderOptions $renderOptions = null;
 
     /**
      * Set how soft breaks are rendered
@@ -88,6 +90,13 @@ class MarkdownRenderer implements RendererInterface
     public function getSoftBreakMode(): SoftBreakMode
     {
         return $this->softBreakMode;
+    }
+
+    public function setRenderOptions(RenderOptions $renderOptions): self
+    {
+        $this->renderOptions = $renderOptions;
+
+        return $this;
     }
 
     public function render(Document $document): string
@@ -173,9 +182,14 @@ class MarkdownRenderer implements RendererInterface
 
     protected function renderHeading(Heading $node): string
     {
-        $prefix = str_repeat('#', $node->getLevel()) . ' ';
+        $prefix = str_repeat('#', min($node->getLevel() + $this->getRenderOptions()->headingLevelShift, 6)) . ' ';
 
         return $prefix . $this->renderChildren($node) . "\n\n";
+    }
+
+    protected function getRenderOptions(): RenderOptions
+    {
+        return $this->renderOptions ??= new RenderOptions();
     }
 
     protected function renderCodeBlock(CodeBlock $node): string

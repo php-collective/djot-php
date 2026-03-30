@@ -17,6 +17,8 @@ use Djot\Renderer\HtmlRenderer;
 use Djot\Renderer\MarkdownRenderer;
 use Djot\Renderer\PlainTextRenderer;
 use Djot\Renderer\RendererInterface;
+use Djot\Renderer\RenderOptions;
+use Djot\Renderer\RenderOptionsAwareInterface;
 use Djot\Renderer\SoftBreakMode;
 use LengthException;
 use LogicException;
@@ -30,6 +32,8 @@ class DjotConverter
     protected BlockParser $parser;
 
     protected RendererInterface $renderer;
+
+    protected RenderOptions $renderOptions;
 
     protected bool $collectWarnings;
 
@@ -138,6 +142,7 @@ class DjotConverter
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
+        $this->renderOptions = new RenderOptions();
 
         // Use provided parser or create one from parameters
         if ($parser !== null) {
@@ -164,6 +169,10 @@ class DjotConverter
             if ($roundTripMode) {
                 $this->renderer->setRoundTripMode(true);
             }
+        }
+
+        if ($this->renderer instanceof RenderOptionsAwareInterface) {
+            $this->renderer->setRenderOptions($this->renderOptions);
         }
 
         // Configure profile
@@ -248,6 +257,14 @@ class DjotConverter
     public function getProfile(): ?Profile
     {
         return $this->profile;
+    }
+
+    /**
+     * Get shared renderer options for this converter.
+     */
+    public function getRenderOptions(): RenderOptions
+    {
+        return $this->renderOptions;
     }
 
     /**

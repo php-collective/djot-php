@@ -53,7 +53,7 @@ use Djot\Node\Node;
  * Produces colored, styled text suitable for display in terminals
  * that support ANSI escape codes.
  */
-class AnsiRenderer implements RendererInterface
+class AnsiRenderer implements RendererInterface, RenderOptionsAwareInterface
 {
     // ANSI escape codes
     /**
@@ -302,6 +302,8 @@ class AnsiRenderer implements RendererInterface
 
     protected SoftBreakMode $softBreakMode = SoftBreakMode::Space;
 
+    protected ?RenderOptions $renderOptions = null;
+
     /**
      * @var array<int, int>
      */
@@ -362,6 +364,13 @@ class AnsiRenderer implements RendererInterface
     public function getSoftBreakMode(): SoftBreakMode
     {
         return $this->softBreakMode;
+    }
+
+    public function setRenderOptions(RenderOptions $renderOptions): self
+    {
+        $this->renderOptions = $renderOptions;
+
+        return $this;
     }
 
     public function render(Document $document): string
@@ -444,7 +453,7 @@ class AnsiRenderer implements RendererInterface
 
     protected function renderHeading(Heading $node): string
     {
-        $level = $node->getLevel();
+        $level = min($node->getLevel() + $this->getRenderOptions()->headingLevelShift, 6);
         $content = $this->renderChildren($node);
 
         // Color based on level
@@ -470,6 +479,11 @@ class AnsiRenderer implements RendererInterface
         }
 
         return $styled . "\n\n";
+    }
+
+    protected function getRenderOptions(): RenderOptions
+    {
+        return $this->renderOptions ??= new RenderOptions();
     }
 
     protected function renderCodeBlock(CodeBlock $node): string

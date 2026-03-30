@@ -46,7 +46,7 @@ use Djot\Renderer\Utility\EventDispatcherTrait;
  * - Plain text email fallbacks
  * - Word count / reading time estimation
  */
-class PlainTextRenderer implements RendererInterface
+class PlainTextRenderer implements RendererInterface, RenderOptionsAwareInterface
 {
     use EventDispatcherTrait;
 
@@ -61,6 +61,8 @@ class PlainTextRenderer implements RendererInterface
     protected string $blockQuoteSuffix = '"';
 
     protected SoftBreakMode $softBreakMode = SoftBreakMode::Space;
+
+    protected ?RenderOptions $renderOptions = null;
 
     /**
      * Set how soft breaks are rendered
@@ -83,6 +85,13 @@ class PlainTextRenderer implements RendererInterface
     public function getSoftBreakMode(): SoftBreakMode
     {
         return $this->softBreakMode;
+    }
+
+    public function setRenderOptions(RenderOptions $renderOptions): self
+    {
+        $this->renderOptions = $renderOptions;
+
+        return $this;
     }
 
     public function render(Document $document): string
