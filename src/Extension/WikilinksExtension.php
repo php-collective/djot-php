@@ -127,11 +127,11 @@ class WikilinksExtension implements ExtensionInterface
         return static function (string $page): string {
             // Convert to lowercase, replace spaces with hyphens
             $slug = strtolower(trim($page));
-            $slug = (string)preg_replace('/\s+/', '-', $slug);
+            $slug = preg_replace('/\s+/', '-', $slug) ?? $slug;
             // Remove unsafe characters, keep alphanumeric, hyphens, underscores, slashes
-            $slug = (string)preg_replace('/[^a-z0-9\-_\/]/', '', $slug);
+            $slug = preg_replace('/[^a-z0-9\-_\/]/', '', $slug) ?? $slug;
             // Remove multiple consecutive hyphens
-            $slug = (string)preg_replace('/-+/', '-', $slug);
+            $slug = preg_replace('/-+/', '-', $slug) ?? $slug;
 
             return $slug;
         };
