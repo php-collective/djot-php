@@ -1,6 +1,6 @@
 # Upgrade Guide
 
-## Upgrading to 0.2
+## Upgrading to 0.1.23
 
 ### Breaking Change: `significantNewlines` No Longer Sets `SoftBreakMode::Break`
 
