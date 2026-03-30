@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Renderer;
 
 use Djot\Node\Block\CodeBlock;
+use Djot\Node\Block\Footnote;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\LineBlock;
 use Djot\Node\Block\Paragraph;
@@ -14,6 +15,7 @@ use Djot\Node\Block\TableRow;
 use Djot\Node\Document;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Emphasis;
+use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
 use Djot\Node\Inline\Link;
@@ -193,6 +195,99 @@ class HtmlRendererTest extends TestCase
         $result = $this->renderer->render($doc);
 
         $this->assertSame("<pre><code>plain code\n</code></pre>\n", $result);
+    }
+
+    public function testRenderNodeFragmentUsesActiveRenderContext(): void
+    {
+        $doc = new Document();
+
+        $headingOne = new Heading(1);
+        $headingOne->appendChild(new Text('Repeat'));
+        $doc->appendChild($headingOne);
+
+        $renderer = $this->renderer;
+        $renderer->on('render.heading', function ($event) use ($renderer): void {
+            $node = $event->getNode();
+            if (!$node instanceof Heading || $node->getLevel() !== 1) {
+                return;
+            }
+
+            $fragmentHeading = new Heading(2);
+            $fragmentHeading->appendChild(new Text('Repeat'));
+
+            $event->setHtml($renderer->renderNodeFragment($fragmentHeading));
+        });
+
+        $headingTwo = new Heading(2);
+        $headingTwo->appendChild(new Text('Repeat'));
+        $doc->appendChild($headingTwo);
+
+        $result = $renderer->render($doc);
+
+        $this->assertStringContainsString('<h2 id="Repeat">Repeat</h2>', $result);
+        $this->assertStringContainsString('<section id="Repeat-1">', $result);
+    }
+
+    public function testRenderDocumentFragmentUsesActiveFootnoteState(): void
+    {
+        $doc = new Document();
+
+        $firstParagraph = new Paragraph();
+        $firstParagraph->appendChild(new Text('Before'));
+        $firstParagraph->appendChild(new FootnoteRef('a'));
+        $doc->appendChild($firstParagraph);
+
+        $renderer = $this->renderer;
+        $renderer->on('render.paragraph', function ($event) use ($renderer): void {
+            $node = $event->getNode();
+            if (!$node instanceof Paragraph) {
+                return;
+            }
+
+            $text = '';
+            foreach ($node->getChildren() as $child) {
+                if ($child instanceof Text) {
+                    $text .= $child->getContent();
+                }
+            }
+
+            if ($text !== 'Trigger') {
+                return;
+            }
+
+            $fragmentDoc = new Document();
+            $fragmentParagraph = new Paragraph();
+            $fragmentParagraph->appendChild(new Text('Inside'));
+            $fragmentParagraph->appendChild(new FootnoteRef('b'));
+            $fragmentDoc->appendChild($fragmentParagraph);
+
+            $event->setHtml($renderer->renderDocumentFragment($fragmentDoc));
+        });
+
+        $triggerParagraph = new Paragraph();
+        $triggerParagraph->appendChild(new Text('Trigger'));
+        $doc->appendChild($triggerParagraph);
+
+        $footnoteA = new Footnote('a');
+        $footnoteParaA = new Paragraph();
+        $footnoteParaA->appendChild(new Text('Alpha'));
+        $footnoteA->appendChild($footnoteParaA);
+        $doc->appendChild($footnoteA);
+
+        $footnoteB = new Footnote('b');
+        $footnoteParaB = new Paragraph();
+        $footnoteParaB->appendChild(new Text('Beta'));
+        $footnoteB->appendChild($footnoteParaB);
+        $doc->appendChild($footnoteB);
+
+        $result = $renderer->render($doc);
+
+        $this->assertStringContainsString('id="fnref1"', $result);
+        $this->assertStringContainsString('id="fnref2"', $result);
+        $this->assertStringContainsString('<li id="fn1">', $result);
+        $this->assertStringContainsString('<li id="fn2">', $result);
+        $this->assertStringContainsString('Alpha', $result);
+        $this->assertStringContainsString('Beta', $result);
     }
 
     public function testRenderHardBreak(): void
