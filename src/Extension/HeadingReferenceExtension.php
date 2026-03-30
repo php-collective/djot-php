@@ -31,6 +31,8 @@ use Random\RandomException;
  */
 class HeadingReferenceExtension implements ResettableExtensionInterface, BeforeRenderExtensionInterface
 {
+    protected bool $roundTripMode = false;
+
     protected string $placeholderPrefix = '';
 
     /**
@@ -60,6 +62,9 @@ class HeadingReferenceExtension implements ResettableExtensionInterface, BeforeR
         if (!$converter->getRenderer() instanceof HtmlRenderer) {
             return;
         }
+
+        $renderer = $converter->getRenderer();
+        $this->roundTripMode = $renderer->isRoundTripMode();
 
         $inlineParser = $converter->getParser()->getInlineParser();
         $tracker = $converter->getHeadingIdTracker();
@@ -205,11 +210,22 @@ class HeadingReferenceExtension implements ResettableExtensionInterface, BeforeR
                     '/<a\b(?=[^>]*\bhref="' . $quotedPlaceholder . '")(?=[^>]*\bdata-heading-ref="' . $quotedTarget . '")(?P<before>[^>]*)\bhref="' . $quotedPlaceholder . '"(?P<after>[^>]*)>'
                     . $quotedDisplayText
                     . '<\/a>/u',
-                    function (array $matches) use ($displayText, $normalizedTarget): string {
+                    function (array $matches) use ($target, $displayText, $normalizedTarget): string {
+                        $before = $this->stripInternalHeadingReferenceAttribute($matches['before']);
+                        $after = $this->stripInternalHeadingReferenceAttribute($matches['after']);
+
+                        if ($this->roundTripMode) {
+                            $after .= ' data-djot-heading-ref="' . $this->escapeAttribute($target) . '"';
+                            if ($displayText !== $target) {
+                                $after .= ' data-djot-heading-ref-display="'
+                                    . $this->escapeAttribute($displayText) . '"';
+                            }
+                        }
+
                         return '<a'
-                            . $matches['before']
+                            . $before
                             . 'href="#' . $this->escapeAttribute($this->headingTargets[$normalizedTarget]) . '"'
-                            . $matches['after']
+                            . $after
                             . '>'
                             . $this->escape($displayText)
                             . '</a>';
@@ -289,5 +305,10 @@ class HeadingReferenceExtension implements ResettableExtensionInterface, BeforeR
         foreach ($node->getChildren() as $child) {
             $this->collectPlaceholders($child);
         }
+    }
+
+    protected function stripInternalHeadingReferenceAttribute(string $attrs): string
+    {
+        return (string)preg_replace('/\sdata-heading-ref="[^"]*"/u', '', $attrs);
     }
 }

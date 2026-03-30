@@ -26,7 +26,7 @@ DJOT);
 
         $this->assertStringContainsString('href="#Getting-Started"', $html);
         $this->assertStringContainsString('class="heading-ref"', $html);
-        $this->assertStringContainsString('data-heading-ref="Getting Started"', $html);
+        $this->assertStringNotContainsString('data-heading-ref=', $html);
     }
 
     public function testReferenceUsesExplicitHeadingId(): void
@@ -57,7 +57,7 @@ DJOT);
 
         $this->assertStringContainsString('href="#Getting-Started"', $html);
         $this->assertStringContainsString('>the introduction</a>', $html);
-        $this->assertStringContainsString('data-heading-ref="Getting Started"', $html);
+        $this->assertStringNotContainsString('data-heading-ref=', $html);
     }
 
     public function testCustomDisplayTextFallbackOnMissing(): void
@@ -211,7 +211,7 @@ See [[Bob's Guide]].
 DJOT);
 
         $this->assertStringContainsString('href="#Bob-s-Guide"', $html);
-        $this->assertStringContainsString('data-heading-ref="Bob&apos;s Guide"', $html);
+        $this->assertStringNotContainsString('data-heading-ref=', $html);
         $this->assertStringNotContainsString('[[Bob\'s Guide]]', $html);
     }
 

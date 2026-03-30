@@ -482,7 +482,7 @@ See [[Getting Started]] for setup steps.
 
 **Output:**
 ```html
-<p>See <a href="#Getting-Started" class="heading-ref" data-heading-ref="Getting Started">Getting Started</a> for setup steps.</p>
+<p>See <a href="#Getting-Started" class="heading-ref">Getting Started</a> for setup steps.</p>
 <section id="Getting-Started">
 <h2>Getting Started</h2>
 </section>

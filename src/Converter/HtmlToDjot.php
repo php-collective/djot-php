@@ -291,6 +291,18 @@ class HtmlToDjot
 
     protected function processLink(DOMElement $node): string
     {
+        if ($node->hasAttribute('data-djot-heading-ref')) {
+            $target = $node->getAttribute('data-djot-heading-ref');
+            $displayText = $node->getAttribute('data-djot-heading-ref-display');
+            if ($displayText === '') {
+                $displayText = trim($this->processChildren($node));
+            }
+
+            return $displayText === $target
+                ? '[[' . $target . ']]'
+                : '[[' . $target . '|' . $displayText . ']]';
+        }
+
         if ($node->hasAttribute('data-djot-inline-footnote-html')) {
             $html = $node->getAttribute('data-djot-inline-footnote-html');
             preg_match('/^\s+/u', $html, $leadingWhitespaceMatch);
