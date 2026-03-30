@@ -489,7 +489,7 @@ Both extensions parse `[[...]]` syntax, and `DjotConverter::addExtension()` will
 
 ## InlineFootnotesExtension
 
-Converts spans with `.fn` class to inline footnotes. This allows footnote content to be written inline with the text, rather than requiring a separate footnote definition block. Additional attributes on the span (other classes, IDs, etc.) are not preserved on the generated footnote reference, consistent with regular footnote syntax.
+Converts spans with `.fn` class to inline footnotes for HTML output. This allows footnote content to be written inline with the text, rather than requiring a separate footnote definition block. Additional attributes on the span (other classes, IDs, etc.) are not preserved on the generated footnote reference, consistent with regular footnote syntax.
 
 ```php
 use Djot\Extension\InlineFootnotesExtension;
@@ -500,6 +500,19 @@ $converter->addExtension(new InlineFootnotesExtension());
 $converter->addExtension(new InlineFootnotesExtension(
     cssClass: 'footnote',
 ));
+```
+
+For non-HTML renderers, use the explicit transform instead of relying on render-time AST mutation:
+
+```php
+use Djot\Transform\InlineFootnotesToParenthesesTransform;
+
+$converter = DjotConverter::plainText();
+$document = $converter->parse('Text[A footnote]{.fn} continues.');
+$document = $converter->transform($document, new InlineFootnotesToParenthesesTransform());
+
+$text = $converter->render($document);
+// Text (A footnote) continues.
 ```
 
 **Input:**
@@ -537,6 +550,13 @@ Regular footnote[^ref] and inline[Inline content]{.fn} together.
 ```
 
 Both footnotes appear in order in the endnotes section.
+
+### Non-HTML Renderers
+
+For Markdown, PlainText, and ANSI output, inline footnotes are not rewritten by
+the extension during `render()`. Apply
+`InlineFootnotesToParenthesesTransform` explicitly when you want a non-HTML
+fallback such as parenthetical inline content.
 
 ### Why This Syntax?
 

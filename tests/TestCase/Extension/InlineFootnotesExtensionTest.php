@@ -243,26 +243,4 @@ DJOT;
             $html,
         );
     }
-
-    public function testWorksWithMarkdownRenderer(): void
-    {
-        $converter = DjotConverter::markdown();
-        $converter->addExtension(new InlineFootnotesExtension());
-
-        $result = $converter->convert('Text[A footnote]{.fn} continues.');
-
-        // Footnote content wrapped in parentheses
-        $this->assertStringContainsString('Text (A footnote) continues.', $result);
-    }
-
-    public function testWorksWithPlainTextRenderer(): void
-    {
-        $converter = DjotConverter::plainText();
-        $converter->addExtension(new InlineFootnotesExtension());
-
-        $result = $converter->convert('Text[A footnote]{.fn} continues.');
-
-        // Footnote content wrapped in parentheses
-        $this->assertStringContainsString('Text (A footnote) continues.', $result);
-    }
 }

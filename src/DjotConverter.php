@@ -18,6 +18,7 @@ use Djot\Renderer\MarkdownRenderer;
 use Djot\Renderer\PlainTextRenderer;
 use Djot\Renderer\RendererInterface;
 use Djot\Renderer\SoftBreakMode;
+use Djot\Transform\TransformerInterface;
 use LengthException;
 use LogicException;
 use RuntimeException;
@@ -327,6 +328,18 @@ class DjotConverter
         }
 
         return $this->parse($content);
+    }
+
+    /**
+     * Apply one or more AST transforms and return the transformed document.
+     */
+    public function transform(Document $document, TransformerInterface ...$transformers): Document
+    {
+        foreach ($transformers as $transformer) {
+            $document = $transformer->transform($document);
+        }
+
+        return $document;
     }
 
     /**

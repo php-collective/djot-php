@@ -6,10 +6,7 @@ namespace Djot\Extension;
 
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
-use Djot\Node\Document;
 use Djot\Node\Inline\Span;
-use Djot\Node\Inline\Text;
-use Djot\Node\Node;
 use Djot\Renderer\HtmlRenderer;
 
 /**
@@ -38,15 +35,13 @@ use Djot\Renderer\HtmlRenderer;
  * preserved on the generated footnote reference, consistent with regular
  * footnote syntax which also doesn't support attributes.
  *
- * For non-HTML renderers (Markdown, PlainText, ANSI), footnote content is
- * wrapped in parentheses to preserve the "aside" semantics.
+ * For non-HTML renderers, use InlineFootnotesToParenthesesTransform to convert
+ * inline footnotes into explicit parenthetical inline content before rendering.
  *
  * @see https://github.com/jgm/djot/issues/286
  */
 class InlineFootnotesExtension implements ExtensionInterface
 {
-    protected bool $isHtmlRenderer = false;
-
     /**
      * @param string $cssClass CSS class that marks a span as an inline footnote
      */
@@ -57,20 +52,17 @@ class InlineFootnotesExtension implements ExtensionInterface
     public function register(DjotConverter $converter): void
     {
         $renderer = $converter->getRenderer();
-        $this->isHtmlRenderer = $renderer instanceof HtmlRenderer;
 
-        // HTML renderer uses events for proper footnote handling
-        if (!$this->isHtmlRenderer) {
+        // HTML renderer uses events for proper footnote handling. Non-HTML
+        // renderers should use an explicit transform instead of mutating the
+        // caller-owned AST during render().
+        if (!$renderer instanceof HtmlRenderer) {
             return;
         }
 
-        // At this point we know it's HtmlRenderer
-        $htmlRenderer = $renderer;
-        assert($htmlRenderer instanceof HtmlRenderer);
-
         $cssClass = $this->cssClass;
 
-        $converter->on('render.span', function (RenderEvent $event) use ($htmlRenderer, $cssClass): void {
+        $converter->on('render.span', function (RenderEvent $event) use ($renderer, $cssClass): void {
             $node = $event->getNode();
             if (!$node instanceof Span) {
                 return;
@@ -84,7 +76,7 @@ class InlineFootnotesExtension implements ExtensionInterface
             // Register with the renderer and get the footnote number.
             // Content rendering is deferred to ensure this inline footnote's number
             // is reserved before any nested footnotes in its content are rendered.
-            $number = $htmlRenderer->registerInlineFootnote(function () use ($event): string {
+            $number = $renderer->registerInlineFootnote(function () use ($event): string {
                 $content = $event->getChildrenHtml();
 
                 // Normalize content to a paragraph to ensure consistent rendering
@@ -113,36 +105,6 @@ class InlineFootnotesExtension implements ExtensionInterface
 
             $event->setHtml($html);
         });
-    }
-
-    /**
-     * For non-HTML renderers, wrap footnote spans in parentheses
-     */
-    public function beforeRender(Document $document): void
-    {
-        if ($this->isHtmlRenderer) {
-            return;
-        }
-
-        $this->wrapFootnoteSpans($document);
-    }
-
-    /**
-     * Recursively find and wrap footnote spans with parentheses
-     */
-    protected function wrapFootnoteSpans(Node $node): void
-    {
-        foreach ($node->getChildren() as $child) {
-            if ($child instanceof Span && $this->isFootnoteSpan($child)) {
-                // Prepend " (" and append ")" to the span's children
-                $child->prependChild(new Text(' ('));
-                $child->appendChild(new Text(')'));
-                // Remove the .fn class so it renders as a normal span
-                $child->removeAttribute('class');
-            }
-
-            $this->wrapFootnoteSpans($child);
-        }
     }
 
     /**
