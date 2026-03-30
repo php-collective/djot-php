@@ -163,7 +163,7 @@ class HeadingReferenceExtension implements ExtensionInterface
     /**
      * Mirror HtmlRenderer::escape() so replacement regexes match rendered output.
      */
-    protected function escapeText(string $text): string
+    protected function escape(string $text): string
     {
         $escaped = htmlspecialchars($text, ENT_NOQUOTES | ENT_HTML5, 'UTF-8');
 
@@ -189,7 +189,7 @@ class HeadingReferenceExtension implements ExtensionInterface
             $count = $this->headingTargetCounts[$normalizedTarget] ?? 0;
             $quotedPlaceholder = preg_quote($this->escapeAttribute($placeholder), '/');
             $quotedTarget = preg_quote($this->escapeAttribute($target), '/');
-            $quotedDisplayText = preg_quote($this->escapeText($displayText), '/');
+            $quotedDisplayText = preg_quote($this->escape($displayText), '/');
 
             if ($count === 1 && isset($this->headingTargets[$normalizedTarget])) {
                 $html = (string)preg_replace_callback(
@@ -202,7 +202,7 @@ class HeadingReferenceExtension implements ExtensionInterface
                             . 'href="#' . $this->escapeAttribute($this->headingTargets[$normalizedTarget]) . '"'
                             . $matches['after']
                             . '>'
-                            . $this->escapeText($displayText)
+                            . $this->escape($displayText)
                             . '</a>';
                     },
                     $html,
@@ -224,7 +224,7 @@ class HeadingReferenceExtension implements ExtensionInterface
                 . '<\/a>/u';
             $html = (string)preg_replace(
                 $pattern,
-                $this->escapeText($fallback),
+                $this->escape($fallback),
                 $html,
                 1,
             );
