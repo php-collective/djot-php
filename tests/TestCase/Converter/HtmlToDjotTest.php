@@ -938,4 +938,43 @@ HTML;
         $this->assertStringContainsString('Question?', $result);
         $this->assertStringContainsString('Answer.', $result);
     }
+
+    // ==================== Round-trip Table Separators ====================
+
+    public function testTableSeparatorWidthsRoundTrip(): void
+    {
+        // Table with specific separator widths should preserve them through round-trip
+        $djot = <<<'DJOT'
+| Header 1  | H2      | Header Three       |
+|-----------|---------|-------------------|
+| Content A | Short   | Much longer text  |
+DJOT;
+
+        $djotConverter = new DjotConverter(roundTripMode: true);
+        $html = $djotConverter->convert($djot);
+
+        // HTML should contain the column widths attribute (11 dashes, 9 dashes, 19 dashes)
+        $this->assertStringContainsString('data-djot-col-widths="11,9,19"', $html);
+
+        // Convert back to Djot
+        $back = trim($this->converter->convert($html));
+
+        // Separator widths should be preserved (with spaces around dashes in output format)
+        $this->assertStringContainsString('| ----------- | --------- | ------------------- |', $back);
+    }
+
+    public function testTableSeparatorWidthsNotPresentInNonRoundTripMode(): void
+    {
+        // Without round-trip mode, no data-djot-col-widths attribute
+        $djot = <<<'DJOT'
+| H1 | H2 |
+|----|----|
+| A  | B  |
+DJOT;
+
+        $djotConverter = new DjotConverter(roundTripMode: false);
+        $html = $djotConverter->convert($djot);
+
+        $this->assertStringNotContainsString('data-djot-col-widths', $html);
+    }
 }

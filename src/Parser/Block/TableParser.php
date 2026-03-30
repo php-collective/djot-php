@@ -120,6 +120,27 @@ class TableParser
     }
 
     /**
+     * Parse separator widths from a separator row for round-trip preservation.
+     *
+     * @param string $separatorLine The separator row line
+     *
+     * @return array<int> Array of separator widths (number of dashes per column)
+     */
+    public function parseSeparatorWidths(string $separatorLine): array
+    {
+        $widths = [];
+        $cells = $this->parseTableCells($separatorLine);
+
+        foreach ($cells as $cell) {
+            // Count only the dashes (excluding colons and whitespace)
+            $dashes = preg_replace('/[^-]/', '', $cell) ?? '';
+            $widths[] = strlen($dashes);
+        }
+
+        return $widths;
+    }
+
+    /**
      * Parse table cells from a row, respecting code spans and escaped pipes.
      *
      * @param string $line The table row line

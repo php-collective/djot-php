@@ -2109,6 +2109,10 @@ class BlockParser
                 $alignments = $this->tableParser->parseTableAlignments($lineWithoutRowAttrs);
                 $headerFound = true;
 
+                // Store separator widths for round-trip preservation
+                $separatorWidths = $this->tableParser->parseSeparatorWidths($lineWithoutRowAttrs);
+                $table->setSeparatorWidths($separatorWidths);
+
                 // Mark previous row as header and apply alignments to it
                 $children = $table->getChildren();
                 if ($children !== []) {
