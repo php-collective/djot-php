@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Node\Block\Heading;
 use Djot\Node\Document;
+use Djot\Node\Node;
 
 /**
  * Shifts heading levels down (h1 → h2, h2 → h3, etc.)
@@ -58,7 +59,7 @@ class HeadingLevelShiftExtension implements ExtensionInterface
     /**
      * Recursively walk the AST and shift heading levels
      */
-    protected function walkAndShift(\Djot\Node\Node $node): void
+    protected function walkAndShift(Node $node): void
     {
         if ($node instanceof Heading) {
             $node->setLevel($node->getLevel() + $this->shift);
