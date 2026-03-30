@@ -27,6 +27,8 @@ class HtmlToDjot
 
     protected bool $inPre = false;
 
+    protected bool $preserveTextWhitespace = false;
+
     /**
      * Attributes to skip when converting (these don't translate well to Djot)
      *
@@ -47,6 +49,7 @@ class HtmlToDjot
         // Reset state
         $this->listDepth = 0;
         $this->inPre = false;
+        $this->preserveTextWhitespace = false;
 
         // Wrap in root element if needed
         if (!preg_match('/<(html|body|div)[^>]*>/i', $html)) {
@@ -93,7 +96,7 @@ class HtmlToDjot
     {
         if ($node instanceof DOMText) {
             $text = $node->textContent;
-            if (!$this->inPre) {
+            if (!$this->inPre && !$this->preserveTextWhitespace) {
                 // Normalize whitespace outside pre blocks
                 $text = preg_replace('/\s+/', ' ', $text) ?? $text;
             }
@@ -806,6 +809,7 @@ class HtmlToDjot
     protected function convertInlineFragmentToDjot(string $html): string
     {
         $converter = new self();
+        $converter->preserveTextWhitespace = true;
 
         $doc = new DOMDocument();
         $doc->encoding = 'UTF-8';

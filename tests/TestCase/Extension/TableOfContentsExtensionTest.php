@@ -244,6 +244,18 @@ DJOT;
         $this->assertStringNotContainsString('<hr>', $html);
     }
 
+    public function testParseThenRenderIncludesAutoInsertedToc(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TableOfContentsExtension(position: 'top'));
+
+        $document = $converter->parse("# One\n\nText.");
+        $html = $converter->render($document);
+
+        $this->assertStringContainsString('<nav class="toc">', $html);
+        $this->assertStringContainsString('<a href="#One">One</a>', $html);
+    }
+
     public function testPositionBottom(): void
     {
         $converter = new DjotConverter();

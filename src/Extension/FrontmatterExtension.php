@@ -80,7 +80,7 @@ use Djot\Node\Document;
  * );
  * ```
  */
-class FrontmatterExtension implements ExtensionInterface
+class FrontmatterExtension implements ParsedDocumentExtensionInterface
 {
     protected ?Frontmatter $frontmatter = null;
 
@@ -164,40 +164,6 @@ class FrontmatterExtension implements ExtensionInterface
             },
         );
 
-        // Track which document we've processed to clear stale state
-        $processedDoc = null;
-
-        // Clear state when rendering a new document (using wildcard to catch first child)
-        $converter->on('render.*', function (RenderEvent $event) use (&$processedDoc): void {
-            $node = $event->getNode();
-            $parent = $node->getParent();
-
-            // Only process when we see a direct child of Document
-            if (!($parent instanceof Document)) {
-                return;
-            }
-
-            // If this is a new document (different from last processed), check for frontmatter
-            if ($processedDoc !== $parent) {
-                $processedDoc = $parent;
-
-                // Check if this document has a Frontmatter node
-                $hasFrontmatter = false;
-                foreach ($parent->getChildren() as $child) {
-                    if ($child instanceof Frontmatter) {
-                        $hasFrontmatter = true;
-
-                        break;
-                    }
-                }
-
-                // Clear stale state if no frontmatter in this document
-                if (!$hasFrontmatter) {
-                    $this->frontmatter = null;
-                }
-            }
-        });
-
         // Register render event to control output
         $converter->on('render.frontmatter', function (RenderEvent $event): void {
             $node = $event->getNode();
@@ -225,6 +191,19 @@ class FrontmatterExtension implements ExtensionInterface
             // Default: no output
             $event->setHtml('');
         });
+    }
+
+    public function afterParse(Document $document): void
+    {
+        $this->frontmatter = null;
+
+        foreach ($document->getChildren() as $child) {
+            if ($child instanceof Frontmatter) {
+                $this->frontmatter = $child;
+
+                break;
+            }
+        }
     }
 
     /**

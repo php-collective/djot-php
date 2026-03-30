@@ -73,7 +73,7 @@ use Djot\Renderer\HtmlRenderer;
  * - Labels come from headings or attributes
  * - You need ARIA mode with full keyboard navigation
  */
-class CodeGroupExtension implements ExtensionInterface
+class CodeGroupExtension implements ResettableExtensionInterface
 {
     /**
      * Counter for generating unique group IDs
@@ -124,6 +124,11 @@ class CodeGroupExtension implements ExtensionInterface
             $html = $this->renderCodeGroup($node, $codeBlocks, $renderer);
             $event->setHtml($html);
         });
+    }
+
+    public function clear(): void
+    {
+        $this->groupCounter = 0;
     }
 
     /**

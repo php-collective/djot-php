@@ -787,6 +787,18 @@ HTML;
         $this->assertSame($djot, $back);
     }
 
+    public function testInlineFootnoteRoundtripPreservesInteriorWhitespace(): void
+    {
+        $djotConverter = new DjotConverter(roundTripMode: true);
+        $djotConverter->addExtension(new InlineFootnotesExtension());
+
+        $djot = 'Text[  Foo   Bar  ]{.fn} after.';
+        $html = $djotConverter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame($djot, $back);
+    }
+
     // ==================== Implicit Paragraphs ====================
 
     public function testInlineElementsAtBlockLevelAsImplicitParagraph(): void

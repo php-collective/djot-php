@@ -127,6 +127,23 @@ DJOT);
         $this->assertStringContainsString('class="permalink"', $html);
     }
 
+    public function testParseThenRenderAppliesOutputTransformer(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $document = $converter->parse(<<<'DJOT'
+See [[Getting Started]].
+
+# Getting Started
+DJOT);
+
+        $html = $converter->render($document);
+
+        $this->assertStringContainsString('href="#Getting-Started"', $html);
+        $this->assertStringNotContainsString('__djot_heading_ref_', $html);
+    }
+
     public function testHeadingWithSmartQuotesMatchesStraightQuoteReference(): void
     {
         $converter = new DjotConverter();

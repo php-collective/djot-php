@@ -97,6 +97,27 @@ class ProfileTest extends TestCase
         $this->assertStringContainsString('Paragraph text', $html);
     }
 
+    public function testParseEnforcesProfileMaxLength(): void
+    {
+        $converter = new DjotConverter(profile: (new Profile())->setMaxLength(5));
+
+        $this->expectException(LengthException::class);
+        $converter->parse('1234567890');
+    }
+
+    public function testRenderAppliesProfileToParsedDocument(): void
+    {
+        $converter = new DjotConverter(profile: Profile::comment());
+        $document = $converter->parse("# Heading\n\nParagraph text");
+
+        $html = $converter->render($document);
+
+        $this->assertStringNotContainsString('<h1>', $html);
+        $this->assertStringContainsString('Heading', $html);
+        $this->assertStringContainsString('Paragraph text', $html);
+        $this->assertTrue($converter->hasProfileViolations());
+    }
+
     public function testCommentProfileStripsImages(): void
     {
         $converter = new DjotConverter(profile: Profile::comment());

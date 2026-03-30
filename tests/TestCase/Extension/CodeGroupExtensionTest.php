@@ -272,6 +272,31 @@ DJOT;
         $this->assertStringContainsString('id="codegroup-2-tab-1"', $html);
     }
 
+    public function testIdsResetBetweenConversions(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+::: code-group
+``` php
+echo "Hello";
+```
+
+``` javascript
+console.log("Hello");
+```
+:::
+DJOT;
+
+        $first = $converter->convert($djot);
+        $second = $converter->convert($djot);
+
+        $this->assertStringContainsString('id="codegroup-1-tab-1"', $first);
+        $this->assertStringContainsString('id="codegroup-1-tab-1"', $second);
+        $this->assertStringNotContainsString('id="codegroup-2-tab-1"', $second);
+    }
+
     public function testPreservesIdAttribute(): void
     {
         $converter = new DjotConverter();
