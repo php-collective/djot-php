@@ -10,6 +10,7 @@ use Djot\Event\RenderEvent;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Div;
 use Djot\Renderer\HtmlRenderer;
+use Djot\Util\StringUtil;
 
 /**
  * Transforms code-group divs into tabbed code block interfaces
@@ -228,19 +229,19 @@ class CodeGroupExtension implements ResettableExtensionInterface
             $inputId = $groupId . '-tab-' . $tabNum;
             $checked = $item['selected'] ? ' checked' : '';
 
-            $html .= '<input type="radio" name="' . $this->escape($groupId) . '" ';
-            $html .= 'id="' . $this->escape($inputId) . '" ';
-            $html .= 'class="' . $this->escape($this->radioClass) . '"' . $checked . ">\n";
+            $html .= '<input type="radio" name="' . StringUtil::escapeHtml($groupId) . '" ';
+            $html .= 'id="' . StringUtil::escapeHtml($inputId) . '" ';
+            $html .= 'class="' . StringUtil::escapeHtml($this->radioClass) . '"' . $checked . ">\n";
 
-            $html .= '<label for="' . $this->escape($inputId) . '" ';
-            $html .= 'class="' . $this->escape($this->labelClass) . '">';
-            $html .= $this->escape($item['label']);
+            $html .= '<label for="' . StringUtil::escapeHtml($inputId) . '" ';
+            $html .= 'class="' . StringUtil::escapeHtml($this->labelClass) . '">';
+            $html .= StringUtil::escapeHtml($item['label']);
             $html .= "</label>\n";
         }
 
         // Render all code panels
         foreach ($codeBlocks as $item) {
-            $html .= '<div class="' . $this->escape($this->panelClass) . '">';
+            $html .= '<div class="' . StringUtil::escapeHtml($this->panelClass) . '">';
             $html .= $this->renderCodeBlock($item['block'], $item['language'], $renderer);
             $html .= "</div>\n";
         }
@@ -289,24 +290,16 @@ class CodeGroupExtension implements ResettableExtensionInterface
             }
         }
 
-        $attrs = ' class="' . $this->escape(implode(' ', $classes)) . '"';
+        $attrs = ' class="' . StringUtil::escapeHtml(implode(' ', $classes)) . '"';
 
         // Copy other attributes (except class)
         foreach ($wrapper->getAttributes() as $name => $value) {
             if ($name === 'class') {
                 continue;
             }
-            $attrs .= ' ' . $this->escape($name) . '="' . $this->escape((string)$value) . '"';
+            $attrs .= ' ' . StringUtil::escapeHtml($name) . '="' . StringUtil::escapeHtml((string)$value) . '"';
         }
 
         return $attrs;
-    }
-
-    /**
-     * Escape HTML special characters
-     */
-    protected function escape(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }

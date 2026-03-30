@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Node\Block\Heading;
 use Djot\Renderer\HtmlRenderer;
+use Djot\Util\StringUtil;
 
 /**
  * Table of Contents generator
@@ -168,7 +169,7 @@ class TableOfContentsExtension implements ResettableExtensionInterface
             return '';
         }
 
-        $html = '<nav class="' . $this->escape($this->cssClass) . '">' . "\n";
+        $html = '<nav class="' . StringUtil::escapeHtml($this->cssClass) . '">' . "\n";
         $html .= $this->renderTocList($headings);
         $html .= '</nav>' . "\n";
 
@@ -213,8 +214,8 @@ class TableOfContentsExtension implements ResettableExtensionInterface
             }
 
             $html .= '<li>';
-            $html .= '<a href="#' . $this->escape($heading['id']) . '">';
-            $html .= $this->escape($heading['text']);
+            $html .= '<a href="#' . StringUtil::escapeHtml($heading['id']) . '">';
+            $html .= StringUtil::escapeHtml($heading['text']);
             $html .= '</a>';
             $hasOpenItem = true;
         }
@@ -232,13 +233,5 @@ class TableOfContentsExtension implements ResettableExtensionInterface
         $html .= '</' . $this->listType . '>' . "\n";
 
         return $html;
-    }
-
-    /**
-     * Escape HTML special characters
-     */
-    protected function escape(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }

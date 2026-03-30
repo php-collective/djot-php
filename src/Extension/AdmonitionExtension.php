@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\Div;
+use Djot\Util\StringUtil;
 
 /**
  * Transforms divs with admonition type classes into semantic admonition markup
@@ -241,9 +242,9 @@ class AdmonitionExtension implements ExtensionInterface
 
         $content = '';
         if ($icon !== null) {
-            $content .= '<span class="' . $this->escape($this->iconClass) . '">' . $icon . '</span> ';
+            $content .= '<span class="' . StringUtil::escapeHtml($this->iconClass) . '">' . $icon . '</span> ';
         }
-        $content .= $this->escape($title);
+        $content .= StringUtil::escapeHtml($title);
 
         return $content;
     }
@@ -254,10 +255,10 @@ class AdmonitionExtension implements ExtensionInterface
     protected function renderStatic(string $type, string $classAttr, string $extraAttrs, ?string $title, string $childrenHtml, ?string $icon): string
     {
         $role = in_array($type, self::ALERT_TYPES, true) ? 'alert' : 'note';
-        $html = '<div class="' . $this->escape($classAttr) . '" role="' . $role . '"' . $extraAttrs . ">\n";
+        $html = '<div class="' . StringUtil::escapeHtml($classAttr) . '" role="' . $role . '"' . $extraAttrs . ">\n";
 
         if ($title !== null) {
-            $html .= '<' . $this->titleTag . ' class="' . $this->escape($this->titleClass) . '">';
+            $html .= '<' . $this->titleTag . ' class="' . StringUtil::escapeHtml($this->titleClass) . '">';
             $html .= $this->renderTitleContent($title, $icon);
             $html .= '</' . $this->titleTag . ">\n";
         }
@@ -274,7 +275,7 @@ class AdmonitionExtension implements ExtensionInterface
     protected function renderCollapsible(string $classAttr, string $extraAttrs, ?string $title, string $childrenHtml, bool $isOpen, ?string $icon): string
     {
         $openAttr = $isOpen ? ' open' : '';
-        $html = '<details class="' . $this->escape($classAttr) . '"' . $openAttr . $extraAttrs . ">\n";
+        $html = '<details class="' . StringUtil::escapeHtml($classAttr) . '"' . $openAttr . $extraAttrs . ">\n";
 
         if ($title !== null) {
             $html .= '<summary>' . $this->renderTitleContent($title, $icon) . "</summary>\n";
@@ -298,17 +299,9 @@ class AdmonitionExtension implements ExtensionInterface
             if (in_array($name, $excluded, true)) {
                 continue;
             }
-            $attrs .= ' ' . $this->escape($name) . '="' . $this->escape((string)$value) . '"';
+            $attrs .= ' ' . StringUtil::escapeHtml($name) . '="' . StringUtil::escapeHtml((string)$value) . '"';
         }
 
         return $attrs;
-    }
-
-    /**
-     * Escape HTML special characters
-     */
-    protected function escape(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }

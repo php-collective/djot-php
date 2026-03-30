@@ -416,7 +416,7 @@ class HtmlRenderer implements RendererInterface
     {
         if ($node->hasAttribute('id')) {
             $idAttr = $node->getAttribute('id');
-            $id = is_string($idAttr) ? $idAttr : '';
+            $id = $idAttr ?? '';
             $this->getRenderContext()->headingIdTracker->trackId($id);
         }
     }

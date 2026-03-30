@@ -3217,7 +3217,7 @@ class BlockParser
     {
         if ($node->hasAttribute('id')) {
             $id = $node->getAttribute('id');
-            if (is_string($id) && $id !== '') {
+            if ($id !== null && $id !== '') {
                 $ids[$id] = true;
             }
         }

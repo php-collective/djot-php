@@ -11,6 +11,7 @@ use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\HtmlRenderer;
+use Djot\Util\StringUtil;
 
 /**
  * Transforms nested divs into tabbed content interfaces
@@ -375,19 +376,19 @@ class TabsExtension implements ResettableExtensionInterface
             $inputId = $tab['id'] ?? ($setId . '-tab-' . $tabNum);
             $checked = $tab['selected'] ? ' checked' : '';
 
-            $html .= '<input type="radio" name="' . $this->escape($setId) . '" ';
-            $html .= 'id="' . $this->escape($inputId) . '"';
-            $html .= ' class="' . $this->escape($this->radioClass) . '"' . $checked . ">\n";
+            $html .= '<input type="radio" name="' . StringUtil::escapeHtml($setId) . '" ';
+            $html .= 'id="' . StringUtil::escapeHtml($inputId) . '"';
+            $html .= ' class="' . StringUtil::escapeHtml($this->radioClass) . '"' . $checked . ">\n";
 
-            $html .= '<label for="' . $this->escape($inputId) . '" ';
-            $html .= 'class="' . $this->escape($this->labelClass) . '">';
-            $html .= $this->escape($tab['label']);
+            $html .= '<label for="' . StringUtil::escapeHtml($inputId) . '" ';
+            $html .= 'class="' . StringUtil::escapeHtml($this->labelClass) . '">';
+            $html .= StringUtil::escapeHtml($tab['label']);
             $html .= "</label>\n";
         }
 
         // Render all tab panels
         foreach ($tabs as $tab) {
-            $html .= '<div class="' . $this->escape($this->tabClass) . '">';
+            $html .= '<div class="' . StringUtil::escapeHtml($this->tabClass) . '">';
             $html .= "\n" . $tab['content'];
             $html .= "</div>\n";
         }
@@ -416,29 +417,29 @@ class TabsExtension implements ResettableExtensionInterface
         // Render all tab buttons first
         foreach ($tabs as $index => $tab) {
             $tabNum = $index + 1;
-            $tabId = $tab['id'] ? $this->escape($tab['id']) . '-tab' : $setId . '-tab-' . $tabNum;
-            $panelId = $tab['id'] ? $this->escape($tab['id']) . '-panel' : $setId . '-panel-' . $tabNum;
+            $tabId = $tab['id'] ? StringUtil::escapeHtml($tab['id']) . '-tab' : $setId . '-tab-' . $tabNum;
+            $panelId = $tab['id'] ? StringUtil::escapeHtml($tab['id']) . '-panel' : $setId . '-panel-' . $tabNum;
             $selected = $tab['selected'] ? 'true' : 'false';
             $tabindex = $tab['selected'] ? '' : ' tabindex="-1"';
 
             $html .= '<button role="tab" id="' . $tabId . '" ';
             $html .= 'aria-selected="' . $selected . '" ';
             $html .= 'aria-controls="' . $panelId . '" ';
-            $html .= 'class="' . $this->escape($this->labelClass) . '"' . $tabindex . '>';
-            $html .= $this->escape($tab['label']);
+            $html .= 'class="' . StringUtil::escapeHtml($this->labelClass) . '"' . $tabindex . '>';
+            $html .= StringUtil::escapeHtml($tab['label']);
             $html .= "</button>\n";
         }
 
         // Render all tab panels
         foreach ($tabs as $index => $tab) {
             $tabNum = $index + 1;
-            $tabId = $tab['id'] ? $this->escape($tab['id']) . '-tab' : $setId . '-tab-' . $tabNum;
-            $panelId = $tab['id'] ? $this->escape($tab['id']) . '-panel' : $setId . '-panel-' . $tabNum;
+            $tabId = $tab['id'] ? StringUtil::escapeHtml($tab['id']) . '-tab' : $setId . '-tab-' . $tabNum;
+            $panelId = $tab['id'] ? StringUtil::escapeHtml($tab['id']) . '-panel' : $setId . '-panel-' . $tabNum;
             $hidden = $tab['selected'] ? '' : ' hidden';
 
             $html .= '<div role="tabpanel" id="' . $panelId . '" ';
             $html .= 'aria-labelledby="' . $tabId . '" ';
-            $html .= 'class="' . $this->escape($this->tabClass) . '"' . $hidden . '>';
+            $html .= 'class="' . StringUtil::escapeHtml($this->tabClass) . '"' . $hidden . '>';
             $html .= "\n" . $tab['content'];
             $html .= "</div>\n";
         }
@@ -462,7 +463,7 @@ class TabsExtension implements ResettableExtensionInterface
             }
         }
 
-        $attrs = ' class="' . $this->escape(implode(' ', $classes)) . '"';
+        $attrs = ' class="' . StringUtil::escapeHtml(implode(' ', $classes)) . '"';
 
         if ($role !== null) {
             $attrs .= ' role="' . $role . '"';
@@ -473,17 +474,9 @@ class TabsExtension implements ResettableExtensionInterface
             if ($name === 'class') {
                 continue;
             }
-            $attrs .= ' ' . $this->escape($name) . '="' . $this->escape((string)$value) . '"';
+            $attrs .= ' ' . StringUtil::escapeHtml($name) . '="' . StringUtil::escapeHtml((string)$value) . '"';
         }
 
         return $attrs;
-    }
-
-    /**
-     * Escape HTML special characters
-     */
-    protected function escape(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }
