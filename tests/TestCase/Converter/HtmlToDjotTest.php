@@ -6,6 +6,8 @@ namespace Djot\Test\TestCase\Converter;
 
 use Djot\Converter\HtmlToDjot;
 use Djot\DjotConverter;
+use Djot\Extension\HeadingLevelShiftExtension;
+use Djot\Extension\InlineFootnotesExtension;
 use PHPUnit\Framework\TestCase;
 
 class HtmlToDjotTest extends TestCase
@@ -730,6 +732,47 @@ HTML;
         $this->assertStringContainsString('data-char="*"', $html);
         $back = trim($this->converter->convert($html));
         $this->assertSame('***', $back, 'Asterisk thematic break should round-trip');
+    }
+
+    public function testHeadingLevelShiftRoundtripPreservesOriginalSourceLevel(): void
+    {
+        $djotConverter = new DjotConverter(roundTripMode: true);
+        $djotConverter->addExtension(new HeadingLevelShiftExtension(shift: 1));
+
+        $html = $djotConverter->convert('# Title');
+
+        $this->assertStringContainsString('data-djot-source-level="1"', $html);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame('# Title', $back);
+    }
+
+    public function testInlineFootnoteRoundtripPreservesInlineSyntax(): void
+    {
+        $djotConverter = new DjotConverter(roundTripMode: true);
+        $djotConverter->addExtension(new InlineFootnotesExtension());
+
+        $djot = 'Text[Footnote]{.fn} after.';
+        $html = $djotConverter->convert($djot);
+
+        $this->assertStringContainsString('data-djot-inline-footnote-html=', $html);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame($djot, $back);
+    }
+
+    public function testInlineFootnoteRoundtripPreservesCustomCssClass(): void
+    {
+        $djotConverter = new DjotConverter(roundTripMode: true);
+        $djotConverter->addExtension(new InlineFootnotesExtension(cssClass: 'footnote'));
+
+        $djot = 'Text[Footnote]{.footnote} after.';
+        $html = $djotConverter->convert($djot);
+
+        $this->assertStringContainsString('data-djot-inline-footnote-class="footnote"', $html);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame($djot, $back);
     }
 
     // ==================== Implicit Paragraphs ====================

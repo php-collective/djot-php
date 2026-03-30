@@ -8,6 +8,7 @@ use Djot\DjotConverter;
 use Djot\Node\Block\Heading;
 use Djot\Node\Document;
 use Djot\Node\Node;
+use Djot\Renderer\HtmlRenderer;
 
 /**
  * Shifts heading levels down (h1 → h2, h2 → h3, etc.)
@@ -31,6 +32,8 @@ use Djot\Node\Node;
  */
 class HeadingLevelShiftExtension implements ExtensionInterface
 {
+    protected ?HtmlRenderer $htmlRenderer = null;
+
     /**
      * @param int $shift Number of levels to shift (1-5). Values are clamped to valid range.
      */
@@ -41,7 +44,8 @@ class HeadingLevelShiftExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
-        // Registration not needed - we use beforeRender hook
+        $renderer = $converter->getRenderer();
+        $this->htmlRenderer = $renderer instanceof HtmlRenderer ? $renderer : null;
     }
 
     /**
@@ -62,6 +66,13 @@ class HeadingLevelShiftExtension implements ExtensionInterface
     protected function walkAndShift(Node $node): void
     {
         if ($node instanceof Heading) {
+            if (
+                $this->htmlRenderer !== null
+                && $this->htmlRenderer->isRoundTripMode()
+                && !$node->hasAttribute('data-djot-source-level')
+            ) {
+                $node->setAttribute('data-djot-source-level', (string)$node->getLevel());
+            }
             $node->setLevel($node->getLevel() + $this->shift);
         }
 
