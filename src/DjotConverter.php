@@ -56,7 +56,8 @@ class DjotConverter
      * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode (true for defaults, SafeMode instance for custom config)
      * @param \Djot\Profile|null $profile Profile for feature restriction (null = all features allowed)
      * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
-     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (null = renderer default)
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (HTML renderer only)
+     * @param bool $roundTripMode Add data attributes for Djot→HTML→Djot round-trips (HTML renderer only)
      */
     public function __construct(
         bool $xhtml = false,
@@ -66,6 +67,7 @@ class DjotConverter
         ?Profile $profile = null,
         bool $significantNewlines = false,
         ?SoftBreakMode $softBreakMode = null,
+        bool $roundTripMode = false,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
@@ -82,6 +84,11 @@ class DjotConverter
         // Configure soft break mode if explicitly provided
         if ($softBreakMode !== null) {
             $this->renderer->setSoftBreakMode($softBreakMode);
+        }
+
+        // Configure round-trip mode
+        if ($roundTripMode) {
+            $this->renderer->setRoundTripMode(true);
         }
 
         // Configure profile
@@ -108,7 +115,8 @@ class DjotConverter
      * @param bool $strict Whether to throw exceptions on parse errors
      * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode
      * @param \Djot\Profile|null $profile Profile for feature restriction
-     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (HTML renderer only)
+     * @param bool $roundTripMode Add data attributes for round-trips (HTML renderer only)
      */
     public static function withSignificantNewlines(
         bool $xhtml = false,
@@ -117,8 +125,9 @@ class DjotConverter
         bool|SafeMode|null $safeMode = null,
         ?Profile $profile = null,
         ?SoftBreakMode $softBreakMode = null,
+        bool $roundTripMode = false,
     ): self {
-        return new self($xhtml, $warnings, $strict, $safeMode, $profile, true, $softBreakMode);
+        return new self($xhtml, $warnings, $strict, $safeMode, $profile, true, $softBreakMode, $roundTripMode);
     }
 
     /**
