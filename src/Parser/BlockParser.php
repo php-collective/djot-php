@@ -693,7 +693,7 @@ class BlockParser
      */
     protected function tryCustomBlockPatterns(Node $parent, array $lines, int $start): ?int
     {
-        if (empty($this->customBlockPatterns)) {
+        if ($this->customBlockPatterns === []) {
             return null;
         }
 
@@ -807,7 +807,7 @@ class BlockParser
      */
     protected function applyPendingAttributes(Node $node): void
     {
-        if (!empty($this->pendingAttributes)) {
+        if ($this->pendingAttributes !== []) {
             $node->setAttributes($this->pendingAttributes);
             $this->pendingAttributes = [];
         }

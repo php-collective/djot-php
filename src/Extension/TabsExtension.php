@@ -189,6 +189,11 @@ class TabsExtension implements ExtensionInterface
     protected int $tabSetCounter = 0;
 
     /**
+     * Counter for generating fallback tab labels
+     */
+    protected int $labelCounter = 0;
+
+    /**
      * @param string $mode Output mode: 'css' (default) or 'aria'
      * @param string $wrapperClass CSS class for the tabs container
      * @param string $tabClass CSS class for individual tab panels
@@ -295,10 +300,7 @@ class TabsExtension implements ExtensionInterface
         }
 
         // Fallback: generic label
-        /** @var int $counter */
-        static $counter = 0;
-
-        return 'Tab ' . ++$counter;
+        return 'Tab ' . ++$this->labelCounter;
     }
 
     /**

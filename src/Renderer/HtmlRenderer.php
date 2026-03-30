@@ -358,7 +358,7 @@ class HtmlRenderer implements RendererInterface
 
                 // Close any sections at same or deeper level
                 for ($l = 6; $l >= $level; $l--) {
-                    while (!empty($openSections[$l]) && $openSections[$l] > 0) {
+                    while (($openSections[$l] ?? 0) > 0) {
                         $html .= "</section>\n";
                         $openSections[$l]--;
                     }
@@ -392,7 +392,7 @@ class HtmlRenderer implements RendererInterface
 
         // Close all open sections (deepest first)
         for ($l = 6; $l >= 1; $l--) {
-            while (!empty($openSections[$l]) && $openSections[$l] > 0) {
+            while (($openSections[$l] ?? 0) > 0) {
                 $html .= "</section>\n";
                 $openSections[$l]--;
             }
@@ -586,7 +586,7 @@ class HtmlRenderer implements RendererInterface
             }
             // Preserve marker for round-trip (only if non-default and round-trip mode enabled)
             if ($this->roundTripMode && $marker !== null && $marker !== '.') {
-                $olAttrs .= ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES) . '"';
+                $olAttrs .= ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
             }
 
             return '<ol' . $olAttrs . $this->renderAttributeArray($attrs) . ">\n" . $html . "</ol>\n";
@@ -600,7 +600,7 @@ class HtmlRenderer implements RendererInterface
         $marker = $node->getMarker();
         $markerAttr = '';
         if ($this->roundTripMode && $marker !== null && $marker !== '-') {
-            $markerAttr = ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES) . '"';
+            $markerAttr = ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
         }
 
         return '<ul' . $markerAttr . $this->renderAttributeArray($attrs) . ">\n" . $html . "</ul>\n";
@@ -638,7 +638,7 @@ class HtmlRenderer implements RendererInterface
         $attrs = $this->renderAttributes($node);
         // Preserve character for round-trip (only if non-default and round-trip mode enabled)
         if ($this->roundTripMode && $node->char !== '-') {
-            $attrs .= ' data-char="' . htmlspecialchars($node->char, ENT_QUOTES) . '"';
+            $attrs .= ' data-char="' . htmlspecialchars($node->char, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
         }
 
         return $this->xhtml ? '<hr' . $attrs . " />\n" : '<hr' . $attrs . ">\n";
