@@ -30,6 +30,11 @@ class RawBlock extends BlockNode
         return $this->format;
     }
 
+    public function setFormat(string $format): void
+    {
+        $this->format = $format;
+    }
+
     public function getType(): string
     {
         return 'raw_block';

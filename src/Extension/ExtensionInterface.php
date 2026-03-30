@@ -46,8 +46,6 @@ interface ExtensionInterface
      * - Register inline patterns via $converter->getParser()->getInlineParser()
      * - Register block patterns via $converter->getParser()
      * - Register render event listeners via $converter->on()
-     *
-     * @return void
      */
     public function register(DjotConverter $converter): void;
 }

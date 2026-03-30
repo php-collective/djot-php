@@ -78,7 +78,7 @@ class InlineFootnotesExtension implements ExtensionInterface
 
             // Check if this span has the footnote class
             $class = $node->getAttribute('class');
-            if ($class === null || !is_string($class) || !$this->hasClass($class, $cssClass)) {
+            if ($class === null || !$this->hasClass($class, $cssClass)) {
                 return;
             }
 
@@ -144,7 +144,7 @@ class InlineFootnotesExtension implements ExtensionInterface
     {
         $class = $span->getAttribute('class');
 
-        return $class !== null && is_string($class) && $this->hasClass($class, $this->cssClass);
+        return $class !== null && $this->hasClass($class, $this->cssClass);
     }
 
     /**

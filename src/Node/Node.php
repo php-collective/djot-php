@@ -129,21 +129,12 @@ abstract class Node
         return $child;
     }
 
-    /**
-     * @param string $key
-     * @param string $value
-     *
-     * @return void
-     */
-    public function setAttribute(string $key, mixed $value): void
+    public function setAttribute(string $key, string $value): void
     {
         $this->attributes[$key] = $value;
     }
 
-    /**
-     * @return string|int|null
-     */
-    public function getAttribute(string $key): mixed
+    public function getAttribute(string $key): ?string
     {
         return $this->attributes[$key] ?? null;
     }

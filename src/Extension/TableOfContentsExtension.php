@@ -68,9 +68,6 @@ class TableOfContentsExtension implements ExtensionInterface
     ) {
     }
 
-    /**
-     * @return void
-     */
     public function register(DjotConverter $converter): void
     {
         // Only works with HTML output - requires heading ID tracking
@@ -154,8 +151,6 @@ class TableOfContentsExtension implements ExtensionInterface
 
     /**
      * Clear the collected TOC (useful when reusing the extension)
-     *
-     * @return void
      */
     public function clear(): void
     {

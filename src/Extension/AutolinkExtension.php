@@ -40,9 +40,6 @@ class AutolinkExtension implements ExtensionInterface
     ) {
     }
 
-    /**
-     * @return void
-     */
     public function register(DjotConverter $converter): void
     {
         $inlineParser = $converter->getParser()->getInlineParser();
@@ -56,7 +53,7 @@ class AutolinkExtension implements ExtensionInterface
 
         $inlineParser->addInlinePattern(
             $pattern,
-            function (string $match, array $groups): Link {
+            function (string $match, array $_groups): Link {
                 $url = $match;
 
                 $link = new Link($url);
@@ -73,7 +70,7 @@ class AutolinkExtension implements ExtensionInterface
 
             $inlineParser->addInlinePattern(
                 $emailPattern,
-                function (string $match, array $groups): Link {
+                function (string $match, array $_groups): Link {
                     $link = new Link($match);
                     // Display without mailto: prefix
                     $display = substr($match, 7);
@@ -88,7 +85,7 @@ class AutolinkExtension implements ExtensionInterface
 
             $inlineParser->addInlinePattern(
                 $bareEmailPattern,
-                function (string $match, array $groups): Link {
+                function (string $match, array $_groups): Link {
                     $link = new Link('mailto:' . $match);
                     $link->appendChild(new Text($match));
 

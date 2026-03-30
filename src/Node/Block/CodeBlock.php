@@ -35,6 +35,11 @@ class CodeBlock extends BlockNode
         return $this->language;
     }
 
+    public function setLanguage(?string $language): void
+    {
+        $this->language = $language;
+    }
+
     public function getType(): string
     {
         return 'code_block';

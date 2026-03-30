@@ -42,9 +42,6 @@ class MentionsExtension implements ExtensionInterface
     ) {
     }
 
-    /**
-     * @return void
-     */
     public function register(DjotConverter $converter): void
     {
         $inlineParser = $converter->getParser()->getInlineParser();
