@@ -815,7 +815,7 @@ class HtmlToDjot
         }
 
         foreach ($listItems as $listItem) {
-            if (!$listItem instanceof DOMElement || !$listItem->hasAttribute('data-djot-inline-footnote')) {
+            if (!$listItem->hasAttribute('data-djot-inline-footnote')) {
                 return false;
             }
         }
