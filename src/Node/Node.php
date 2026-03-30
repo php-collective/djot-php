@@ -185,8 +185,7 @@ abstract class Node
         }
 
         $classes = (string)($this->getAttribute('class') ?? '');
-        $classList = $classes !== '' ? preg_split('/\s+/', trim($classes)) : [];
-        $classList = is_array($classList) ? $classList : [];
+        $classList = $classes !== '' ? (preg_split('/\s+/', trim($classes)) ?: []) : [];
 
         if (in_array($class, $classList, true)) {
             return;

@@ -323,8 +323,7 @@ class HtmlRenderer implements RendererInterface
         $html = $this->renderDocumentWithSections($document);
 
         // Render collected footnotes at end (populated by renderFootnote/renderFootnoteRef during rendering)
-        // @phpstan-ignore-next-line
-        if ($this->collectedFootnotes || $this->footnoteNumbers) {
+        if ($this->collectedFootnotes !== [] || $this->footnoteNumbers !== []) {
             $html .= $this->renderFootnotesSection();
         }
 
@@ -344,6 +343,8 @@ class HtmlRenderer implements RendererInterface
 
     /**
      * Render document with section wrapping around headings
+     *
+     * @phpstan-impure Populates collectedFootnotes and footnoteNumbers during rendering
      */
     protected function renderDocumentWithSections(Document $document): string
     {
