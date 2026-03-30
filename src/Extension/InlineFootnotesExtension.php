@@ -78,7 +78,6 @@ class InlineFootnotesExtension implements ExtensionInterface
                 return;
             }
 
-            /** @var HtmlRenderer $renderer */
             // Register with the renderer and get the footnote number.
             // Content rendering is deferred to ensure this inline footnote's number
             // is reserved before any nested footnotes in its content are rendered.
