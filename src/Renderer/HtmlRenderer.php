@@ -65,15 +65,6 @@ class HtmlRenderer implements RendererInterface
     protected ?SafeMode $safeMode = null;
 
     /**
-     * Tracks footnote reference counts for generating unique IDs
-     *
-     * @var array<string, int>
-     */
-    protected array $footnoteRefCounts = [];
-
-    protected HeadingIdTracker $headingIdTracker;
-
-    /**
      * Tab width for code blocks (null = preserve tabs, integer = convert to spaces)
      */
     protected ?int $codeBlockTabWidth = 4;
@@ -84,31 +75,9 @@ class HtmlRenderer implements RendererInterface
      */
     protected bool $roundTripMode = false;
 
-    /**
-     * Maps footnote labels to their assigned numbers (order of first reference)
-     *
-     * @var array<string, int>
-     */
-    protected array $footnoteNumbers = [];
+    protected RenderContext $sharedRenderContext;
 
-    /**
-     * Counter for footnote numbering
-     */
-    protected int $footnoteCounter = 0;
-
-    /**
-     * Collected footnote nodes for rendering at end
-     *
-     * @var array<string, \Djot\Node\Block\Footnote>
-     */
-    protected array $collectedFootnotes = [];
-
-    /**
-     * Deferred content renderers for inline footnotes (number => callback)
-     *
-     * @var array<int, \Closure(): string>
-     */
-    protected array $inlineFootnoteRenderers = [];
+    protected ?RenderContext $activeRenderContext = null;
 
     /**
      * Dispatch table mapping node class names to render method names
@@ -119,7 +88,7 @@ class HtmlRenderer implements RendererInterface
 
     public function __construct(protected bool $xhtml = false)
     {
-        $this->headingIdTracker = new HeadingIdTracker();
+        $this->sharedRenderContext = new RenderContext();
         $this->initNodeRenderers();
     }
 
@@ -128,7 +97,7 @@ class HtmlRenderer implements RendererInterface
      */
     public function getHeadingIdTracker(): HeadingIdTracker
     {
-        return $this->headingIdTracker;
+        return $this->getRenderContext()->headingIdTracker;
     }
 
     /**
@@ -295,39 +264,41 @@ class HtmlRenderer implements RendererInterface
      */
     public function registerInlineFootnote(Closure $contentRenderer): int
     {
-        $this->footnoteCounter++;
-        $number = $this->footnoteCounter;
+        $context = $this->getRenderContext();
+        $context->footnoteCounter++;
+        $number = $context->footnoteCounter;
 
         // Use a synthetic label that cannot collide with user-supplied labels.
         // Djot footnote labels cannot contain ']', so including it here ensures uniqueness.
         $label = '_inline_]' . $number;
-        $this->footnoteNumbers[$label] = $number;
-        $this->footnoteRefCounts[$label] = 1;
+        $context->footnoteNumbers[$label] = $number;
+        $context->footnoteRefCounts[$label] = 1;
 
         // Store deferred content renderer
-        $this->inlineFootnoteRenderers[$number] = $contentRenderer;
+        $context->inlineFootnoteRenderers[$number] = $contentRenderer;
 
         return $number;
     }
 
     public function render(Document $document): string
     {
-        // Reset state for each render
-        $this->footnoteRefCounts = [];
-        $this->headingIdTracker->reset();
-        $this->footnoteNumbers = [];
-        $this->footnoteCounter = 0;
-        $this->collectedFootnotes = [];
-        $this->inlineFootnoteRenderers = [];
+        return $this->withRenderContext(
+            $this->sharedRenderContext,
+            function () use ($document): string {
+                $this->sharedRenderContext->reset();
 
-        $html = $this->renderDocumentWithSections($document);
+                $html = $this->renderDocumentWithSections($document);
 
-        // Render collected footnotes at end (populated by renderFootnote/renderFootnoteRef during rendering)
-        if ($this->collectedFootnotes !== [] || $this->footnoteNumbers !== []) {
-            $html .= $this->renderFootnotesSection();
-        }
+                if (
+                    $this->sharedRenderContext->collectedFootnotes !== []
+                    || $this->sharedRenderContext->footnoteNumbers !== []
+                ) {
+                    $html .= $this->renderFootnotesSection();
+                }
 
-        return $html;
+                return $html;
+            },
+        );
     }
 
     /**
@@ -338,7 +309,18 @@ class HtmlRenderer implements RendererInterface
      */
     public function renderNodeFragment(Node $node): string
     {
-        return $this->renderNode($node);
+        return $this->withFragmentContext(fn (): string => $this->renderNode($node));
+    }
+
+    /**
+     * Render a document fragment without resetting active render state.
+     *
+     * This is intended for extensions that need block-level rendering for a
+     * temporary document while participating in the current render.
+     */
+    public function renderDocumentFragment(Document $document): string
+    {
+        return $this->withFragmentContext(fn (): string => $this->renderDocumentWithSections($document));
     }
 
     /**
@@ -424,7 +406,7 @@ class HtmlRenderer implements RendererInterface
      */
     protected function getSectionId(Heading $node): string
     {
-        return $this->headingIdTracker->getIdForHeading($node);
+        return $this->getRenderContext()->headingIdTracker->getIdForHeading($node);
     }
 
     /**
@@ -435,7 +417,7 @@ class HtmlRenderer implements RendererInterface
         if ($node->hasAttribute('id')) {
             $idAttr = $node->getAttribute('id');
             $id = is_string($idAttr) ? $idAttr : '';
-            $this->headingIdTracker->trackId($id);
+            $this->getRenderContext()->headingIdTracker->trackId($id);
         }
     }
 
@@ -538,7 +520,7 @@ class HtmlRenderer implements RendererInterface
      */
     protected function getPlainText(Node $node): string
     {
-        return $this->headingIdTracker->getPlainText($node);
+        return $this->getRenderContext()->headingIdTracker->getPlainText($node);
     }
 
     protected function renderCodeBlock(CodeBlock $node): string
@@ -1091,7 +1073,7 @@ class HtmlRenderer implements RendererInterface
     {
         // Collect footnote for rendering at document end, don't output here
         $label = $node->getLabel();
-        $this->collectedFootnotes[$label] = $node;
+        $this->getRenderContext()->collectedFootnotes[$label] = $node;
 
         return '';
     }
@@ -1101,6 +1083,8 @@ class HtmlRenderer implements RendererInterface
      */
     protected function renderFootnotesSection(): string
     {
+        $context = $this->getRenderContext();
+
         // Pre-render all footnote contents to discover any nested footnote references
         // Keep iterating until no new footnotes are discovered
         $renderedContents = [];
@@ -1108,24 +1092,24 @@ class HtmlRenderer implements RendererInterface
 
         do {
             $newFootnotes = false;
-            foreach ($this->footnoteNumbers as $label => $number) {
+            foreach ($context->footnoteNumbers as $label => $number) {
                 if (isset($processedNumbers[$number])) {
                     continue;
                 }
                 $processedNumbers[$number] = true;
 
-                if (isset($this->inlineFootnoteRenderers[$number])) {
+                if (isset($context->inlineFootnoteRenderers[$number])) {
                     // Inline footnote - invoke deferred renderer
-                    $renderedContents[$number] = trim(($this->inlineFootnoteRenderers[$number])());
-                } elseif (isset($this->collectedFootnotes[$label])) {
+                    $renderedContents[$number] = trim(($context->inlineFootnoteRenderers[$number])());
+                } elseif (isset($context->collectedFootnotes[$label])) {
                     // Regular footnote - rendering may discover new footnote references
-                    $renderedContents[$number] = trim($this->renderChildren($this->collectedFootnotes[$label]));
+                    $renderedContents[$number] = trim($this->renderChildren($context->collectedFootnotes[$label]));
                 } else {
                     $renderedContents[$number] = '';
                 }
 
                 // Check if new footnotes were discovered during rendering
-                if (count($this->footnoteNumbers) > count($processedNumbers)) {
+                if (count($context->footnoteNumbers) > count($processedNumbers)) {
                     $newFootnotes = true;
                 }
             }
@@ -1142,8 +1126,8 @@ class HtmlRenderer implements RendererInterface
             $html .= '<li id="fn' . $number . '">' . "\n";
 
             // Find the label for this footnote number to get ref count
-            $label = array_search($number, $this->footnoteNumbers, true);
-            $refCount = $label !== false ? ($this->footnoteRefCounts[$label] ?? 1) : 1;
+            $label = array_search($number, $context->footnoteNumbers, true);
+            $refCount = $label !== false ? ($context->footnoteRefCounts[$label] ?? 1) : 1;
 
             // Generate backlinks - multiple if footnote referenced multiple times
             $backlinks = $this->generateBacklinks($number, $refCount);
@@ -1198,21 +1182,22 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderFootnoteRef(FootnoteRef $node): string
     {
+        $context = $this->getRenderContext();
         $label = $node->getLabel();
 
         // Assign number to footnote on first reference
-        if (!isset($this->footnoteNumbers[$label])) {
-            $this->footnoteCounter++;
-            $this->footnoteNumbers[$label] = $this->footnoteCounter;
+        if (!isset($context->footnoteNumbers[$label])) {
+            $context->footnoteCounter++;
+            $context->footnoteNumbers[$label] = $context->footnoteCounter;
         }
-        $number = $this->footnoteNumbers[$label];
+        $number = $context->footnoteNumbers[$label];
 
         // Track reference count for this footnote to generate unique IDs
-        if (!isset($this->footnoteRefCounts[$label])) {
-            $this->footnoteRefCounts[$label] = 0;
+        if (!isset($context->footnoteRefCounts[$label])) {
+            $context->footnoteRefCounts[$label] = 0;
         }
-        $this->footnoteRefCounts[$label]++;
-        $refCount = $this->footnoteRefCounts[$label];
+        $context->footnoteRefCounts[$label]++;
+        $refCount = $context->footnoteRefCounts[$label];
 
         // Generate unique ID: fnref1 for first, fnref1-2 for second, etc.
         $refId = 'fnref' . $number;
@@ -1240,5 +1225,35 @@ class HtmlRenderer implements RendererInterface
         // By default, symbols are rendered as their name
         // Could be extended to support emoji mappings
         return ':' . $this->escape($node->getName()) . ':';
+    }
+
+    protected function getRenderContext(): RenderContext
+    {
+        return $this->activeRenderContext ?? $this->sharedRenderContext;
+    }
+
+    /**
+     * @param \Closure(): string $callback
+     */
+    protected function withFragmentContext(Closure $callback): string
+    {
+        $context = $this->activeRenderContext ?? new RenderContext();
+
+        return $this->withRenderContext($context, $callback);
+    }
+
+    /**
+     * @param \Closure(): string $callback
+     */
+    protected function withRenderContext(RenderContext $context, Closure $callback): string
+    {
+        $previousContext = $this->activeRenderContext;
+        $this->activeRenderContext = $context;
+
+        try {
+            return $callback();
+        } finally {
+            $this->activeRenderContext = $previousContext;
+        }
     }
 }
