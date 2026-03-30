@@ -186,5 +186,20 @@ abstract class Node
         $this->setAttribute('class', implode(' ', $classList));
     }
 
+    /**
+     * Check if the node has a specific CSS class
+     */
+    public function hasClass(string $class): bool
+    {
+        $classes = $this->getAttribute('class') ?? '';
+        if ($classes === '') {
+            return false;
+        }
+
+        $classList = preg_split('/\s+/', trim($classes)) ?: [];
+
+        return in_array($class, $classList, true);
+    }
+
     abstract public function getType(): string;
 }

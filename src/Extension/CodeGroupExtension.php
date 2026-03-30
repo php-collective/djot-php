@@ -112,7 +112,7 @@ class CodeGroupExtension implements ExtensionInterface
                 return;
             }
 
-            if (!$this->hasClass($node, 'code-group')) {
+            if (!$node->hasClass('code-group')) {
                 return;
             }
 
@@ -297,17 +297,6 @@ class CodeGroupExtension implements ExtensionInterface
         }
 
         return $attrs;
-    }
-
-    /**
-     * Check if a node has a specific class
-     */
-    protected function hasClass(Div $node, string $className): bool
-    {
-        $classAttr = (string)$node->getAttribute('class');
-        $classes = preg_split('/\s+/', trim($classAttr));
-
-        return is_array($classes) && in_array($className, $classes, true);
     }
 
     /**

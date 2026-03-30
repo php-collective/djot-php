@@ -223,7 +223,7 @@ class TabsExtension implements ExtensionInterface
                 return;
             }
 
-            if (!$this->hasClass($node, 'tabs')) {
+            if (!$node->hasClass('tabs')) {
                 return;
             }
 
@@ -250,7 +250,7 @@ class TabsExtension implements ExtensionInterface
         $tabs = [];
 
         foreach ($wrapper->getChildren() as $child) {
-            if (!$child instanceof Div || !$this->hasClass($child, 'tab')) {
+            if (!$child instanceof Div || !$child->hasClass('tab')) {
                 continue;
             }
 
@@ -471,17 +471,6 @@ class TabsExtension implements ExtensionInterface
         }
 
         return $attrs;
-    }
-
-    /**
-     * Check if a node has a specific class
-     */
-    protected function hasClass(Node $node, string $className): bool
-    {
-        $classAttr = (string)$node->getAttribute('class');
-        $classes = preg_split('/\s+/', trim($classAttr));
-
-        return is_array($classes) && in_array($className, $classes, true);
     }
 
     /**

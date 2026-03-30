@@ -580,7 +580,7 @@ class BlockParser
             // Match heading: optional leading spaces, 1-6 # characters, followed by space(s) and content
             // Space after # is syntax delimiter, not indentation - must be space(s) per spec, not tab
             if (preg_match('/^[ ]{0,3}(#{1,6})(?: +(.*))?$/', $line, $matches)) {
-                $headingText = isset($matches[2]) ? trim($matches[2]) : '';
+                $headingText = trim($matches[2] ?? '');
 
                 // Collect continuation lines
                 $j = $i + 1;
@@ -1211,7 +1211,7 @@ class BlockParser
         }
 
         $level = strlen($matches[1]);
-        $content = isset($matches[2]) ? trim($matches[2]) : '';
+        $content = trim($matches[2] ?? '');
 
         // Collect continuation lines
         $i = $start + 1;

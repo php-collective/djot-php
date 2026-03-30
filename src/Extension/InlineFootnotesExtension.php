@@ -77,8 +77,7 @@ class InlineFootnotesExtension implements ExtensionInterface
             }
 
             // Check if this span has the footnote class
-            $class = $node->getAttribute('class');
-            if ($class === null || !$this->hasClass($class, $cssClass)) {
+            if (!$node->hasClass($cssClass)) {
                 return;
             }
 
@@ -142,21 +141,6 @@ class InlineFootnotesExtension implements ExtensionInterface
      */
     protected function isFootnoteSpan(Span $span): bool
     {
-        $class = $span->getAttribute('class');
-
-        return $class !== null && $this->hasClass($class, $this->cssClass);
-    }
-
-    /**
-     * Check if a class string contains the target class
-     */
-    protected function hasClass(string $classString, string $targetClass): bool
-    {
-        $classes = preg_split('/\s+/', $classString);
-        if ($classes === false) {
-            return false;
-        }
-
-        return in_array($targetClass, $classes, true);
+        return $span->hasClass($this->cssClass);
     }
 }
