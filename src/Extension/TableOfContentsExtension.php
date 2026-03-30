@@ -6,6 +6,7 @@ namespace Djot\Extension;
 
 use Djot\DjotConverter;
 use Djot\Node\Block\Heading;
+use Djot\Renderer\HtmlRenderer;
 
 /**
  * Table of Contents generator
@@ -72,6 +73,11 @@ class TableOfContentsExtension implements ExtensionInterface
      */
     public function register(DjotConverter $converter): void
     {
+        // Only works with HTML output - requires heading ID tracking
+        if (!$converter->getRenderer() instanceof HtmlRenderer) {
+            return;
+        }
+
         $tracker = $converter->getHeadingIdTracker();
 
         // Hook into heading rendering to collect TOC entries

@@ -10,6 +10,7 @@ use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Span;
 use Djot\Node\Inline\Text;
+use Djot\Renderer\HtmlRenderer;
 
 /**
  * Adds permalink anchors to headings
@@ -88,6 +89,11 @@ class HeadingPermalinksExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
+        // Only works with HTML output - requires heading ID tracking
+        if (!$converter->getRenderer() instanceof HtmlRenderer) {
+            return;
+        }
+
         $tracker = $converter->getHeadingIdTracker();
 
         $converter->on('render.heading', function (RenderEvent $event) use ($tracker): void {
