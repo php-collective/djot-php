@@ -12,6 +12,7 @@ use Djot\Extension\TabsExtension;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Symbol;
 use Djot\Profile;
+use Djot\Renderer\MarkdownRenderer;
 use Djot\Renderer\SoftBreakMode;
 use LengthException;
 use PHPUnit\Framework\TestCase;
@@ -3086,7 +3087,7 @@ DJOT;
     public function testCreateWithCustomRenderer(): void
     {
         $converter = DjotConverter::create(
-            renderer: new \Djot\Renderer\MarkdownRenderer(),
+            renderer: new MarkdownRenderer(),
         );
 
         $result = $converter->convert("# Hello\n\n*bold*");
@@ -3100,7 +3101,8 @@ DJOT;
         $converter = DjotConverter::plainText();
 
         // Should not throw, just return $this
-        $result = $converter->on('render.paragraph', function () {});
+        $result = $converter->on('render.paragraph', function () {
+        });
         $this->assertSame($converter, $result);
 
         $result = $converter->off('render.paragraph');
