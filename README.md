@@ -26,16 +26,6 @@ $html = $converter->convert('Hello *world*!');
 // Output: <p>Hello <strong>world</strong>!</p>
 ```
 
-## Output Formats
-
-```php
-use Djot\DjotConverter;
-
-$converter = DjotConverter::markdown();   // Djot → Markdown
-$converter = DjotConverter::plainText();  // Djot → Plain text
-$converter = DjotConverter::ansi();       // Djot → ANSI terminal
-```
-
 ## Features
 
 - **Block elements**: Headings, paragraphs, code blocks, block quotes, lists, tables, divs, definition lists, line blocks
