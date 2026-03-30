@@ -9,6 +9,7 @@ use Djot\Event\RenderEvent;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Text;
+use Djot\Renderer\HtmlRenderer;
 use Random\RandomException;
 
 /**
@@ -22,6 +23,9 @@ use Random\RandomException;
  *
  * Because it uses the same [[...]] syntax as WikilinksExtension, the two
  * extensions cannot be used together on the same converter instance.
+ *
+ * Note: This extension only works with HtmlRenderer. For non-HTML renderers,
+ * [[Heading Text]] syntax will be rendered as literal text.
  */
 class HeadingReferenceExtension implements ExtensionInterface
 {
@@ -50,6 +54,11 @@ class HeadingReferenceExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
+        // Only works with HTML output - requires heading ID tracking
+        if (!$converter->getRenderer() instanceof HtmlRenderer) {
+            return;
+        }
+
         $inlineParser = $converter->getParser()->getInlineParser();
         $tracker = $converter->getHeadingIdTracker();
 
