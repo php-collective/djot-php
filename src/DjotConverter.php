@@ -466,8 +466,9 @@ class DjotConverter
     public function addExtension(ExtensionInterface $extension): self
     {
         $this->assertCompatibleExtension($extension);
-        $this->extensions[] = $extension;
-        $extension->register($this);
+        $registeredExtension = $extension instanceof BeforeRenderExtensionInterface ? clone $extension : $extension;
+        $this->extensions[] = $registeredExtension;
+        $registeredExtension->register($this);
 
         return $this;
     }

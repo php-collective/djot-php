@@ -188,31 +188,27 @@ class TableOfContentsExtension implements ResettableExtensionInterface
 
         $html = '<' . $this->listType . '>' . "\n";
         $levelStack = [$headings[0]['level']];
+        $hasOpenItem = false;
 
-        foreach ($headings as $index => $heading) {
+        foreach ($headings as $heading) {
             $level = $heading['level'];
-            $stackIndex = count($levelStack) - 1;
-            $currentLevel = $levelStack[$stackIndex];
 
-            if ($index > 0) {
+            if ($hasOpenItem) {
+                $depth = count($levelStack);
+                $currentLevel = $levelStack[$depth - 1];
+
                 if ($level > $currentLevel) {
                     $html .= "\n<" . $this->listType . '>' . "\n";
                     $levelStack[] = $level;
                 } else {
-                    $depth = count($levelStack);
-                    while ($depth > 1 && $level < $levelStack[$depth - 1]) {
+                    while ($depth > 1 && $level <= $levelStack[$depth - 2]) {
                         $html .= '</li>' . "\n";
                         $html .= '</' . $this->listType . '>' . "\n";
                         array_pop($levelStack);
                         $depth--;
                     }
 
-                    if ($level > $levelStack[$depth - 1]) {
-                        $html .= "\n<" . $this->listType . '>' . "\n";
-                        $levelStack[] = $level;
-                    } else {
-                        $html .= '</li>' . "\n";
-                    }
+                    $html .= '</li>' . "\n";
                 }
             }
 
@@ -220,6 +216,7 @@ class TableOfContentsExtension implements ResettableExtensionInterface
             $html .= '<a href="#' . $this->escape($heading['id']) . '">';
             $html .= $this->escape($heading['text']);
             $html .= '</a>';
+            $hasOpenItem = true;
         }
 
         $html .= '</li>' . "\n";

@@ -290,13 +290,20 @@ class HtmlToDjot
     {
         if ($node->hasAttribute('data-djot-inline-footnote-html')) {
             $html = $node->getAttribute('data-djot-inline-footnote-html');
-            $content = $this->convertInlineFragmentToDjot($html);
+            preg_match('/^\s+/u', $html, $leadingWhitespaceMatch);
+            preg_match('/\s+$/u', $html, $trailingWhitespaceMatch);
+
+            $leadingWhitespace = $leadingWhitespaceMatch[0] ?? '';
+            $trailingWhitespace = $trailingWhitespaceMatch[0] ?? '';
+            $trimmedHtml = preg_replace('/^\s+|\s+$/u', '', $html) ?? $html;
+            $content = $this->convertInlineFragmentToDjot($trimmedHtml);
+            $content = $leadingWhitespace . $content . $trailingWhitespace;
             $cssClass = $node->getAttribute('data-djot-inline-footnote-class');
             if ($cssClass === '') {
                 $cssClass = 'fn';
             }
 
-            return '[' . trim($content) . ']{.' . $cssClass . '}';
+            return '[' . $content . ']{.' . $cssClass . '}';
         }
 
         $href = $node->getAttribute('href');
@@ -800,7 +807,19 @@ class HtmlToDjot
     {
         $converter = new self();
 
-        return trim($converter->convert($html));
+        $doc = new DOMDocument();
+        $doc->encoding = 'UTF-8';
+
+        libxml_use_internal_errors(true);
+        $doc->loadHTML('<?xml encoding="UTF-8"><span>' . $html . '</span>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        $root = $doc->documentElement;
+        if (!$root instanceof DOMElement) {
+            return '';
+        }
+
+        return $converter->processChildren($root);
     }
 
     protected function isInlineOnlyEndnotesSection(DOMElement $node): bool

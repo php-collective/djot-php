@@ -403,4 +403,19 @@ DJOT;
         $this->assertStringContainsString('<li><a href="#Three">Three</a></li>', $html);
         $this->assertStringContainsString("</ul>\n</li>\n</ul>", $html);
     }
+
+    public function testSkippedHeadingLevelsFollowedByShallowerHeadingReuseSameNestedList(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+        $converter->addExtension($tocExtension);
+
+        $converter->convert("# One\n\n### Three\n\n## Two\n");
+
+        $html = $tocExtension->getTocHtml();
+
+        $this->assertSame(2, substr_count($html, '<ul>'));
+        $this->assertStringNotContainsString("</ul>\n\n<ul>", $html);
+        $this->assertStringContainsString('<li><a href="#Three">Three</a></li>' . "\n<li><a href=\"#Two\">Two</a></li>", $html);
+    }
 }
