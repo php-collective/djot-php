@@ -270,7 +270,7 @@ class TabsExtension implements ExtensionInterface
         }
 
         // If no tab is explicitly selected, select the first one
-        if ($tabs !== [] && !array_filter($tabs, fn ($t) => $t['selected'])) {
+        if ($tabs !== [] && !in_array(true, array_column($tabs, 'selected'), true)) {
             $tabs[0]['selected'] = true;
         }
 
@@ -448,10 +448,8 @@ class TabsExtension implements ExtensionInterface
         $classes = [$this->wrapperClass];
 
         // Add any additional classes from the original div (except 'tabs')
-        $existingClasses = (string)$wrapper->getAttribute('class');
-        foreach (preg_split('/\s+/', $existingClasses) ?: [] as $class) {
-            $class = trim($class);
-            if ($class !== '' && $class !== 'tabs' && !in_array($class, $classes, true)) {
+        foreach ($wrapper->getClassList() as $class) {
+            if ($class !== 'tabs' && !in_array($class, $classes, true)) {
                 $classes[] = $class;
             }
         }

@@ -132,13 +132,9 @@ class MermaidExtension implements ExtensionInterface
 
         // Build CSS classes
         $classes = [$this->cssClass];
-        $existingClass = (string)$node->getAttribute('class');
-        if ($existingClass !== '') {
-            foreach (preg_split('/\s+/', $existingClass) ?: [] as $class) {
-                $class = trim($class);
-                if ($class !== '' && !in_array($class, $classes, true)) {
-                    $classes[] = $class;
-                }
+        foreach ($node->getClassList() as $class) {
+            if (!in_array($class, $classes, true)) {
+                $classes[] = $class;
             }
         }
         $classAttr = implode(' ', $classes);

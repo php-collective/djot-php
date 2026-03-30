@@ -214,10 +214,8 @@ class AdmonitionExtension implements ExtensionInterface
 
         // Build class list
         $classes = [$this->containerClass, $type];
-        $existingClasses = (string)$node->getAttribute('class');
-        foreach (preg_split('/\s+/', $existingClasses) ?: [] as $class) {
-            $class = trim($class);
-            if ($class !== '' && !in_array($class, $classes, true) && !in_array($class, $this->types, true)) {
+        foreach ($node->getClassList() as $class) {
+            if (!in_array($class, $classes, true) && !in_array($class, $this->types, true)) {
                 $classes[] = $class;
             }
         }

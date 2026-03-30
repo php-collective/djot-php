@@ -156,7 +156,7 @@ class CodeGroupExtension implements ExtensionInterface
         }
 
         // If no block is explicitly selected, select the first one
-        if ($blocks !== [] && !array_filter($blocks, fn ($b) => $b['selected'])) {
+        if ($blocks !== [] && !in_array(true, array_column($blocks, 'selected'), true)) {
             $blocks[0]['selected'] = true;
         }
 
@@ -278,10 +278,8 @@ class CodeGroupExtension implements ExtensionInterface
         $classes = [$this->wrapperClass];
 
         // Add any additional classes from the original div (except 'code-group')
-        $existingClasses = (string)$wrapper->getAttribute('class');
-        foreach (preg_split('/\s+/', $existingClasses) ?: [] as $class) {
-            $class = trim($class);
-            if ($class !== '' && $class !== 'code-group' && !in_array($class, $classes, true)) {
+        foreach ($wrapper->getClassList() as $class) {
+            if ($class !== 'code-group' && !in_array($class, $classes, true)) {
                 $classes[] = $class;
             }
         }

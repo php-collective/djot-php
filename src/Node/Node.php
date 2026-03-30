@@ -191,14 +191,24 @@ abstract class Node
      */
     public function hasClass(string $class): bool
     {
+        return in_array($class, $this->getClassList(), true);
+    }
+
+    /**
+     * Get all CSS classes as an array
+     *
+     * @return list<string>
+     */
+    public function getClassList(): array
+    {
         $classes = $this->getAttribute('class') ?? '';
         if ($classes === '') {
-            return false;
+            return [];
         }
 
         $classList = preg_split('/\s+/', trim($classes)) ?: [];
 
-        return in_array($class, $classList, true);
+        return array_values(array_filter($classList, fn ($c) => $c !== ''));
     }
 
     abstract public function getType(): string;
