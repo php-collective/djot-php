@@ -289,6 +289,16 @@ class PlainTextRendererTest extends TestCase
         $this->assertSame($expected, $this->renderer->render($document));
     }
 
+    public function testCustomOrderedListPrefix(): void
+    {
+        $this->renderer->setOrderedListItemPrefix(') ');
+        $djot = "1. First\n2. Second";
+        $document = $this->converter->parse($djot);
+
+        $expected = "1) First\n2) Second\n";
+        $this->assertSame($expected, $this->renderer->render($document));
+    }
+
     public function testCustomTableSeparator(): void
     {
         $this->renderer->setTableCellSeparator("\t");

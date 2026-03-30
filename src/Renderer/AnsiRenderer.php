@@ -300,6 +300,8 @@ class AnsiRenderer implements RendererInterface
 
     protected bool $useUnicode = true;
 
+    protected SoftBreakMode $softBreakMode = SoftBreakMode::Space;
+
     /**
      * @var array<int, int>
      */
@@ -340,6 +342,26 @@ class AnsiRenderer implements RendererInterface
         $this->useUnicode = $useUnicode;
 
         return $this;
+    }
+
+    /**
+     * Set how soft breaks are rendered
+     *
+     * @param \Djot\Renderer\SoftBreakMode $mode Space (default) or Newline
+     */
+    public function setSoftBreakMode(SoftBreakMode $mode): self
+    {
+        $this->softBreakMode = $mode;
+
+        return $this;
+    }
+
+    /**
+     * Get the current soft break mode
+     */
+    public function getSoftBreakMode(): SoftBreakMode
+    {
+        return $this->softBreakMode;
     }
 
     public function render(Document $document): string
@@ -383,7 +405,7 @@ class AnsiRenderer implements RendererInterface
             $node instanceof Link => $this->renderLink($node),
             $node instanceof Image => $this->renderImage($node),
             $node instanceof HardBreak => "\n",
-            $node instanceof SoftBreak => ' ',
+            $node instanceof SoftBreak => $this->softBreakMode === SoftBreakMode::Space ? ' ' : "\n",
             $node instanceof Superscript => $this->renderSuperscript($node),
             $node instanceof Subscript => $this->renderSubscript($node),
             $node instanceof Highlight => $this->renderHighlight($node),

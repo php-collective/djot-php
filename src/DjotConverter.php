@@ -153,11 +153,7 @@ class DjotConverter
             $this->renderer = new HtmlRenderer($xhtml);
 
             // Configure safe mode
-            if ($safeMode === true) {
-                $this->renderer->setSafeMode(SafeMode::defaults());
-            } elseif ($safeMode instanceof SafeMode) {
-                $this->renderer->setSafeMode($safeMode);
-            }
+            $this->setSafeMode($safeMode);
 
             // Configure soft break mode if explicitly provided
             if ($softBreakMode !== null) {

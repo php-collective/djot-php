@@ -67,6 +67,28 @@ class MarkdownRenderer implements RendererInterface
 
     protected bool $inBlockQuote = false;
 
+    protected SoftBreakMode $softBreakMode = SoftBreakMode::Newline;
+
+    /**
+     * Set how soft breaks are rendered
+     *
+     * @param \Djot\Renderer\SoftBreakMode $mode Newline (default) or Space
+     */
+    public function setSoftBreakMode(SoftBreakMode $mode): self
+    {
+        $this->softBreakMode = $mode;
+
+        return $this;
+    }
+
+    /**
+     * Get the current soft break mode
+     */
+    public function getSoftBreakMode(): SoftBreakMode
+    {
+        return $this->softBreakMode;
+    }
+
     public function render(Document $document): string
     {
         $markdown = $this->renderChildren($document);
@@ -114,7 +136,11 @@ class MarkdownRenderer implements RendererInterface
             $node instanceof Link => $this->renderLink($node),
             $node instanceof Image => $this->renderImage($node),
             $node instanceof HardBreak => "  \n",
-            $node instanceof SoftBreak => "\n",
+            $node instanceof SoftBreak => match ($this->softBreakMode) {
+                SoftBreakMode::Newline => "\n",
+                SoftBreakMode::Space => ' ',
+                SoftBreakMode::Break => "  \n", // Markdown hard break
+            },
             $node instanceof Superscript => $this->renderSuperscript($node),
             $node instanceof Subscript => $this->renderSubscript($node),
             $node instanceof Highlight => $this->renderHighlight($node),

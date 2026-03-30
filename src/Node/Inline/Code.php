@@ -18,6 +18,11 @@ class Code extends InlineNode
         return $this->content;
     }
 
+    public function setContent(string $content): void
+    {
+        $this->content = $content;
+    }
+
     public function getType(): string
     {
         return 'code';
