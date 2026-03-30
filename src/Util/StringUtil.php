@@ -30,4 +30,17 @@ final class StringUtil
 
         return $backticks;
     }
+
+    /**
+     * Escape string for safe HTML output (attributes and text content)
+     *
+     * Escapes <, >, &, and quotes. Also converts the internal nbsp placeholder
+     * (U+E000) to &nbsp; entity.
+     */
+    public static function escapeHtml(string $value): string
+    {
+        $escaped = htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return str_replace("\u{E000}", '&nbsp;', $escaped);
+    }
 }

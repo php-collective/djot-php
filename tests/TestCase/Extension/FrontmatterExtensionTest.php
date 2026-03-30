@@ -464,6 +464,31 @@ DJOT;
         $this->assertNull($ext->getContent());
     }
 
+    public function testParseWithoutFrontmatterClearsPreviousState(): void
+    {
+        $ext = new FrontmatterExtension();
+        $converter = new DjotConverter();
+        $converter->addExtension($ext);
+
+        $converter->parse(<<<'DJOT'
+---yaml
+doc: first
+---
+
+First document.
+DJOT);
+        $this->assertSame('doc: first', $ext->getContent());
+
+        $converter->parse(<<<'DJOT'
+# Second Document
+
+No frontmatter here.
+DJOT);
+
+        $this->assertFalse($ext->hasFrontmatter());
+        $this->assertNull($ext->getContent());
+    }
+
     public function testExtensionReuseWithNewFrontmatter(): void
     {
         $ext = new FrontmatterExtension();

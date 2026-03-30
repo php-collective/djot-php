@@ -8,6 +8,7 @@ use Closure;
 use Djot\Extension\BeforeRenderExtensionInterface;
 use Djot\Extension\ExtensionInterface;
 use Djot\Extension\HeadingReferenceExtension;
+use Djot\Extension\ParsedDocumentExtensionInterface;
 use Djot\Extension\ResettableExtensionInterface;
 use Djot\Extension\WikilinksExtension;
 use Djot\Filter\ProfileFilter;
@@ -262,17 +263,7 @@ class DjotConverter
         // Check max length before parsing
         $this->enforceProfileMaxLength($djot);
 
-        $document = $this->parse($djot);
-        $document = $this->applyProfile($document);
-
-        $html = $this->render($document);
-
-        // Apply output transformers
-        foreach ($this->outputTransformers as $transformer) {
-            $html = $transformer($html);
-        }
-
-        return $html;
+        return $this->render($this->parse($djot));
     }
 
     /**
@@ -293,17 +284,7 @@ class DjotConverter
 
         $this->enforceProfileMaxLength($content);
 
-        $document = $this->parse($content);
-        $document = $this->applyProfile($document);
-
-        $html = $this->render($document);
-
-        // Apply output transformers
-        foreach ($this->outputTransformers as $transformer) {
-            $html = $transformer($html);
-        }
-
-        return $html;
+        return $this->render($this->parse($content));
     }
 
     /**
@@ -311,7 +292,17 @@ class DjotConverter
      */
     public function parse(string $djot): Document
     {
-        return $this->parser->parse($djot);
+        $this->enforceProfileMaxLength($djot);
+
+        $document = $this->parser->parse($djot);
+
+        foreach ($this->extensions as $extension) {
+            if ($extension instanceof ParsedDocumentExtensionInterface) {
+                $extension->afterParse($document);
+            }
+        }
+
+        return $document;
     }
 
     /**
@@ -352,6 +343,8 @@ class DjotConverter
      */
     public function render(Document $document): string
     {
+        $document = $this->prepareDocumentForRender($document);
+
         foreach ($this->extensions as $extension) {
             if ($extension instanceof ResettableExtensionInterface) {
                 $extension->clear();
@@ -364,7 +357,13 @@ class DjotConverter
             }
         }
 
-        return $this->renderer->render($document);
+        $html = $this->renderer->render($document);
+
+        foreach ($this->outputTransformers as $transformer) {
+            $html = $transformer($html);
+        }
+
+        return $html;
     }
 
     /**
@@ -466,8 +465,9 @@ class DjotConverter
     public function addExtension(ExtensionInterface $extension): self
     {
         $this->assertCompatibleExtension($extension);
-        $this->extensions[] = $extension;
-        $extension->register($this);
+        $registeredExtension = $extension instanceof BeforeRenderExtensionInterface ? clone $extension : $extension;
+        $this->extensions[] = $registeredExtension;
+        $registeredExtension->register($this);
 
         return $this;
     }
@@ -593,5 +593,18 @@ class DjotConverter
         }
 
         return $document;
+    }
+
+    protected function prepareDocumentForRender(Document $document): Document
+    {
+        if ($this->profileFilter !== null && $this->profile === null) {
+            $this->profileFilter->clearViolations();
+        }
+
+        if ($this->profile === null || $this->profileFilter === null) {
+            return $document;
+        }
+
+        return $this->applyProfile(clone $document);
     }
 }

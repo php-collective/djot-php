@@ -7,8 +7,10 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\Heading;
+use Djot\Node\Document;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Text;
+use Djot\Node\Node;
 use Djot\Renderer\HtmlRenderer;
 use Random\RandomException;
 
@@ -27,8 +29,10 @@ use Random\RandomException;
  * Note: This extension only works with HtmlRenderer. For non-HTML renderers,
  * [[Heading Text]] syntax will be rendered as literal text.
  */
-class HeadingReferenceExtension implements ResettableExtensionInterface
+class HeadingReferenceExtension implements ResettableExtensionInterface, BeforeRenderExtensionInterface
 {
+    protected bool $roundTripMode = false;
+
     protected string $placeholderPrefix = '';
 
     /**
@@ -58,6 +62,9 @@ class HeadingReferenceExtension implements ResettableExtensionInterface
         if (!$converter->getRenderer() instanceof HtmlRenderer) {
             return;
         }
+
+        $renderer = $converter->getRenderer();
+        $this->roundTripMode = $renderer->isRoundTripMode();
 
         $inlineParser = $converter->getParser()->getInlineParser();
         $tracker = $converter->getHeadingIdTracker();
@@ -124,6 +131,13 @@ class HeadingReferenceExtension implements ResettableExtensionInterface
         // resolveRenderedReferences() instead.
         $this->headingTargets = [];
         $this->headingTargetCounts = [];
+    }
+
+    public function beforeRender(Document $document): Document
+    {
+        $this->rebuildPlaceholdersForDocument($document);
+
+        return $document;
     }
 
     protected function generatePlaceholder(): string
@@ -196,11 +210,22 @@ class HeadingReferenceExtension implements ResettableExtensionInterface
                     '/<a\b(?=[^>]*\bhref="' . $quotedPlaceholder . '")(?=[^>]*\bdata-heading-ref="' . $quotedTarget . '")(?P<before>[^>]*)\bhref="' . $quotedPlaceholder . '"(?P<after>[^>]*)>'
                     . $quotedDisplayText
                     . '<\/a>/u',
-                    function (array $matches) use ($displayText, $normalizedTarget): string {
+                    function (array $matches) use ($target, $displayText, $normalizedTarget): string {
+                        $before = $this->stripInternalHeadingReferenceAttribute($matches['before']);
+                        $after = $this->stripInternalHeadingReferenceAttribute($matches['after']);
+
+                        if ($this->roundTripMode) {
+                            $after .= ' data-djot-heading-ref="' . $this->escapeAttribute($target) . '"';
+                            if ($displayText !== $target) {
+                                $after .= ' data-djot-heading-ref-display="'
+                                    . $this->escapeAttribute($displayText) . '"';
+                            }
+                        }
+
                         return '<a'
-                            . $matches['before']
+                            . $before
                             . 'href="#' . $this->escapeAttribute($this->headingTargets[$normalizedTarget]) . '"'
-                            . $matches['after']
+                            . $after
                             . '>'
                             . $this->escape($displayText)
                             . '</a>';
@@ -235,5 +260,55 @@ class HeadingReferenceExtension implements ResettableExtensionInterface
         $this->placeholderPrefix = '';
 
         return $html;
+    }
+
+    protected function rebuildPlaceholdersForDocument(Node $node): void
+    {
+        $this->placeholders = [];
+
+        if ($this->placeholderPrefix === '') {
+            return;
+        }
+
+        $this->collectPlaceholders($node);
+    }
+
+    protected function collectPlaceholders(Node $node): void
+    {
+        if ($node instanceof Link) {
+            $placeholder = $node->getDestination();
+            $target = $node->getAttribute('data-heading-ref');
+
+            if (
+                $placeholder !== null
+                && str_starts_with($placeholder, $this->placeholderPrefix)
+                && $target !== null
+            ) {
+                $displayText = '';
+                foreach ($node->getChildren() as $child) {
+                    if ($child instanceof Text) {
+                        $displayText .= $child->getContent();
+                    }
+                }
+
+                if ($displayText === '') {
+                    $displayText = $target;
+                }
+
+                $this->placeholders[$placeholder] = [
+                    'target' => $target,
+                    'displayText' => $displayText,
+                ];
+            }
+        }
+
+        foreach ($node->getChildren() as $child) {
+            $this->collectPlaceholders($child);
+        }
+    }
+
+    protected function stripInternalHeadingReferenceAttribute(string $attrs): string
+    {
+        return (string)preg_replace('/\sdata-heading-ref="[^"]*"/u', '', $attrs);
     }
 }

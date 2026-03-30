@@ -7,6 +7,7 @@ namespace Djot\Test\TestCase\Converter;
 use Djot\Converter\HtmlToDjot;
 use Djot\DjotConverter;
 use Djot\Extension\HeadingLevelShiftExtension;
+use Djot\Extension\HeadingReferenceExtension;
 use Djot\Extension\InlineFootnotesExtension;
 use PHPUnit\Framework\TestCase;
 
@@ -747,6 +748,21 @@ HTML;
         $this->assertSame('# Title', $back);
     }
 
+    public function testHeadingReferenceRoundtripPreservesHeadingReferenceSyntax(): void
+    {
+        $djotConverter = new DjotConverter(roundTripMode: true);
+        $djotConverter->addExtension(new HeadingReferenceExtension());
+
+        $djot = "See [[Getting Started]].\n\n# Getting Started";
+        $html = $djotConverter->convert($djot);
+
+        $this->assertStringContainsString('data-djot-heading-ref="Getting Started"', $html);
+        $this->assertStringNotContainsString('data-heading-ref=', $html);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame($djot, $back);
+    }
+
     public function testInlineFootnoteRoundtripPreservesInlineSyntax(): void
     {
         $djotConverter = new DjotConverter(roundTripMode: true);
@@ -770,6 +786,30 @@ HTML;
         $html = $djotConverter->convert($djot);
 
         $this->assertStringContainsString('data-djot-inline-footnote-class="footnote"', $html);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame($djot, $back);
+    }
+
+    public function testInlineFootnoteRoundtripPreservesBoundaryWhitespace(): void
+    {
+        $djotConverter = new DjotConverter(roundTripMode: true);
+        $djotConverter->addExtension(new InlineFootnotesExtension());
+
+        $djot = 'Text[  Footnote  ]{.fn} after.';
+        $html = $djotConverter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame($djot, $back);
+    }
+
+    public function testInlineFootnoteRoundtripPreservesInteriorWhitespace(): void
+    {
+        $djotConverter = new DjotConverter(roundTripMode: true);
+        $djotConverter->addExtension(new InlineFootnotesExtension());
+
+        $djot = 'Text[  Foo   Bar  ]{.fn} after.';
+        $html = $djotConverter->convert($djot);
         $back = trim($this->converter->convert($html));
 
         $this->assertSame($djot, $back);

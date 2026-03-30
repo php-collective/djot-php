@@ -186,7 +186,7 @@ class HeadingIdTracker
         // If heading has explicit id attribute, use it
         if ($node->hasAttribute('id')) {
             $idAttr = $node->getAttribute('id');
-            $id = is_string($idAttr) ? $idAttr : '';
+            $id = $idAttr ?? '';
             // Track explicit IDs so auto-generated IDs don't conflict
             if (!isset($this->usedIds[$id])) {
                 $this->usedIds[$id] = 0;

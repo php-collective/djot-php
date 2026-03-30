@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Inline\Span;
+use Djot\Util\StringUtil;
 
 /**
  * Converts spans with semantic attributes to proper HTML elements
@@ -89,7 +90,7 @@ class SemanticSpanExtension implements ExtensionInterface
 
             // Wrap in <abbr> if abbr attribute present (with title)
             if ($abbr !== null && $abbr !== '') {
-                $html = '<abbr title="' . $this->escape((string)$abbr) . '">' . $html . '</abbr>';
+                $html = '<abbr title="' . StringUtil::escapeHtml((string)$abbr) . '">' . $html . '</abbr>';
             }
 
             // Wrap in <kbd> if kbd attribute present
@@ -100,7 +101,7 @@ class SemanticSpanExtension implements ExtensionInterface
             // Wrap in <dfn> if dfn attribute present (with optional title)
             if ($dfn !== null) {
                 if ($dfn !== '') {
-                    $html = '<dfn title="' . $this->escape((string)$dfn) . '">' . $html . '</dfn>';
+                    $html = '<dfn title="' . StringUtil::escapeHtml((string)$dfn) . '">' . $html . '</dfn>';
                 } else {
                     $html = '<dfn>' . $html . '</dfn>';
                 }
@@ -117,14 +118,6 @@ class SemanticSpanExtension implements ExtensionInterface
     }
 
     /**
-     * Escape a string for use in an HTML attribute
-     */
-    protected function escape(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-    }
-
-    /**
      * Render attributes as HTML attribute string
      *
      * @param array<string, string> $attrs
@@ -133,8 +126,8 @@ class SemanticSpanExtension implements ExtensionInterface
     {
         $html = '';
         foreach ($attrs as $key => $value) {
-            $html .= ' ' . htmlspecialchars($key, ENT_QUOTES | ENT_HTML5, 'UTF-8')
-                . '="' . $this->escape((string)$value) . '"';
+            $html .= ' ' . StringUtil::escapeHtml($key)
+                . '="' . StringUtil::escapeHtml((string)$value) . '"';
         }
 
         return $html;

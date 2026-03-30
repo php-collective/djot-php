@@ -92,7 +92,7 @@ class InlineFootnotesExtension implements ExtensionInterface
             // Output the footnote reference in the same structure as regular footnotes
             $html = '<a id="fnref' . $number . '" href="#fn' . $number . '" role="doc-noteref"';
             if ($renderer->isRoundTripMode()) {
-                $contentHtml = trim($event->getChildrenHtml());
+                $contentHtml = $event->getChildrenHtml();
                 $html .= ' data-djot-inline-footnote-html="'
                     . htmlspecialchars($contentHtml, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
                 if ($cssClass !== 'fn') {

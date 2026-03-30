@@ -26,7 +26,7 @@ DJOT);
 
         $this->assertStringContainsString('href="#Getting-Started"', $html);
         $this->assertStringContainsString('class="heading-ref"', $html);
-        $this->assertStringContainsString('data-heading-ref="Getting Started"', $html);
+        $this->assertStringNotContainsString('data-heading-ref=', $html);
     }
 
     public function testReferenceUsesExplicitHeadingId(): void
@@ -57,7 +57,7 @@ DJOT);
 
         $this->assertStringContainsString('href="#Getting-Started"', $html);
         $this->assertStringContainsString('>the introduction</a>', $html);
-        $this->assertStringContainsString('data-heading-ref="Getting Started"', $html);
+        $this->assertStringNotContainsString('data-heading-ref=', $html);
     }
 
     public function testCustomDisplayTextFallbackOnMissing(): void
@@ -127,6 +127,46 @@ DJOT);
         $this->assertStringContainsString('class="permalink"', $html);
     }
 
+    public function testParseThenRenderAppliesOutputTransformer(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $document = $converter->parse(<<<'DJOT'
+See [[Getting Started]].
+
+# Getting Started
+DJOT);
+
+        $html = $converter->render($document);
+
+        $this->assertStringContainsString('href="#Getting-Started"', $html);
+        $this->assertStringNotContainsString('__djot_heading_ref_', $html);
+    }
+
+    public function testOlderParsedDocumentStillResolvesAfterParsingNewerDocument(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $first = $converter->parse(<<<'DJOT'
+See [[One]].
+
+# One
+DJOT);
+
+        $converter->parse(<<<'DJOT'
+See [[Two]].
+
+# Two
+DJOT);
+
+        $html = $converter->render($first);
+
+        $this->assertStringContainsString('href="#One"', $html);
+        $this->assertStringNotContainsString('__djot_heading_ref_', $html);
+    }
+
     public function testHeadingWithSmartQuotesMatchesStraightQuoteReference(): void
     {
         $converter = new DjotConverter();
@@ -171,7 +211,7 @@ See [[Bob's Guide]].
 DJOT);
 
         $this->assertStringContainsString('href="#Bob-s-Guide"', $html);
-        $this->assertStringContainsString('data-heading-ref="Bob&apos;s Guide"', $html);
+        $this->assertStringNotContainsString('data-heading-ref=', $html);
         $this->assertStringNotContainsString('[[Bob\'s Guide]]', $html);
     }
 

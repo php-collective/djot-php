@@ -159,4 +159,19 @@ class HeadingLevelShiftExtensionTest extends TestCase
         $this->assertStringContainsString('<h2>Heading 1</h2>', $second);
         $this->assertStringNotContainsString('<h3>Heading 1</h3>', $second);
     }
+
+    public function testExtensionInstanceCanBeReusedAcrossConverters(): void
+    {
+        $extension = new HeadingLevelShiftExtension(shift: 1);
+
+        $roundTripConverter = new DjotConverter(roundTripMode: true);
+        $roundTripConverter->addExtension($extension);
+
+        $normalConverter = new DjotConverter();
+        $normalConverter->addExtension($extension);
+
+        $html = $roundTripConverter->convert('# Heading 1');
+
+        $this->assertStringContainsString('data-djot-source-level="1"', $html);
+    }
 }

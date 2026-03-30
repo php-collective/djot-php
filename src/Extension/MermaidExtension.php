@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\CodeBlock;
+use Djot\Util\StringUtil;
 
 /**
  * Transforms code blocks with language "mermaid" into Mermaid.js-compatible markup
@@ -143,12 +144,12 @@ class MermaidExtension implements ExtensionInterface
         $extraAttrs = $this->buildExtraAttributes($node);
 
         // Build the main element
-        $element = '<' . $this->tag . ' class="' . $this->escape($classAttr) . '"' . $extraAttrs . '>';
-        $element .= $this->escape($content);
+        $element = '<' . $this->tag . ' class="' . StringUtil::escapeHtml($classAttr) . '"' . $extraAttrs . '>';
+        $element .= StringUtil::escapeHtml($content);
         $element .= '</' . $this->tag . ">\n";
 
         if ($this->wrapInFigure) {
-            $html = '<figure class="' . $this->escape($this->figureClass) . "\">\n";
+            $html = '<figure class="' . StringUtil::escapeHtml($this->figureClass) . "\">\n";
             $html .= $element;
             $html .= "</figure>\n";
 
@@ -170,17 +171,9 @@ class MermaidExtension implements ExtensionInterface
             if (in_array($name, $excluded, true)) {
                 continue;
             }
-            $attrs .= ' ' . $this->escape($name) . '="' . $this->escape((string)$value) . '"';
+            $attrs .= ' ' . StringUtil::escapeHtml($name) . '="' . StringUtil::escapeHtml((string)$value) . '"';
         }
 
         return $attrs;
-    }
-
-    /**
-     * Escape HTML special characters
-     */
-    protected function escape(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 }
