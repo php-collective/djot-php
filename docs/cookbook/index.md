@@ -565,10 +565,8 @@ function getTaskStats(string $djot): array
             }
         }
 
-        if (method_exists($node, 'getChildren')) {
-            foreach ($node->getChildren() as $child) {
-                $findTasks($child);
-            }
+        foreach ($node->getChildren() as $child) {
+            $findTasks($child);
         }
     };
 

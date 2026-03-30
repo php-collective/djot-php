@@ -13,6 +13,8 @@ use Djot\DjotConverter;
  * - Custom inline patterns (e.g., @mentions, [[wiki-links]])
  * - Custom block patterns (e.g., admonitions, spoilers)
  * - Render event listeners (e.g., external link handling, heading permalinks)
+ * - Optional render lifecycle hooks via BeforeRenderExtensionInterface and
+ *   ResettableExtensionInterface
  *
  * Example:
  * ```php
@@ -46,6 +48,8 @@ interface ExtensionInterface
      * - Register inline patterns via $converter->getParser()->getInlineParser()
      * - Register block patterns via $converter->getParser()
      * - Register render event listeners via $converter->on()
+     * - Prepare optional lifecycle hooks for render() if implementing
+     *   BeforeRenderExtensionInterface or ResettableExtensionInterface
      */
     public function register(DjotConverter $converter): void;
 }

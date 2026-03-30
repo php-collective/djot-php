@@ -169,7 +169,7 @@ use Djot\Renderer\HtmlRenderer;
  * });
  * ```
  */
-class TabsExtension implements ExtensionInterface
+class TabsExtension implements ResettableExtensionInterface
 {
     /**
      * Output mode: 'css' for CSS-only, 'aria' for ARIA with JS
@@ -243,6 +243,12 @@ class TabsExtension implements ExtensionInterface
 
             $event->setHtml($html);
         });
+    }
+
+    public function clear(): void
+    {
+        $this->tabSetCounter = 0;
+        $this->labelCounter = 0;
     }
 
     /**

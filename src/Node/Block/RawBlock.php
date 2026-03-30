@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Djot\Node\Block;
 
+use Djot\Node\ContentNodeInterface;
+
 /**
  * Raw block (pass-through to specific format)
  */
-class RawBlock extends BlockNode
+class RawBlock extends BlockNode implements ContentNodeInterface
 {
     public function __construct(
         protected string $content = '',

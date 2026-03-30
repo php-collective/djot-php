@@ -27,7 +27,7 @@ use Random\RandomException;
  * Note: This extension only works with HtmlRenderer. For non-HTML renderers,
  * [[Heading Text]] syntax will be rendered as literal text.
  */
-class HeadingReferenceExtension implements ExtensionInterface
+class HeadingReferenceExtension implements ResettableExtensionInterface
 {
     protected string $placeholderPrefix = '';
 

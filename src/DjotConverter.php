@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Djot;
 
 use Closure;
+use Djot\Extension\BeforeRenderExtensionInterface;
 use Djot\Extension\ExtensionInterface;
 use Djot\Extension\HeadingReferenceExtension;
+use Djot\Extension\ResettableExtensionInterface;
 use Djot\Extension\WikilinksExtension;
 use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
@@ -18,6 +20,7 @@ use Djot\Renderer\MarkdownRenderer;
 use Djot\Renderer\PlainTextRenderer;
 use Djot\Renderer\RendererInterface;
 use Djot\Renderer\SoftBreakMode;
+use Djot\Transform\RenderAwareTransformerInterface;
 use Djot\Transform\TransformerInterface;
 use LengthException;
 use LogicException;
@@ -336,7 +339,9 @@ class DjotConverter
     public function transform(Document $document, TransformerInterface ...$transformers): Document
     {
         foreach ($transformers as $transformer) {
-            $document = $transformer->transform($document);
+            $document = $transformer instanceof RenderAwareTransformerInterface
+                ? $transformer->transformForRenderer($document, $this->renderer)
+                : $transformer->transform($document);
         }
 
         return $document;
@@ -348,11 +353,14 @@ class DjotConverter
     public function render(Document $document): string
     {
         foreach ($this->extensions as $extension) {
-            if (method_exists($extension, 'clear')) {
+            if ($extension instanceof ResettableExtensionInterface) {
                 $extension->clear();
             }
-            if (method_exists($extension, 'beforeRender')) {
-                $extension->beforeRender($document);
+        }
+
+        foreach ($this->extensions as $extension) {
+            if ($extension instanceof BeforeRenderExtensionInterface) {
+                $document = $extension->beforeRender($document);
             }
         }
 

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Djot\Node\Block;
 
+use Djot\Node\ContentNodeInterface;
+
 /**
  * Fenced code block
  */
-class CodeBlock extends BlockNode
+class CodeBlock extends BlockNode implements ContentNodeInterface
 {
     public function __construct(
         protected string $content = '',

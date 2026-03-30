@@ -153,6 +153,7 @@ Generate plain text version of HTML emails:
 ```php
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Node\ContentNodeInterface;
 use Djot\Node\Inline\Link;
 use Djot\Renderer\PlainTextRenderer;
 
@@ -173,7 +174,7 @@ $renderer->on('render.link', function (RenderEvent $event): void {
     // We need to render children manually
     $text = '';
     foreach ($node->getChildren() as $child) {
-        if (method_exists($child, 'getContent')) {
+        if ($child instanceof ContentNodeInterface) {
             $text .= $child->getContent();
         }
     }

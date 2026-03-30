@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Djot\Node\Inline;
 
+use Djot\Node\ContentNodeInterface;
+
 /**
  * Raw inline content (pass-through to specific format)
  */
-class RawInline extends InlineNode
+class RawInline extends InlineNode implements ContentNodeInterface
 {
     public function __construct(
         protected string $content = '',

@@ -250,11 +250,17 @@ $back = $htmlToDjot->convert($html);
 | Thematic breaks | `data-char` | Preserves `*` vs `-` character |
 | Unordered lists | `data-marker` | Preserves `*`, `+`, or `-` marker |
 | Ordered lists | `data-marker` | Preserves `)` vs `.` delimiter |
+| Shifted headings | `data-djot-source-level` | Preserves original Djot heading level during HTML round-trips |
+| Inline footnotes | `data-djot-inline-footnote-*` | Preserves inline-footnote syntax and custom footnote class |
 
 Without round-trip mode, these elements use defaults when converting back:
 - Thematic breaks → `---`
 - Unordered lists → `-` marker
 - Ordered lists → `.` delimiter
+- Shifted headings → rendered heading level
+- Inline footnotes → regular footnote HTML without inline-footnote provenance
+
+When using explicit AST transforms through `DjotConverter::transform()`, renderer-aware transforms such as `HeadingLevelShiftTransform` automatically preserve round-trip metadata when the converter uses `HtmlRenderer` with round-trip mode enabled.
 
 **Use Cases:**
 - Importing content from WordPress or other CMS

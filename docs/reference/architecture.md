@@ -191,6 +191,12 @@ Events are fired for each node type using the pattern `render.{node_type}`:
 
 See the [Cookbook](/cookbook/) for common customization recipes.
 
+Extensions with per-render state should implement
+`ResettableExtensionInterface`. Extensions that need a derived document for
+rendering should implement `BeforeRenderExtensionInterface` and return either
+the original AST or a transformed copy. For explicit caller-controlled AST
+rewrites, prefer `DjotConverter::transform()` and `TransformerInterface`.
+
 ### Adding New Syntax
 
 For entirely new syntax elements, extend the parser:

@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Djot\Extension;
 
 use Djot\DjotConverter;
-use Djot\Node\Block\Heading;
 use Djot\Node\Document;
-use Djot\Node\Node;
-use Djot\Renderer\HtmlRenderer;
+use Djot\Renderer\RendererInterface;
+use Djot\Transform\HeadingLevelShiftTransform;
 
 /**
  * Shifts heading levels down (h1 → h2, h2 → h3, etc.)
@@ -30,9 +29,9 @@ use Djot\Renderer\HtmlRenderer;
  * Note: Heading levels are capped at h6 (enforced by Heading::setLevel).
  * Works with all renderers (HTML, Markdown, PlainText, ANSI).
  */
-class HeadingLevelShiftExtension implements ExtensionInterface
+class HeadingLevelShiftExtension implements BeforeRenderExtensionInterface
 {
-    protected ?HtmlRenderer $htmlRenderer = null;
+    protected ?RendererInterface $renderer = null;
 
     /**
      * @param int $shift Number of levels to shift (1-5). Values are clamped to valid range.
@@ -44,40 +43,23 @@ class HeadingLevelShiftExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
-        $renderer = $converter->getRenderer();
-        $this->htmlRenderer = $renderer instanceof HtmlRenderer ? $renderer : null;
+        $this->renderer = $converter->getRenderer();
     }
 
     /**
-     * Modify heading levels in the AST before rendering
+     * Return a shifted copy of the document for rendering.
      */
-    public function beforeRender(Document $document): void
+    public function beforeRender(Document $document): Document
     {
         if ($this->shift === 0) {
-            return;
+            return $document;
         }
 
-        $this->walkAndShift($document);
-    }
-
-    /**
-     * Recursively walk the AST and shift heading levels
-     */
-    protected function walkAndShift(Node $node): void
-    {
-        if ($node instanceof Heading) {
-            if (
-                $this->htmlRenderer !== null
-                && $this->htmlRenderer->isRoundTripMode()
-                && !$node->hasAttribute('data-djot-source-level')
-            ) {
-                $node->setAttribute('data-djot-source-level', (string)$node->getLevel());
-            }
-            $node->setLevel($node->getLevel() + $this->shift);
+        $transform = new HeadingLevelShiftTransform($this->shift);
+        if ($this->renderer !== null) {
+            return $transform->transformForRenderer($document, $this->renderer);
         }
 
-        foreach ($node->getChildren() as $child) {
-            $this->walkAndShift($child);
-        }
+        return $transform->transform($document);
     }
 }

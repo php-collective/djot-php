@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Test\TestCase\Transform;
 
+use Djot\Converter\HtmlToDjot;
 use Djot\DjotConverter;
 use Djot\Transform\HeadingLevelShiftTransform;
 use PHPUnit\Framework\TestCase;
@@ -33,5 +34,17 @@ class HeadingLevelShiftTransformTest extends TestCase
         $this->assertStringContainsString('<h2>Heading 1</h2>', $first);
         $this->assertStringContainsString('<h2>Heading 1</h2>', $second);
         $this->assertStringNotContainsString('<h3>Heading 1</h3>', $second);
+    }
+
+    public function testTransformPreservesSourceLevelsInHtmlRoundTripMode(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $document = $converter->parse('# Heading 1');
+
+        $transformed = $converter->transform($document, new HeadingLevelShiftTransform(1));
+        $html = $converter->render($transformed);
+
+        $this->assertStringContainsString('data-djot-source-level="1"', $html);
+        $this->assertSame('# Heading 1', trim((new HtmlToDjot())->convert($html)));
     }
 }

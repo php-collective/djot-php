@@ -117,6 +117,10 @@ Applies one or more AST transforms and returns the transformed `Document`.
 Use this when you want an explicit, reusable derived tree instead of hidden AST
 mutation during `render()`.
 
+When you call `transform()` on a converter configured for a specific renderer,
+renderer-aware transforms can preserve renderer-specific metadata such as HTML
+round-trip source attributes.
+
 ```php
 use Djot\Transform\HeadingLevelShiftTransform;
 

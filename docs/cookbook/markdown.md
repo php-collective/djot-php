@@ -110,6 +110,7 @@ Migrate content from Djot to a Markdown-based CMS:
 ```php
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Node\ContentNodeInterface;
 use Djot\Node\Block\Div;
 use Djot\Node\Inline\Span;
 use Djot\Renderer\MarkdownRenderer;
@@ -129,12 +130,9 @@ $renderer->on('render.div', function (RenderEvent $event): void {
     // Render children first
     $content = '';
     foreach ($div->getChildren() as $child) {
-        // Simple text extraction
-        if (method_exists($child, 'getChildren')) {
-            foreach ($child->getChildren() as $inline) {
-                if (method_exists($inline, 'getContent')) {
-                    $content .= $inline->getContent();
-                }
+        foreach ($child->getChildren() as $inline) {
+            if ($inline instanceof ContentNodeInterface) {
+                $content .= $inline->getContent();
             }
         }
     }
@@ -233,6 +231,7 @@ Customize footnote output for different Markdown flavors:
 ```php
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Node\ContentNodeInterface;
 use Djot\Node\Block\Footnote;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Renderer\MarkdownRenderer;
@@ -271,11 +270,9 @@ $renderer->on('render.footnote', function (RenderEvent $event) use (&$footnoteMa
     // Get content
     $content = '';
     foreach ($footnote->getChildren() as $child) {
-        if (method_exists($child, 'getChildren')) {
-            foreach ($child->getChildren() as $inline) {
-                if (method_exists($inline, 'getContent')) {
-                    $content .= $inline->getContent();
-                }
+        foreach ($child->getChildren() as $inline) {
+            if ($inline instanceof ContentNodeInterface) {
+                $content .= $inline->getContent();
             }
         }
     }
@@ -299,6 +296,7 @@ Transform links during conversion:
 ```php
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Node\ContentNodeInterface;
 use Djot\Node\Inline\Link;
 use Djot\Renderer\MarkdownRenderer;
 
@@ -321,7 +319,7 @@ $renderer->on('render.link', function (RenderEvent $event): void {
         // Get link text
         $text = '';
         foreach ($link->getChildren() as $child) {
-            if (method_exists($child, 'getContent')) {
+            if ($child instanceof ContentNodeInterface) {
                 $text .= $child->getContent();
             }
         }
@@ -409,6 +407,7 @@ Remove Djot-specific features that don't translate to Markdown:
 ```php
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Node\ContentNodeInterface;
 use Djot\Node\Block\Div;
 use Djot\Node\Inline\Highlight;
 use Djot\Node\Inline\Insert;
@@ -434,7 +433,7 @@ $renderer->on('render.highlight', function (RenderEvent $event): void {
 
     $content = '';
     foreach ($node->getChildren() as $child) {
-        if (method_exists($child, 'getContent')) {
+        if ($child instanceof ContentNodeInterface) {
             $content .= $child->getContent();
         }
     }
@@ -448,7 +447,7 @@ $renderer->on('render.insert', function (RenderEvent $event): void {
 
     $content = '';
     foreach ($node->getChildren() as $child) {
-        if (method_exists($child, 'getContent')) {
+        if ($child instanceof ContentNodeInterface) {
             $content .= $child->getContent();
         }
     }

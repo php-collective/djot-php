@@ -49,6 +49,10 @@ Extensions are applied in registration order. Generally, order doesn't matter, b
 
 Extensions are reset per render, so reusing the same `DjotConverter` across multiple `convert()` calls will not carry per-document extension state such as collected TOC entries into the next output.
 
+Extensions that need render lifecycle hooks should implement
+`ResettableExtensionInterface` and/or `BeforeRenderExtensionInterface` rather
+than relying on undocumented `clear()` or `beforeRender()` magic methods.
+
 ## AdmonitionExtension
 
 Transforms fenced divs with admonition type classes into semantic HTML with proper accessibility attributes. Inspired by Python-Markdown/Material for MkDocs admonition syntax, using djot's native fenced div syntax.
