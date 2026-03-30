@@ -144,6 +144,29 @@ DJOT);
         $this->assertStringNotContainsString('__djot_heading_ref_', $html);
     }
 
+    public function testOlderParsedDocumentStillResolvesAfterParsingNewerDocument(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $first = $converter->parse(<<<'DJOT'
+See [[One]].
+
+# One
+DJOT);
+
+        $converter->parse(<<<'DJOT'
+See [[Two]].
+
+# Two
+DJOT);
+
+        $html = $converter->render($first);
+
+        $this->assertStringContainsString('href="#One"', $html);
+        $this->assertStringNotContainsString('__djot_heading_ref_', $html);
+    }
+
     public function testHeadingWithSmartQuotesMatchesStraightQuoteReference(): void
     {
         $converter = new DjotConverter();

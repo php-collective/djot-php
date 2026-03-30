@@ -62,6 +62,10 @@ public function convert(string $input): string
 
 Converts Djot markup to HTML.
 
+When a `Profile` with `maxLength` is configured, the source-length limit is
+enforced here because the converter still has access to the original input
+string.
+
 #### convertFile()
 
 ```php
@@ -81,6 +85,9 @@ public function parse(string $input): Document
 ```
 
 Parses Djot markup into an AST Document without rendering.
+
+When a `Profile` with `maxLength` is configured, the source-length limit is
+also enforced here.
 
 #### parseFile()
 
@@ -103,6 +110,11 @@ public function render(Document $document): string
 ```
 
 Renders an AST Document to HTML.
+
+`render()` does not enforce source-length limits from `Profile::setMaxLength()`.
+That limit only applies on source-based entry points such as `convert()`,
+`convertFile()`, `parse()`, and `parseFile()`, where the original input length
+is known.
 
 Registered extensions are reset before each render, so repeated `convert()` calls on the same converter start with fresh per-document extension state.
 

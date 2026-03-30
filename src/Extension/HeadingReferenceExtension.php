@@ -7,8 +7,10 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\Heading;
+use Djot\Node\Document;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Text;
+use Djot\Node\Node;
 use Djot\Renderer\HtmlRenderer;
 use Random\RandomException;
 
@@ -27,7 +29,7 @@ use Random\RandomException;
  * Note: This extension only works with HtmlRenderer. For non-HTML renderers,
  * [[Heading Text]] syntax will be rendered as literal text.
  */
-class HeadingReferenceExtension implements ResettableExtensionInterface
+class HeadingReferenceExtension implements ResettableExtensionInterface, BeforeRenderExtensionInterface
 {
     protected string $placeholderPrefix = '';
 
@@ -124,6 +126,13 @@ class HeadingReferenceExtension implements ResettableExtensionInterface
         // resolveRenderedReferences() instead.
         $this->headingTargets = [];
         $this->headingTargetCounts = [];
+    }
+
+    public function beforeRender(Document $document): Document
+    {
+        $this->rebuildPlaceholdersForDocument($document);
+
+        return $document;
     }
 
     protected function generatePlaceholder(): string
@@ -235,5 +244,50 @@ class HeadingReferenceExtension implements ResettableExtensionInterface
         $this->placeholderPrefix = '';
 
         return $html;
+    }
+
+    protected function rebuildPlaceholdersForDocument(Node $node): void
+    {
+        $this->placeholders = [];
+
+        if ($this->placeholderPrefix === '') {
+            return;
+        }
+
+        $this->collectPlaceholders($node);
+    }
+
+    protected function collectPlaceholders(Node $node): void
+    {
+        if ($node instanceof Link) {
+            $placeholder = $node->getDestination();
+            $target = $node->getAttribute('data-heading-ref');
+
+            if (
+                $placeholder !== null
+                && str_starts_with($placeholder, $this->placeholderPrefix)
+                && $target !== null
+            ) {
+                $displayText = '';
+                foreach ($node->getChildren() as $child) {
+                    if ($child instanceof Text) {
+                        $displayText .= $child->getContent();
+                    }
+                }
+
+                if ($displayText === '') {
+                    $displayText = $target;
+                }
+
+                $this->placeholders[$placeholder] = [
+                    'target' => $target,
+                    'displayText' => $displayText,
+                ];
+            }
+        }
+
+        foreach ($node->getChildren() as $child) {
+            $this->collectPlaceholders($child);
+        }
     }
 }

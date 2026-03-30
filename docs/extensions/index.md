@@ -307,6 +307,11 @@ if ($ext->hasFrontmatter()) {
 }
 ```
 
+The accessor methods on `FrontmatterExtension` reflect the most recent document
+parsed by that converter. If you keep multiple `Document` instances alive at
+once, inspect the specific AST you care about rather than assuming the
+extension stores per-document state.
+
 **Parsing frontmatter content:**
 
 Use `getParsedContent()` with your preferred parser library:
@@ -383,6 +388,10 @@ author: John Doe
 $ext->reset();  // Clear frontmatter state
 $converter->convert($anotherDocument);
 ```
+
+In normal converter usage this manual reset is optional because parsing a new
+document updates the extension state automatically. `reset()` is only needed if
+you want to clear the cached "last parsed document" metadata explicitly.
 
 **Attributes:**
 

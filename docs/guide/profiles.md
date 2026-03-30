@@ -126,6 +126,11 @@ $profile
 $converter = new DjotConverter(profile: $profile);
 ```
 
+`setMaxLength()` applies to source-based entry points (`convert()`,
+`convertFile()`, `parse()`, `parseFile()`). It does not apply to
+`render(Document)` because an arbitrary AST does not retain a canonical source
+length.
+
 ## Deny Lists
 
 Instead of allowlists, use deny lists to block specific features:
