@@ -21,6 +21,20 @@ abstract class Node
      */
     protected array $attributes = [];
 
+    /**
+     * Clone child nodes and rebind their parent links to the cloned node.
+     */
+    public function __clone()
+    {
+        $this->parent = null;
+
+        foreach ($this->children as $index => $child) {
+            $clonedChild = clone $child;
+            $clonedChild->parent = $this;
+            $this->children[$index] = $clonedChild;
+        }
+    }
+
     public function appendChild(Node $child): void
     {
         $child->parent = $this;

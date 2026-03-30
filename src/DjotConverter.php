@@ -334,16 +334,18 @@ class DjotConverter
      */
     public function render(Document $document): string
     {
+        $renderDocument = clone $document;
+
         foreach ($this->extensions as $extension) {
             if (method_exists($extension, 'clear')) {
                 $extension->clear();
             }
             if (method_exists($extension, 'beforeRender')) {
-                $extension->beforeRender($document);
+                $extension->beforeRender($renderDocument);
             }
         }
 
-        return $this->renderer->render($document);
+        return $this->renderer->render($renderDocument);
     }
 
     /**
