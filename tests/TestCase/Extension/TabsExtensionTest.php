@@ -167,6 +167,60 @@ DJOT;
         $this->assertEquals(1, substr_count($html, 'Tab Title'));
     }
 
+    public function testTabsPreserveFootnotesOutsideTabContent(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+Text[^a]
+
+[^a]: Outside footnote.
+
+:::: tabs
+::: tab
+Inside tab.
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('id="fnref1"', $html);
+        $this->assertStringContainsString('<li id="fn1">', $html);
+        $this->assertStringContainsString('Outside footnote.', $html);
+    }
+
+    public function testTabsDoNotResetHeadingTrackingForFollowingHeadings(): void
+    {
+        $converter = new DjotConverter();
+        $toc = new TableOfContentsExtension();
+        $converter->addExtension($toc);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+# Before
+
+:::: tabs
+::: tab
+### Inner
+
+Body
+:::
+::::
+
+## After
+DJOT;
+
+        $html = $converter->convert($djot);
+        $tocHtml = $toc->getTocHtml();
+
+        $this->assertStringContainsString('id="Before"', $html);
+        $this->assertStringContainsString('id="After"', $html);
+        $this->assertStringContainsString('href="#Before"', $tocHtml);
+        $this->assertStringContainsString('href="#After"', $tocHtml);
+    }
+
     public function testAriaMode(): void
     {
         $converter = new DjotConverter();
