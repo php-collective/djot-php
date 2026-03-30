@@ -106,6 +106,26 @@ Renders an AST Document to HTML.
 
 Registered extensions are reset before each render, so repeated `convert()` calls on the same converter start with fresh per-document extension state.
 
+#### transform()
+
+```php
+public function transform(Document $document, TransformerInterface ...$transformers): Document
+```
+
+Applies one or more AST transforms and returns the transformed `Document`.
+
+Use this when you want an explicit, reusable derived tree instead of hidden AST
+mutation during `render()`.
+
+```php
+use Djot\Transform\HeadingLevelShiftTransform;
+
+$document = $converter->parse($input);
+$shifted = $converter->transform($document, new HeadingLevelShiftTransform(1));
+
+$html = $converter->render($shifted);
+```
+
 #### getParser()
 
 ```php
