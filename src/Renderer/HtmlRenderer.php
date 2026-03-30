@@ -1243,6 +1243,7 @@ class HtmlRenderer implements RendererInterface
     }
 
     /**
+     * @param \Djot\Renderer\RenderContext $context
      * @param \Closure(): string $callback
      */
     protected function withRenderContext(RenderContext $context, Closure $callback): string

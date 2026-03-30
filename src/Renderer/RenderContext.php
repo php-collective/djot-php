@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
-use Closure;
-use Djot\Node\Block\Footnote;
-
 /**
  * Per-render mutable state for HtmlRenderer.
  */

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Renderer;
 
 use Djot\Node\Block\CodeBlock;
+use Djot\Node\Block\Footnote;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\LineBlock;
 use Djot\Node\Block\Paragraph;
@@ -267,13 +268,13 @@ class HtmlRendererTest extends TestCase
         $triggerParagraph->appendChild(new Text('Trigger'));
         $doc->appendChild($triggerParagraph);
 
-        $footnoteA = new \Djot\Node\Block\Footnote('a');
+        $footnoteA = new Footnote('a');
         $footnoteParaA = new Paragraph();
         $footnoteParaA->appendChild(new Text('Alpha'));
         $footnoteA->appendChild($footnoteParaA);
         $doc->appendChild($footnoteA);
 
-        $footnoteB = new \Djot\Node\Block\Footnote('b');
+        $footnoteB = new Footnote('b');
         $footnoteParaB = new Paragraph();
         $footnoteParaB->appendChild(new Text('Beta'));
         $footnoteB->appendChild($footnoteParaB);
