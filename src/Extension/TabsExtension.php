@@ -4,10 +4,18 @@ declare(strict_types=1);
 
 namespace Djot\Extension;
 
+use Djot\Converter\HtmlToDjot;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Node\Block\DefinitionDescription;
+use Djot\Node\Block\DefinitionList;
+use Djot\Node\Block\DefinitionTerm;
 use Djot\Node\Block\Div;
 use Djot\Node\Block\Heading;
+use Djot\Node\Block\Paragraph;
+use Djot\Node\Block\Table;
+use Djot\Node\Block\TableCell;
+use Djot\Node\Block\TableRow;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\HtmlRenderer;
@@ -239,8 +247,8 @@ class TabsExtension implements ResettableExtensionInterface
             }
 
             $html = $this->mode === self::MODE_ARIA
-                ? $this->renderAriaTabs($node, $tabs)
-                : $this->renderCssTabs($node, $tabs);
+                ? $this->renderAriaTabs($node, $tabs, $renderer)
+                : $this->renderCssTabs($node, $tabs, $renderer);
 
             $event->setHtml($html);
         });
@@ -255,7 +263,7 @@ class TabsExtension implements ResettableExtensionInterface
     /**
      * Collect tab data from child divs
      *
-     * @return array<array{label: string, content: string, selected: bool, id: string|null}>
+     * @return array<array{label: string, content: string, selected: bool, id: string|null, node: \Djot\Node\Block\Div}>
      */
     protected function collectTabs(Div $wrapper, HtmlRenderer $renderer): array
     {
@@ -278,6 +286,7 @@ class TabsExtension implements ResettableExtensionInterface
                 'content' => $content,
                 'selected' => $selected,
                 'id' => $id,
+                'node' => $child, // Store original node for round-trip reconstruction
             ];
         }
 
@@ -358,15 +367,22 @@ class TabsExtension implements ResettableExtensionInterface
      * Render tabs using CSS-only approach with radio inputs
      *
      * @param \Djot\Node\Block\Div $wrapper
-     * @param array<array{label: string, content: string, selected: bool, id: string|null}> $tabs
+     * @param array<array{label: string, content: string, selected: bool, id: string|null, node: \Djot\Node\Block\Div}> $tabs
+     * @param \Djot\Renderer\HtmlRenderer $renderer
      */
-    protected function renderCssTabs(Div $wrapper, array $tabs): string
+    protected function renderCssTabs(Div $wrapper, array $tabs, HtmlRenderer $renderer): string
     {
         $this->tabSetCounter++;
         $setId = $this->idPrefix . '-' . $this->tabSetCounter;
 
         // Build wrapper attributes
         $attrs = $this->buildWrapperAttributes($wrapper);
+
+        // Add data-djot-src for round-trip support
+        if ($renderer->isRoundTripMode()) {
+            $djotSrc = $this->reconstructDjotSource($wrapper, $tabs, $renderer);
+            $attrs .= ' data-djot-src="' . StringUtil::escapeHtml($djotSrc) . '"';
+        }
 
         $html = '<div' . $attrs . ">\n";
 
@@ -402,15 +418,22 @@ class TabsExtension implements ResettableExtensionInterface
      * Render tabs using ARIA roles (requires JavaScript)
      *
      * @param \Djot\Node\Block\Div $wrapper
-     * @param array<array{label: string, content: string, selected: bool, id: string|null}> $tabs
+     * @param array<array{label: string, content: string, selected: bool, id: string|null, node: \Djot\Node\Block\Div}> $tabs
+     * @param \Djot\Renderer\HtmlRenderer $renderer
      */
-    protected function renderAriaTabs(Div $wrapper, array $tabs): string
+    protected function renderAriaTabs(Div $wrapper, array $tabs, HtmlRenderer $renderer): string
     {
         $this->tabSetCounter++;
         $setId = $this->idPrefix . '-' . $this->tabSetCounter;
 
         // Build wrapper attributes with tablist role
         $attrs = $this->buildWrapperAttributes($wrapper, 'tablist');
+
+        // Add data-djot-src for round-trip support
+        if ($renderer->isRoundTripMode()) {
+            $djotSrc = $this->reconstructDjotSource($wrapper, $tabs, $renderer);
+            $attrs .= ' data-djot-src="' . StringUtil::escapeHtml($djotSrc) . '"';
+        }
 
         $html = '<div' . $attrs . ">\n";
 
@@ -478,5 +501,250 @@ class TabsExtension implements ResettableExtensionInterface
         }
 
         return $attrs;
+    }
+
+    /**
+     * Reconstruct the original Djot source for round-trip support
+     *
+     * @param \Djot\Node\Block\Div $wrapper
+     * @param array<array{label: string, content: string, selected: bool, id: string|null, node: \Djot\Node\Block\Div}> $tabs
+     * @param \Djot\Renderer\HtmlRenderer $renderer
+     */
+    protected function reconstructDjotSource(Div $wrapper, array $tabs, HtmlRenderer $renderer): string
+    {
+        $djot = $this->renderDjotAttributeBlock($wrapper, skipClasses: ['tabs']);
+        $djot .= ":::: tabs\n\n";
+
+        foreach ($tabs as $tab) {
+            $node = $tab['node'];
+            $hasHeadingLabel = $this->hasHeadingLabel($node);
+            $skipAttrs = $hasHeadingLabel ? ['label'] : [];
+
+            $djot .= $this->renderDjotAttributeBlock($node, skipAttrs: $skipAttrs, skipClasses: ['tab']);
+            $djot .= "::: tab\n";
+            if ($hasHeadingLabel) {
+                $djot .= '### ' . $tab['label'] . "\n\n";
+            }
+            $content = $this->reconstructTabContent($node, $renderer);
+            if ($content !== '') {
+                $djot .= $content . "\n";
+            }
+            $djot .= ":::\n";
+        }
+
+        $djot = rtrim($djot) . "\n";
+        $djot .= "::::\n";
+
+        return $djot;
+    }
+
+    protected function reconstructTabContent(Div $tab, HtmlRenderer $renderer): string
+    {
+        $parts = [];
+        $skipFirstHeading = !$tab->hasAttribute('label');
+        $skippedHeading = false;
+
+        foreach ($tab->getChildren() as $child) {
+            if ($skipFirstHeading && !$skippedHeading && $child instanceof Heading) {
+                $skippedHeading = true;
+
+                continue;
+            }
+
+            $parts[] = rtrim($this->reconstructChildToDjot($child, $renderer), "\n");
+        }
+
+        return rtrim(implode("\n\n", array_filter($parts, static fn (string $part): bool => $part !== '')), "\n");
+    }
+
+    protected function hasHeadingLabel(Div $tab): bool
+    {
+        if ($tab->hasAttribute('label')) {
+            return false;
+        }
+
+        foreach ($tab->getChildren() as $child) {
+            if ($child instanceof Heading) {
+                return true;
+            }
+
+            if ($child instanceof Paragraph || $child instanceof Div || !$child instanceof Text) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    protected function reconstructChildToDjot(Node $child, HtmlRenderer $renderer): string
+    {
+        return match (true) {
+            $child instanceof DefinitionList => $this->renderDefinitionListToDjot($child, $renderer),
+            $child instanceof Div => $this->renderDivToDjot($child, $renderer),
+            $child instanceof Table => $this->renderTableToDjot($child, $renderer),
+            default => rtrim((new HtmlToDjot())->convert($renderer->renderNodeFragment($child)), "\n"),
+        };
+    }
+
+    protected function renderDefinitionListToDjot(DefinitionList $list, HtmlRenderer $renderer): string
+    {
+        $lines = [];
+
+        foreach ($list->getChildren() as $child) {
+            if ($child instanceof DefinitionTerm) {
+                $lines[] = rtrim((new HtmlToDjot())->convert($renderer->renderNodeFragment($child)), "\n");
+            } elseif ($child instanceof DefinitionDescription) {
+                $content = rtrim((new HtmlToDjot())->convert($renderer->renderNodeFragment($child)), "\n");
+                $lines[] = ': ' . $content;
+            }
+        }
+
+        return implode("\n", array_filter($lines, static fn (string $line): bool => $line !== ''));
+    }
+
+    protected function renderDivToDjot(Div $div, HtmlRenderer $renderer): string
+    {
+        $djotSrc = $div->getAttribute('data-djot-src');
+        if ($djotSrc !== null && $djotSrc !== '') {
+            return rtrim($djotSrc, "\n");
+        }
+
+        $classes = $div->getClassList();
+        $fenceClass = array_shift($classes) ?? 'div';
+
+        $djot = '';
+        if ($div->getAttribute('id') !== null || $classes !== [] || count($div->getAttributes()) > ($div->hasAttribute('class') ? 1 : 0)) {
+            $clone = clone $div;
+            if ($clone->hasAttribute('class')) {
+                $clone->setAttribute('class', implode(' ', $classes));
+            }
+            $djot .= $this->renderDjotAttributeBlock($clone);
+        }
+
+        $djot .= '::: ' . $fenceClass . "\n";
+
+        $parts = [];
+        foreach ($div->getChildren() as $child) {
+            $parts[] = rtrim($this->reconstructChildToDjot($child, $renderer), "\n");
+        }
+        $content = rtrim(implode("\n\n", array_filter($parts, static fn (string $part): bool => $part !== '')), "\n");
+        if ($content !== '') {
+            $djot .= $content . "\n";
+        }
+
+        $djot .= ':::';
+
+        return $djot;
+    }
+
+    protected function renderTableToDjot(Table $table, HtmlRenderer $renderer): string
+    {
+        $rows = [];
+        $alignments = [];
+
+        foreach ($table->getChildren() as $row) {
+            if (!$row instanceof TableRow) {
+                continue;
+            }
+
+            $cells = [];
+            $cellIndex = 0;
+
+            foreach ($row->getChildren() as $cell) {
+                if (!$cell instanceof TableCell) {
+                    continue;
+                }
+
+                $cells[] = rtrim((new HtmlToDjot())->convert($renderer->renderNodeFragment($cell)), "\n");
+                if ($row->isHeader() || !isset($alignments[$cellIndex])) {
+                    $alignments[$cellIndex] = $cell->getAlignment();
+                }
+                $cellIndex++;
+            }
+
+            $rows[] = $cells;
+        }
+
+        if ($rows === []) {
+            return '';
+        }
+
+        $widths = $table->getSeparatorWidths();
+        $lines = [];
+
+        foreach ($rows as $rowIndex => $row) {
+            $lines[] = '| ' . implode(' | ', $row) . ' |';
+
+            if ($rowIndex === 0) {
+                $separators = [];
+                foreach ($row as $index => $_cell) {
+                    $width = $widths[$index] ?? 3;
+                    $separators[] = $this->renderAlignedSeparator($alignments[$index] ?? TableCell::ALIGN_DEFAULT, $width);
+                }
+                $lines[] = '|' . implode('|', $separators) . '|';
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    protected function renderAlignedSeparator(string $alignment, int $width): string
+    {
+        $width = max(3, $width);
+
+        return match ($alignment) {
+            TableCell::ALIGN_LEFT => ':' . str_repeat('-', $width),
+            TableCell::ALIGN_RIGHT => str_repeat('-', $width) . ':',
+            TableCell::ALIGN_CENTER => ':' . str_repeat('-', $width) . ':',
+            default => str_repeat('-', $width),
+        };
+    }
+
+    /**
+     * @param \Djot\Node\Block\Div $node
+     * @param array<string> $skipAttrs
+     * @param array<string> $skipClasses
+     */
+    protected function renderDjotAttributeBlock(Div $node, array $skipAttrs = [], array $skipClasses = []): string
+    {
+        $parts = [];
+
+        $id = $node->getAttribute('id');
+        if ($id !== null && $id !== '' && !in_array('id', $skipAttrs, true)) {
+            $parts[] = '#' . $id;
+        }
+
+        if (!in_array('class', $skipAttrs, true)) {
+            foreach ($node->getClassList() as $class) {
+                if (!in_array($class, $skipClasses, true)) {
+                    $parts[] = '.' . $class;
+                }
+            }
+        }
+
+        foreach ($node->getAttributes() as $name => $value) {
+            if ($name === 'id' || $name === 'class' || in_array($name, $skipAttrs, true)) {
+                continue;
+            }
+
+            $parts[] = $value === ''
+                ? $name
+                : $name . '=' . $this->quoteDjotAttributeValue($value);
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return '{' . implode(' ', $parts) . "}\n";
+    }
+
+    protected function quoteDjotAttributeValue(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[A-Za-z0-9._:-]+$/', $value) === 1) {
+            return $value;
+        }
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 }

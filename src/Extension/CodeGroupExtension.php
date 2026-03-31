@@ -221,6 +221,12 @@ class CodeGroupExtension implements ResettableExtensionInterface
         // Build wrapper attributes
         $attrs = $this->buildWrapperAttributes($wrapper);
 
+        // Add data-djot-src for round-trip support
+        if ($renderer->isRoundTripMode()) {
+            $djotSrc = $this->reconstructDjotSource($wrapper, $codeBlocks);
+            $attrs .= ' data-djot-src="' . StringUtil::escapeHtml($djotSrc) . '"';
+        }
+
         $html = '<div' . $attrs . ">\n";
 
         // Render all radio inputs and labels first
@@ -274,6 +280,95 @@ class CodeGroupExtension implements ResettableExtensionInterface
         }
 
         return $renderer->renderNodeFragment($renderBlock);
+    }
+
+    /**
+     * Reconstruct the original Djot source for round-trip support
+     *
+     * @param \Djot\Node\Block\Div $wrapper
+     * @param array<array{block: \Djot\Node\Block\CodeBlock, language: string|null, label: string, selected: bool}> $codeBlocks
+     */
+    protected function reconstructDjotSource(Div $wrapper, array $codeBlocks): string
+    {
+        $djot = $this->renderDjotAttributeBlock($wrapper, skipClasses: ['code-group']);
+        $djot .= "::: code-group\n";
+
+        foreach ($codeBlocks as $item) {
+            /** @var \Djot\Node\Block\CodeBlock $block */
+            $block = $item['block'];
+            $langHint = $block->getLanguage() ?? '';
+
+            $content = $block->getContent();
+            $fence = StringUtil::findSafeCodeFence($content, 3);
+
+            $djot .= $this->renderDjotAttributeBlock($block);
+            $djot .= $fence;
+            if ($langHint !== '') {
+                $djot .= ' ' . $langHint;
+            }
+            $djot .= "\n";
+
+            // Ensure content ends with newline before closing fence
+            if (!str_ends_with($content, "\n")) {
+                $content .= "\n";
+            }
+            $djot .= $content;
+            $djot .= $fence . "\n\n";
+        }
+
+        // Remove trailing blank line
+        $djot = rtrim($djot) . "\n";
+        $djot .= ":::\n";
+
+        return $djot;
+    }
+
+    /**
+     * @param \Djot\Node\Block\Div|\Djot\Node\Block\CodeBlock $node
+     * @param array<string> $skipAttrs
+     * @param array<string> $skipClasses
+     */
+    protected function renderDjotAttributeBlock(Div|CodeBlock $node, array $skipAttrs = [], array $skipClasses = []): string
+    {
+        $parts = [];
+
+        $id = $node->getAttribute('id');
+        if ($id !== null && $id !== '' && !in_array('id', $skipAttrs, true)) {
+            $parts[] = '#' . $id;
+        }
+
+        if (!in_array('class', $skipAttrs, true)) {
+            foreach ($node->getClassList() as $class) {
+                if (!in_array($class, $skipClasses, true)) {
+                    $parts[] = '.' . $class;
+                }
+            }
+        }
+
+        foreach ($node->getAttributes() as $name => $value) {
+            if ($name === 'id' || $name === 'class' || in_array($name, $skipAttrs, true)) {
+                continue;
+            }
+
+            $parts[] = $value === ''
+                ? $name
+                : $name . '=' . $this->quoteDjotAttributeValue($value);
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return '{' . implode(' ', $parts) . "}\n";
+    }
+
+    protected function quoteDjotAttributeValue(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[A-Za-z0-9._:-]+$/', $value) === 1) {
+            return $value;
+        }
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
     /**

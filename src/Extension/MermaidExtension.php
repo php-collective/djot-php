@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\CodeBlock;
+use Djot\Renderer\HtmlRenderer;
 use Djot\Util\StringUtil;
 
 /**
@@ -93,6 +94,8 @@ use Djot\Util\StringUtil;
  */
 class MermaidExtension implements ExtensionInterface
 {
+    protected bool $roundTripMode = false;
+
     /**
      * @param string $tag HTML tag to use ('pre' or 'div')
      * @param string $cssClass CSS class for Mermaid.js to detect
@@ -109,6 +112,12 @@ class MermaidExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
+        // Check for round-trip mode from HTML renderer
+        $renderer = $converter->getRenderer();
+        if ($renderer instanceof HtmlRenderer) {
+            $this->roundTripMode = $renderer->isRoundTripMode();
+        }
+
         $converter->on('render.code_block', function (RenderEvent $event): void {
             $node = $event->getNode();
             if (!$node instanceof CodeBlock) {
@@ -143,9 +152,19 @@ class MermaidExtension implements ExtensionInterface
         // Build additional attributes (excluding class and language-related)
         $extraAttrs = $this->buildExtraAttributes($node);
 
+        // Add data-djot-src for round-trip support
+        if ($this->roundTripMode) {
+            $djotSrc = $this->reconstructCodeBlockSource($node);
+            $extraAttrs .= ' data-djot-src="' . StringUtil::escapeHtml($djotSrc) . '"';
+        }
+
         // Build the main element
+        // Mermaid content needs special escaping:
+        // - Escape < and & to prevent XSS (e.g., <script> becomes &lt;script>)
+        // - Preserve > for Mermaid arrow syntax (e.g., -->)
+        $escapedContent = str_replace(['&', '<'], ['&amp;', '&lt;'], $content);
         $element = '<' . $this->tag . ' class="' . StringUtil::escapeHtml($classAttr) . '"' . $extraAttrs . '>';
-        $element .= StringUtil::escapeHtml($content);
+        $element .= $escapedContent;
         $element .= '</' . $this->tag . ">\n";
 
         if ($this->wrapInFigure) {
@@ -157,6 +176,76 @@ class MermaidExtension implements ExtensionInterface
         }
 
         return $element;
+    }
+
+    /**
+     * Reconstruct the original Djot source for a mermaid code block
+     */
+    protected function reconstructCodeBlockSource(CodeBlock $node): string
+    {
+        $content = $node->getContent();
+
+        // Choose a fence that does not conflict with the content
+        $fence = StringUtil::findSafeCodeFence($content, 3);
+
+        // Build the code fence
+        $djot = $this->renderDjotAttributeBlock($node);
+        $djot .= $fence . ' mermaid' . "\n";
+        $djot .= $content;
+        if (!str_ends_with($content, "\n")) {
+            $djot .= "\n";
+        }
+        $djot .= $fence . "\n";
+
+        return $djot;
+    }
+
+    /**
+     * @param \Djot\Node\Block\CodeBlock $node
+     * @param array<string> $skipAttrs
+     * @param array<string> $skipClasses
+     */
+    protected function renderDjotAttributeBlock(CodeBlock $node, array $skipAttrs = [], array $skipClasses = []): string
+    {
+        $parts = [];
+
+        $id = $node->getAttribute('id');
+        if ($id !== null && $id !== '' && !in_array('id', $skipAttrs, true)) {
+            $parts[] = '#' . $id;
+        }
+
+        if (!in_array('class', $skipAttrs, true)) {
+            foreach ($node->getClassList() as $class) {
+                if (!in_array($class, $skipClasses, true)) {
+                    $parts[] = '.' . $class;
+                }
+            }
+        }
+
+        foreach ($node->getAttributes() as $name => $value) {
+            if ($name === 'id' || $name === 'class' || in_array($name, $skipAttrs, true)) {
+                continue;
+            }
+
+            $parts[] = $value === ''
+                ? $name
+                : $name . '=' . $this->quoteDjotAttributeValue($value);
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return '{' . implode(' ', $parts) . "}\n";
+    }
+
+    protected function quoteDjotAttributeValue(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[A-Za-z0-9._:-]+$/', $value) === 1) {
+            return $value;
+        }
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
     /**

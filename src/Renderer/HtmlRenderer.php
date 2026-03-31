@@ -49,6 +49,7 @@ use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\Utility\EventDispatcherTrait;
 use Djot\SafeMode;
+use Djot\Util\StringUtil;
 
 /**
  * Renders AST to HTML
@@ -540,13 +541,95 @@ class HtmlRenderer implements RendererInterface
             $code .= "\n";
         }
 
+        // Add data-djot-src for round-trip support
+        $djotSrcAttr = '';
+        if ($this->roundTripMode) {
+            $djotSrc = $this->reconstructCodeBlockSource($node);
+            $djotSrcAttr = ' data-djot-src="' . $this->escapeAttribute($djotSrc) . '"';
+        }
+
         if ($language !== null) {
             $langClass = 'class="language-' . $this->escapeAttribute($language) . '"';
 
-            return '<pre' . $attrs . '><code ' . $langClass . '>' . $code . "</code></pre>\n";
+            return '<pre' . $attrs . $djotSrcAttr . '><code ' . $langClass . '>' . $code . "</code></pre>\n";
         }
 
-        return '<pre' . $attrs . '><code>' . $code . "</code></pre>\n";
+        return '<pre' . $attrs . $djotSrcAttr . '><code>' . $code . "</code></pre>\n";
+    }
+
+    /**
+     * Reconstruct the original Djot source for a code block
+     */
+    protected function reconstructCodeBlockSource(CodeBlock $node): string
+    {
+        $language = $node->getLanguage();
+        $content = $node->getContent();
+
+        // Choose a fence that does not conflict with the content
+        $fence = StringUtil::findSafeCodeFence($content, 3);
+
+        // Build the code fence
+        $djot = $this->renderDjotAttributeBlock($node);
+        $djot .= $fence;
+        if ($language !== null && $language !== '') {
+            $djot .= ' ' . $language;
+        }
+        $djot .= "\n";
+        $djot .= $content;
+        if (!str_ends_with($content, "\n")) {
+            $djot .= "\n";
+        }
+        $djot .= $fence . "\n";
+
+        return $djot;
+    }
+
+    /**
+     * @param \Djot\Node\Node $node
+     * @param array<string> $skipAttrs
+     * @param array<string> $skipClasses
+     */
+    protected function renderDjotAttributeBlock(Node $node, array $skipAttrs = [], array $skipClasses = []): string
+    {
+        $parts = [];
+
+        $id = $node->getAttribute('id');
+        if ($id !== null && $id !== '' && !in_array('id', $skipAttrs, true)) {
+            $parts[] = '#' . $id;
+        }
+
+        if (!in_array('class', $skipAttrs, true)) {
+            foreach ($node->getClassList() as $class) {
+                if (!in_array($class, $skipClasses, true)) {
+                    $parts[] = '.' . $class;
+                }
+            }
+        }
+
+        foreach ($node->getAttributes() as $name => $value) {
+            if ($name === 'id' || $name === 'class' || in_array($name, $skipAttrs, true)) {
+                continue;
+            }
+
+            $parts[] = $value === ''
+                ? $name
+                : $name . '=' . $this->quoteDjotAttributeValue($value);
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return '{' . implode(' ', $parts) . "}\n";
+    }
+
+    protected function quoteDjotAttributeValue(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[A-Za-z0-9._:-]+$/', $value) === 1) {
+            return $value;
+        }
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
     protected function renderBlockQuote(BlockQuote $node): string

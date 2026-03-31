@@ -6,6 +6,7 @@ namespace Djot\Test\TestCase\Extension;
 
 use Djot\DjotConverter;
 use Djot\Extension\CodeGroupExtension;
+use Djot\Renderer\HtmlRenderer;
 use PHPUnit\Framework\TestCase;
 
 class CodeGroupExtensionTest extends TestCase
@@ -512,5 +513,75 @@ DJOT;
 
         // Should have all classes merged
         $this->assertStringContainsString('class="code-group extra-class another-class"', $html);
+    }
+
+    public function testRoundTripModeAddsDjotSrc(): void
+    {
+        $renderer = new HtmlRenderer();
+        $renderer->setRoundTripMode(true);
+        $converter = DjotConverter::create(renderer: $renderer);
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+::: code-group
+``` php
+echo "Hello";
+```
+
+``` javascript
+console.log("World");
+```
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('data-djot-src="', $html);
+        $this->assertStringContainsString('::: code-group', $html);
+    }
+
+    public function testNonRoundTripModeNoDjotSrc(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+::: code-group
+``` php
+echo "Hello";
+```
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringNotContainsString('data-djot-src=', $html);
+    }
+
+    public function testRoundTripWithCustomLabels(): void
+    {
+        $renderer = new HtmlRenderer();
+        $renderer->setRoundTripMode(true);
+        $converter = DjotConverter::create(renderer: $renderer);
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+::: code-group
+``` php [Composer]
+composer require djot/djot
+```
+
+``` bash [NPM]
+npm install djot
+```
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('data-djot-src="', $html);
+        // Labels should be preserved in the reconstructed source
+        $this->assertStringContainsString('[Composer]', $html);
+        $this->assertStringContainsString('[NPM]', $html);
     }
 }

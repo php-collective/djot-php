@@ -7,6 +7,7 @@ namespace Djot\Test\TestCase\Extension;
 use Djot\DjotConverter;
 use Djot\Extension\TableOfContentsExtension;
 use Djot\Extension\TabsExtension;
+use Djot\Renderer\HtmlRenderer;
 use PHPUnit\Framework\TestCase;
 
 class TabsExtensionTest extends TestCase
@@ -785,5 +786,106 @@ DJOT;
         // When label attribute is used, the heading inside tab remains in content
         // and should be captured by TOC
         $this->assertContains('Heading Inside Tab', $headingTexts);
+    }
+
+    public function testRoundTripModeAddsDjotSrc(): void
+    {
+        $renderer = new HtmlRenderer();
+        $renderer->setRoundTripMode(true);
+        $converter = DjotConverter::create(renderer: $renderer);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+::: tab
+### First Tab
+
+Content one.
+:::
+
+::: tab
+### Second Tab
+
+Content two.
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('data-djot-src="', $html);
+        $this->assertStringContainsString(':::: tabs', $html);
+    }
+
+    public function testNonRoundTripModeNoDjotSrc(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+::: tab
+### First Tab
+
+Content.
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringNotContainsString('data-djot-src=', $html);
+    }
+
+    public function testRoundTripWithCodeBlock(): void
+    {
+        $renderer = new HtmlRenderer();
+        $renderer->setRoundTripMode(true);
+        $converter = DjotConverter::create(renderer: $renderer);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+::: tab
+### Code Example
+
+``` php
+echo "Hello";
+```
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('data-djot-src="', $html);
+        // The reconstructed djot should contain the code fence
+        $this->assertStringContainsString('``` php', $html);
+    }
+
+    public function testRoundTripWithTable(): void
+    {
+        $renderer = new HtmlRenderer();
+        $renderer->setRoundTripMode(true);
+        $converter = DjotConverter::create(renderer: $renderer);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+::: tab
+### Table Example
+
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('data-djot-src="', $html);
+        // The reconstructed djot should contain the table
+        $this->assertStringContainsString('| Header 1 | Header 2 |', $html);
     }
 }
