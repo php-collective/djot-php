@@ -229,6 +229,7 @@ class HtmlToDjot
             foreach ($node->attributes as $attr) {
                 if ($attr->name !== 'class' && !in_array($attr->name, $this->skipAttributes, true) && !str_starts_with($attr->name, 'data-djot-')) {
                     $hasExtraAttrs = true;
+
                     break;
                 }
             }

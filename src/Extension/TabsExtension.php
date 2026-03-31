@@ -508,6 +508,7 @@ class TabsExtension implements ResettableExtensionInterface
      *
      * @param \Djot\Node\Block\Div $wrapper
      * @param array<array{label: string, content: string, selected: bool, id: string|null, node: \Djot\Node\Block\Div}> $tabs
+     * @param \Djot\Renderer\HtmlRenderer $renderer
      */
     protected function reconstructDjotSource(Div $wrapper, array $tabs, HtmlRenderer $renderer): string
     {

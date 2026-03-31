@@ -1287,5 +1287,4 @@ DJOT;
 
         $this->assertSame(trim($expected), $back);
     }
-
 }
