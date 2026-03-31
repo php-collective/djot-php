@@ -1258,4 +1258,34 @@ DJOT;
 
         $this->assertSame(trim($djot), $back);
     }
+
+    public function testGenericDivRoundTripUsesDjotSrc(): void
+    {
+        $html = '<div class="box note" id="callout" data-x="1"><p>Inside</p></div>';
+        $back = trim($this->converter->convert($html));
+
+        $expected = <<<'DJOT'
+{#callout .note data-x=1}
+::: box
+Inside
+:::
+DJOT;
+
+        $this->assertSame(trim($expected), $back);
+    }
+
+    public function testTableAlignmentRoundTripWithoutDjotSrcUsesCellAlignment(): void
+    {
+        $html = '<table data-djot-col-widths="5,6"><tr><th style="text-align: left;">Left</th><th style="text-align: right;">Right</th></tr><tr><td style="text-align: left;">a</td><td style="text-align: right;">b</td></tr></table>';
+        $back = trim($this->converter->convert($html));
+
+        $expected = <<<'DJOT'
+| Left | Right |
+| :---- | -----: |
+| a | b |
+DJOT;
+
+        $this->assertSame(trim($expected), $back);
+    }
+
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Converter;
 
+use Djot\Node\Block\TableCell;
 use Djot\Util\StringUtil;
 use DOMDocument;
 use DOMElement;
@@ -121,8 +122,9 @@ class HtmlToDjot
         }
 
         return match ($tagName) {
-            'html', 'body', 'div', 'article', 'section', 'main', 'header', 'footer', 'nav', 'aside',
+            'html', 'body', 'article', 'section', 'main', 'header', 'footer', 'nav', 'aside',
             'address', 'details', 'dialog', 'fieldset', 'form', 'hgroup', 'menu', 'search' => $this->processBlock($node),
+            'div' => $this->processDiv($node),
             'p' => $this->processParagraph($node),
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6' => $this->processHeading($node),
             'strong', 'b' => $this->processInlineFormatting($node, '*', '*'),
@@ -211,6 +213,79 @@ class HtmlToDjot
         }
 
         return trim($content);
+    }
+
+    protected function processDiv(DOMElement $node): string
+    {
+        $classes = $this->getElementClassList($node);
+        $fenceClass = array_shift($classes);
+
+        if ($fenceClass === null || $fenceClass === '') {
+            return $this->processBlock($node);
+        }
+        if ($fenceClass === 'djot-content' && $classes === [] && $node->getAttribute('id') === '') {
+            $hasExtraAttrs = false;
+            /** @var \DOMAttr $attr */
+            foreach ($node->attributes as $attr) {
+                if ($attr->name !== 'class' && !in_array($attr->name, $this->skipAttributes, true) && !str_starts_with($attr->name, 'data-djot-')) {
+                    $hasExtraAttrs = true;
+                    break;
+                }
+            }
+            if (!$hasExtraAttrs) {
+                return $this->processBlock($node);
+            }
+        }
+
+        $content = trim($this->processChildren($node));
+        $parts = [];
+        $id = $node->getAttribute('id');
+        if ($id !== '') {
+            $parts[] = '#' . $id;
+        }
+        foreach ($classes as $class) {
+            $parts[] = '.' . $class;
+        }
+        /** @var \DOMAttr $attr */
+        foreach ($node->attributes as $attr) {
+            $name = $attr->name;
+            if ($name === 'id' || $name === 'class' || in_array($name, $this->skipAttributes, true) || str_starts_with($name, 'data-djot-')) {
+                continue;
+            }
+            $value = $attr->value;
+            $parts[] = $value === '' ? $name : $name . '=' . $this->quoteAttributeValue($value);
+        }
+        $attrs = $parts === [] ? '' : '{' . implode(' ', $parts) . "}\n";
+        $output = $attrs . '::: ' . $fenceClass . "\n";
+        if ($content !== '') {
+            $output .= $content . "\n";
+        }
+
+        return $output . ":::\n\n";
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function getElementClassList(DOMElement $node): array
+    {
+        $classes = trim($node->getAttribute('class'));
+        if ($classes === '') {
+            return [];
+        }
+
+        $classList = preg_split('/\s+/', $classes) ?: [];
+
+        return array_values(array_filter($classList, static fn (string $class): bool => $class !== ''));
+    }
+
+    protected function quoteAttributeValue(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[A-Za-z0-9._:-]+$/', $value) === 1) {
+            return $value;
+        }
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
     protected function processParagraph(DOMElement $node): string
@@ -571,6 +646,7 @@ class HtmlToDjot
         $headerRowAttrs = '';
         $columnCount = 0;
         $captionText = '';
+        $alignments = [];
 
         // Find caption element if present
         $captionElement = $node->getElementsByTagName('caption')->item(0);
@@ -585,6 +661,7 @@ class HtmlToDjot
             $cells = [];
             $isHeader = false;
 
+            $columnIndex = 0;
             foreach ($tr->childNodes as $cell) {
                 if ($cell instanceof DOMElement) {
                     $tag = strtolower($cell->tagName);
@@ -601,6 +678,10 @@ class HtmlToDjot
                         if ($tag === 'th') {
                             $isHeader = true;
                         }
+                        if (!isset($alignments[$columnIndex])) {
+                            $alignments[$columnIndex] = $this->extractTableCellAlignment($cell);
+                        }
+                        $columnIndex++;
                     }
                 }
             }
@@ -636,16 +717,18 @@ class HtmlToDjot
             if ($colWidthsAttr !== '') {
                 $colWidths = array_map('intval', explode(',', $colWidthsAttr));
                 foreach ($colWidths as $width) {
-                    $separator[] = str_repeat('-', max(3, $width));
+                    $separator[] = $this->buildTableSeparator(max(3, $width), $alignments[count($separator)] ?? TableCell::ALIGN_DEFAULT);
                 }
                 // Fill remaining columns with default width
                 $separatorCount = count($separator);
                 while ($separatorCount < $columnCount) {
-                    $separator[] = '---';
+                    $separator[] = $this->buildTableSeparator(3, $alignments[$separatorCount] ?? TableCell::ALIGN_DEFAULT);
                     $separatorCount++;
                 }
             } else {
-                $separator = array_fill(0, $columnCount, '---');
+                for ($i = 0; $i < $columnCount; $i++) {
+                    $separator[] = $this->buildTableSeparator(3, $alignments[$i] ?? TableCell::ALIGN_DEFAULT);
+                }
             }
 
             $output .= '| ' . implode(' | ', $separator) . ' |' . "\n";
@@ -710,6 +793,26 @@ class HtmlToDjot
         }
 
         return $output . "\n";
+    }
+
+    protected function extractTableCellAlignment(DOMElement $cell): string
+    {
+        $style = $cell->getAttribute('style');
+        if ($style !== '' && preg_match('/text-align\s*:\s*(left|right|center)\s*;?/i', $style, $matches) === 1) {
+            return strtolower($matches[1]);
+        }
+
+        return TableCell::ALIGN_DEFAULT;
+    }
+
+    protected function buildTableSeparator(int $width, string $alignment): string
+    {
+        return match ($alignment) {
+            TableCell::ALIGN_LEFT => ':' . str_repeat('-', max(2, $width - 1)),
+            TableCell::ALIGN_RIGHT => str_repeat('-', max(2, $width - 1)) . ':',
+            TableCell::ALIGN_CENTER => ':' . str_repeat('-', max(1, $width - 2)) . ':',
+            default => str_repeat('-', max(3, $width)),
+        };
     }
 
     protected function processSpan(DOMElement $node): string
