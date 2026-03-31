@@ -1086,4 +1086,176 @@ DJOT;
 
         $this->assertSame(trim($djot), $back);
     }
+
+    public function testTabsRoundTripPreservesInlineLinkAndImageAttributes(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+
+{label=Media}
+::: tab
+[link](https://example.com "Title"){#ln .btn data-x=1}
+
+![alt](img.png "Img Title"){#im .thumb width=400}
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
+
+    public function testTabsRoundTripPreservesCodeBlockAttributes(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+
+{label=Code}
+::: tab
+{#cb .demo linenos}
+``` php
+$x = 1;
+```
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
+
+    public function testTabsRoundTripPreservesTaskLists(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+
+{label=Tasks}
+::: tab
+- [x] done
+- [ ] todo
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
+
+    public function testTabsRoundTripPreservesOrderedListMarkers(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+
+{label=OL}
+::: tab
+1) one
+2) two
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
+
+    public function testTabsRoundTripPreservesTableAlignment(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+
+{label=Table}
+::: tab
+| H1 | H2 |
+|:---|---:|
+| a | b |
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
+
+    public function testTabsRoundTripPreservesDefinitionLists(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+
+{label=Defs}
+::: tab
+: Term
+
+  Desc with *em*
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $expected = <<<'DJOT'
+:::: tabs
+
+{label=Defs}
+::: tab
+Term
+: Desc with *em*
+:::
+::::
+DJOT;
+
+        $this->assertSame(trim($expected), $back);
+    }
+
+    public function testTabsRoundTripPreservesNestedDivAttributes(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+
+{label=Div}
+::: tab
+{#callout .note data-x=1}
+::: box
+Nested content
+:::
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
 }
