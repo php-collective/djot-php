@@ -91,6 +91,12 @@ export default defineConfig({
             { text: 'ANSI Renderer', link: '/cookbook/ansi' },
           ],
         },
+        {
+          text: 'Framework Integration',
+          items: [
+            { text: 'Symfony', link: '/cookbook/symfony' },
+          ],
+        },
       ],
       '/reference/': [
         {
