@@ -201,6 +201,7 @@ class MermaidExtension implements ExtensionInterface
     }
 
     /**
+     * @param \Djot\Node\Block\CodeBlock $node
      * @param array<string> $skipAttrs
      * @param array<string> $skipClasses
      */

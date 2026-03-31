@@ -568,6 +568,7 @@ class TabsExtension implements ResettableExtensionInterface
     }
 
     /**
+     * @param \Djot\Node\Block\Div $node
      * @param array<string> $skipAttrs
      * @param array<string> $skipClasses
      */

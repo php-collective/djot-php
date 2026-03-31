@@ -585,6 +585,7 @@ class HtmlRenderer implements RendererInterface
     }
 
     /**
+     * @param \Djot\Node\Node $node
      * @param array<string> $skipAttrs
      * @param array<string> $skipClasses
      */

@@ -324,6 +324,7 @@ class CodeGroupExtension implements ResettableExtensionInterface
     }
 
     /**
+     * @param \Djot\Node\Block\Div|\Djot\Node\Block\CodeBlock $node
      * @param array<string> $skipAttrs
      * @param array<string> $skipClasses
      */
