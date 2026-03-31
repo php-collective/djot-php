@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\CodeBlock;
+use Djot\Renderer\HtmlRenderer;
 use Djot\Util\StringUtil;
 
 /**
@@ -93,6 +94,8 @@ use Djot\Util\StringUtil;
  */
 class MermaidExtension implements ExtensionInterface
 {
+    protected bool $roundTripMode = false;
+
     /**
      * @param string $tag HTML tag to use ('pre' or 'div')
      * @param string $cssClass CSS class for Mermaid.js to detect
@@ -109,6 +112,12 @@ class MermaidExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
+        // Check for round-trip mode from HTML renderer
+        $renderer = $converter->getRenderer();
+        if ($renderer instanceof HtmlRenderer) {
+            $this->roundTripMode = $renderer->isRoundTripMode();
+        }
+
         $converter->on('render.code_block', function (RenderEvent $event): void {
             $node = $event->getNode();
             if (!$node instanceof CodeBlock) {
@@ -143,9 +152,18 @@ class MermaidExtension implements ExtensionInterface
         // Build additional attributes (excluding class and language-related)
         $extraAttrs = $this->buildExtraAttributes($node);
 
+        // Add data-djot-src for round-trip support
+        if ($this->roundTripMode) {
+            $djotSrc = $this->reconstructCodeBlockSource($node);
+            $extraAttrs .= ' data-djot-src="' . StringUtil::escapeHtml($djotSrc) . '"';
+        }
+
         // Build the main element
+        // Content is NOT HTML-escaped because:
+        // 1. Mermaid.js parses the raw content directly (expects --> not --&gt;)
+        // 2. HTML-escaping would break mermaid syntax and round-trip editing
         $element = '<' . $this->tag . ' class="' . StringUtil::escapeHtml($classAttr) . '"' . $extraAttrs . '>';
-        $element .= StringUtil::escapeHtml($content);
+        $element .= $content;
         $element .= '</' . $this->tag . ">\n";
 
         if ($this->wrapInFigure) {
@@ -157,6 +175,24 @@ class MermaidExtension implements ExtensionInterface
         }
 
         return $element;
+    }
+
+    /**
+     * Reconstruct the original Djot source for a mermaid code block
+     */
+    protected function reconstructCodeBlockSource(CodeBlock $node): string
+    {
+        $content = $node->getContent();
+
+        // Build the code fence
+        $djot = '``` mermaid' . "\n";
+        $djot .= $content;
+        if (!str_ends_with($content, "\n")) {
+            $djot .= "\n";
+        }
+        $djot .= "```\n";
+
+        return $djot;
     }
 
     /**

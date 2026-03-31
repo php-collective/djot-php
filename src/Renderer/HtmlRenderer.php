@@ -540,13 +540,43 @@ class HtmlRenderer implements RendererInterface
             $code .= "\n";
         }
 
+        // Add data-djot-src for round-trip support
+        $djotSrcAttr = '';
+        if ($this->roundTripMode) {
+            $djotSrc = $this->reconstructCodeBlockSource($node);
+            $djotSrcAttr = ' data-djot-src="' . $this->escapeAttribute($djotSrc) . '"';
+        }
+
         if ($language !== null) {
             $langClass = 'class="language-' . $this->escapeAttribute($language) . '"';
 
-            return '<pre' . $attrs . '><code ' . $langClass . '>' . $code . "</code></pre>\n";
+            return '<pre' . $attrs . $djotSrcAttr . '><code ' . $langClass . '>' . $code . "</code></pre>\n";
         }
 
-        return '<pre' . $attrs . '><code>' . $code . "</code></pre>\n";
+        return '<pre' . $attrs . $djotSrcAttr . '><code>' . $code . "</code></pre>\n";
+    }
+
+    /**
+     * Reconstruct the original Djot source for a code block
+     */
+    protected function reconstructCodeBlockSource(CodeBlock $node): string
+    {
+        $language = $node->getLanguage();
+        $content = $node->getContent();
+
+        // Build the code fence
+        $djot = '```';
+        if ($language !== null) {
+            $djot .= ' ' . $language;
+        }
+        $djot .= "\n";
+        $djot .= $content;
+        if (!str_ends_with($content, "\n")) {
+            $djot .= "\n";
+        }
+        $djot .= "```\n";
+
+        return $djot;
     }
 
     protected function renderBlockQuote(BlockQuote $node): string

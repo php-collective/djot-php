@@ -6,8 +6,16 @@ namespace Djot\Extension;
 
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Div;
 use Djot\Node\Block\Heading;
+use Djot\Node\Block\ListBlock;
+use Djot\Node\Block\ListItem;
+use Djot\Node\Block\Paragraph;
+use Djot\Node\Block\Table;
+use Djot\Node\Block\TableCell;
+use Djot\Node\Block\TableRow;
+use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\HtmlRenderer;
@@ -239,8 +247,8 @@ class TabsExtension implements ResettableExtensionInterface
             }
 
             $html = $this->mode === self::MODE_ARIA
-                ? $this->renderAriaTabs($node, $tabs)
-                : $this->renderCssTabs($node, $tabs);
+                ? $this->renderAriaTabs($node, $tabs, $renderer)
+                : $this->renderCssTabs($node, $tabs, $renderer);
 
             $event->setHtml($html);
         });
@@ -255,7 +263,7 @@ class TabsExtension implements ResettableExtensionInterface
     /**
      * Collect tab data from child divs
      *
-     * @return array<array{label: string, content: string, selected: bool, id: string|null}>
+     * @return array<array{label: string, content: string, selected: bool, id: string|null, node: \Djot\Node\Block\Div}>
      */
     protected function collectTabs(Div $wrapper, HtmlRenderer $renderer): array
     {
@@ -278,6 +286,7 @@ class TabsExtension implements ResettableExtensionInterface
                 'content' => $content,
                 'selected' => $selected,
                 'id' => $id,
+                'node' => $child, // Store original node for round-trip reconstruction
             ];
         }
 
@@ -358,15 +367,22 @@ class TabsExtension implements ResettableExtensionInterface
      * Render tabs using CSS-only approach with radio inputs
      *
      * @param \Djot\Node\Block\Div $wrapper
-     * @param array<array{label: string, content: string, selected: bool, id: string|null}> $tabs
+     * @param array<array{label: string, content: string, selected: bool, id: string|null, node: \Djot\Node\Block\Div}> $tabs
+     * @param \Djot\Renderer\HtmlRenderer $renderer
      */
-    protected function renderCssTabs(Div $wrapper, array $tabs): string
+    protected function renderCssTabs(Div $wrapper, array $tabs, HtmlRenderer $renderer): string
     {
         $this->tabSetCounter++;
         $setId = $this->idPrefix . '-' . $this->tabSetCounter;
 
         // Build wrapper attributes
         $attrs = $this->buildWrapperAttributes($wrapper);
+
+        // Add data-djot-src for round-trip support
+        if ($renderer->isRoundTripMode()) {
+            $djotSrc = $this->reconstructDjotSource($wrapper, $tabs);
+            $attrs .= ' data-djot-src="' . StringUtil::escapeHtml($djotSrc) . '"';
+        }
 
         $html = '<div' . $attrs . ">\n";
 
@@ -402,15 +418,22 @@ class TabsExtension implements ResettableExtensionInterface
      * Render tabs using ARIA roles (requires JavaScript)
      *
      * @param \Djot\Node\Block\Div $wrapper
-     * @param array<array{label: string, content: string, selected: bool, id: string|null}> $tabs
+     * @param array<array{label: string, content: string, selected: bool, id: string|null, node: \Djot\Node\Block\Div}> $tabs
+     * @param \Djot\Renderer\HtmlRenderer $renderer
      */
-    protected function renderAriaTabs(Div $wrapper, array $tabs): string
+    protected function renderAriaTabs(Div $wrapper, array $tabs, HtmlRenderer $renderer): string
     {
         $this->tabSetCounter++;
         $setId = $this->idPrefix . '-' . $this->tabSetCounter;
 
         // Build wrapper attributes with tablist role
         $attrs = $this->buildWrapperAttributes($wrapper, 'tablist');
+
+        // Add data-djot-src for round-trip support
+        if ($renderer->isRoundTripMode()) {
+            $djotSrc = $this->reconstructDjotSource($wrapper, $tabs);
+            $attrs .= ' data-djot-src="' . StringUtil::escapeHtml($djotSrc) . '"';
+        }
 
         $html = '<div' . $attrs . ">\n";
 
@@ -478,5 +501,181 @@ class TabsExtension implements ResettableExtensionInterface
         }
 
         return $attrs;
+    }
+
+    /**
+     * Reconstruct the original Djot source for round-trip support
+     *
+     * @param \Djot\Node\Block\Div $wrapper
+     * @param array<array{label: string, content: string, selected: bool, id: string|null, node: \Djot\Node\Block\Div}> $tabs
+     */
+    protected function reconstructDjotSource(Div $wrapper, array $tabs): string
+    {
+        $djot = ":::: tabs\n\n";
+
+        foreach ($tabs as $tab) {
+            $djot .= "::: tab\n";
+            $djot .= '### ' . $tab['label'] . "\n\n";
+
+            // Render tab content to Djot-like format
+            $djot .= $this->renderNodeToDjot($tab['node'], true);
+
+            $djot .= ":::\n\n";
+        }
+
+        // Remove trailing blank line
+        $djot = rtrim($djot) . "\n";
+        $djot .= "::::\n";
+
+        return $djot;
+    }
+
+    /**
+     * Render a node to Djot-like markup (simplified serialization)
+     *
+     * @param \Djot\Node\Node $node
+     * @param bool $skipFirstHeading Whether to skip the first heading (used as tab label)
+     */
+    protected function renderNodeToDjot(Node $node, bool $skipFirstHeading = false): string
+    {
+        $djot = '';
+        $skippedHeading = false;
+
+        foreach ($node->getChildren() as $child) {
+            // Skip the first heading if it's used as the tab label
+            if ($skipFirstHeading && !$skippedHeading && $child instanceof Heading) {
+                $skippedHeading = true;
+
+                continue;
+            }
+
+            if ($child instanceof Paragraph) {
+                $djot .= $this->renderInlineToDjot($child) . "\n\n";
+            } elseif ($child instanceof Heading) {
+                $djot .= str_repeat('#', $child->getLevel()) . ' ' . $this->renderInlineToDjot($child) . "\n\n";
+            } elseif ($child instanceof ListBlock) {
+                $djot .= $this->renderListToDjot($child) . "\n";
+            } elseif ($child instanceof Table) {
+                $djot .= $this->renderTableToDjot($child) . "\n";
+            } elseif ($child instanceof CodeBlock) {
+                $lang = $child->getLanguage() ?? '';
+                $djot .= '```' . ($lang ? ' ' . $lang : '') . "\n";
+                $djot .= $child->getContent();
+                $djot .= "```\n\n";
+            }
+        }
+
+        return $djot;
+    }
+
+    /**
+     * Render inline content to Djot markup
+     */
+    protected function renderInlineToDjot(Node $node): string
+    {
+        $text = '';
+
+        foreach ($node->getChildren() as $child) {
+            if ($child instanceof Text) {
+                $text .= $child->getContent();
+            } elseif ($child instanceof Code) {
+                $text .= '`' . $child->getContent() . '`';
+            } else {
+                $text .= $this->renderInlineToDjot($child);
+            }
+        }
+
+        return $text;
+    }
+
+    /**
+     * Render a list to Djot
+     */
+    protected function renderListToDjot(ListBlock $list, string $indent = ''): string
+    {
+        $djot = '';
+        $num = 1;
+        $isOrdered = $list->getListType() === ListBlock::TYPE_ORDERED;
+        $marker = $isOrdered ? '%d. ' : '- ';
+
+        foreach ($list->getChildren() as $item) {
+            if (!$item instanceof ListItem) {
+                continue;
+            }
+
+            $prefix = $isOrdered ? sprintf($marker, $num++) : $marker;
+            $djot .= $indent . $prefix;
+
+            // Get first paragraph content
+            foreach ($item->getChildren() as $i => $child) {
+                if ($child instanceof Paragraph) {
+                    $djot .= $this->renderInlineToDjot($child) . "\n";
+                } elseif ($child instanceof ListBlock) {
+                    // Nested list
+                    $djot .= $this->renderListToDjot($child, $indent . '  ');
+                }
+            }
+        }
+
+        return $djot;
+    }
+
+    /**
+     * Render a table to Djot
+     */
+    protected function renderTableToDjot(Table $table): string
+    {
+        $djot = '';
+        $rows = [];
+
+        // First pass: collect all cell texts
+        foreach ($table->getChildren() as $rowOrSection) {
+            $rowNodes = [];
+            if ($rowOrSection instanceof TableRow) {
+                $rowNodes = [$rowOrSection];
+            } else {
+                // It's a thead/tbody - get its row children
+                $rowNodes = iterator_to_array($rowOrSection->getChildren());
+            }
+
+            foreach ($rowNodes as $row) {
+                if (!$row instanceof TableRow) {
+                    continue;
+                }
+
+                $rowTexts = [];
+                foreach ($row->getChildren() as $cell) {
+                    if (!$cell instanceof TableCell) {
+                        continue;
+                    }
+
+                    $cellText = $this->renderInlineToDjot($cell);
+                    $rowTexts[] = $cellText;
+                }
+                $rows[] = $rowTexts;
+            }
+        }
+
+        // Get original separator widths if available
+        $originalWidths = $table->getSeparatorWidths();
+
+        // Second pass: output rows with separator after header
+        foreach ($rows as $i => $row) {
+            $djot .= '| ' . implode(' | ', $row) . " |\n";
+
+            // Add separator after first row (header)
+            if ($i === 0) {
+                if ($originalWidths !== null) {
+                    // Use original separator widths for exact round-trip
+                    $separators = array_map(fn ($w) => str_repeat('-', $w), $originalWidths);
+                } else {
+                    // Fall back to minimal separators
+                    $separators = array_fill(0, count($row), '---');
+                }
+                $djot .= '|' . implode('|', $separators) . "|\n";
+            }
+        }
+
+        return $djot;
     }
 }

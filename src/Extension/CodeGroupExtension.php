@@ -221,6 +221,12 @@ class CodeGroupExtension implements ResettableExtensionInterface
         // Build wrapper attributes
         $attrs = $this->buildWrapperAttributes($wrapper);
 
+        // Add data-djot-src for round-trip support
+        if ($renderer->isRoundTripMode()) {
+            $djotSrc = $this->reconstructDjotSource($wrapper, $codeBlocks);
+            $attrs .= ' data-djot-src="' . StringUtil::escapeHtml($djotSrc) . '"';
+        }
+
         $html = '<div' . $attrs . ">\n";
 
         // Render all radio inputs and labels first
@@ -274,6 +280,45 @@ class CodeGroupExtension implements ResettableExtensionInterface
         }
 
         return $renderer->renderNodeFragment($renderBlock);
+    }
+
+    /**
+     * Reconstruct the original Djot source for round-trip support
+     *
+     * @param \Djot\Node\Block\Div $wrapper
+     * @param array<array{block: \Djot\Node\Block\CodeBlock, language: string|null, label: string, selected: bool}> $codeBlocks
+     */
+    protected function reconstructDjotSource(Div $wrapper, array $codeBlocks): string
+    {
+        $djot = "::: code-group\n";
+
+        foreach ($codeBlocks as $index => $item) {
+            /** @var \Djot\Node\Block\CodeBlock $block */
+            $block = $item['block'];
+
+            // Reconstruct language with optional label
+            // Only include label if it differs from language and is not auto-generated
+            $langHint = $item['language'] ?? '';
+            $autoLabel = 'Code ' . ($index + 1);
+            if ($item['label'] !== $langHint && $item['label'] !== $autoLabel) {
+                $langHint .= ' [' . $item['label'] . ']';
+            }
+
+            $djot .= '``` ' . $langHint . "\n";
+            $content = $block->getContent();
+            // Ensure content ends with newline before closing fence
+            if (!str_ends_with($content, "\n")) {
+                $content .= "\n";
+            }
+            $djot .= $content;
+            $djot .= "```\n\n";
+        }
+
+        // Remove trailing blank line
+        $djot = rtrim($djot) . "\n";
+        $djot .= ":::\n";
+
+        return $djot;
     }
 
     /**

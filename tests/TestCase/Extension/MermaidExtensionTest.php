@@ -6,6 +6,7 @@ namespace Djot\Test\TestCase\Extension;
 
 use Djot\DjotConverter;
 use Djot\Extension\MermaidExtension;
+use Djot\Renderer\HtmlRenderer;
 use PHPUnit\Framework\TestCase;
 
 class MermaidExtensionTest extends TestCase
@@ -26,7 +27,8 @@ DJOT;
 
         $this->assertStringContainsString('<pre class="mermaid">', $html);
         $this->assertStringContainsString('graph TD;', $html);
-        $this->assertStringContainsString('A--&gt;B;', $html);
+        // Raw syntax preserved for Mermaid.js (not HTML-escaped)
+        $this->assertStringContainsString('A-->B;', $html);
         $this->assertStringContainsString('</pre>', $html);
     }
 
@@ -198,7 +200,14 @@ DJOT;
         $this->assertStringContainsString('data-theme="dark"', $html);
     }
 
-    public function testEscapesHtmlInDiagram(): void
+    /**
+     * Test that mermaid content is preserved as-is (not HTML-escaped).
+     *
+     * Mermaid.js requires raw syntax to work correctly. HTML-escaping would
+     * break mermaid syntax like `-->` arrows. Security concerns should be
+     * addressed via CSP headers or other means, not by escaping content.
+     */
+    public function testPreservesRawContentForMermaid(): void
     {
         $converter = new DjotConverter();
         $converter->addExtension(new MermaidExtension());
@@ -212,8 +221,9 @@ DJOT;
 
         $html = $converter->convert($djot);
 
-        $this->assertStringNotContainsString('<script>', $html);
-        $this->assertStringContainsString('&lt;script&gt;', $html);
+        // Content is preserved raw for Mermaid.js compatibility
+        // Security should be handled via CSP, not content escaping
+        $this->assertStringContainsString("A[\"<script>alert('xss')</script>\"]-->B;", $html);
     }
 
     public function testClassDiagram(): void
@@ -352,8 +362,9 @@ DJOT;
         $html = $converter->convert($djot);
 
         $this->assertSame(2, substr_count($html, '<pre class="mermaid">'));
-        $this->assertStringContainsString('A--&gt;B;', $html);
-        $this->assertStringContainsString('C--&gt;D;', $html);
+        // Raw syntax preserved for Mermaid.js
+        $this->assertStringContainsString('A-->B;', $html);
+        $this->assertStringContainsString('C-->D;', $html);
     }
 
     public function testDivTagWithFigure(): void
@@ -377,5 +388,42 @@ DJOT;
         $this->assertStringContainsString('<div class="mermaid">', $html);
         $this->assertStringContainsString('</div>', $html);
         $this->assertStringContainsString('</figure>', $html);
+    }
+
+    public function testRoundTripModeAddsDjotSrc(): void
+    {
+        $renderer = new HtmlRenderer();
+        $renderer->setRoundTripMode(true);
+        $converter = DjotConverter::create(renderer: $renderer);
+        $converter->addExtension(new MermaidExtension());
+
+        $djot = <<<'DJOT'
+``` mermaid
+graph TD;
+    A-->B;
+```
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('data-djot-src="', $html);
+        $this->assertStringContainsString('``` mermaid', $html);
+    }
+
+    public function testNonRoundTripModeNoDjotSrc(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new MermaidExtension());
+
+        $djot = <<<'DJOT'
+``` mermaid
+graph TD;
+    A-->B;
+```
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringNotContainsString('data-djot-src=', $html);
     }
 }
