@@ -159,11 +159,12 @@ class MermaidExtension implements ExtensionInterface
         }
 
         // Build the main element
-        // Content is NOT HTML-escaped because:
-        // 1. Mermaid.js parses the raw content directly (expects --> not --&gt;)
-        // 2. HTML-escaping would break mermaid syntax and round-trip editing
+        // Mermaid content needs special escaping:
+        // - Escape < and & to prevent XSS (e.g., <script> becomes &lt;script>)
+        // - Preserve > for Mermaid arrow syntax (e.g., -->)
+        $escapedContent = str_replace(['&', '<'], ['&amp;', '&lt;'], $content);
         $element = '<' . $this->tag . ' class="' . StringUtil::escapeHtml($classAttr) . '"' . $extraAttrs . '>';
-        $element .= $content;
+        $element .= $escapedContent;
         $element .= '</' . $this->tag . ">\n";
 
         if ($this->wrapInFigure) {
@@ -184,13 +185,16 @@ class MermaidExtension implements ExtensionInterface
     {
         $content = $node->getContent();
 
+        // Choose a fence that does not conflict with the content
+        $fence = StringUtil::findSafeCodeFence($content, 3);
+
         // Build the code fence
-        $djot = '``` mermaid' . "\n";
+        $djot = $fence . ' mermaid' . "\n";
         $djot .= $content;
         if (!str_ends_with($content, "\n")) {
             $djot .= "\n";
         }
-        $djot .= "```\n";
+        $djot .= $fence . "\n";
 
         return $djot;
     }

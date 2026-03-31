@@ -304,14 +304,21 @@ class CodeGroupExtension implements ResettableExtensionInterface
                 $langHint .= ' [' . $item['label'] . ']';
             }
 
-            $djot .= '``` ' . $langHint . "\n";
             $content = $block->getContent();
+            $fence = StringUtil::findSafeCodeFence($content, 3);
+
+            $djot .= $fence;
+            if ($langHint !== '') {
+                $djot .= ' ' . $langHint;
+            }
+            $djot .= "\n";
+
             // Ensure content ends with newline before closing fence
             if (!str_ends_with($content, "\n")) {
                 $content .= "\n";
             }
             $djot .= $content;
-            $djot .= "```\n\n";
+            $djot .= $fence . "\n\n";
         }
 
         // Remove trailing blank line

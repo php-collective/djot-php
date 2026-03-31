@@ -544,4 +544,64 @@ class HtmlRendererTest extends TestCase
         $this->renderer->setCodeBlockTabWidth(null);
         $this->assertNull($this->renderer->getCodeBlockTabWidth());
     }
+
+    public function testRoundTripModeAddsDjotSrcToCodeBlock(): void
+    {
+        $this->renderer->setRoundTripMode(true);
+
+        $doc = new Document();
+        $codeBlock = new CodeBlock("echo 'Hello';");
+        $codeBlock->setLanguage('php');
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('data-djot-src="', $result);
+        $this->assertStringContainsString('``` php', $result);
+    }
+
+    public function testNonRoundTripModeNoDjotSrcOnCodeBlock(): void
+    {
+        $this->renderer->setRoundTripMode(false);
+
+        $doc = new Document();
+        $codeBlock = new CodeBlock("echo 'Hello';");
+        $codeBlock->setLanguage('php');
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringNotContainsString('data-djot-src=', $result);
+    }
+
+    public function testRoundTripCodeBlockWithBackticks(): void
+    {
+        $this->renderer->setRoundTripMode(true);
+
+        $doc = new Document();
+        // Content containing triple backticks
+        $codeBlock = new CodeBlock('Example with ```backticks```');
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('data-djot-src="', $result);
+        // Should use 4+ backticks to avoid conflict
+        $this->assertStringContainsString('````', $result);
+    }
+
+    public function testRoundTripCodeBlockWithoutLanguage(): void
+    {
+        $this->renderer->setRoundTripMode(true);
+
+        $doc = new Document();
+        $codeBlock = new CodeBlock('plain code');
+        $doc->appendChild($codeBlock);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('data-djot-src="', $result);
+        // Should have fence without trailing space when no language
+        $this->assertStringContainsString("```\nplain code", $result);
+    }
 }

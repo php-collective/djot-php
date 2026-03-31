@@ -49,6 +49,7 @@ use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\Utility\EventDispatcherTrait;
 use Djot\SafeMode;
+use Djot\Util\StringUtil;
 
 /**
  * Renders AST to HTML
@@ -564,8 +565,11 @@ class HtmlRenderer implements RendererInterface
         $language = $node->getLanguage();
         $content = $node->getContent();
 
+        // Choose a fence that does not conflict with the content
+        $fence = StringUtil::findSafeCodeFence($content, 3);
+
         // Build the code fence
-        $djot = '```';
+        $djot = $fence;
         if ($language !== null) {
             $djot .= ' ' . $language;
         }
@@ -574,7 +578,7 @@ class HtmlRenderer implements RendererInterface
         if (!str_ends_with($content, "\n")) {
             $djot .= "\n";
         }
-        $djot .= "```\n";
+        $djot .= $fence . "\n";
 
         return $djot;
     }

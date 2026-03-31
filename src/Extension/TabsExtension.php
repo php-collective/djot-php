@@ -559,9 +559,19 @@ class TabsExtension implements ResettableExtensionInterface
                 $djot .= $this->renderTableToDjot($child) . "\n";
             } elseif ($child instanceof CodeBlock) {
                 $lang = $child->getLanguage() ?? '';
-                $djot .= '```' . ($lang ? ' ' . $lang : '') . "\n";
-                $djot .= $child->getContent();
-                $djot .= "```\n\n";
+                $content = $child->getContent();
+
+                // Choose a fence that does not conflict with the content
+                $fence = StringUtil::findSafeCodeFence($content, 3);
+
+                // Ensure the content ends with a newline so the closing fence is on its own line
+                if ($content !== '' && !str_ends_with($content, "\n")) {
+                    $content .= "\n";
+                }
+
+                $djot .= $fence . ($lang ? ' ' . $lang : '') . "\n";
+                $djot .= $content;
+                $djot .= $fence . "\n\n";
             }
         }
 

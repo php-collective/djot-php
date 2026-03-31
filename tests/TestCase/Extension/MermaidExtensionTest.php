@@ -201,13 +201,12 @@ DJOT;
     }
 
     /**
-     * Test that mermaid content is preserved as-is (not HTML-escaped).
+     * Test that mermaid content is safely escaped while preserving arrow syntax.
      *
-     * Mermaid.js requires raw syntax to work correctly. HTML-escaping would
-     * break mermaid syntax like `-->` arrows. Security concerns should be
-     * addressed via CSP headers or other means, not by escaping content.
+     * - `<` and `&` are escaped to prevent XSS
+     * - `>` is preserved for Mermaid arrow syntax like `-->`
      */
-    public function testPreservesRawContentForMermaid(): void
+    public function testEscapesHtmlWhilePreservingArrows(): void
     {
         $converter = new DjotConverter();
         $converter->addExtension(new MermaidExtension());
@@ -221,9 +220,12 @@ DJOT;
 
         $html = $converter->convert($djot);
 
-        // Content is preserved raw for Mermaid.js compatibility
-        // Security should be handled via CSP, not content escaping
-        $this->assertStringContainsString("A[\"<script>alert('xss')</script>\"]-->B;", $html);
+        // < is escaped to &lt; to prevent XSS
+        $this->assertStringContainsString('&lt;script>', $html);
+        // > is preserved for Mermaid arrow syntax
+        $this->assertStringContainsString('-->B;', $html);
+        // Full expected output with proper escaping
+        $this->assertStringContainsString("A[\"&lt;script>alert('xss')&lt;/script>\"]-->B;", $html);
     }
 
     public function testClassDiagram(): void
