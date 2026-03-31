@@ -6,6 +6,7 @@ namespace Djot\Extension;
 
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\DefinitionDescription;
 use Djot\Node\Block\DefinitionList;
@@ -19,6 +20,10 @@ use Djot\Node\Block\Table;
 use Djot\Node\Block\TableCell;
 use Djot\Node\Block\TableRow;
 use Djot\Node\Inline\Code;
+use Djot\Node\Inline\Emphasis;
+use Djot\Node\Inline\Image;
+use Djot\Node\Inline\Link;
+use Djot\Node\Inline\Strong;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\HtmlRenderer;
@@ -514,16 +519,45 @@ class TabsExtension implements ResettableExtensionInterface
      */
     protected function reconstructDjotSource(Div $wrapper, array $tabs): string
     {
-        $djot = ":::: tabs\n\n";
+        // Include wrapper attributes (but skip 'tabs' class)
+        $djot = $this->renderDjotAttributeBlock($wrapper, skipClasses: ['tabs']);
+        $djot .= ":::: tabs\n\n";
 
         foreach ($tabs as $tab) {
-            $djot .= "::: tab\n";
-            $djot .= '### ' . $tab['label'] . "\n\n";
+            $node = $tab['node'];
+            $hasLabelAttr = $node->hasAttribute('label');
+            $hasHeadingLabel = false;
 
-            // Render tab content to Djot-like format
-            $djot .= $this->renderNodeToDjot($tab['node'], true);
+            // Check if the first child is a heading (used as label)
+            foreach ($node->getChildren() as $child) {
+                if ($child instanceof Heading) {
+                    $hasHeadingLabel = true;
 
-            $djot .= ":::\n\n";
+                    break;
+                }
+                if ($child instanceof Paragraph || $child instanceof CodeBlock || $child instanceof Div) {
+                    break;
+                }
+            }
+
+            // Output tab with all its attributes (but skip 'tab' class)
+            $attrBlock = $this->renderDjotAttributeBlock($node, skipClasses: ['tab']);
+            if ($attrBlock !== '') {
+                $djot .= $attrBlock;
+                $djot .= "::: tab\n";
+                // Don't skip heading since label came from attribute
+                $content = $this->renderNodeToDjot($node, false);
+                $djot .= rtrim($content) . "\n";
+            } else {
+                $djot .= "::: tab\n";
+                if ($hasHeadingLabel) {
+                    $djot .= '### ' . $tab['label'] . "\n\n";
+                }
+                $content = $this->renderNodeToDjot($node, true);
+                $djot .= rtrim($content) . "\n";
+            }
+
+            $djot .= ":::\n";
         }
 
         // Remove trailing blank line
@@ -531,6 +565,53 @@ class TabsExtension implements ResettableExtensionInterface
         $djot .= "::::\n";
 
         return $djot;
+    }
+
+    /**
+     * @param array<string> $skipAttrs
+     * @param array<string> $skipClasses
+     */
+    protected function renderDjotAttributeBlock(Div $node, array $skipAttrs = [], array $skipClasses = []): string
+    {
+        $parts = [];
+
+        $id = $node->getAttribute('id');
+        if ($id !== null && $id !== '' && !in_array('id', $skipAttrs, true)) {
+            $parts[] = '#' . $id;
+        }
+
+        if (!in_array('class', $skipAttrs, true)) {
+            foreach ($node->getClassList() as $class) {
+                if (!in_array($class, $skipClasses, true)) {
+                    $parts[] = '.' . $class;
+                }
+            }
+        }
+
+        foreach ($node->getAttributes() as $name => $value) {
+            if ($name === 'id' || $name === 'class' || in_array($name, $skipAttrs, true)) {
+                continue;
+            }
+
+            $parts[] = $value === ''
+                ? $name
+                : $name . '=' . $this->quoteDjotAttributeValue($value);
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return '{' . implode(' ', $parts) . "}\n";
+    }
+
+    protected function quoteDjotAttributeValue(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[A-Za-z0-9._:-]+$/', $value) === 1) {
+            return $value;
+        }
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
     /**
@@ -577,6 +658,28 @@ class TabsExtension implements ResettableExtensionInterface
                 $djot .= $fence . "\n\n";
             } elseif ($child instanceof DefinitionList) {
                 $djot .= $this->renderDefinitionListToDjot($child) . "\n";
+            } elseif ($child instanceof BlockQuote) {
+                $djot .= $this->renderBlockQuoteToDjot($child) . "\n";
+            } elseif ($child instanceof Div) {
+                // Handle nested divs (like code-group) - check for data-djot-src first
+                $djotSrc = $child->getAttribute('data-djot-src');
+                if ($djotSrc !== null && $djotSrc !== '') {
+                    // Include the djot source, ensuring single trailing newline
+                    $djot .= rtrim($djotSrc) . "\n";
+                } elseif ($child->hasClass('code-group')) {
+                    // Fallback: reconstruct code-group from child code blocks
+                    $djot .= "::: code-group\n";
+                    $content = $this->renderNodeToDjot($child, false);
+                    $djot .= rtrim($content) . "\n";
+                    $djot .= ":::\n";
+                } else {
+                    // Generic div reconstruction
+                    $className = implode(' ', $child->getClassList());
+                    $djot .= '::: ' . ($className ?: 'div') . "\n";
+                    $content = $this->renderNodeToDjot($child, false);
+                    $djot .= rtrim($content) . "\n";
+                    $djot .= ":::\n";
+                }
             }
         }
 
@@ -595,6 +698,17 @@ class TabsExtension implements ResettableExtensionInterface
                 $text .= $child->getContent();
             } elseif ($child instanceof Code) {
                 $text .= '`' . $child->getContent() . '`';
+            } elseif ($child instanceof Strong) {
+                $text .= '*' . $this->renderInlineToDjot($child) . '*';
+            } elseif ($child instanceof Emphasis) {
+                $text .= '_' . $this->renderInlineToDjot($child) . '_';
+            } elseif ($child instanceof Image) {
+                $alt = $child->getAlt();
+                $src = $child->getSource();
+                $text .= '![' . $alt . '](' . $src . ')';
+            } elseif ($child instanceof Link) {
+                $href = $child->getDestination() ?? '';
+                $text .= '[' . $this->renderInlineToDjot($child) . '](' . $href . ')';
             } else {
                 $text .= $this->renderInlineToDjot($child);
             }
@@ -649,6 +763,28 @@ class TabsExtension implements ResettableExtensionInterface
                 $djot .= $this->renderInlineToDjot($child) . "\n";
             } elseif ($child instanceof DefinitionDescription) {
                 $djot .= ': ' . $this->renderInlineToDjot($child) . "\n";
+            }
+        }
+
+        return $djot;
+    }
+
+    /**
+     * Render a block quote to Djot
+     */
+    protected function renderBlockQuoteToDjot(BlockQuote $quote): string
+    {
+        $djot = '';
+
+        foreach ($quote->getChildren() as $child) {
+            if ($child instanceof Paragraph) {
+                $djot .= '> ' . $this->renderInlineToDjot($child) . "\n";
+            } else {
+                // For other block types, recursively render and prefix each line
+                $content = $this->renderNodeToDjot($child, false);
+                foreach (explode("\n", rtrim($content)) as $line) {
+                    $djot .= '> ' . $line . "\n";
+                }
             }
         }
 

@@ -323,6 +323,10 @@ class CodeGroupExtension implements ResettableExtensionInterface
         return $djot;
     }
 
+    /**
+     * @param array<string> $skipAttrs
+     * @param array<string> $skipClasses
+     */
     protected function renderDjotAttributeBlock(Div|CodeBlock $node, array $skipAttrs = [], array $skipClasses = []): string
     {
         $parts = [];

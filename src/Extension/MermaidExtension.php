@@ -200,6 +200,10 @@ class MermaidExtension implements ExtensionInterface
         return $djot;
     }
 
+    /**
+     * @param array<string> $skipAttrs
+     * @param array<string> $skipClasses
+     */
     protected function renderDjotAttributeBlock(CodeBlock $node, array $skipAttrs = [], array $skipClasses = []): string
     {
         $parts = [];
