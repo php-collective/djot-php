@@ -125,6 +125,7 @@ See [Safe Mode](https://php-collective.github.io/djot-php/guide/safe-mode) for d
 
 ## Implementations
 
+- [php-collective/symfony-djot](https://github.com/php-collective/symfony-djot) - Symfony bundle with Twig filters, services, forms, and validation
 - [php-collective/wp-djot](https://github.com/php-collective/wp-djot) - WordPress plugin for Djot support
 - [dereuromark/cakephp-markup](https://github.com/dereuromark/cakephp-markup) - CakePHP integration with Djot helper and view class
 

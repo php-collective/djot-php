@@ -1,14 +1,56 @@
 # Symfony Integration
 
-This guide shows how to integrate djot-php with Symfony and Twig, providing a `djot_to_html` filter for your templates.
+This guide covers Symfony integration options for djot-php.
 
-## Installation
+## Recommended: Symfony Djot Bundle
+
+For most projects, use the official **[symfony-djot](https://github.com/php-collective/symfony-djot)** bundle which provides:
+
+- Twig filters (`|djot`, `|djot_text`) and function (`djot()`)
+- Service injection via `DjotConverterInterface`
+- Multiple converter profiles with different configurations
+- Form type (`DjotType`) for Djot-enabled form fields
+- Validation constraint (`ValidDjot`)
+- Output caching
+- All djot-php extensions configurable via YAML
+
+```bash
+composer require php-collective/symfony-djot
+```
+
+```twig
+{# Use immediately in templates #}
+{{ article.body|djot }}
+```
+
+```yaml
+# config/packages/symfony_djot.yaml
+symfony_djot:
+    converters:
+        default:
+            safe_mode: false
+            extensions:
+                - type: autolink
+                - type: external_links
+        user_content:
+            safe_mode: true
+```
+
+See the [symfony-djot documentation](https://github.com/php-collective/symfony-djot) for full configuration options.
+
+---
+
+## Manual Integration
+
+For advanced use cases or full control over the integration, you can set up djot-php manually.
+
+### Installation
 
 ```bash
 composer require php-collective/djot
 ```
 
-## Basic Setup
+### Basic Setup
 
 ### 1. Create the Converter Factory
 
