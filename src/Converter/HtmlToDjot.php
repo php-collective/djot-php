@@ -111,6 +111,11 @@ class HtmlToDjot
 
         $tagName = strtolower($node->tagName);
 
+        $djotSrc = $this->extractRoundTripSource($node, $tagName);
+        if ($djotSrc !== null) {
+            return $djotSrc;
+        }
+
         if ($tagName === 'section' && $this->isInlineOnlyEndnotesSection($node)) {
             return '';
         }
@@ -287,6 +292,21 @@ class HtmlToDjot
         $attrs = $this->formatBlockAttributes($node);
 
         return $attrs . "\n" . $backticks . $language . "\n" . rtrim($content) . "\n" . $backticks . "\n\n";
+    }
+
+    protected function extractRoundTripSource(DOMElement $node, string $tagName): ?string
+    {
+        if (!$node->hasAttribute('data-djot-src')) {
+            return null;
+        }
+
+        if ($tagName !== 'pre' && !in_array($tagName, $this->blockElements, true)) {
+            return null;
+        }
+
+        $source = html_entity_decode($node->getAttribute('data-djot-src'), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return rtrim($source, "\n") . "\n\n";
     }
 
     protected function processLink(DOMElement $node): string

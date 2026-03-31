@@ -569,8 +569,9 @@ class HtmlRenderer implements RendererInterface
         $fence = StringUtil::findSafeCodeFence($content, 3);
 
         // Build the code fence
-        $djot = $fence;
-        if ($language !== null) {
+        $djot = $this->renderDjotAttributeBlock($node);
+        $djot .= $fence;
+        if ($language !== null && $language !== '') {
             $djot .= ' ' . $language;
         }
         $djot .= "\n";
@@ -581,6 +582,49 @@ class HtmlRenderer implements RendererInterface
         $djot .= $fence . "\n";
 
         return $djot;
+    }
+
+    protected function renderDjotAttributeBlock(Node $node, array $skipAttrs = [], array $skipClasses = []): string
+    {
+        $parts = [];
+
+        $id = $node->getAttribute('id');
+        if ($id !== null && $id !== '' && !in_array('id', $skipAttrs, true)) {
+            $parts[] = '#' . $id;
+        }
+
+        if (!in_array('class', $skipAttrs, true)) {
+            foreach ($node->getClassList() as $class) {
+                if (!in_array($class, $skipClasses, true)) {
+                    $parts[] = '.' . $class;
+                }
+            }
+        }
+
+        foreach ($node->getAttributes() as $name => $value) {
+            if ($name === 'id' || $name === 'class' || in_array($name, $skipAttrs, true)) {
+                continue;
+            }
+
+            $parts[] = $value === ''
+                ? $name
+                : $name . '=' . $this->quoteDjotAttributeValue($value);
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return '{' . implode(' ', $parts) . "}\n";
+    }
+
+    protected function quoteDjotAttributeValue(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[A-Za-z0-9._:-]+$/', $value) === 1) {
+            return $value;
+        }
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
     protected function renderBlockQuote(BlockQuote $node): string

@@ -6,9 +6,12 @@ namespace Djot\Test\TestCase\Converter;
 
 use Djot\Converter\HtmlToDjot;
 use Djot\DjotConverter;
+use Djot\Extension\CodeGroupExtension;
 use Djot\Extension\HeadingLevelShiftExtension;
 use Djot\Extension\HeadingReferenceExtension;
 use Djot\Extension\InlineFootnotesExtension;
+use Djot\Extension\MermaidExtension;
+use Djot\Extension\TabsExtension;
 use PHPUnit\Framework\TestCase;
 
 class HtmlToDjotTest extends TestCase
@@ -976,5 +979,111 @@ DJOT;
         $html = $djotConverter->convert($djot);
 
         $this->assertStringNotContainsString('data-djot-col-widths', $html);
+    }
+
+    public function testCodeBlockRoundTripUsesDjotSrc(): void
+    {
+        $djot = "{#snippet .demo selected}\n``` php [Example]\necho 123;\n```\n";
+
+        $html = (new DjotConverter(roundTripMode: true))->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
+
+    public function testMermaidRoundTripUsesDjotSrc(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new MermaidExtension());
+
+        $djot = "{#flow data-theme=dark}\n``` mermaid\ngraph TD;\n    A-->B;\n```\n";
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
+
+    public function testCodeGroupRoundTripUsesDjotSrc(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+{#cg .custom}
+::: code-group
+{selected}
+``` php [Composer]
+echo 1;
+```
+
+{#shell data-copy=1}
+``` bash [NPM]
+echo 2;
+```
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
+
+    public function testTabsRoundTripUsesDjotSrc(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+{#wrapper .outer}
+:::: tabs
+
+{#first .alpha label="First tab" selected}
+::: tab
+Text with *bold*, _em_, `code`, ![alt](img.png), and [link](https://example.com).
+
+> quote
+
+1. one
+2. two
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
+    }
+
+    public function testNestedTabsAndCodeGroupRoundTripUsesDjotSrc(): void
+    {
+        $converter = new DjotConverter(roundTripMode: true);
+        $converter->addExtension(new TabsExtension());
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+:::: tabs
+
+{label=Demo}
+::: tab
+::: code-group
+``` php [One]
+echo 1;
+```
+
+``` bash [Two]
+echo 2;
+```
+:::
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+        $back = trim($this->converter->convert($html));
+
+        $this->assertSame(trim($djot), $back);
     }
 }

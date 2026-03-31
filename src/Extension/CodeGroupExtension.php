@@ -290,23 +290,18 @@ class CodeGroupExtension implements ResettableExtensionInterface
      */
     protected function reconstructDjotSource(Div $wrapper, array $codeBlocks): string
     {
-        $djot = "::: code-group\n";
+        $djot = $this->renderDjotAttributeBlock($wrapper, skipClasses: ['code-group']);
+        $djot .= "::: code-group\n";
 
-        foreach ($codeBlocks as $index => $item) {
+        foreach ($codeBlocks as $item) {
             /** @var \Djot\Node\Block\CodeBlock $block */
             $block = $item['block'];
-
-            // Reconstruct language with optional label
-            // Only include label if it differs from language and is not auto-generated
-            $langHint = $item['language'] ?? '';
-            $autoLabel = 'Code ' . ($index + 1);
-            if ($item['label'] !== $langHint && $item['label'] !== $autoLabel) {
-                $langHint .= ' [' . $item['label'] . ']';
-            }
+            $langHint = $block->getLanguage() ?? '';
 
             $content = $block->getContent();
             $fence = StringUtil::findSafeCodeFence($content, 3);
 
+            $djot .= $this->renderDjotAttributeBlock($block);
             $djot .= $fence;
             if ($langHint !== '') {
                 $djot .= ' ' . $langHint;
@@ -326,6 +321,49 @@ class CodeGroupExtension implements ResettableExtensionInterface
         $djot .= ":::\n";
 
         return $djot;
+    }
+
+    protected function renderDjotAttributeBlock(Div|CodeBlock $node, array $skipAttrs = [], array $skipClasses = []): string
+    {
+        $parts = [];
+
+        $id = $node->getAttribute('id');
+        if ($id !== null && $id !== '' && !in_array('id', $skipAttrs, true)) {
+            $parts[] = '#' . $id;
+        }
+
+        if (!in_array('class', $skipAttrs, true)) {
+            foreach ($node->getClassList() as $class) {
+                if (!in_array($class, $skipClasses, true)) {
+                    $parts[] = '.' . $class;
+                }
+            }
+        }
+
+        foreach ($node->getAttributes() as $name => $value) {
+            if ($name === 'id' || $name === 'class' || in_array($name, $skipAttrs, true)) {
+                continue;
+            }
+
+            $parts[] = $value === ''
+                ? $name
+                : $name . '=' . $this->quoteDjotAttributeValue($value);
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        return '{' . implode(' ', $parts) . "}\n";
+    }
+
+    protected function quoteDjotAttributeValue(string $value): string
+    {
+        if ($value !== '' && preg_match('/^[A-Za-z0-9._:-]+$/', $value) === 1) {
+            return $value;
+        }
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
     /**
