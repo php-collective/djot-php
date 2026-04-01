@@ -265,8 +265,8 @@ $back = $htmlToDjot->convert($html);
 | Admonitions | `data-djot-admonition-type` | Preserves `::: type` div syntax with AdmonitionExtension |
 | Line blocks | class `line-block` | Preserves `\| Line` syntax via div.line-block detection |
 | Raw inline | `data-djot-raw` | Preserves `` `content`{=format} `` syntax for any format |
-| Escaped characters | `data-djot-escaped` | Preserves `\*`, `\_`, etc. escape sequences |
-| Abbreviation definitions | `data-djot-abbreviations` | Preserves `*[ABBR]: Definition` syntax |
+| Escaped characters | `data-djot-escaped` | Wraps escaped punctuation in span to preserve `\*`, `\_`, etc. |
+| Abbreviation definitions | `data-djot-abbreviations` | Stores definitions in template element for restoration |
 
 Without round-trip mode, these elements use defaults when converting back:
 - Thematic breaks → `---`
