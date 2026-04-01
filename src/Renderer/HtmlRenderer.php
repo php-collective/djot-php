@@ -452,6 +452,10 @@ class HtmlRenderer implements RendererInterface
             $id = $idAttr ?? '';
             $this->getRenderContext()->headingIdTracker->trackId($id);
         }
+
+        foreach ($node->getChildren() as $child) {
+            $this->trackIdFromNode($child);
+        }
     }
 
     /**
