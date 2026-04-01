@@ -1279,6 +1279,11 @@ class HtmlToDjot
 
     protected function processSpan(DOMElement $node): string
     {
+        // Check for raw inline content (round-trip support)
+        if ($node->hasAttribute('data-djot-raw')) {
+            return $this->processRawInline($node);
+        }
+
         $content = $this->processChildren($node);
 
         // Use getElementAttributes to get all attributes including data-*
@@ -1290,6 +1295,40 @@ class HtmlToDjot
         }
 
         return $content;
+    }
+
+    /**
+     * Process raw inline span (with data-djot-raw) for round-trip
+     */
+    protected function processRawInline(DOMElement $node): string
+    {
+        $format = $node->getAttribute('data-djot-raw');
+
+        // For HTML format, get the innerHTML (raw HTML content)
+        // For other formats, get the text content (was HTML-escaped)
+        if ($format === 'html') {
+            $content = $this->getInnerHtml($node);
+        } else {
+            $content = $node->textContent;
+        }
+
+        // Find the appropriate backtick fence
+        $backticks = StringUtil::findSafeCodeFence($content, 1);
+
+        return $backticks . $content . $backticks . '{=' . $format . '}';
+    }
+
+    /**
+     * Get the innerHTML of an element
+     */
+    protected function getInnerHtml(DOMElement $node): string
+    {
+        $html = '';
+        foreach ($node->childNodes as $child) {
+            $html .= $node->ownerDocument?->saveHTML($child) ?? '';
+        }
+
+        return $html;
     }
 
     protected function processFigure(DOMElement $node): string

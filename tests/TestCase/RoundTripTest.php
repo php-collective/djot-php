@@ -972,4 +972,27 @@ DJOT;
 DJOT;
         $this->assertRoundTrip($djot);
     }
+
+    // =========================================================================
+    // Raw Inline
+    // =========================================================================
+
+    public function testRawInlineHtml(): void
+    {
+        $djot = 'Text `<br>`{=html} more.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testRawInlineHtmlComplex(): void
+    {
+        $djot = 'Insert `<span class="red">colored</span>`{=html} text.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testRawInlineNonHtml(): void
+    {
+        // Non-HTML formats are preserved in round-trip mode
+        $djot = 'LaTeX: `\alpha`{=tex} formula.';
+        $this->assertRoundTrip($djot);
+    }
 }
