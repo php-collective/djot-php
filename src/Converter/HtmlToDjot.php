@@ -1592,7 +1592,7 @@ class HtmlToDjot
             }
 
             // Track definition lists (`: term` starts one)
-            if (preg_match('/^: /', $line)) {
+            if (str_starts_with($line, ': ')) {
                 $inDefinitionList = true;
                 $inList = false;
                 $result[] = $line;
