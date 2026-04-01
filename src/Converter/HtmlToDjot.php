@@ -121,7 +121,7 @@ class HtmlToDjot
             // Ensure blank line before footnote definitions
             $notes = "\n\n";
             foreach ($this->footnoteDefinitions as $label => $content) {
-                $notes .= '[^' . $label . ']: ' . $content . "\n";
+                $notes .= $this->formatFootnoteDefinition($label, $content) . "\n";
             }
             $djot .= $notes;
         }
@@ -1642,7 +1642,7 @@ class HtmlToDjot
     }
 
     /**
-     * @return list<DOMElement>
+     * @return list<\DOMElement>
      */
     protected function getDirectChildElementsByTagName(DOMElement $node, string $tagName): array
     {
@@ -1681,6 +1681,23 @@ class HtmlToDjot
         $content = trim($this->processChildren($clone));
 
         return $content;
+    }
+
+    protected function formatFootnoteDefinition(string|int $label, string $content): string
+    {
+        $lines = explode("\n", $content);
+        $firstLine = $lines[0];
+        $lines = array_slice($lines, 1);
+        $formatted = '[^' . $label . ']: ' . $firstLine;
+
+        foreach ($lines as $line) {
+            $formatted .= "\n";
+            if ($line !== '') {
+                $formatted .= '  ' . $line;
+            }
+        }
+
+        return $formatted;
     }
 
     protected function cleanup(string $djot): string
