@@ -1705,10 +1705,6 @@ class HtmlToDjot
 
     protected function processFigure(DOMElement $node): string
     {
-        if ($this->shouldFallbackFigureToRawHtml($node)) {
-            return $this->processRawHtmlBlock($node);
-        }
-
         $output = "\n";
 
         // Find img, blockquote, and figcaption
@@ -1716,12 +1712,14 @@ class HtmlToDjot
         $blockquote = $this->findFirstDirectChildByTagName($node, 'blockquote');
         $caption = $this->findFirstDirectChildByTagName($node, 'figcaption');
 
-        if ($img instanceof DOMElement) {
+        if ($this->hasOnlySupportedFigureContent($node) && $img instanceof DOMElement) {
             $output .= $this->processImage($img) . "\n";
-        } elseif ($blockquote instanceof DOMElement) {
+        } elseif ($this->hasOnlySupportedFigureContent($node) && $blockquote instanceof DOMElement) {
             $output .= $this->processBlockquote($blockquote);
             // Remove the trailing blank line since caption follows immediately
             $output = rtrim($output) . "\n";
+        } else {
+            return $this->processGenericFigureContent($node);
         }
 
         if ($caption instanceof DOMElement) {
@@ -1731,17 +1729,13 @@ class HtmlToDjot
         return $output . "\n\n";
     }
 
-    protected function shouldFallbackFigureToRawHtml(DOMElement $node): bool
+    protected function hasOnlySupportedFigureContent(DOMElement $node): bool
     {
-        if ($this->getElementAttributes($node) !== '') {
-            return true;
-        }
-
         $contentChildren = [];
         foreach ($node->childNodes as $child) {
             if (!($child instanceof DOMElement)) {
                 if (trim($child->textContent) !== '') {
-                    return true;
+                    return false;
                 }
 
                 continue;
@@ -1755,22 +1749,30 @@ class HtmlToDjot
         }
 
         if (count($contentChildren) !== 1) {
-            return true;
+            return false;
         }
 
-        return !in_array($contentChildren[0], ['img', 'blockquote'], true);
+        return in_array($contentChildren[0], ['img', 'blockquote'], true);
     }
 
-    protected function processRawHtmlBlock(DOMElement $node): string
+    protected function processGenericFigureContent(DOMElement $node): string
     {
-        $html = $node->ownerDocument?->saveHTML($node);
-        if (!is_string($html)) {
-            $html = '';
+        $output = '';
+
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement && strtolower($child->tagName) === 'figcaption') {
+                $captionText = trim($this->processChildren($child));
+                if ($captionText !== '') {
+                    $output .= $captionText . "\n\n";
+                }
+
+                continue;
+            }
+
+            $output .= $this->processNode($child);
         }
 
-        $fence = StringUtil::findSafeCodeFence($html, 3);
-
-        return "\n" . $fence . " =html\n" . $html . "\n" . $fence . "\n\n";
+        return $output;
     }
 
     /**
