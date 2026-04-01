@@ -1677,4 +1677,39 @@ DJOT;
 
         $this->assertStringContainsString('[TBP]{abbr="The \\"Best\\" Practice"}', $result);
     }
+
+    public function testSampElement(): void
+    {
+        $html = '<p>The output was <samp>Hello World</samp>.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('The output was [Hello World]{samp}.', $result);
+    }
+
+    public function testSampElementWithAttributes(): void
+    {
+        $html = '<p>Output: <samp class="output" id="result">Success</samp></p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertStringContainsString('[Success]{samp', $result);
+        $this->assertStringContainsString('.output', $result);
+        $this->assertStringContainsString('#result', $result);
+    }
+
+    public function testVarElement(): void
+    {
+        $html = '<p>The variable <var>x</var> represents a number.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('The variable [x]{var} represents a number.', $result);
+    }
+
+    public function testVarElementWithAttributes(): void
+    {
+        $html = '<p>Set <var class="math">y</var> to 5.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertStringContainsString('[y]{var', $result);
+        $this->assertStringContainsString('.math', $result);
+    }
 }
