@@ -409,7 +409,7 @@ HTML;
 
         $this->assertStringContainsString("[^1]: top\n", $result);
         $this->assertStringContainsString("  1. nested\n", $result);
-        $this->assertStringNotContainsString("[^nested]:", $result);
+        $this->assertStringNotContainsString('[^nested]:', $result);
         $this->assertStringNotContainsString("\n1. nested", $result);
     }
 
