@@ -233,6 +233,7 @@ class HtmlToDjot
             'table' => $this->processTable($node),
             'dl' => $this->processDefinitionList($node),
             'span' => $this->processSpan($node),
+            'math' => $this->processMath($node),
             'figure' => $this->processFigure($node),
             'figcaption' => '', // Handled by figure
             'caption' => '', // Handled by table
@@ -367,6 +368,20 @@ class HtmlToDjot
 
         $classes = $this->getElementClassList($node);
         $fenceClass = array_shift($classes);
+
+        // Check for wrapper div unwrapping: if div has NO class but has attrs
+        // and single block child, apply attrs to the child instead of fenced div
+        if ($fenceClass === null || $fenceClass === '') {
+            $singleChild = $this->getSingleBlockChild($node);
+            if ($singleChild !== null) {
+                $attrs = $this->formatBlockAttributes($node);
+                if ($attrs !== '') {
+                    $content = trim($this->processNode($singleChild));
+
+                    return $attrs . $content . "\n";
+                }
+            }
+        }
 
         if ($fenceClass === null || $fenceClass === '') {
             $attrs = $this->formatBlockAttributes($node);
@@ -990,10 +1005,22 @@ class HtmlToDjot
 
     protected function processBlockquote(DOMElement $node): string
     {
+        // Check for attribution (footer or cite element)
+        $attribution = $this->extractBlockquoteAttribution($node);
+
+        // Process content excluding attribution elements, preserving paragraph breaks
         $parts = [];
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMText && trim($child->textContent) === '') {
                 continue;
+            }
+
+            // Skip footer and cite elements (handled as attribution)
+            if ($child instanceof DOMElement) {
+                $tag = strtolower($child->tagName);
+                if ($tag === 'footer' || $tag === 'cite') {
+                    continue;
+                }
             }
 
             $part = rtrim($this->processNode($child), "\n");
@@ -1010,9 +1037,78 @@ class HtmlToDjot
             $quoted[] = $line === '' ? '>' : '> ' . rtrim($line);
         }
 
+        // Add attribution as final quoted line with blank line before
+        if ($attribution !== null) {
+            $quoted[] = '>';
+            $quoted[] = '> ' . $attribution;
+        }
+
         $attrs = $this->formatBlockAttributes($node);
 
         return $attrs . "\n" . implode("\n", $quoted) . "\n\n";
+    }
+
+    /**
+     * Extract attribution from blockquote (footer or cite element)
+     */
+    protected function extractBlockquoteAttribution(DOMElement $node): ?string
+    {
+        // Look for footer or cite as direct child
+        foreach ($node->childNodes as $child) {
+            if (!$child instanceof DOMElement) {
+                continue;
+            }
+
+            $tag = strtolower($child->tagName);
+            if ($tag === 'footer' || $tag === 'cite') {
+                $text = trim($this->processChildren($child));
+                if ($text !== '') {
+                    return $text;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Process MathML element to Djot math syntax
+     *
+     * Attempts to extract LaTeX from:
+     * 1. alttext attribute
+     * 2. annotation element with encoding="application/x-tex" or "LaTeX"
+     * 3. Falls back to text content
+     */
+    protected function processMath(DOMElement $node): string
+    {
+        $isDisplay = $node->getAttribute('display') === 'block';
+        $delimiter = $isDisplay ? '$$' : '$';
+
+        // Try alttext attribute first (common in MathJax output)
+        $latex = $node->getAttribute('alttext');
+        if ($latex !== '') {
+            return $delimiter . '`' . $latex . '`' . $delimiter;
+        }
+
+        // Look for annotation element with LaTeX encoding
+        $annotations = $node->getElementsByTagName('annotation');
+        foreach ($annotations as $annotation) {
+            $encoding = $annotation->getAttribute('encoding');
+            if (stripos($encoding, 'tex') !== false || stripos($encoding, 'latex') !== false) {
+                $latex = trim($annotation->textContent);
+                if ($latex !== '') {
+                    return $delimiter . '`' . $latex . '`' . $delimiter;
+                }
+            }
+        }
+
+        // Fall back to text content (basic extraction)
+        $text = trim($node->textContent);
+        if ($text !== '') {
+            return $delimiter . '`' . $text . '`' . $delimiter;
+        }
+
+        return '';
     }
 
     protected function processList(DOMElement $node): string
@@ -1311,6 +1407,46 @@ class HtmlToDjot
         foreach ($node->childNodes as $child) {
             if ($child instanceof DOMElement && strtolower($child->tagName) === $tagName) {
                 return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get single block child element if div is a wrapper
+     *
+     * Returns the child element if:
+     * - There is exactly one element child (ignoring whitespace text nodes)
+     * - The child is a block-level element
+     */
+    protected function getSingleBlockChild(DOMElement $node): ?DOMElement
+    {
+        $elementChild = null;
+
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMText) {
+                // Allow whitespace-only text nodes
+                if (trim($child->textContent) !== '') {
+                    return null; // Has significant text content, not a wrapper
+                }
+
+                continue;
+            }
+
+            if ($child instanceof DOMElement) {
+                if ($elementChild !== null) {
+                    return null; // More than one element child
+                }
+                $elementChild = $child;
+            }
+        }
+
+        // Check if the child is a block element
+        if ($elementChild !== null) {
+            $tag = strtolower($elementChild->tagName);
+            if (in_array($tag, $this->blockElements, true)) {
+                return $elementChild;
             }
         }
 

@@ -1388,4 +1388,126 @@ DJOT;
 
         $this->assertSame(trim($expected), $back);
     }
+
+    // ==================== Blockquote Attribution ====================
+
+    public function testBlockquoteWithFooterAttribution(): void
+    {
+        $html = '<blockquote><p>To be or not to be</p><footer>— Shakespeare</footer></blockquote>';
+        $result = trim($this->converter->convert($html));
+
+        $expected = <<<'DJOT'
+> To be or not to be
+>
+> — Shakespeare
+DJOT;
+
+        $this->assertSame($expected, $result);
+    }
+
+    public function testBlockquoteWithCiteAttribution(): void
+    {
+        $html = '<blockquote><p>Famous quote</p><cite>Author Name</cite></blockquote>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertStringContainsString('> Famous quote', $result);
+        $this->assertStringContainsString('> Author Name', $result);
+    }
+
+    public function testBlockquoteWithoutAttribution(): void
+    {
+        $html = '<blockquote><p>Just a quote</p></blockquote>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('> Just a quote', $result);
+    }
+
+    // ==================== Wrapper Div Unwrapping ====================
+
+    public function testWrapperDivWithSingleParagraph(): void
+    {
+        // Div without class but with id/data-attr wrapping single block child
+        $html = '<div id="summary" data-type="note"><p>Some text</p></div>';
+        $result = trim($this->converter->convert($html));
+
+        // Should unwrap: apply attrs to child instead of fenced div
+        $this->assertStringContainsString('{#summary data-type=note}', $result);
+        $this->assertStringContainsString('Some text', $result);
+        $this->assertStringNotContainsString(':::', $result);
+    }
+
+    public function testWrapperDivWithSingleBlockquote(): void
+    {
+        // Div with only id wrapping single blockquote
+        $html = '<div id="intro"><blockquote><p>Quote</p></blockquote></div>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertStringContainsString('{#intro}', $result);
+        $this->assertStringContainsString('> Quote', $result);
+        $this->assertStringNotContainsString(':::', $result);
+    }
+
+    public function testDivWithMultipleChildrenNotUnwrapped(): void
+    {
+        $html = '<div class="box"><p>First</p><p>Second</p></div>';
+        $result = trim($this->converter->convert($html));
+
+        // Should use fenced div syntax, not unwrapped
+        $this->assertStringContainsString('::: box', $result);
+        $this->assertStringContainsString('First', $result);
+        $this->assertStringContainsString('Second', $result);
+    }
+
+    public function testDivWithClassNotUnwrapped(): void
+    {
+        // Divs with class should use fenced div syntax, not wrapper unwrapping
+        $html = '<div class="note" id="box"><p>Content</p></div>';
+        $result = trim($this->converter->convert($html));
+
+        // Should use fenced div with class as fence name
+        $this->assertStringContainsString('::: note', $result);
+        $this->assertStringContainsString('{#box}', $result);
+    }
+
+    // ==================== MathML Conversion ====================
+
+    public function testMathMLWithAlttext(): void
+    {
+        $html = '<math alttext="x^2 + y^2"><mrow></mrow></math>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('$`x^2 + y^2`$', $result);
+    }
+
+    public function testMathMLDisplayMode(): void
+    {
+        $html = '<math display="block" alttext="\\int_0^1 f(x) dx"><mrow></mrow></math>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('$$`\\int_0^1 f(x) dx`$$', $result);
+    }
+
+    public function testMathMLWithAnnotation(): void
+    {
+        $html = '<math><semantics><mrow></mrow><annotation encoding="application/x-tex">E = mc^2</annotation></semantics></math>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('$`E = mc^2`$', $result);
+    }
+
+    public function testMathMLTextFallback(): void
+    {
+        $html = '<math><mi>x</mi><mo>+</mo><mi>y</mi></math>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('$`x+y`$', $result);
+    }
+
+    public function testMathMLInParagraph(): void
+    {
+        $html = '<p>Equation: <math alttext="a + b"></math> here</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('Equation: $`a + b`$ here', $result);
+    }
 }
