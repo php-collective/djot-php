@@ -410,6 +410,30 @@ HTML;
         $this->assertSame("![Photo](photo.jpg)\n^ cap one\ncap two", $result);
     }
 
+    public function testFigureWithUnsupportedBlockContentFallsBackToRawHtml(): void
+    {
+        $html = '<figure><pre><code>code</code></pre><figcaption>Cap</figcaption></figure>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString("``` =html\n", $result);
+        $this->assertStringContainsString('<figure><pre><code>code</code></pre><figcaption>Cap</figcaption></figure>', $result);
+
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<figure><pre><code>code</code></pre><figcaption>Cap</figcaption></figure>', $htmlBack);
+    }
+
+    public function testFigureWithAttributesFallsBackToRawHtml(): void
+    {
+        $html = '<figure id="fig1" data-kind="hero"><img src="photo.jpg" alt="Photo"><figcaption>A photo</figcaption></figure>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString("``` =html\n", $result);
+        $this->assertStringContainsString('<figure id="fig1" data-kind="hero"><img src="photo.jpg" alt="Photo"><figcaption>A photo</figcaption></figure>', $result);
+
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<figure id="fig1" data-kind="hero"><img src="photo.jpg" alt="Photo"><figcaption>A photo</figcaption></figure>', $htmlBack);
+    }
+
     public function testEndnotesSectionDoesNotTreatNestedListItemsAsFootnotes(): void
     {
         $html = '<section role="doc-endnotes"><ol><li id="fn1"><p>top</p><ol><li>nested</li></ol><p><a role="doc-backlink" href="#fnref1">↩︎</a></p></li></ol></section>';

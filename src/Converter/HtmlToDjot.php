@@ -1705,6 +1705,10 @@ class HtmlToDjot
 
     protected function processFigure(DOMElement $node): string
     {
+        if ($this->shouldFallbackFigureToRawHtml($node)) {
+            return $this->processRawHtmlBlock($node);
+        }
+
         $output = "\n";
 
         // Find img, blockquote, and figcaption
@@ -1725,6 +1729,48 @@ class HtmlToDjot
         }
 
         return $output . "\n\n";
+    }
+
+    protected function shouldFallbackFigureToRawHtml(DOMElement $node): bool
+    {
+        if ($this->getElementAttributes($node) !== '') {
+            return true;
+        }
+
+        $contentChildren = [];
+        foreach ($node->childNodes as $child) {
+            if (!($child instanceof DOMElement)) {
+                if (trim($child->textContent) !== '') {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (strtolower($child->tagName) === 'figcaption') {
+                continue;
+            }
+
+            $contentChildren[] = strtolower($child->tagName);
+        }
+
+        if (count($contentChildren) !== 1) {
+            return true;
+        }
+
+        return !in_array($contentChildren[0], ['img', 'blockquote'], true);
+    }
+
+    protected function processRawHtmlBlock(DOMElement $node): string
+    {
+        $html = $node->ownerDocument?->saveHTML($node);
+        if (!is_string($html)) {
+            $html = '';
+        }
+
+        $fence = StringUtil::findSafeCodeFence($html, 3);
+
+        return "\n" . $fence . " =html\n" . $html . "\n" . $fence . "\n\n";
     }
 
     /**
