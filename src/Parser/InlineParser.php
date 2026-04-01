@@ -798,12 +798,17 @@ class InlineParser
                     $ref = preg_replace('/\s+/', ' ', trim($ref)) ?? $ref;
                 }
 
+                // Store original bracket content before normalization
+                $originalRefBracket = substr($text, $afterBracket + 1, $refEnd - $afterBracket - 1);
+
                 $refDef = $this->blockParser->getReference($ref);
                 if ($refDef !== null) {
                     // Track reference usage for validation
                     $this->blockParser->markReferenceUsed($ref, $this->currentLine);
 
                     $link = new Link($refDef->url);
+                    // Store reference info for round-trip support
+                    $link->setReferenceLabel($originalRefBracket === '' ? '' : $ref);
                     $this->parseInlines($link, $linkText);
 
                     // Track anchor links for validation
@@ -837,6 +842,8 @@ class InlineParser
                 $this->blockParser->addUndefinedReferenceWarning($ref, $this->currentLine, $pos + 1);
 
                 $link = new Link(null);
+                // Store reference info for round-trip support
+                $link->setReferenceLabel($originalRefBracket === '' ? '' : $ref);
                 $this->parseInlines($link, $linkText);
 
                 $endPos = $refEnd + 1;
@@ -898,6 +905,11 @@ class InlineParser
 
         $image = new Image($link->getDestination() ?? '', $alt, $link->getTitle());
 
+        // Transfer reference label for round-trip support
+        if ($link->getReferenceLabel() !== null) {
+            $image->setReferenceLabel($link->getReferenceLabel());
+        }
+
         // Transfer attributes from link to image
         foreach ($link->getAttributes() as $key => $value) {
             $image->setAttribute($key, $value);
@@ -939,6 +951,7 @@ class InlineParser
         // URL autolink
         if (preg_match('/^[a-zA-Z][a-zA-Z0-9+.-]*:[^\s<>]*$/', $content)) {
             $link = new Link($content);
+            $link->setAutolink(true);
             $link->appendChild(new Text($content));
 
             $endPos = $end + 1;
@@ -957,6 +970,7 @@ class InlineParser
         // Email autolink
         if (filter_var($content, FILTER_VALIDATE_EMAIL)) {
             $link = new Link('mailto:' . $content);
+            $link->setAutolink(true);
             $link->appendChild(new Text($content));
 
             $endPos = $end + 1;

@@ -375,8 +375,14 @@ class HtmlRenderer implements RendererInterface
                 // Get the section ID
                 $sectionId = $this->getSectionId($child);
 
+                // Check if heading has explicit ID (for round-trip support)
+                $explicitIdAttr = '';
+                if ($this->roundTripMode && $child->hasAttribute('id')) {
+                    $explicitIdAttr = ' data-djot-explicit-id="1"';
+                }
+
                 // Open new section
-                $html .= '<section id="' . $this->escapeAttribute($sectionId) . '">' . "\n";
+                $html .= '<section id="' . $this->escapeAttribute($sectionId) . '"' . $explicitIdAttr . '>' . "\n";
                 if (!isset($openSections[$level])) {
                     $openSections[$level] = 0;
                 }
@@ -512,7 +518,13 @@ class HtmlRenderer implements RendererInterface
         $sectionId = $this->getSectionId($node);
         $attrs = $this->renderAttributesExcluding($node, ['id']);
 
-        return '<h' . $level . ' id="' . $this->escapeAttribute($sectionId) . '"' . $attrs . '>'
+        // Add data attribute for explicit ID round-trip support
+        $explicitIdAttr = '';
+        if ($this->roundTripMode && $node->hasAttribute('id')) {
+            $explicitIdAttr = ' data-djot-explicit-id="1"';
+        }
+
+        return '<h' . $level . ' id="' . $this->escapeAttribute($sectionId) . '"' . $explicitIdAttr . $attrs . '>'
             . $this->renderChildren($node) . '</h' . $level . ">\n";
     }
 
@@ -868,6 +880,17 @@ class HtmlRenderer implements RendererInterface
         if ($title !== null) {
             $html .= ' title="' . $this->escapeAttribute($title) . '"';
         }
+
+        // In round-trip mode, store reference label for reconstruction
+        if ($this->roundTripMode && $node->getReferenceLabel() !== null) {
+            $html .= ' data-djot-ref="' . $this->escapeAttribute($node->getReferenceLabel()) . '"';
+        }
+
+        // In round-trip mode, mark autolinks for reconstruction
+        if ($this->roundTripMode && $node->isAutolink()) {
+            $html .= ' data-djot-autolink="1"';
+        }
+
         $html .= $attrs . '>' . $this->renderChildren($node) . '</a>';
 
         return $html;
@@ -889,6 +912,12 @@ class HtmlRenderer implements RendererInterface
         if ($title !== null) {
             $html .= ' title="' . $this->escapeAttribute($title) . '"';
         }
+
+        // In round-trip mode, store reference label for reconstruction
+        if ($this->roundTripMode && $node->getReferenceLabel() !== null) {
+            $html .= ' data-djot-ref="' . $this->escapeAttribute($node->getReferenceLabel()) . '"';
+        }
+
         $html .= $attrs;
 
         return $this->xhtml ? $html . ' />' : $html . '>';

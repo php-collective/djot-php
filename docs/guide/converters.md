@@ -250,21 +250,56 @@ $back = $htmlToDjot->convert($html);
 | Thematic breaks | `data-char` | Preserves `*` vs `-` character |
 | Unordered lists | `data-marker` | Preserves `*`, `+`, or `-` marker |
 | Ordered lists | `data-marker` | Preserves `)` vs `.` delimiter |
+| Reference links | `data-djot-ref` | Preserves `[text][ref]` and `[text][]` syntax |
+| Autolinks | `data-djot-autolink` | Preserves `<url>` and `<email>` syntax |
+| Custom heading IDs | `data-djot-explicit-id` | Preserves `{#custom-id}` on headings |
 | Heading references | `data-djot-heading-ref*` | Preserves `[[Heading]]` / `[[Heading|Text]]` syntax |
 | Shifted headings | `data-djot-source-level` | Preserves original Djot heading level during HTML round-trips |
 | Inline footnotes | `data-djot-inline-footnote-*` | Preserves inline-footnote syntax and custom footnote class |
 | Table separator widths | `data-djot-col-widths` | Preserves original table separator widths during HTML round-trips |
+| Code blocks | `data-djot-src` | Preserves fence length, language, and content |
+| Mermaid diagrams | `data-djot-src` | Preserves full mermaid source |
+| Code groups | `data-djot-src` | Preserves code group structure |
+| Tabs | `data-djot-src` | Preserves tab structure |
 
 Without round-trip mode, these elements use defaults when converting back:
 - Thematic breaks → `---`
 - Unordered lists → `-` marker
 - Ordered lists → `.` delimiter
+- Reference links → inline links `[text](url)`
+- Autolinks → inline links `[url](url)`
+- Custom heading IDs → auto-generated IDs (not preserved)
 - Heading references → ordinary links such as `[Text](#heading-id)`
 - Shifted headings → rendered heading level
 - Inline footnotes → regular footnote HTML without inline-footnote provenance
 - Tables → regenerated separator widths based on converted cell content
 
+**Extensions with round-trip support:**
+
+The following extensions support round-trip via the `data-djot-src` attribute:
+- `CodeGroupExtension` - Code groups with tabs
+- `TabsExtension` - Generic tabs containers
+- `MermaidExtension` - Mermaid diagrams
+
+The following extensions support round-trip via specific data attributes:
+- `HeadingReferenceExtension` - Wikilinks `[[Heading]]`
+- `InlineFootnotesExtension` - Inline footnotes
+- `MentionsExtension` - `@username` patterns (via `data-username`)
+
 When using explicit AST transforms through `DjotConverter::transform()`, renderer-aware transforms such as `HeadingLevelShiftTransform` automatically preserve round-trip metadata when the converter uses `HtmlRenderer` with round-trip mode enabled.
+
+### Round-Trip Limitations
+
+Some Djot features cannot survive round-trip conversion due to semantic equivalence in HTML:
+
+| Element | Behavior | Reason |
+|---------|----------|--------|
+| Smart quotes (`"..."`) | Converted to curly quotes | Parser feature, not loss of information |
+| Soft breaks (line breaks) | Become spaces | Semantically correct - soft breaks are spaces |
+| Nested lists without blank lines | May need reformatting | Djot requires blank lines before nested lists |
+| Definition list variations | Normalized format | Multiple valid syntaxes map to same HTML |
+
+These behaviors are correct and intentional - they represent semantic preservation rather than character-for-character preservation.
 
 **Use Cases:**
 - Importing content from WordPress or other CMS

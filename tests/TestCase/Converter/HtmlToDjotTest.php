@@ -230,7 +230,7 @@ HTML;
         $result = $this->converter->convert($html);
 
         $this->assertStringContainsString('| Name | Age |', $result);
-        $this->assertStringContainsString('| --- | --- |', $result);
+        $this->assertStringContainsString('|---|---|', $result);
         $this->assertStringContainsString('| Alice | 30 |', $result);
     }
 
@@ -962,8 +962,8 @@ DJOT;
         // Convert back to Djot
         $back = trim($this->converter->convert($html));
 
-        // Separator widths should be preserved (with spaces around dashes in output format)
-        $this->assertStringContainsString('| ----------- | --------- | ------------------- |', $back);
+        // Separator widths should be preserved (compact format without spaces around dashes)
+        $this->assertStringContainsString('|-----------|---------|-------------------|', $back);
     }
 
     public function testTableSeparatorWidthsNotPresentInNonRoundTripMode(): void
@@ -1281,7 +1281,7 @@ DJOT;
 
         $expected = <<<'DJOT'
 | Left | Right |
-| :---- | -----: |
+|:-----|------:|
 | a | b |
 DJOT;
 

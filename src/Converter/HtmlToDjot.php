@@ -31,6 +31,14 @@ class HtmlToDjot
     protected bool $preserveTextWhitespace = false;
 
     /**
+     * Collected reference definitions for round-trip support
+     * Maps reference label => url
+     *
+     * @var array<string, string>
+     */
+    protected array $referenceDefinitions = [];
+
+    /**
      * Attributes to skip when converting (these don't translate well to Djot)
      *
      * @var array<string>
@@ -51,6 +59,7 @@ class HtmlToDjot
         $this->listDepth = 0;
         $this->inPre = false;
         $this->preserveTextWhitespace = false;
+        $this->referenceDefinitions = [];
 
         // Wrap in root element if needed
         if (!preg_match('/<(html|body|div)[^>]*>/i', $html)) {
@@ -67,6 +76,16 @@ class HtmlToDjot
         libxml_clear_errors();
 
         $djot = $this->processNode($doc->documentElement ?? $doc);
+
+        // Append reference definitions collected during conversion
+        if ($this->referenceDefinitions !== []) {
+            // Ensure blank line before reference definitions
+            $refs = "\n\n";
+            foreach ($this->referenceDefinitions as $label => $url) {
+                $refs .= '[' . $label . ']: ' . $url . "\n";
+            }
+            $djot .= $refs;
+        }
 
         // Clean up
         $djot = $this->cleanup($djot);
@@ -122,7 +141,8 @@ class HtmlToDjot
         }
 
         return match ($tagName) {
-            'html', 'body', 'article', 'section', 'main', 'header', 'footer', 'nav', 'aside',
+            'section' => $this->processSection($node),
+            'html', 'body', 'article', 'main', 'header', 'footer', 'nav', 'aside',
             'address', 'details', 'dialog', 'fieldset', 'form', 'hgroup', 'menu', 'search' => $this->processBlock($node),
             'div' => $this->processDiv($node),
             'p' => $this->processParagraph($node),
@@ -213,6 +233,52 @@ class HtmlToDjot
         }
 
         return trim($content);
+    }
+
+    /**
+     * Process section elements, handling explicit IDs for round-trip support
+     */
+    protected function processSection(DOMElement $node): string
+    {
+        // Check if section has an explicit ID from round-trip mode
+        $hasExplicitId = $node->hasAttribute('data-djot-explicit-id');
+        $sectionId = $node->getAttribute('id');
+
+        // Find the first heading inside this section
+        $firstHeading = null;
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $tag = strtolower($child->tagName);
+                if (in_array($tag, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'], true)) {
+                    $firstHeading = $child;
+
+                    break;
+                }
+            }
+        }
+
+        // If we have an explicit ID and a heading, combine ID with heading's attributes
+        $prefix = '';
+        if ($hasExplicitId && $sectionId !== '' && $firstHeading !== null) {
+            // Get heading's attributes (class, etc.) excluding id
+            $headingAttrs = $this->getElementAttributes($firstHeading, ['id', 'data-djot-explicit-id', 'data-djot-source-level']);
+
+            // Build combined attribute block with ID first
+            $attrParts = ['#' . $sectionId];
+            if ($headingAttrs !== '') {
+                // Add other attributes (already formatted with . prefix for classes)
+                $attrParts[] = $headingAttrs;
+            }
+            $prefix = '{' . implode(' ', $attrParts) . "}\n";
+
+            // Mark that we've handled the heading's attributes
+            $firstHeading->setAttribute('data-djot-attrs-handled', '1');
+        }
+
+        // Process section content as a normal block
+        $content = $this->processBlock($node);
+
+        return $prefix . $content;
     }
 
     protected function processDiv(DOMElement $node): string
@@ -309,7 +375,19 @@ class HtmlToDjot
         }
         $content = trim($this->processChildren($node));
         $prefix = str_repeat('#', $level) . ' ';
-        $attrs = $this->formatBlockAttributes($node, ['data-djot-source-level']);
+
+        // Check if attributes were already handled by processSection
+        if ($node->hasAttribute('data-djot-attrs-handled')) {
+            return $prefix . $content . "\n\n";
+        }
+
+        // Skip ID attribute unless it was explicitly set (marked by data-djot-explicit-id)
+        // Auto-generated IDs should not be preserved in round-trip
+        $skipAttrs = ['data-djot-source-level', 'data-djot-explicit-id', 'data-djot-attrs-handled'];
+        if (!$node->hasAttribute('data-djot-explicit-id')) {
+            $skipAttrs[] = 'id';
+        }
+        $attrs = $this->formatBlockAttributes($node, $skipAttrs);
 
         return $attrs . $prefix . $content . "\n\n";
     }
@@ -338,6 +416,21 @@ class HtmlToDjot
 
         $backticks = StringUtil::findSafeCodeFence($content, 1);
         $attrs = $this->formatInlineAttributes($node);
+
+        // Add spaces around content if needed to distinguish from fence
+        // Only add space if content starts/ends with backtick but NOT already a space
+        // (If there's already a space, it was preserved from the original)
+        if (strlen($backticks) > 1) {
+            $needsStartSpace = str_starts_with($content, '`') && !str_starts_with($content, ' ');
+            $needsEndSpace = str_ends_with($content, '`') && !str_ends_with($content, ' ');
+
+            if ($needsStartSpace || $needsEndSpace) {
+                $start = $needsStartSpace ? ' ' : '';
+                $end = $needsEndSpace ? ' ' : '';
+
+                return $backticks . $start . $content . $end . $backticks . $attrs;
+            }
+        }
 
         return $backticks . $content . $backticks . $attrs;
     }
@@ -425,6 +518,52 @@ class HtmlToDjot
             $text = $href;
         }
 
+        // Check for @mention (round-trip support for MentionsExtension)
+        if ($node->hasAttribute('data-username')) {
+            $username = $node->getAttribute('data-username');
+            // Verify the link text matches @username pattern
+            if ($text === '@' . $username) {
+                return '@' . $username;
+            }
+        }
+
+        // Check for autolink (round-trip support)
+        if ($node->hasAttribute('data-djot-autolink')) {
+            // Skip href and data-djot-autolink since they're in the autolink syntax
+            $attrs = $this->formatInlineAttributes($node, ['href', 'data-djot-autolink']);
+
+            // Email autolinks have mailto: prefix - strip it for output
+            if (str_starts_with($href, 'mailto:')) {
+                $email = substr($href, 7);
+
+                return '<' . $email . '>' . $attrs;
+            }
+
+            return '<' . $href . '>' . $attrs;
+        }
+
+        // Check for reference link (round-trip support)
+        if ($node->hasAttribute('data-djot-ref')) {
+            $refLabel = $node->getAttribute('data-djot-ref');
+            // Skip href, title, and data-djot-ref since they're in the reference syntax
+            $attrs = $this->formatInlineAttributes($node, ['href', 'title', 'data-djot-ref']);
+
+            // Collect reference definition
+            // For collapsed reference (empty label), use the link text as label
+            $defLabel = $refLabel === '' ? $text : $refLabel;
+            if (!isset($this->referenceDefinitions[$defLabel])) {
+                $this->referenceDefinitions[$defLabel] = $href;
+            }
+
+            // Output reference link syntax
+            if ($refLabel === '') {
+                // Collapsed reference [text][]
+                return '[' . $text . '][]' . $attrs;
+            }
+
+            return '[' . $text . '][' . $refLabel . ']' . $attrs;
+        }
+
         // Skip href and title since they're in the link syntax
         $attrs = $this->formatInlineAttributes($node, ['href', 'title']);
 
@@ -440,6 +579,28 @@ class HtmlToDjot
         $src = $node->getAttribute('src');
         $alt = $node->getAttribute('alt');
         $title = $node->getAttribute('title');
+
+        // Check for reference image (round-trip support)
+        if ($node->hasAttribute('data-djot-ref')) {
+            $refLabel = $node->getAttribute('data-djot-ref');
+            // Skip src, alt, title, and data-djot-ref since they're in the reference syntax
+            $attrs = $this->formatInlineAttributes($node, ['src', 'alt', 'title', 'data-djot-ref']);
+
+            // Collect reference definition
+            // For collapsed reference (empty label), use the alt text as label
+            $defLabel = $refLabel === '' ? $alt : $refLabel;
+            if (!isset($this->referenceDefinitions[$defLabel])) {
+                $this->referenceDefinitions[$defLabel] = $src;
+            }
+
+            // Output reference image syntax
+            if ($refLabel === '') {
+                // Collapsed reference ![alt][]
+                return '![' . $alt . '][]' . $attrs;
+            }
+
+            return '![' . $alt . '][' . $refLabel . ']' . $attrs;
+        }
 
         // Skip src, alt, title since they're in the image syntax
         $attrs = $this->formatInlineAttributes($node, ['src', 'alt', 'title']);
@@ -718,7 +879,8 @@ class HtmlToDjot
             if ($colWidthsAttr !== '') {
                 $colWidths = array_map('intval', explode(',', $colWidthsAttr));
                 foreach ($colWidths as $width) {
-                    $separator[] = $this->buildTableSeparator(max(3, $width), $alignments[count($separator)] ?? TableCell::ALIGN_DEFAULT);
+                    // Use exact width from original for round-trip fidelity
+                    $separator[] = $this->buildTableSeparator($width, $alignments[count($separator)] ?? TableCell::ALIGN_DEFAULT);
                 }
                 // Fill remaining columns with default width
                 $separatorCount = count($separator);
@@ -732,7 +894,7 @@ class HtmlToDjot
                 }
             }
 
-            $output .= '| ' . implode(' | ', $separator) . ' |' . "\n";
+            $output .= '|' . implode('|', $separator) . '|' . "\n";
         }
 
         $output .= implode("\n", $rows) . "\n";
@@ -808,11 +970,14 @@ class HtmlToDjot
 
     protected function buildTableSeparator(int $width, string $alignment): string
     {
+        // Width represents the number of dashes in the separator
+        // For alignment markers, we add colons around the dashes
+        // Minimum is 1 dash for center, 2 for others (Djot allows 2-dash separators)
         return match ($alignment) {
-            TableCell::ALIGN_LEFT => ':' . str_repeat('-', max(2, $width - 1)),
-            TableCell::ALIGN_RIGHT => str_repeat('-', max(2, $width - 1)) . ':',
-            TableCell::ALIGN_CENTER => ':' . str_repeat('-', max(1, $width - 2)) . ':',
-            default => str_repeat('-', max(3, $width)),
+            TableCell::ALIGN_LEFT => ':' . str_repeat('-', max(2, $width)),
+            TableCell::ALIGN_RIGHT => str_repeat('-', max(2, $width)) . ':',
+            TableCell::ALIGN_CENTER => ':' . str_repeat('-', max(1, $width)) . ':',
+            default => str_repeat('-', max(2, $width)),
         };
     }
 
