@@ -1082,12 +1082,11 @@ class HtmlToDjot
     protected function processMath(DOMElement $node): string
     {
         $isDisplay = $node->getAttribute('display') === 'block';
-        $delimiter = $isDisplay ? '$$' : '$';
 
         // Try alttext attribute first (common in MathJax output)
         $latex = $node->getAttribute('alttext');
         if ($latex !== '') {
-            return $delimiter . '`' . $latex . '`' . $delimiter;
+            return $this->renderMath($latex, $isDisplay);
         }
 
         // Look for annotation element with LaTeX encoding
@@ -1097,18 +1096,47 @@ class HtmlToDjot
             if (stripos($encoding, 'tex') !== false || stripos($encoding, 'latex') !== false) {
                 $latex = trim($annotation->textContent);
                 if ($latex !== '') {
-                    return $delimiter . '`' . $latex . '`' . $delimiter;
+                    return $this->renderMath($latex, $isDisplay);
                 }
             }
         }
 
-        // Fall back to text content (basic extraction)
-        $text = trim($node->textContent);
+        // Fall back to rendered MathML text, excluding annotation payloads.
+        $text = trim($this->extractMathText($node));
         if ($text !== '') {
-            return $delimiter . '`' . $text . '`' . $delimiter;
+            return $this->renderMath($text, $isDisplay);
         }
 
         return '';
+    }
+
+    protected function renderMath(string $content, bool $isDisplay): string
+    {
+        $delimiter = $isDisplay ? '$$' : '$';
+        $backticks = StringUtil::findSafeCodeFence($content, 1);
+
+        return $delimiter . $backticks . $content . $backticks . $delimiter;
+    }
+
+    protected function extractMathText(DOMNode $node): string
+    {
+        if ($node instanceof DOMText) {
+            return $node->textContent;
+        }
+
+        if ($node instanceof DOMElement) {
+            $tag = strtolower($node->tagName);
+            if ($tag === 'annotation' || $tag === 'annotation-xml') {
+                return '';
+            }
+        }
+
+        $text = '';
+        foreach ($node->childNodes as $child) {
+            $text .= $this->extractMathText($child);
+        }
+
+        return $text;
     }
 
     protected function processList(DOMElement $node): string
