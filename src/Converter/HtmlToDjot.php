@@ -219,8 +219,9 @@ class HtmlToDjot
 
         return match ($tagName) {
             'section' => $this->processSection($node),
-            'html', 'body', 'article', 'main', 'header', 'footer', 'nav', 'aside',
-            'address', 'dialog', 'fieldset', 'form', 'hgroup', 'menu', 'search' => $this->processBlock($node),
+            'html', 'body' => $this->processBlock($node),
+            'article', 'main', 'header', 'footer', 'nav', 'aside',
+            'address', 'dialog', 'fieldset', 'form', 'hgroup', 'menu', 'search' => $this->processGenericBlockContainer($node),
             'details' => $this->processDetails($node),
             'div' => $this->processDiv($node),
             'p' => $this->processParagraph($node),
@@ -541,8 +542,25 @@ class HtmlToDjot
             return $this->processCollapsibleAdmonition($node);
         }
 
-        // Otherwise treat as regular block
-        return $this->processBlock($node);
+        return $this->processGenericBlockContainer($node);
+    }
+
+    protected function processGenericBlockContainer(DOMElement $node): string
+    {
+        $tagName = strtolower($node->tagName);
+        $attrs = $this->formatBlockAttributes($node);
+
+        if ($tagName !== 'details' && $attrs === '') {
+            return $this->processBlock($node);
+        }
+
+        $content = trim($this->processBlock($node));
+        $output = $attrs . '::: ' . $tagName . "\n";
+        if ($content !== '') {
+            $output .= $content . "\n";
+        }
+
+        return $output . ":::\n\n";
     }
 
     /**
@@ -1208,8 +1226,9 @@ class HtmlToDjot
 
                 $prefix = $isOrdered ? $counter . $marker . ' ' : $marker . ' ' . $checkbox;
 
-                // Process list item content, separating text from nested lists
-                $textContent = '';
+                // Process list item content, separating nested lists from other content
+                $contentParts = [];
+                $inlineBuffer = '';
                 $nestedContent = '';
 
                 foreach ($child->childNodes as $liChild) {
@@ -1221,33 +1240,56 @@ class HtmlToDjot
                         } elseif ($childTag === 'input' && $liChild->getAttribute('type') === 'checkbox') {
                             // Skip checkbox inputs (handled via $checkbox prefix)
                             continue;
+                        } elseif (in_array($childTag, $this->blockElements, true)) {
+                            $this->flushListItemInlineBuffer($contentParts, $inlineBuffer);
+                            $content = trim($this->processNode($liChild));
+                            if ($content !== '') {
+                                $contentParts[] = $content;
+                            }
                         } else {
-                            $textContent .= $this->processNode($liChild);
+                            $inlineBuffer .= $this->processNode($liChild);
                         }
                     } else {
-                        $textContent .= $this->processNode($liChild);
+                        $inlineBuffer .= $this->processNode($liChild);
                     }
                 }
 
-                $textContent = trim($textContent);
-
-                // Handle multi-line text content
-                $lines = explode("\n", $textContent);
-                $firstLine = array_shift($lines);
-                $output .= $indent . $prefix . $firstLine . "\n";
+                $this->flushListItemInlineBuffer($contentParts, $inlineBuffer);
 
                 // Add list item attributes on next line (indented)
                 $liAttrs = $this->getElementAttributes($child);
-                if ($liAttrs !== '') {
-                    $output .= $indent . str_repeat(' ', strlen($prefix)) . '{' . $liAttrs . "}\n";
-                }
+                $continuation = $indent . str_repeat(' ', strlen($prefix));
 
-                if ($lines) {
-                    $continuation = str_repeat(' ', strlen($prefix));
-                    foreach ($lines as $line) {
-                        if (trim($line) !== '') {
-                            $output .= $indent . $continuation . $line . "\n";
+                if ($contentParts === []) {
+                    $output .= $indent . $prefix . "\n";
+                    if ($liAttrs !== '') {
+                        $output .= $continuation . '{' . $liAttrs . "}\n";
+                    }
+                } else {
+                    $firstPart = array_shift($contentParts);
+                    $firstPartLines = preg_split('/\R/', $firstPart) ?: [''];
+                    $firstLine = array_shift($firstPartLines);
+
+                    if ($this->isListItemBlockPart($firstPart)) {
+                        $output .= $indent . $prefix . "\n\n";
+                        if ($liAttrs !== '') {
+                            $output .= $continuation . '{' . $liAttrs . "}\n";
                         }
+                        $output .= $this->indentListItemPart($firstPart, $continuation) . "\n";
+                    } else {
+                        $output .= $indent . $prefix . $firstLine . "\n";
+                        if ($liAttrs !== '') {
+                            $output .= $continuation . '{' . $liAttrs . "}\n";
+                        }
+                        foreach ($firstPartLines as $line) {
+                            if (trim($line) !== '') {
+                                $output .= $continuation . $line . "\n";
+                            }
+                        }
+                    }
+
+                    foreach ($contentParts as $part) {
+                        $output .= "\n" . $this->indentListItemPart($part, $continuation) . "\n";
                     }
                 }
 
@@ -1269,6 +1311,41 @@ class HtmlToDjot
     protected function processListItem(DOMElement $node): string
     {
         return $this->processChildren($node);
+    }
+
+    /**
+     * @param list<string> $contentParts
+     * @param string $inlineBuffer
+     */
+    protected function flushListItemInlineBuffer(array &$contentParts, string &$inlineBuffer): void
+    {
+        $inlineContent = trim($inlineBuffer);
+        if ($inlineContent !== '') {
+            $contentParts[] = $inlineContent;
+        }
+        $inlineBuffer = '';
+    }
+
+    protected function isListItemBlockPart(string $content): bool
+    {
+        return str_contains($content, "\n")
+            || str_starts_with($content, '>')
+            || str_starts_with($content, '```')
+            || str_starts_with($content, ':::')
+            || str_starts_with($content, '|')
+            || str_starts_with($content, '#');
+    }
+
+    protected function indentListItemPart(string $content, string $indent): string
+    {
+        $lines = preg_split('/\R/', $content) ?: [];
+        $output = [];
+
+        foreach ($lines as $line) {
+            $output[] = $line === '' ? '' : $indent . $line;
+        }
+
+        return implode("\n", $output);
     }
 
     /**
@@ -2083,6 +2160,13 @@ class HtmlToDjot
 
             // Preserve indented attribute blocks after list items (li attributes)
             if ($inList && preg_match('/^\s+\{[^{}]+\}\s*$/', $line)) {
+                $result[] = $line;
+
+                continue;
+            }
+
+            // Preserve indented continuation lines inside list items
+            if ($inList && preg_match('/^\s{2,}\S/', $line)) {
                 $result[] = $line;
 
                 continue;
