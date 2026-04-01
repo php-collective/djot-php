@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Renderer;
 
 use Djot\Node\Block\CodeBlock;
+use Djot\Node\Block\Div;
 use Djot\Node\Block\Footnote;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\LineBlock;
@@ -226,6 +227,27 @@ class HtmlRendererTest extends TestCase
 
         $this->assertStringContainsString('<h2 id="Repeat">Repeat</h2>', $result);
         $this->assertStringContainsString('<section id="Repeat-1">', $result);
+    }
+
+    public function testNestedExplicitIdsAreTrackedBeforeLaterHeadings(): void
+    {
+        $doc = new Document();
+
+        $wrapper = new Div();
+        $paragraph = new Paragraph();
+        $paragraph->setAttribute('id', 'Foo');
+        $paragraph->appendChild(new Text('Bar'));
+        $wrapper->appendChild($paragraph);
+        $doc->appendChild($wrapper);
+
+        $heading = new Heading(1);
+        $heading->appendChild(new Text('Foo'));
+        $doc->appendChild($heading);
+
+        $result = $this->renderer->render($doc);
+
+        $this->assertStringContainsString('<p id="Foo">Bar</p>', $result);
+        $this->assertStringContainsString('<section id="Foo-1">', $result);
     }
 
     public function testRenderDocumentFragmentUsesActiveFootnoteState(): void

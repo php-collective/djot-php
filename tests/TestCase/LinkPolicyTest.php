@@ -52,6 +52,7 @@ class LinkPolicyTest extends TestCase
 
         $this->assertFalse($policy->isUrlAllowed('https://example.com'));
         $this->assertFalse($policy->isUrlAllowed('http://external.com/path'));
+        $this->assertFalse($policy->isUrlAllowed('//external.com/path'));
     }
 
     public function testInternalOnlyAllowsMailtoAndTel(): void
@@ -170,6 +171,15 @@ class LinkPolicyTest extends TestCase
         // With a base host set, same-host URLs are allowed
         $this->assertTrue($policy->isUrlAllowed('https://example.com/page', 'example.com'));
         $this->assertFalse($policy->isUrlAllowed('https://other.com/page', 'example.com'));
+        $this->assertTrue($policy->isUrlAllowed('//example.com/page', 'example.com'));
+        $this->assertFalse($policy->isUrlAllowed('//other.com/page', 'example.com'));
+    }
+
+    public function testProtocolRelativeUrlRespectsAllowedSchemes(): void
+    {
+        $policy = (new LinkPolicy())->setAllowedSchemes(['mailto']);
+
+        $this->assertFalse($policy->isUrlAllowed('//example.com/path'));
     }
 
     // ==================== Getter Tests ====================

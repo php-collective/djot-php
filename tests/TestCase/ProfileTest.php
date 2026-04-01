@@ -571,6 +571,20 @@ DJOT;
         $this->assertTrue($converter->hasProfileViolations());
     }
 
+    public function testLinkPolicyInternalOnlyBlocksProtocolRelativeExternal(): void
+    {
+        $profile = (new Profile())
+            ->allowInline([NodeType::TEXT, NodeType::LINK])
+            ->allowBlock([NodeType::PARAGRAPH])
+            ->setLinkPolicy(LinkPolicy::internalOnly());
+
+        $converter = new DjotConverter(profile: $profile);
+        $html = $converter->convert('[external](//example.com)');
+
+        $this->assertStringNotContainsString('//example.com', $html);
+        $this->assertTrue($converter->hasProfileViolations());
+    }
+
     public function testLinkPolicyInternalOnlyAllowsRelative(): void
     {
         $profile = (new Profile())

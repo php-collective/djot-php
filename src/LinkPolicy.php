@@ -216,6 +216,11 @@ class LinkPolicy
             return $this->allowInternal;
         }
 
+        // Protocol-relative URLs are absolute external URLs, not internal paths.
+        if (str_starts_with($url, '//')) {
+            return $this->isProtocolRelativeUrlAllowed($url, $baseHost);
+        }
+
         // Relative paths are internal
         if (str_starts_with($url, '/') || str_starts_with($url, './') || str_starts_with($url, '../')) {
             return $this->allowInternal;
@@ -269,6 +274,46 @@ class LinkPolicy
                         }
                     }
                 }
+            }
+        }
+
+        return true;
+    }
+
+    protected function isProtocolRelativeUrlAllowed(string $url, ?string $baseHost): bool
+    {
+        if ($this->allowedSchemes !== null) {
+            $allowedSchemes = array_map('strtolower', $this->allowedSchemes);
+            if (
+                !in_array('http', $allowedSchemes, true)
+                && !in_array('https', $allowedSchemes, true)
+            ) {
+                return false;
+            }
+        }
+
+        $parsed = parse_url('https:' . $url);
+        $host = $parsed['host'] ?? null;
+
+        if ($host === null) {
+            return false;
+        }
+
+        if ($this->isDomainDenied($host)) {
+            return false;
+        }
+
+        if ($this->allowedDomains !== null && !$this->isDomainAllowed($host)) {
+            return false;
+        }
+
+        if (!$this->allowExternal) {
+            if ($baseHost !== null && !$this->isSameHost($host, $baseHost)) {
+                return false;
+            }
+
+            if ($baseHost === null) {
+                return false;
             }
         }
 
