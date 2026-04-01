@@ -261,6 +261,8 @@ $back = $htmlToDjot->convert($html);
 | Mermaid diagrams | `data-djot-src` | Preserves full mermaid source |
 | Code groups | `data-djot-src` | Preserves code group structure |
 | Tabs | `data-djot-src` | Preserves tab structure |
+| Footnotes | `data-djot-footnote-label` | Preserves `[^label]` and `[^label]: content` syntax |
+| Admonitions | `data-djot-admonition-type` | Preserves `::: type` div syntax with AdmonitionExtension |
 
 Without round-trip mode, these elements use defaults when converting back:
 - Thematic breaks → `---`
@@ -273,6 +275,8 @@ Without round-trip mode, these elements use defaults when converting back:
 - Shifted headings → rendered heading level
 - Inline footnotes → regular footnote HTML without inline-footnote provenance
 - Tables → regenerated separator widths based on converted cell content
+- Footnotes → still work but original labels may not be preserved
+- Admonitions → rendered as generic div structure
 
 **Extensions with round-trip support:**
 
@@ -285,6 +289,7 @@ The following extensions support round-trip via specific data attributes:
 - `HeadingReferenceExtension` - Wikilinks `[[Heading]]`
 - `InlineFootnotesExtension` - Inline footnotes
 - `MentionsExtension` - `@username` patterns (via `data-username`)
+- `AdmonitionExtension` - Admonition divs with type/title/collapsible (via `data-djot-admonition-*`)
 
 When using explicit AST transforms through `DjotConverter::transform()`, renderer-aware transforms such as `HeadingLevelShiftTransform` automatically preserve round-trip metadata when the converter uses `HtmlRenderer` with round-trip mode enabled.
 

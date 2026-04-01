@@ -6,6 +6,7 @@ namespace Djot\Test\TestCase;
 
 use Djot\Converter\HtmlToDjot;
 use Djot\DjotConverter;
+use Djot\Extension\AdmonitionExtension;
 use Djot\Extension\CodeGroupExtension;
 use Djot\Extension\MermaidExtension;
 use Djot\Extension\TabsExtension;
@@ -29,6 +30,7 @@ class RoundTripTest extends TestCase
         $this->converter->addExtension(new CodeGroupExtension());
         $this->converter->addExtension(new TabsExtension());
         $this->converter->addExtension(new MermaidExtension());
+        $this->converter->addExtension(new AdmonitionExtension());
         $this->htmlToDjot = new HtmlToDjot();
     }
 
@@ -790,6 +792,151 @@ DJOT;
     public function testAutolinkWithScheme(): void
     {
         $djot = 'Use <ftp://files.example.com> to download.';
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Footnotes
+    // =========================================================================
+
+    public function testSimpleFootnote(): void
+    {
+        $djot = <<<'DJOT'
+Text[^1].
+
+[^1]: Footnote content.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testNamedFootnote(): void
+    {
+        $djot = <<<'DJOT'
+Text[^note].
+
+[^note]: Named footnote.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testMultipleFootnotes(): void
+    {
+        $djot = <<<'DJOT'
+First[^1] and second[^2].
+
+[^1]: First note.
+[^2]: Second note.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testFootnoteWithFormatting(): void
+    {
+        $djot = <<<'DJOT'
+Text[^1].
+
+[^1]: Footnote with *emphasis* and `code`.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testFootnoteWithLink(): void
+    {
+        $djot = <<<'DJOT'
+Text[^1].
+
+[^1]: Footnote with [link](http://example.com).
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Admonitions (via AdmonitionExtension)
+    // =========================================================================
+
+    public function testSimpleAdmonitionNote(): void
+    {
+        $djot = <<<'DJOT'
+::: note
+Content here.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAdmonitionWarning(): void
+    {
+        $djot = <<<'DJOT'
+::: warning
+Warning content.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAdmonitionWithMultipleParagraphs(): void
+    {
+        $djot = <<<'DJOT'
+::: note
+First paragraph.
+
+Second paragraph.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAdmonitionWithFormatting(): void
+    {
+        $djot = <<<'DJOT'
+::: note
+This is *important* text.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAdmonitionWithCustomTitle(): void
+    {
+        $djot = <<<'DJOT'
+{title="My Custom Title"}
+::: note
+Content with custom title.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testCollapsibleAdmonition(): void
+    {
+        $djot = <<<'DJOT'
+{collapsible}
+::: tip
+Collapsible content.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testCollapsibleAdmonitionOpen(): void
+    {
+        $djot = <<<'DJOT'
+{collapsible=open}
+::: danger
+Expanded by default.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testCollapsibleAdmonitionWithTitle(): void
+    {
+        $djot = <<<'DJOT'
+{collapsible title="Click me"}
+::: note
+Hidden content.
+:::
+DJOT;
         $this->assertRoundTrip($djot);
     }
 }

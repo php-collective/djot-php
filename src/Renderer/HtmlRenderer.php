@@ -1243,14 +1243,20 @@ class HtmlRenderer implements RendererInterface
 
         foreach ($renderedContents as $number => $content) {
             $liAttrs = '';
+
+            // Find the label for this footnote number
+            $label = array_search($number, $context->footnoteNumbers, true);
+
             if ($this->roundTripMode && isset($context->inlineFootnoteRenderers[$number])) {
                 $liAttrs = ' data-djot-inline-footnote="1"';
+            } elseif ($this->roundTripMode && $label !== false) {
+                // Regular footnote - store label for round-trip
+                $liAttrs = ' data-djot-footnote-label="' . $this->escapeAttribute((string)$label) . '"';
             }
 
             $html .= '<li id="fn' . $number . '"' . $liAttrs . '>' . "\n";
 
-            // Find the label for this footnote number to get ref count
-            $label = array_search($number, $context->footnoteNumbers, true);
+            // Get ref count for this footnote
             $refCount = $label !== false ? ($context->footnoteRefCounts[$label] ?? 1) : 1;
 
             // Generate backlinks - multiple if footnote referenced multiple times
@@ -1330,7 +1336,16 @@ class HtmlRenderer implements RendererInterface
         }
 
         // Format: <a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a>
-        return '<a id="' . $refId . '" href="#fn' . $number . '" role="doc-noteref"><sup>' . $number . '</sup></a>';
+        $html = '<a id="' . $refId . '" href="#fn' . $number . '" role="doc-noteref"';
+
+        // In round-trip mode, store the original label for reconstruction
+        if ($this->roundTripMode) {
+            $html .= ' data-djot-footnote-label="' . $this->escapeAttribute($label) . '"';
+        }
+
+        $html .= '><sup>' . $number . '</sup></a>';
+
+        return $html;
     }
 
     protected function renderMath(Math $node): string
