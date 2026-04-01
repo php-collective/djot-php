@@ -1712,12 +1712,14 @@ class HtmlToDjot
         $blockquote = $this->findFirstDirectChildByTagName($node, 'blockquote');
         $caption = $this->findFirstDirectChildByTagName($node, 'figcaption');
 
-        if ($img instanceof DOMElement) {
+        if ($this->hasOnlySupportedFigureContent($node) && $img instanceof DOMElement) {
             $output .= $this->processImage($img) . "\n";
-        } elseif ($blockquote instanceof DOMElement) {
+        } elseif ($this->hasOnlySupportedFigureContent($node) && $blockquote instanceof DOMElement) {
             $output .= $this->processBlockquote($blockquote);
             // Remove the trailing blank line since caption follows immediately
             $output = rtrim($output) . "\n";
+        } else {
+            return $this->processGenericFigureContent($node);
         }
 
         if ($caption instanceof DOMElement) {
@@ -1725,6 +1727,52 @@ class HtmlToDjot
         }
 
         return $output . "\n\n";
+    }
+
+    protected function hasOnlySupportedFigureContent(DOMElement $node): bool
+    {
+        $contentChildren = [];
+        foreach ($node->childNodes as $child) {
+            if (!($child instanceof DOMElement)) {
+                if (trim($child->textContent) !== '') {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (strtolower($child->tagName) === 'figcaption') {
+                continue;
+            }
+
+            $contentChildren[] = strtolower($child->tagName);
+        }
+
+        if (count($contentChildren) !== 1) {
+            return false;
+        }
+
+        return in_array($contentChildren[0], ['img', 'blockquote'], true);
+    }
+
+    protected function processGenericFigureContent(DOMElement $node): string
+    {
+        $output = '';
+
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement && strtolower($child->tagName) === 'figcaption') {
+                $captionText = trim($this->processChildren($child));
+                if ($captionText !== '') {
+                    $output .= $captionText . "\n\n";
+                }
+
+                continue;
+            }
+
+            $output .= $this->processNode($child);
+        }
+
+        return $output;
     }
 
     /**

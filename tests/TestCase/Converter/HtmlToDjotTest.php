@@ -12,6 +12,7 @@ use Djot\Extension\HeadingReferenceExtension;
 use Djot\Extension\InlineFootnotesExtension;
 use Djot\Extension\MermaidExtension;
 use Djot\Extension\TabsExtension;
+use Djot\Profile;
 use PHPUnit\Framework\TestCase;
 
 class HtmlToDjotTest extends TestCase
@@ -408,6 +409,34 @@ HTML;
         $result = trim($this->converter->convert($html));
 
         $this->assertSame("![Photo](photo.jpg)\n^ cap one\ncap two", $result);
+    }
+
+    public function testFigureWithUnsupportedBlockContentFallsBackToPlainDjotBlocks(): void
+    {
+        $html = '<figure><pre><code>code</code></pre><figcaption>Cap</figcaption></figure>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringNotContainsString("``` =html\n", $result);
+        $this->assertStringContainsString("```\ncode\n```", $result);
+        $this->assertStringContainsString("\nCap\n", $result);
+
+        $htmlBack = (new DjotConverter(profile: Profile::article()))->convert($result);
+        $this->assertStringContainsString('<pre><code>code', $htmlBack);
+        $this->assertStringContainsString('<p>Cap</p>', $htmlBack);
+    }
+
+    public function testFigureWithAttributesPrefersStructuredFigureOverRawHtml(): void
+    {
+        $html = '<figure id="fig1" data-kind="hero"><img src="photo.jpg" alt="Photo"><figcaption>A photo</figcaption></figure>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringNotContainsString("``` =html\n", $result);
+        $this->assertStringContainsString('![Photo](photo.jpg)', $result);
+        $this->assertStringContainsString('^ A photo', $result);
+
+        $htmlBack = (new DjotConverter(profile: Profile::article()))->convert($result);
+        $this->assertStringContainsString('<figure>', $htmlBack);
+        $this->assertStringContainsString('<figcaption>A photo</figcaption>', $htmlBack);
     }
 
     public function testEndnotesSectionDoesNotTreatNestedListItemsAsFootnotes(): void
