@@ -14,9 +14,8 @@ use Djot\Node\ContentNodeInterface;
  */
 class EscapedText extends InlineNode implements ContentNodeInterface
 {
-    public function __construct(
-        protected string $content = '',
-    ) {
+    public function __construct(protected string $content = '')
+    {
     }
 
     public function getContent(): string
