@@ -651,6 +651,11 @@ class HtmlToDjot
                 foreach ($child->childNodes as $pChild) {
                     $processNode($pChild);
                 }
+
+                if (trim($currentLine) !== '') {
+                    $lines[] = trim($currentLine);
+                    $currentLine = '';
+                }
             } else {
                 $processNode($child);
             }
@@ -788,17 +793,23 @@ class HtmlToDjot
         $this->inPre = true;
 
         // Get content (may be wrapped in code tag)
-        $code = $node->getElementsByTagName('code')->item(0);
+        $code = $this->findFirstDirectChildByTagName($node, 'code');
         $content = $code ? $code->textContent : $node->textContent;
 
         // Detect language from class
         $language = '';
         if ($code instanceof DOMElement) {
-            $class = $code->getAttribute('class');
-            if (preg_match('/language-(\w+)/', $class, $m)) {
-                $language = $m[1];
-            } elseif (preg_match('/(\w+)/', $class, $m)) {
-                $language = $m[1];
+            $classList = $this->getElementClassList($code);
+            foreach ($classList as $class) {
+                if (str_starts_with($class, 'language-') && $class !== 'language-') {
+                    $language = substr($class, 9);
+
+                    break;
+                }
+            }
+
+            if ($language === '' && $classList !== []) {
+                $language = $classList[0];
             }
         }
 
@@ -979,15 +990,24 @@ class HtmlToDjot
 
     protected function processBlockquote(DOMElement $node): string
     {
-        $content = trim($this->processChildren($node));
+        $parts = [];
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMText && trim($child->textContent) === '') {
+                continue;
+            }
+
+            $part = rtrim($this->processNode($child), "\n");
+            if ($part !== '') {
+                $parts[] = $part;
+            }
+        }
+
+        $content = implode("\n\n", $parts);
         $lines = explode("\n", $content);
 
         $quoted = [];
         foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line !== '') {
-                $quoted[] = '> ' . $line;
-            }
+            $quoted[] = $line === '' ? '>' : '> ' . rtrim($line);
         }
 
         $attrs = $this->formatBlockAttributes($node);
