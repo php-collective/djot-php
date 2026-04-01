@@ -1620,6 +1620,12 @@ class HtmlToDjot
     {
         $content = $this->processChildren($node);
 
+        // For abbr elements: if we have abbreviation definitions from round-trip,
+        // the abbr is from AbbreviationExtension - just return the text content
+        if ($type === 'abbr' && $this->abbreviationDefinitions !== []) {
+            return $content;
+        }
+
         // Build attribute parts
         $attrParts = [];
 
