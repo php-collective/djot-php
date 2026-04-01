@@ -1315,6 +1315,7 @@ class HtmlToDjot
 
     /**
      * @param list<string> $contentParts
+     * @param string $inlineBuffer
      */
     protected function flushListItemInlineBuffer(array &$contentParts, string &$inlineBuffer): void
     {
