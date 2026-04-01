@@ -308,9 +308,8 @@ Some Djot features cannot survive round-trip conversion due to semantic equivale
 | Element | Behavior | Reason |
 |---------|----------|--------|
 | Smart quotes (`"..."`) | Converted to curly quotes | Parser feature, not loss of information |
-| Definition list variations | Normalized format | `: definition` vs `:    definition` produce identical HTML |
 
-These behaviors are correct and intentional - they represent semantic preservation rather than character-for-character preservation.
+These behaviors are correct and intentional - smart quotes enhance typography while preserving meaning.
 
 **Use Cases:**
 - Importing content from WordPress or other CMS
