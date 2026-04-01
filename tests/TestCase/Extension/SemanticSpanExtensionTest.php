@@ -149,6 +149,29 @@ class SemanticSpanExtensionTest extends TestCase
         $this->assertStringContainsString('<dfn><kbd><abbr title="HyperText Markup Language">HTML</abbr></kbd></dfn>', $html);
     }
 
+    public function testSampAttribute(): void
+    {
+        $html = $this->converter->convert('[Hello World]{samp}');
+
+        $this->assertStringContainsString('<samp>Hello World</samp>', $html);
+        $this->assertStringNotContainsString('<span samp="">', $html);
+    }
+
+    public function testVarAttribute(): void
+    {
+        $html = $this->converter->convert('[x]{var}');
+
+        $this->assertStringContainsString('<var>x</var>', $html);
+        $this->assertStringNotContainsString('<span var="">', $html);
+    }
+
+    public function testCombinedSampAndVar(): void
+    {
+        $html = $this->converter->convert('[value]{samp var}');
+
+        $this->assertStringContainsString('<var><samp>value</samp></var>', $html);
+    }
+
     public function testWithoutExtension(): void
     {
         $converter = new DjotConverter();

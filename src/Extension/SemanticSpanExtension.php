@@ -16,6 +16,8 @@ use Djot\Util\StringUtil;
  * - `kbd` attribute → `<kbd>` (keyboard input)
  * - `dfn` attribute → `<dfn>` (definition/term)
  * - `abbr` attribute → `<abbr>` (abbreviation, with title)
+ * - `samp` attribute → `<samp>` (sample output)
+ * - `var` attribute → `<var>` (variable)
  *
  * These can also be combined, with `dfn` wrapping inner elements.
  *
@@ -67,9 +69,11 @@ class SemanticSpanExtension implements ExtensionInterface
             $kbd = $node->getAttribute('kbd');
             $dfn = $node->getAttribute('dfn');
             $abbr = $node->getAttribute('abbr');
+            $samp = $node->getAttribute('samp');
+            $var = $node->getAttribute('var');
 
             // Check if any semantic attribute is present
-            if ($kbd === null && $dfn === null && $abbr === null) {
+            if ($kbd === null && $dfn === null && $abbr === null && $samp === null && $var === null) {
                 return;
             }
 
@@ -77,6 +81,8 @@ class SemanticSpanExtension implements ExtensionInterface
             $node->removeAttribute('kbd');
             $node->removeAttribute('dfn');
             $node->removeAttribute('abbr');
+            $node->removeAttribute('samp');
+            $node->removeAttribute('var');
 
             // Get remaining attributes for outer wrapper
             $remainingAttrs = $node->getAttributes();
@@ -85,12 +91,20 @@ class SemanticSpanExtension implements ExtensionInterface
             $content = $event->getChildrenHtml();
 
             // Build inner content with semantic elements
-            // Priority: abbr innermost, kbd, dfn outermost
+            // Priority: abbr innermost, then samp/var, then kbd, dfn outermost
             $html = $content;
 
             // Wrap in <abbr> if abbr attribute present (with title)
             if ($abbr !== null && $abbr !== '') {
                 $html = '<abbr title="' . StringUtil::escapeHtml((string)$abbr) . '">' . $html . '</abbr>';
+            }
+
+            if ($samp !== null) {
+                $html = '<samp>' . $html . '</samp>';
+            }
+
+            if ($var !== null) {
+                $html = '<var>' . $html . '</var>';
             }
 
             // Wrap in <kbd> if kbd attribute present
