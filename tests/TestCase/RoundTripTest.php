@@ -939,4 +939,60 @@ Hidden content.
 DJOT;
         $this->assertRoundTrip($djot);
     }
+
+    // =========================================================================
+    // Line Blocks
+    // =========================================================================
+
+    public function testSimpleLineBlock(): void
+    {
+        $djot = <<<'DJOT'
+| Line one
+| Line two
+| Line three
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testLineBlockWithFormatting(): void
+    {
+        $djot = <<<'DJOT'
+| This is *strong*
+| And _emphasis_
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testLineBlockWithAttributes(): void
+    {
+        $djot = <<<'DJOT'
+{.poem}
+| Roses are red
+| Violets are blue
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Raw Inline
+    // =========================================================================
+
+    public function testRawInlineHtml(): void
+    {
+        $djot = 'Text `<br>`{=html} more.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testRawInlineHtmlComplex(): void
+    {
+        $djot = 'Insert `<span class="red">colored</span>`{=html} text.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testRawInlineNonHtml(): void
+    {
+        // Non-HTML formats are preserved in round-trip mode
+        $djot = 'LaTeX: `\alpha`{=tex} formula.';
+        $this->assertRoundTrip($djot);
+    }
 }

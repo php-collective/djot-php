@@ -1139,12 +1139,19 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderRawInline(RawInline $node): string
     {
-        // Only output if format is HTML
-        if ($node->getFormat() !== 'html') {
+        $format = $node->getFormat();
+        $content = $node->getContent();
+
+        // Handle non-HTML formats
+        if ($format !== 'html') {
+            // In round-trip mode, preserve non-HTML raw content for potential recovery
+            if ($this->roundTripMode) {
+                return '<span data-djot-raw="' . $this->escapeAttribute($format) . '">'
+                    . $this->escape($content) . '</span>';
+            }
+
             return '';
         }
-
-        $content = $node->getContent();
 
         // Handle raw HTML according to safe mode
         if ($this->safeMode !== null) {
@@ -1155,6 +1162,11 @@ class HtmlRenderer implements RendererInterface
             if ($mode === SafeMode::RAW_HTML_ESCAPE) {
                 return $this->escape($content);
             }
+        }
+
+        // In round-trip mode, wrap HTML content for recovery
+        if ($this->roundTripMode) {
+            return '<span data-djot-raw="html">' . $content . '</span>';
         }
 
         return $content;

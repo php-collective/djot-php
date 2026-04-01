@@ -263,6 +263,8 @@ $back = $htmlToDjot->convert($html);
 | Tabs | `data-djot-src` | Preserves tab structure |
 | Footnotes | `data-djot-footnote-label` | Preserves `[^label]` and `[^label]: content` syntax |
 | Admonitions | `data-djot-admonition-type` | Preserves `::: type` div syntax with AdmonitionExtension |
+| Line blocks | class `line-block` | Preserves `\| Line` syntax via div.line-block detection |
+| Raw inline | `data-djot-raw` | Preserves `` `content`{=format} `` syntax for any format |
 
 Without round-trip mode, these elements use defaults when converting back:
 - Thematic breaks → `---`
@@ -277,6 +279,8 @@ Without round-trip mode, these elements use defaults when converting back:
 - Tables → regenerated separator widths based on converted cell content
 - Footnotes → still work but original labels may not be preserved
 - Admonitions → rendered as generic div structure
+- Line blocks → still detected via `div.line-block` class
+- Raw inline → HTML format outputs directly without wrapper, non-HTML formats are stripped
 
 **Extensions with round-trip support:**
 
@@ -301,6 +305,8 @@ Some Djot features cannot survive round-trip conversion due to semantic equivale
 |---------|----------|--------|
 | Smart quotes (`"..."`) | Converted to curly quotes | Parser feature, not loss of information |
 | Soft breaks (line breaks) | Become spaces | Semantically correct - soft breaks are spaces |
+| Escaped characters (`\*`) | Become literal characters | Escapes are consumed during parsing |
+| Abbreviation definitions | Consumed, not preserved | `*[HTML]: ...` definitions expand inline |
 | Nested lists without blank lines | May need reformatting | Djot requires blank lines before nested lists |
 | Definition list variations | Normalized format | Multiple valid syntaxes map to same HTML |
 
