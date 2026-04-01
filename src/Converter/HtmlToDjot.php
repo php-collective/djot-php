@@ -554,7 +554,7 @@ class HtmlToDjot
             return $this->processBlock($node);
         }
 
-        $content = trim($this->processChildren($node));
+        $content = trim($this->processBlock($node));
         $output = $attrs . '::: ' . $tagName . "\n";
         if ($content !== '') {
             $output .= $content . "\n";

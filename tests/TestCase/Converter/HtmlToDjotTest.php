@@ -613,6 +613,38 @@ HTML;
         $this->assertStringContainsString("<li>\n<pre><code>code", $htmlBack);
     }
 
+    public function testEmptyListItemWithAttributesKeepsIndentedAttributeBlock(): void
+    {
+        $html = '<ul><li id="empty"></li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("- \n  {#empty}\n", $result);
+    }
+
+    public function testListItemWithDetailsKeepsIndentedTaggedContainer(): void
+    {
+        $html = '<ul><li><details><summary>Title</summary><p>Body</p></details></li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("- \n\n  ::: details\n  Title\n\n  Body\n  :::\n", $result);
+    }
+
+    public function testListItemWithHeadingKeepsIndentedHeadingBlock(): void
+    {
+        $html = '<ul><li><h2>Head</h2></li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("- \n\n  ## Head\n", $result);
+    }
+
+    public function testHtml5BlockContainerWithoutAttributesFallsBackToPlainBlock(): void
+    {
+        $html = '<article><p>X</p></article>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("X\n", $result);
+    }
+
     public function testDeeplyNestedList(): void
     {
         $html = '<ul><li>Level 1<ul><li>Level 2<ul><li>Level 3</li></ul></li></ul></li></ul>';
