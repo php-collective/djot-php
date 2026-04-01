@@ -123,6 +123,12 @@ class HtmlToDjotTest extends TestCase
         $this->assertSame("[Example](https://example.com \"Example Site\")\n", $result);
     }
 
+    public function testLinkWithQuotedTitleEscapesDjotTitle(): void
+    {
+        $result = $this->converter->convert('<a href="https://example.com" title="a &quot;quote&quot; here">Example</a>');
+        $this->assertSame("[Example](https://example.com \"a \\\"quote\\\" here\")\n", $result);
+    }
+
     // ==================== Images ====================
 
     public function testImage(): void
@@ -135,6 +141,12 @@ class HtmlToDjotTest extends TestCase
     {
         $result = $this->converter->convert('<img src="image.jpg" alt="Alt" title="Title">');
         $this->assertSame("![Alt](image.jpg \"Title\")\n", $result);
+    }
+
+    public function testImageWithQuotedTitleEscapesDjotTitle(): void
+    {
+        $result = $this->converter->convert('<img src="image.jpg" alt="Alt" title="a &quot;quote&quot; here">');
+        $this->assertSame("![Alt](image.jpg \"a \\\"quote\\\" here\")\n", $result);
     }
 
     // ==================== Code ====================
@@ -232,6 +244,23 @@ HTML;
         $this->assertStringContainsString('| Name | Age |', $result);
         $this->assertStringContainsString('|---|---|', $result);
         $this->assertStringContainsString('| Alice | 30 |', $result);
+    }
+
+    public function testNestedTableDoesNotLeakInnerRowsIntoOuterTable(): void
+    {
+        $html = '<table><tr><td>outer <table><tr><td>inner</td></tr></table></td></tr></table>';
+
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('| outer', $result);
+        $this->assertSame(1, substr_count($result, '| inner |'));
+    }
+
+    public function testDivWithoutClassPreservesAttributes(): void
+    {
+        $result = $this->converter->convert('<div id="box" data-kind="note">x</div>');
+
+        $this->assertSame("{#box data-kind=note}\n:::\nx\n:::\n", $result);
     }
 
     // ==================== Definition Lists ====================

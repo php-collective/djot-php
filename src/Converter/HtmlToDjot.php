@@ -369,7 +369,18 @@ class HtmlToDjot
         $fenceClass = array_shift($classes);
 
         if ($fenceClass === null || $fenceClass === '') {
-            return $this->processBlock($node);
+            $attrs = $this->formatBlockAttributes($node);
+            if ($attrs === '') {
+                return $this->processBlock($node);
+            }
+
+            $content = trim($this->processChildren($node));
+            $output = $attrs . ":::\n";
+            if ($content !== '') {
+                $output .= $content . "\n";
+            }
+
+            return $output . ":::\n\n";
         }
         if ($fenceClass === 'djot-content' && $classes === [] && $node->getAttribute('id') === '') {
             $hasExtraAttrs = false;
@@ -687,6 +698,11 @@ class HtmlToDjot
         return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
+    protected function quoteLinkTitle(string $title): string
+    {
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $title) . '"';
+    }
+
     protected function processParagraph(DOMElement $node): string
     {
         $content = trim($this->processChildren($node));
@@ -907,7 +923,7 @@ class HtmlToDjot
         $attrs = $this->formatInlineAttributes($node, ['href', 'title']);
 
         if ($title !== '') {
-            return '[' . $text . '](' . $href . ' "' . $title . '")' . $attrs;
+            return '[' . $text . '](' . $href . ' ' . $this->quoteLinkTitle($title) . ')' . $attrs;
         }
 
         return '[' . $text . '](' . $href . ')' . $attrs;
@@ -945,7 +961,7 @@ class HtmlToDjot
         $attrs = $this->formatInlineAttributes($node, ['src', 'alt', 'title']);
 
         if ($title !== '') {
-            return '![' . $alt . '](' . $src . ' "' . $title . '")' . $attrs;
+            return '![' . $alt . '](' . $src . ' ' . $this->quoteLinkTitle($title) . ')' . $attrs;
         }
 
         return '![' . $alt . '](' . $src . ')' . $attrs;
@@ -1150,13 +1166,13 @@ class HtmlToDjot
         $alignments = [];
 
         // Find caption element if present
-        $captionElement = $node->getElementsByTagName('caption')->item(0);
+        $captionElement = $this->findFirstDirectChildByTagName($node, 'caption');
         if ($captionElement instanceof DOMElement) {
             $captionText = trim($this->processChildren($captionElement));
         }
 
         // Find all rows
-        $trElements = $node->getElementsByTagName('tr');
+        $trElements = $this->getDirectTableRows($node);
 
         foreach ($trElements as $tr) {
             $cells = [];
@@ -1244,6 +1260,52 @@ class HtmlToDjot
         }
 
         return $output . "\n";
+    }
+
+    /**
+     * @return list<DOMElement>
+     */
+    protected function getDirectTableRows(DOMElement $table): array
+    {
+        $rows = [];
+
+        foreach ($table->childNodes as $child) {
+            if (!$child instanceof DOMElement) {
+                continue;
+            }
+
+            $tag = strtolower($child->tagName);
+            if ($tag === 'tr') {
+                $rows[] = $child;
+
+                continue;
+            }
+
+            if (!in_array($tag, ['thead', 'tbody', 'tfoot'], true)) {
+                continue;
+            }
+
+            foreach ($child->childNodes as $row) {
+                if ($row instanceof DOMElement && strtolower($row->tagName) === 'tr') {
+                    $rows[] = $row;
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    protected function findFirstDirectChildByTagName(DOMElement $node, string $tagName): ?DOMElement
+    {
+        $tagName = strtolower($tagName);
+
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement && strtolower($child->tagName) === $tagName) {
+                return $child;
+            }
+        }
+
+        return null;
     }
 
     protected function processDefinitionList(DOMElement $node): string
