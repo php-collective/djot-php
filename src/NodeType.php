@@ -164,6 +164,11 @@ final class NodeType
     /**
      * @var string
      */
+    public const ESCAPED_TEXT = 'escaped_text';
+
+    /**
+     * @var string
+     */
     public const FOOTNOTE_REF = 'footnote_ref';
 
     /**
@@ -256,6 +261,7 @@ final class NodeType
             self::SOFT_BREAK,
             self::HARD_BREAK,
             self::RAW_INLINE,
+            self::ESCAPED_TEXT,
             self::FOOTNOTE_REF,
             self::SPAN,
             self::SUPERSCRIPT,

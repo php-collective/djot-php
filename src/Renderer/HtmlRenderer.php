@@ -31,6 +31,7 @@ use Djot\Node\Inline\Abbreviation;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
+use Djot\Node\Inline\EscapedText;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Highlight;
@@ -137,6 +138,7 @@ class HtmlRenderer implements RendererInterface
             Image::class => 'renderImage',
             Code::class => 'renderCode',
             RawInline::class => 'renderRawInline',
+            EscapedText::class => 'renderEscapedText',
             Math::class => 'renderMath',
             Symbol::class => 'renderSymbol',
             FootnoteRef::class => 'renderFootnoteRef',
@@ -405,7 +407,31 @@ class HtmlRenderer implements RendererInterface
             }
         }
 
+        // Add abbreviation definitions for round-trip support
+        if ($this->roundTripMode) {
+            $abbreviations = $document->getAbbreviations();
+            if ($abbreviations !== []) {
+                $html .= $this->renderAbbreviationDefinitions($abbreviations);
+            }
+        }
+
         return $html;
+    }
+
+    /**
+     * Render abbreviation definitions as a hidden element for round-trip
+     *
+     * @param array<string, string> $abbreviations
+     */
+    protected function renderAbbreviationDefinitions(array $abbreviations): string
+    {
+        $defs = [];
+        foreach ($abbreviations as $abbr => $definition) {
+            $defs[] = '*[' . $abbr . ']: ' . $definition;
+        }
+        $content = implode("\n", $defs);
+
+        return '<template data-djot-abbreviations>' . $this->escape($content) . "</template>\n";
     }
 
     /**
@@ -1170,6 +1196,19 @@ class HtmlRenderer implements RendererInterface
         }
 
         return $content;
+    }
+
+    protected function renderEscapedText(EscapedText $node): string
+    {
+        $content = $node->getContent();
+
+        // In round-trip mode, wrap escaped text for recovery
+        if ($this->roundTripMode) {
+            return '<span data-djot-escaped>' . $this->escape($content) . '</span>';
+        }
+
+        // Without round-trip mode, just output the escaped character
+        return $this->escape($content);
     }
 
     protected function renderDefinitionList(DefinitionList $node): string

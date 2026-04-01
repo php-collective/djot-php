@@ -8,6 +8,7 @@ use Djot\Node\Inline\Abbreviation;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
+use Djot\Node\Inline\EscapedText;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Highlight;
@@ -245,7 +246,10 @@ class InlineParser
                     continue;
                 }
                 if (ctype_punct($escaped)) {
-                    $textBuffer .= $escaped;
+                    // Create EscapedText node for round-trip support
+                    $this->flushText($parent, $textBuffer);
+                    $textBuffer = '';
+                    $parent->appendChild(new EscapedText($escaped));
                     $pos += 2;
 
                     continue;

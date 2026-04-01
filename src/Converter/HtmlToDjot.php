@@ -48,6 +48,13 @@ class HtmlToDjot
     protected array $footnoteDefinitions = [];
 
     /**
+     * Collected abbreviation definitions for round-trip support
+     *
+     * @var array<string>
+     */
+    protected array $abbreviationDefinitions = [];
+
+    /**
      * Attributes to skip when converting (these don't translate well to Djot)
      *
      * @var array<string>
@@ -70,6 +77,7 @@ class HtmlToDjot
         $this->preserveTextWhitespace = false;
         $this->referenceDefinitions = [];
         $this->footnoteDefinitions = [];
+        $this->abbreviationDefinitions = [];
 
         // Wrap in root element if needed
         if (!preg_match('/<(html|body|div)[^>]*>/i', $html)) {
@@ -85,7 +93,16 @@ class HtmlToDjot
         $doc->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
 
+        // Extract abbreviation definitions from template element (round-trip support)
+        $this->extractAbbreviationDefinitions($doc);
+
         $djot = $this->processNode($doc->documentElement ?? $doc);
+
+        // Prepend abbreviation definitions at the start
+        if ($this->abbreviationDefinitions !== []) {
+            $abbrevs = implode("\n", $this->abbreviationDefinitions) . "\n\n";
+            $djot = $abbrevs . $djot;
+        }
 
         // Append reference definitions collected during conversion
         if ($this->referenceDefinitions !== []) {
@@ -111,6 +128,30 @@ class HtmlToDjot
         $djot = $this->cleanup($djot);
 
         return $djot;
+    }
+
+    /**
+     * Extract abbreviation definitions from template element
+     */
+    protected function extractAbbreviationDefinitions(DOMDocument $doc): void
+    {
+        $templates = $doc->getElementsByTagName('template');
+        foreach ($templates as $template) {
+            if ($template->hasAttribute('data-djot-abbreviations')) {
+                $content = $template->textContent;
+                $lines = explode("\n", $content);
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    if ($line !== '') {
+                        $this->abbreviationDefinitions[] = $line;
+                    }
+                }
+                // Remove the template element so it's not processed
+                $template->parentNode?->removeChild($template);
+
+                break;
+            }
+        }
     }
 
     /**
@@ -1279,6 +1320,11 @@ class HtmlToDjot
 
     protected function processSpan(DOMElement $node): string
     {
+        // Check for escaped text (round-trip support)
+        if ($node->hasAttribute('data-djot-escaped')) {
+            return '\\' . $node->textContent;
+        }
+
         // Check for raw inline content (round-trip support)
         if ($node->hasAttribute('data-djot-raw')) {
             return $this->processRawInline($node);
