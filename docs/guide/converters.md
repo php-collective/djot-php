@@ -312,7 +312,5 @@ Some Djot features cannot survive round-trip conversion due to semantic equivale
 These behaviors are correct and intentional - smart quotes enhance typography while preserving meaning.
 
 **Use Cases:**
-- Importing content from WordPress or other CMS
 - Converting WYSIWYG editor output
-- Web scraping and content extraction
 - Migrating HTML documentation to Djot
