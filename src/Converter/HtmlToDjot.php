@@ -1672,9 +1672,10 @@ class HtmlToDjot
     protected function processInlineQuote(DOMElement $node): string
     {
         $content = $this->processChildren($node);
+        $escapedContent = str_replace(['\\', '"'], ['\\\\', '\\"'], $content);
 
         // Wrap in quotes
-        $quoted = '"' . $content . '"';
+        $quoted = '"' . $escapedContent . '"';
 
         // If there's a cite attribute, wrap in span with the attribute
         $cite = $node->getAttribute('cite');

@@ -1625,12 +1625,30 @@ DJOT;
         $this->assertSame('She said "Hello" to me.', $result);
     }
 
+    public function testQElementEscapesInnerQuotes(): void
+    {
+        $html = '<p><q>He said "hi"</q></p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('"He said \\"hi\\""', $result);
+        $this->assertStringContainsString('He said "hi"', (new DjotConverter())->convert($result));
+    }
+
     public function testQElementWithCite(): void
     {
         $html = '<p>As stated: <q cite="https://example.com">Quote here</q>.</p>';
         $result = trim($this->converter->convert($html));
 
         $this->assertSame('As stated: ["Quote here"]{cite="https://example.com"}.', $result);
+    }
+
+    public function testQElementWithCiteEscapesInnerQuotes(): void
+    {
+        $html = '<p><q cite="https://example.com">He said "hi"</q></p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('["He said \\"hi\\""]{cite="https://example.com"}', $result);
+        $this->assertStringContainsString('He said "hi"', (new DjotConverter())->convert($result));
     }
 
     public function testSemanticSpanWithAdditionalAttributes(): void
