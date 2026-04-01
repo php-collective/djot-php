@@ -1040,7 +1040,9 @@ class HtmlToDjot
         // Add attribution as final quoted line with blank line before
         if ($attribution !== null) {
             $quoted[] = '>';
-            $quoted[] = '> ' . $attribution;
+            foreach (explode("\n", $attribution) as $line) {
+                $quoted[] = $line === '' ? '>' : '> ' . rtrim($line);
+            }
         }
 
         $attrs = $this->formatBlockAttributes($node);
@@ -1361,7 +1363,7 @@ class HtmlToDjot
 
         // Add caption after table
         if ($captionText !== '') {
-            $output .= '^ ' . $captionText . "\n";
+            $output .= $this->formatCaptionText($captionText);
         }
 
         return $output . "\n";
@@ -1604,7 +1606,7 @@ class HtmlToDjot
         }
 
         if ($caption instanceof DOMElement) {
-            $output .= '^ ' . trim($this->processChildren($caption));
+            $output .= $this->formatCaptionText(trim($this->processChildren($caption)));
         }
 
         return $output . "\n\n";
@@ -1708,6 +1710,24 @@ class HtmlToDjot
         }
 
         return implode(' ', $parts);
+    }
+
+    protected function formatCaptionText(string $captionText): string
+    {
+        $lines = preg_split('/\R/', $captionText) ?: [];
+        $lines = array_values(array_filter($lines, static fn (string $line): bool => trim($line) !== ''));
+        if ($lines === []) {
+            return '';
+        }
+
+        $firstLine = array_shift($lines);
+        $output = '^ ' . $firstLine . "\n";
+
+        foreach ($lines as $line) {
+            $output .= $line . "\n";
+        }
+
+        return $output;
     }
 
     protected function convertInlineFragmentToDjot(string $html): string
