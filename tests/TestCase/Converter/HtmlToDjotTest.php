@@ -582,6 +582,37 @@ HTML;
         $this->assertMatchesRegularExpression('/- Item 2\n\n\s+- Nested 1/', $result);
     }
 
+    public function testListItemWithMultipleParagraphsKeepsParagraphBreaks(): void
+    {
+        $html = '<ul><li><p>One</p><p>Two</p></li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("- One\n\n  Two\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString("<li>\n<p>One</p>\n<p>Two</p>\n</li>", $htmlBack);
+    }
+
+    public function testListItemWithBlockquoteKeepsNestedBlockquote(): void
+    {
+        $html = '<ul><li><p>One</p><blockquote><p>Quote</p></blockquote></li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("- One\n\n  > Quote\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString("<li>\n<p>One</p>\n<blockquote>", $htmlBack);
+        $this->assertStringContainsString('<p>Quote</p>', $htmlBack);
+    }
+
+    public function testListItemWithOnlyCodeBlockKeepsIndentedCodeFence(): void
+    {
+        $html = '<ul><li><pre><code>code</code></pre></li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("- \n\n  ```\n  code\n  ```\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString("<li>\n<pre><code>code", $htmlBack);
+    }
+
     public function testDeeplyNestedList(): void
     {
         $html = '<ul><li>Level 1<ul><li>Level 2<ul><li>Level 3</li></ul></li></ul></li></ul>';
@@ -1013,6 +1044,7 @@ HTML;
         $html = '<details><summary>Click to expand</summary><p>Hidden content here</p></details>';
         $result = $this->converter->convert($html);
 
+        $this->assertStringContainsString("::: details\n", $result);
         $this->assertStringContainsString('Click to expand', $result);
         $this->assertStringContainsString('Hidden content here', $result);
     }
@@ -1084,8 +1116,20 @@ HTML;
         $html = '<details class="faq" id="q1"><summary>Question?</summary><p>Answer.</p></details>';
         $result = $this->converter->convert($html);
 
+        $this->assertStringContainsString('{#q1 .faq}', $result);
+        $this->assertStringContainsString("::: details\n", $result);
         $this->assertStringContainsString('Question?', $result);
         $this->assertStringContainsString('Answer.', $result);
+    }
+
+    public function testHtml5BlockContainerWithAttributesUsesTaggedFencedDiv(): void
+    {
+        $html = '<article id="a1" data-kind="post"><p>X</p></article>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('{#a1 data-kind=post}', $result);
+        $this->assertStringContainsString("::: article\n", $result);
+        $this->assertStringContainsString("X\n", $result);
     }
 
     // ==================== Round-trip Table Separators ====================
