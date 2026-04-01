@@ -1510,4 +1510,20 @@ DJOT;
 
         $this->assertSame('Equation: $`a + b`$ here', $result);
     }
+
+    public function testMathMLFallbackIgnoresNonTexAnnotations(): void
+    {
+        $html = '<math><semantics><mi>x</mi><mo>+</mo><mi>y</mi><annotation encoding="application/mathml-presentation+xml">ignored</annotation></semantics></math>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('$`x+y`$', $result);
+    }
+
+    public function testMathMLUsesSafeFenceWhenLatexContainsBackticks(): void
+    {
+        $html = '<math alttext="x`y"><mrow></mrow></math>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('$``x`y``$', $result);
+    }
 }
