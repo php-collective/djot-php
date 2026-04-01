@@ -84,7 +84,7 @@ class LinkPolicy
      */
     public function setAllowedSchemes(?array $schemes): self
     {
-        $this->allowedSchemes = $schemes;
+        $this->allowedSchemes = $schemes !== null ? array_map('strtolower', $schemes) : null;
 
         return $this;
     }
@@ -102,7 +102,7 @@ class LinkPolicy
      */
     public function setDeniedSchemes(array $schemes): self
     {
-        $this->deniedSchemes = $schemes;
+        $this->deniedSchemes = array_map('strtolower', $schemes);
 
         return $this;
     }

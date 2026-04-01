@@ -473,6 +473,16 @@ DJOT;
         $this->assertStringContainsString('role="doc-endnotes"', $result);
     }
 
+    public function testFootnotesUseXhtmlHrInXhtmlMode(): void
+    {
+        $converter = new DjotConverter(true);
+
+        $result = $converter->convert("Here is a footnote[^1].\n\n[^1]: Footnote.");
+
+        $this->assertStringContainsString('<section role="doc-endnotes">', $result);
+        $this->assertStringContainsString('<hr />', $result);
+    }
+
     public function testDefinitionList(): void
     {
         $djot = ": Term\n\n  Definition of the term";
