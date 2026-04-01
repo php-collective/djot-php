@@ -360,6 +360,11 @@ class BlockParser
             $this->validateAnchorLinks($document);
         }
 
+        // Store abbreviations on document for round-trip support
+        if ($this->abbreviations !== []) {
+            $document->setAbbreviations($this->abbreviations);
+        }
+
         return $document;
     }
 

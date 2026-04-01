@@ -8,6 +8,7 @@ use Djot\Node\Block\Paragraph;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
+use Djot\Node\Inline\EscapedText;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Highlight;
 use Djot\Node\Inline\Image;
@@ -205,9 +206,20 @@ class InlineParserTest extends TestCase
     {
         $para = $this->parseInline('\*not strong\*');
 
-        $text = $this->getFirstChild($para);
-        $this->assertInstanceOf(Text::class, $text);
-        $this->assertSame('*not strong*', $text->getContent());
+        $children = $para->getChildren();
+        $this->assertCount(3, $children);
+
+        // First child is escaped asterisk
+        $this->assertInstanceOf(EscapedText::class, $children[0]);
+        $this->assertSame('*', $children[0]->getContent());
+
+        // Second child is text
+        $this->assertInstanceOf(Text::class, $children[1]);
+        $this->assertSame('not strong', $children[1]->getContent());
+
+        // Third child is escaped asterisk
+        $this->assertInstanceOf(EscapedText::class, $children[2]);
+        $this->assertSame('*', $children[2]->getContent());
     }
 
     public function testParseInlineAttributes(): void

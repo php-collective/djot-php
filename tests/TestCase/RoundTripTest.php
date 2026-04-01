@@ -995,4 +995,73 @@ DJOT;
         $djot = 'LaTeX: `\alpha`{=tex} formula.';
         $this->assertRoundTrip($djot);
     }
+
+    // =========================================================================
+    // Abbreviation Definitions
+    // =========================================================================
+
+    public function testSingleAbbreviation(): void
+    {
+        $djot = <<<'DJOT'
+*[HTML]: Hypertext Markup Language
+
+The HTML spec defines the standard.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testMultipleAbbreviations(): void
+    {
+        $djot = <<<'DJOT'
+*[HTML]: Hypertext Markup Language
+*[CSS]: Cascading Style Sheets
+
+HTML and CSS are web standards.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAbbreviationWithMultipleOccurrences(): void
+    {
+        $djot = <<<'DJOT'
+*[API]: Application Programming Interface
+
+The API is well documented. Use the API wisely.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Escaped Characters
+    // =========================================================================
+
+    public function testEscapedAsterisks(): void
+    {
+        $djot = 'This is \*not bold\* text.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testEscapedUnderscore(): void
+    {
+        $djot = 'This is \_not italic\_ text.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testEscapedBrackets(): void
+    {
+        $djot = 'Use \[square brackets\] literally.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testEscapedBackslash(): void
+    {
+        $djot = 'A backslash: \\\\ here.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testMixedEscapedCharacters(): void
+    {
+        $djot = 'Mix of \* and \_ and \[ escapes.';
+        $this->assertRoundTrip($djot);
+    }
 }
