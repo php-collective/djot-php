@@ -235,6 +235,8 @@ class HtmlToDjot
             'kbd' => $this->processSemanticSpan($node, 'kbd'),
             'dfn' => $this->processSemanticSpan($node, 'dfn'),
             'abbr' => $this->processSemanticSpan($node, 'abbr'),
+            'samp' => $this->processSemanticSpan($node, 'samp'),
+            'var' => $this->processSemanticSpan($node, 'var'),
             'q' => $this->processInlineQuote($node),
             'code' => $this->processCode($node),
             'pre' => $this->processPreBlock($node),
@@ -1625,7 +1627,7 @@ class HtmlToDjot
      * for round-trip support with SemanticSpanExtension.
      *
      * @param \DOMElement $node The semantic element
-     * @param string $type The element type (kbd, dfn, abbr)
+     * @param string $type The element type (kbd, dfn, abbr, samp, var)
      */
     protected function processSemanticSpan(DOMElement $node, string $type): string
     {
@@ -1672,9 +1674,10 @@ class HtmlToDjot
     protected function processInlineQuote(DOMElement $node): string
     {
         $content = $this->processChildren($node);
+        $escapedContent = str_replace(['\\', '"'], ['\\\\', '\\"'], $content);
 
         // Wrap in quotes
-        $quoted = '"' . $content . '"';
+        $quoted = '"' . $escapedContent . '"';
 
         // If there's a cite attribute, wrap in span with the attribute
         $cite = $node->getAttribute('cite');

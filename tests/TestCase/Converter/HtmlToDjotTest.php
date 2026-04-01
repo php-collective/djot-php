@@ -1625,12 +1625,30 @@ DJOT;
         $this->assertSame('She said "Hello" to me.', $result);
     }
 
+    public function testQElementEscapesInnerQuotes(): void
+    {
+        $html = '<p><q>He said "hi"</q></p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('"He said \\"hi\\""', $result);
+        $this->assertStringContainsString('He said "hi"', (new DjotConverter())->convert($result));
+    }
+
     public function testQElementWithCite(): void
     {
         $html = '<p>As stated: <q cite="https://example.com">Quote here</q>.</p>';
         $result = trim($this->converter->convert($html));
 
         $this->assertSame('As stated: ["Quote here"]{cite="https://example.com"}.', $result);
+    }
+
+    public function testQElementWithCiteEscapesInnerQuotes(): void
+    {
+        $html = '<p><q cite="https://example.com">He said "hi"</q></p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('["He said \\"hi\\""]{cite="https://example.com"}', $result);
+        $this->assertStringContainsString('He said "hi"', (new DjotConverter())->convert($result));
     }
 
     public function testSemanticSpanWithAdditionalAttributes(): void
@@ -1658,5 +1676,40 @@ DJOT;
         $result = trim($this->converter->convert($html));
 
         $this->assertStringContainsString('[TBP]{abbr="The \\"Best\\" Practice"}', $result);
+    }
+
+    public function testSampElement(): void
+    {
+        $html = '<p>The output was <samp>Hello World</samp>.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('The output was [Hello World]{samp}.', $result);
+    }
+
+    public function testSampElementWithAttributes(): void
+    {
+        $html = '<p>Output: <samp class="output" id="result">Success</samp></p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertStringContainsString('[Success]{samp', $result);
+        $this->assertStringContainsString('.output', $result);
+        $this->assertStringContainsString('#result', $result);
+    }
+
+    public function testVarElement(): void
+    {
+        $html = '<p>The variable <var>x</var> represents a number.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('The variable [x]{var} represents a number.', $result);
+    }
+
+    public function testVarElementWithAttributes(): void
+    {
+        $html = '<p>Set <var class="math">y</var> to 5.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertStringContainsString('[y]{var', $result);
+        $this->assertStringContainsString('.math', $result);
     }
 }
