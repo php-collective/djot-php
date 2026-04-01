@@ -1220,8 +1220,13 @@ class InlineParser
                 $endPos = $searchPos + 2;
 
                 // Check for trailing attributes: {=text=}{.class}{.more}
+                // But NOT if it's another braced inline like {=text=}{=more=}
                 if ($endPos < $length && $text[$endPos] === '{') {
-                    $endPos = $this->applyConsecutiveAttributes($node, $text, $endPos);
+                    $nextChar = $text[$endPos + 1] ?? '';
+                    // Braced inline markers that should NOT be treated as attributes
+                    if (!in_array($nextChar, ['=', '+', '-', '~', '^', '_', '*'], true)) {
+                        $endPos = $this->applyConsecutiveAttributes($node, $text, $endPos);
+                    }
                 }
 
                 return [
@@ -1722,14 +1727,17 @@ class InlineParser
     {
         // Remove % ... % comments
         $result = preg_replace('/%[^%]*%/', '', $attrStr);
-
-        // Remove % to end of string comments
-        $percentPos = strpos($result ?? $attrStr, '%');
-        if ($percentPos !== false) {
-            $result = substr($result ?? $attrStr, 0, $percentPos);
+        if ($result === null) {
+            return $attrStr;
         }
 
-        return $result ?? $attrStr;
+        // Remove % to end of string comments
+        $percentPos = strpos($result, '%');
+        if ($percentPos !== false) {
+            $result = substr($result, 0, $percentPos);
+        }
+
+        return $result;
     }
 
     /**
