@@ -263,6 +263,7 @@ $back = $htmlToDjot->convert($html);
 | Tabs | `data-djot-src` | Preserves tab structure |
 | Footnotes | `data-djot-footnote-label` | Preserves `[^label]` and `[^label]: content` syntax |
 | Admonitions | `data-djot-admonition-type` | Preserves `::: type` div syntax with AdmonitionExtension |
+| Line blocks | class `line-block` | Preserves `\| Line` syntax via div.line-block detection |
 
 Without round-trip mode, these elements use defaults when converting back:
 - Thematic breaks → `---`
@@ -277,6 +278,7 @@ Without round-trip mode, these elements use defaults when converting back:
 - Tables → regenerated separator widths based on converted cell content
 - Footnotes → still work but original labels may not be preserved
 - Admonitions → rendered as generic div structure
+- Line blocks → still detected via `div.line-block` class
 
 **Extensions with round-trip support:**
 

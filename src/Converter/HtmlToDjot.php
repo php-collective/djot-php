@@ -317,6 +317,11 @@ class HtmlToDjot
             return $this->processAdmonition($node);
         }
 
+        // Check for line block (round-trip support)
+        if ($this->hasClass($node, 'line-block')) {
+            return $this->processLineBlock($node);
+        }
+
         $classes = $this->getElementClassList($node);
         $fenceClass = array_shift($classes);
 
@@ -509,6 +514,100 @@ class HtmlToDjot
         }
 
         return $output . ":::\n\n";
+    }
+
+    /**
+     * Process line block div (with class "line-block") for round-trip
+     */
+    protected function processLineBlock(DOMElement $node): string
+    {
+        // Build attributes (excluding 'line-block' class)
+        $parts = [];
+        $id = $node->getAttribute('id');
+        if ($id !== '') {
+            $parts[] = '#' . $id;
+        }
+
+        // Get remaining classes (exclude 'line-block')
+        $classes = $this->getElementClassList($node);
+        foreach ($classes as $class) {
+            if ($class !== 'line-block') {
+                $parts[] = '.' . $class;
+            }
+        }
+
+        // Add other attributes (excluding special ones)
+        $skipAttrs = ['id', 'class', ...$this->skipAttributes];
+        /** @var \DOMAttr $attr */
+        foreach ($node->attributes as $attr) {
+            $name = $attr->name;
+            if (in_array($name, $skipAttrs, true) || str_starts_with($name, 'data-djot-')) {
+                continue;
+            }
+            $value = $attr->value;
+            $parts[] = $value === '' ? $name : $name . '=' . $this->quoteAttributeValue($value);
+        }
+
+        // Extract lines from the content - handle <br> as line separators
+        $lines = $this->extractLineBlockLines($node);
+
+        $attrs = $parts === [] ? '' : '{' . implode(' ', $parts) . "}\n";
+        $output = $attrs;
+
+        foreach ($lines as $line) {
+            $output .= '| ' . $line . "\n";
+        }
+
+        return $output . "\n";
+    }
+
+    /**
+     * Extract lines from a line block, handling <br> elements as separators
+     *
+     * @return array<string>
+     */
+    protected function extractLineBlockLines(DOMElement $node): array
+    {
+        $lines = [];
+        $currentLine = '';
+
+        $processNode = function (DOMNode $child) use (&$lines, &$currentLine): void {
+            if ($child instanceof DOMText) {
+                $text = $child->textContent;
+                // Normalize whitespace but preserve content
+                $text = preg_replace('/\s+/', ' ', $text) ?? $text;
+                $currentLine .= $text;
+            } elseif ($child instanceof DOMElement) {
+                $tag = strtolower($child->tagName);
+                if ($tag === 'br') {
+                    // <br> marks end of current line
+                    $lines[] = trim($currentLine);
+                    $currentLine = '';
+                } else {
+                    // Process other elements inline (strong, em, etc.)
+                    $currentLine .= $this->processNode($child);
+                }
+            }
+        };
+
+        // Find inner content (may be wrapped in <p> or direct children)
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement && strtolower($child->tagName) === 'p') {
+                // Process paragraph's children
+                foreach ($child->childNodes as $pChild) {
+                    $processNode($pChild);
+                }
+            } else {
+                $processNode($child);
+            }
+        }
+
+        // Don't forget the last line if any content remains
+        if (trim($currentLine) !== '') {
+            $lines[] = trim($currentLine);
+        }
+
+        return $lines;
     }
 
     /**

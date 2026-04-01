@@ -939,4 +939,37 @@ Hidden content.
 DJOT;
         $this->assertRoundTrip($djot);
     }
+
+    // =========================================================================
+    // Line Blocks
+    // =========================================================================
+
+    public function testSimpleLineBlock(): void
+    {
+        $djot = <<<'DJOT'
+| Line one
+| Line two
+| Line three
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testLineBlockWithFormatting(): void
+    {
+        $djot = <<<'DJOT'
+| This is *strong*
+| And _emphasis_
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testLineBlockWithAttributes(): void
+    {
+        $djot = <<<'DJOT'
+{.poem}
+| Roses are red
+| Violets are blue
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
 }
