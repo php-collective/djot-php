@@ -838,6 +838,28 @@ class InlineParserTest extends TestCase
         $this->assertSame('removed', $del->getAttribute('class'));
     }
 
+    public function testConsecutiveBracedInlines(): void
+    {
+        $para = $this->parseInline('{=a=}{=b=}');
+
+        $children = $para->getChildren();
+        $this->assertCount(2, $children);
+
+        $this->assertInstanceOf(Highlight::class, $children[0]);
+        $this->assertInstanceOf(Highlight::class, $children[1]);
+    }
+
+    public function testConsecutiveDifferentBracedInlines(): void
+    {
+        $para = $this->parseInline('{-del-}{+ins+}');
+
+        $children = $para->getChildren();
+        $this->assertCount(2, $children);
+
+        $this->assertInstanceOf(Delete::class, $children[0]);
+        $this->assertInstanceOf(Insert::class, $children[1]);
+    }
+
     public function testSymbolWithTrailingAttributes(): void
     {
         $para = $this->parseInline(':emoji:{.large}');

@@ -121,7 +121,7 @@ class HtmlToDjot
             // Ensure blank line before footnote definitions
             $notes = "\n\n";
             foreach ($this->footnoteDefinitions as $label => $content) {
-                $notes .= '[^' . $label . ']: ' . $content . "\n";
+                $notes .= $this->formatFootnoteDefinition($label, $content) . "\n";
             }
             $djot .= $notes;
         }
@@ -369,7 +369,18 @@ class HtmlToDjot
         $fenceClass = array_shift($classes);
 
         if ($fenceClass === null || $fenceClass === '') {
-            return $this->processBlock($node);
+            $attrs = $this->formatBlockAttributes($node);
+            if ($attrs === '') {
+                return $this->processBlock($node);
+            }
+
+            $content = trim($this->processChildren($node));
+            $output = $attrs . ":::\n";
+            if ($content !== '') {
+                $output .= $content . "\n";
+            }
+
+            return $output . ":::\n\n";
         }
         if ($fenceClass === 'djot-content' && $classes === [] && $node->getAttribute('id') === '') {
             $hasExtraAttrs = false;
@@ -687,6 +698,11 @@ class HtmlToDjot
         return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $value) . '"';
     }
 
+    protected function quoteLinkTitle(string $title): string
+    {
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $title) . '"';
+    }
+
     protected function processParagraph(DOMElement $node): string
     {
         $content = trim($this->processChildren($node));
@@ -907,7 +923,7 @@ class HtmlToDjot
         $attrs = $this->formatInlineAttributes($node, ['href', 'title']);
 
         if ($title !== '') {
-            return '[' . $text . '](' . $href . ' "' . $title . '")' . $attrs;
+            return '[' . $text . '](' . $href . ' ' . $this->quoteLinkTitle($title) . ')' . $attrs;
         }
 
         return '[' . $text . '](' . $href . ')' . $attrs;
@@ -945,7 +961,7 @@ class HtmlToDjot
         $attrs = $this->formatInlineAttributes($node, ['src', 'alt', 'title']);
 
         if ($title !== '') {
-            return '![' . $alt . '](' . $src . ' "' . $title . '")' . $attrs;
+            return '![' . $alt . '](' . $src . ' ' . $this->quoteLinkTitle($title) . ')' . $attrs;
         }
 
         return '![' . $alt . '](' . $src . ')' . $attrs;
@@ -1021,8 +1037,9 @@ class HtmlToDjot
 
                 // Check for task list item (has checkbox input)
                 $checkbox = '';
-                if ($isTaskList || $this->hasCheckbox($child)) {
-                    $isChecked = $this->isCheckboxChecked($child);
+                $checkboxInput = $this->getDirectCheckboxInput($child);
+                if ($isTaskList || $checkboxInput !== null) {
+                    $isChecked = $checkboxInput?->hasAttribute('checked') ?? false;
                     $checkbox = $isChecked ? '[x] ' : '[ ] ';
                 }
 
@@ -1094,31 +1111,19 @@ class HtmlToDjot
     /**
      * Check if a list item contains a checkbox input
      */
-    protected function hasCheckbox(DOMElement $li): bool
+    protected function getDirectCheckboxInput(DOMElement $li): ?DOMElement
     {
-        $inputs = $li->getElementsByTagName('input');
-        foreach ($inputs as $input) {
-            if ($input->getAttribute('type') === 'checkbox') {
-                return true;
+        foreach ($li->childNodes as $child) {
+            if (
+                $child instanceof DOMElement
+                && strtolower($child->tagName) === 'input'
+                && $child->getAttribute('type') === 'checkbox'
+            ) {
+                return $child;
             }
         }
 
-        return false;
-    }
-
-    /**
-     * Check if a list item's checkbox is checked
-     */
-    protected function isCheckboxChecked(DOMElement $li): bool
-    {
-        $inputs = $li->getElementsByTagName('input');
-        foreach ($inputs as $input) {
-            if ($input->getAttribute('type') === 'checkbox') {
-                return $input->hasAttribute('checked');
-            }
-        }
-
-        return false;
+        return null;
     }
 
     /**
@@ -1150,13 +1155,13 @@ class HtmlToDjot
         $alignments = [];
 
         // Find caption element if present
-        $captionElement = $node->getElementsByTagName('caption')->item(0);
+        $captionElement = $this->findFirstDirectChildByTagName($node, 'caption');
         if ($captionElement instanceof DOMElement) {
             $captionText = trim($this->processChildren($captionElement));
         }
 
         // Find all rows
-        $trElements = $node->getElementsByTagName('tr');
+        $trElements = $this->getDirectTableRows($node);
 
         foreach ($trElements as $tr) {
             $cells = [];
@@ -1244,6 +1249,52 @@ class HtmlToDjot
         }
 
         return $output . "\n";
+    }
+
+    /**
+     * @return list<\DOMElement>
+     */
+    protected function getDirectTableRows(DOMElement $table): array
+    {
+        $rows = [];
+
+        foreach ($table->childNodes as $child) {
+            if (!$child instanceof DOMElement) {
+                continue;
+            }
+
+            $tag = strtolower($child->tagName);
+            if ($tag === 'tr') {
+                $rows[] = $child;
+
+                continue;
+            }
+
+            if (!in_array($tag, ['thead', 'tbody', 'tfoot'], true)) {
+                continue;
+            }
+
+            foreach ($child->childNodes as $row) {
+                if ($row instanceof DOMElement && strtolower($row->tagName) === 'tr') {
+                    $rows[] = $row;
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    protected function findFirstDirectChildByTagName(DOMElement $node, string $tagName): ?DOMElement
+    {
+        $tagName = strtolower($tagName);
+
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement && strtolower($child->tagName) === $tagName) {
+                return $child;
+            }
+        }
+
+        return null;
     }
 
     protected function processDefinitionList(DOMElement $node): string
@@ -1384,9 +1435,9 @@ class HtmlToDjot
         $output = "\n";
 
         // Find img, blockquote, and figcaption
-        $img = $node->getElementsByTagName('img')->item(0);
-        $blockquote = $node->getElementsByTagName('blockquote')->item(0);
-        $caption = $node->getElementsByTagName('figcaption')->item(0);
+        $img = $this->findFirstDirectChildByTagName($node, 'img');
+        $blockquote = $this->findFirstDirectChildByTagName($node, 'blockquote');
+        $caption = $this->findFirstDirectChildByTagName($node, 'figcaption');
 
         if ($img instanceof DOMElement) {
             $output .= $this->processImage($img) . "\n";
@@ -1496,12 +1547,7 @@ class HtmlToDjot
                 // Boolean attribute
                 $parts[] = $name;
             } else {
-                // Quote value if it contains spaces or special chars
-                if (preg_match('/[\s"\'{}]/', $value)) {
-                    $parts[] = $name . '="' . str_replace('"', '\\"', $value) . '"';
-                } else {
-                    $parts[] = $name . '=' . $value;
-                }
+                $parts[] = $name . '=' . $this->quoteAttributeValue($value);
             }
         }
 
@@ -1534,8 +1580,13 @@ class HtmlToDjot
             return false;
         }
 
-        $listItems = $node->getElementsByTagName('li');
-        if ($listItems->length === 0) {
+        $ol = $this->findFirstDirectChildByTagName($node, 'ol');
+        if (!$ol instanceof DOMElement) {
+            return false;
+        }
+
+        $listItems = $this->getDirectChildElementsByTagName($ol, 'li');
+        if ($listItems === []) {
             return false;
         }
 
@@ -1554,13 +1605,13 @@ class HtmlToDjot
     protected function processEndnotesSection(DOMElement $node): string
     {
         // Find the <ol> containing footnote definitions
-        $ol = $node->getElementsByTagName('ol')->item(0);
+        $ol = $this->findFirstDirectChildByTagName($node, 'ol');
         if (!$ol instanceof DOMElement) {
             return '';
         }
 
         // Process each <li> footnote definition
-        $listItems = $ol->getElementsByTagName('li');
+        $listItems = $this->getDirectChildElementsByTagName($ol, 'li');
         foreach ($listItems as $li) {
             // Skip inline footnotes (handled separately)
             if ($li->hasAttribute('data-djot-inline-footnote')) {
@@ -1591,6 +1642,23 @@ class HtmlToDjot
     }
 
     /**
+     * @return list<\DOMElement>
+     */
+    protected function getDirectChildElementsByTagName(DOMElement $node, string $tagName): array
+    {
+        $matches = [];
+        $tagName = strtolower($tagName);
+
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement && strtolower($child->tagName) === $tagName) {
+                $matches[] = $child;
+            }
+        }
+
+        return $matches;
+    }
+
+    /**
      * Process footnote content, removing backlinks
      */
     protected function processFootnoteContent(DOMElement $li): string
@@ -1613,6 +1681,23 @@ class HtmlToDjot
         $content = trim($this->processChildren($clone));
 
         return $content;
+    }
+
+    protected function formatFootnoteDefinition(string|int $label, string $content): string
+    {
+        $lines = explode("\n", $content);
+        $firstLine = $lines[0];
+        $lines = array_slice($lines, 1);
+        $formatted = '[^' . $label . ']: ' . $firstLine;
+
+        foreach ($lines as $line) {
+            $formatted .= "\n";
+            if ($line !== '') {
+                $formatted .= '  ' . $line;
+            }
+        }
+
+        return $formatted;
     }
 
     protected function cleanup(string $djot): string
