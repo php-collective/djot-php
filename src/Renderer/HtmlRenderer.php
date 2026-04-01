@@ -1293,7 +1293,7 @@ class HtmlRenderer implements RendererInterface
         ksort($renderedContents);
 
         $html = '<section role="doc-endnotes">' . "\n";
-        $html .= '<hr>' . "\n";
+        $html .= $this->xhtml ? "<hr />\n" : "<hr>\n";
         $html .= '<ol>' . "\n";
 
         foreach ($renderedContents as $number => $content) {

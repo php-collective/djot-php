@@ -299,6 +299,23 @@ class SafeModeTest extends TestCase
         $this->assertStringContainsString('href=""', $result2);
     }
 
+    public function testAllowedSchemesWhitelistNormalizesConfiguredCasing(): void
+    {
+        $safeMode = SafeMode::defaults()->setAllowedSchemes(['HTTPS']);
+        $converter = new DjotConverter(safeMode: $safeMode);
+
+        $result = $converter->convert('[link](https://example.com)');
+
+        $this->assertStringContainsString('href="https://example.com"', $result);
+    }
+
+    public function testDangerousSchemesNormalizeConfiguredCasing(): void
+    {
+        $safeMode = SafeMode::defaults()->setDangerousSchemes(['JAVASCRIPT']);
+
+        $this->assertFalse($safeMode->isUrlSafe('javascript:alert(1)'));
+    }
+
     // ==================== SafeMode Class Tests ====================
 
     public function testSafeModeIsUrlSafe(): void

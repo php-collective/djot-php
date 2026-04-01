@@ -86,6 +86,13 @@ class LinkPolicyTest extends TestCase
         $this->assertFalse($policy->isUrlAllowed('ssh://server.com'));
     }
 
+    public function testCustomDeniedSchemesNormalizeConfiguredCasing(): void
+    {
+        $policy = (new LinkPolicy())->setDeniedSchemes(['FTP']);
+
+        $this->assertFalse($policy->isUrlAllowed('ftp://server.com'));
+    }
+
     public function testCustomAllowedSchemes(): void
     {
         $policy = (new LinkPolicy())->setAllowedSchemes(['https', 'mailto']);
@@ -94,6 +101,14 @@ class LinkPolicyTest extends TestCase
         $this->assertTrue($policy->isUrlAllowed('mailto:test@example.com'));
         $this->assertFalse($policy->isUrlAllowed('http://example.com'));
         $this->assertFalse($policy->isUrlAllowed('ftp://files.com'));
+    }
+
+    public function testCustomAllowedSchemesNormalizeConfiguredCasing(): void
+    {
+        $policy = (new LinkPolicy())->setAllowedSchemes(['HTTPS', 'MAILTO']);
+
+        $this->assertTrue($policy->isUrlAllowed('https://example.com'));
+        $this->assertTrue($policy->isUrlAllowed('mailto:test@example.com'));
     }
 
     // ==================== Domain Tests ====================

@@ -106,7 +106,7 @@ class SafeMode
      */
     public function setDangerousSchemes(array $schemes): self
     {
-        $this->dangerousSchemes = $schemes;
+        $this->dangerousSchemes = array_map('strtolower', $schemes);
 
         return $this;
     }
@@ -138,7 +138,7 @@ class SafeMode
      */
     public function setAllowedSchemes(?array $schemes): self
     {
-        $this->allowedSchemes = $schemes;
+        $this->allowedSchemes = $schemes !== null ? array_map('strtolower', $schemes) : null;
 
         return $this;
     }
