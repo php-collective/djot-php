@@ -308,8 +308,6 @@ Some Djot features cannot survive round-trip conversion due to semantic equivale
 | Element | Behavior | Reason |
 |---------|----------|--------|
 | Smart quotes (`"..."`) | Converted to curly quotes | Parser feature, not loss of information |
-| Soft breaks (line breaks) | Become spaces | Semantically correct - soft breaks are spaces |
-| Nested lists without blank lines | May need reformatting | Djot requires blank lines before nested lists |
 | Definition list variations | Normalized format | Multiple valid syntaxes map to same HTML |
 
 These behaviors are correct and intentional - they represent semantic preservation rather than character-for-character preservation.
