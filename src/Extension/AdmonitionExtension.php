@@ -7,6 +7,7 @@ namespace Djot\Extension;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\Div;
+use Djot\Renderer\HtmlRenderer;
 use Djot\Util\StringUtil;
 
 /**
@@ -170,7 +171,12 @@ class AdmonitionExtension implements ExtensionInterface
 
     public function register(DjotConverter $converter): void
     {
-        $converter->on('render.div', function (RenderEvent $event): void {
+        $renderer = $converter->getRenderer();
+        if (!$renderer instanceof HtmlRenderer) {
+            return;
+        }
+
+        $converter->on('render.div', function (RenderEvent $event) use ($renderer): void {
             $node = $event->getNode();
             if (!$node instanceof Div) {
                 return;
@@ -181,7 +187,7 @@ class AdmonitionExtension implements ExtensionInterface
                 return;
             }
 
-            $html = $this->renderAdmonition($node, $admonitionType, $event->getChildrenHtml());
+            $html = $this->renderAdmonition($node, $admonitionType, $event->getChildrenHtml(), $renderer);
             $event->setHtml($html);
         });
     }
@@ -203,7 +209,7 @@ class AdmonitionExtension implements ExtensionInterface
     /**
      * Render the admonition HTML
      */
-    protected function renderAdmonition(Div $node, string $type, string $childrenHtml): string
+    protected function renderAdmonition(Div $node, string $type, string $childrenHtml, HtmlRenderer $renderer): string
     {
         $isCollapsible = $node->hasAttribute('collapsible');
         $isOpen = $node->getAttribute('collapsible') === 'open';
@@ -221,6 +227,15 @@ class AdmonitionExtension implements ExtensionInterface
 
         // Build additional attributes (excluding class, title, collapsible)
         $extraAttrs = $this->buildExtraAttributes($node);
+
+        // Add round-trip data attributes
+        if ($renderer->isRoundTripMode()) {
+            $extraAttrs .= ' data-djot-admonition-type="' . StringUtil::escapeHtml($type) . '"';
+            // Store custom title if provided (null means auto-generated)
+            if ($customTitle !== null) {
+                $extraAttrs .= ' data-djot-admonition-title="' . StringUtil::escapeHtml($customTitle) . '"';
+            }
+        }
 
         $icon = $this->getIcon($type);
 

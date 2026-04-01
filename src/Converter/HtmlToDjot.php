@@ -10,6 +10,7 @@ use DOMDocument;
 use DOMElement;
 use DOMNode;
 use DOMText;
+use DOMXPath;
 use RuntimeException;
 
 /**
@@ -29,6 +30,22 @@ class HtmlToDjot
     protected bool $inPre = false;
 
     protected bool $preserveTextWhitespace = false;
+
+    /**
+     * Collected reference definitions for round-trip support
+     * Maps reference label => url
+     *
+     * @var array<string, string>
+     */
+    protected array $referenceDefinitions = [];
+
+    /**
+     * Collected footnote definitions for round-trip support
+     * Maps footnote label => content
+     *
+     * @var array<string, string>
+     */
+    protected array $footnoteDefinitions = [];
 
     /**
      * Attributes to skip when converting (these don't translate well to Djot)
@@ -51,6 +68,8 @@ class HtmlToDjot
         $this->listDepth = 0;
         $this->inPre = false;
         $this->preserveTextWhitespace = false;
+        $this->referenceDefinitions = [];
+        $this->footnoteDefinitions = [];
 
         // Wrap in root element if needed
         if (!preg_match('/<(html|body|div)[^>]*>/i', $html)) {
@@ -67,6 +86,26 @@ class HtmlToDjot
         libxml_clear_errors();
 
         $djot = $this->processNode($doc->documentElement ?? $doc);
+
+        // Append reference definitions collected during conversion
+        if ($this->referenceDefinitions !== []) {
+            // Ensure blank line before reference definitions
+            $refs = "\n\n";
+            foreach ($this->referenceDefinitions as $label => $url) {
+                $refs .= '[' . $label . ']: ' . $url . "\n";
+            }
+            $djot .= $refs;
+        }
+
+        // Append footnote definitions collected during conversion
+        if ($this->footnoteDefinitions !== []) {
+            // Ensure blank line before footnote definitions
+            $notes = "\n\n";
+            foreach ($this->footnoteDefinitions as $label => $content) {
+                $notes .= '[^' . $label . ']: ' . $content . "\n";
+            }
+            $djot .= $notes;
+        }
 
         // Clean up
         $djot = $this->cleanup($djot);
@@ -93,6 +132,9 @@ class HtmlToDjot
         return $this->convert($content);
     }
 
+    /**
+     * @phpstan-impure
+     */
     protected function processNode(DOMNode $node): string
     {
         if ($node instanceof DOMText) {
@@ -122,8 +164,10 @@ class HtmlToDjot
         }
 
         return match ($tagName) {
-            'html', 'body', 'article', 'section', 'main', 'header', 'footer', 'nav', 'aside',
-            'address', 'details', 'dialog', 'fieldset', 'form', 'hgroup', 'menu', 'search' => $this->processBlock($node),
+            'section' => $this->processSection($node),
+            'html', 'body', 'article', 'main', 'header', 'footer', 'nav', 'aside',
+            'address', 'dialog', 'fieldset', 'form', 'hgroup', 'menu', 'search' => $this->processBlock($node),
+            'details' => $this->processDetails($node),
             'div' => $this->processDiv($node),
             'p' => $this->processParagraph($node),
             'h1', 'h2', 'h3', 'h4', 'h5', 'h6' => $this->processHeading($node),
@@ -215,8 +259,64 @@ class HtmlToDjot
         return trim($content);
     }
 
+    /**
+     * Process section elements, handling explicit IDs for round-trip support
+     */
+    protected function processSection(DOMElement $node): string
+    {
+        // Check if this is a footnotes section (doc-endnotes)
+        if ($node->getAttribute('role') === 'doc-endnotes') {
+            return $this->processEndnotesSection($node);
+        }
+
+        // Check if section has an explicit ID from round-trip mode
+        $hasExplicitId = $node->hasAttribute('data-djot-explicit-id');
+        $sectionId = $node->getAttribute('id');
+
+        // Find the first heading inside this section
+        $firstHeading = null;
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $tag = strtolower($child->tagName);
+                if (in_array($tag, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'], true)) {
+                    $firstHeading = $child;
+
+                    break;
+                }
+            }
+        }
+
+        // If we have an explicit ID and a heading, combine ID with heading's attributes
+        $prefix = '';
+        if ($hasExplicitId && $sectionId !== '' && $firstHeading !== null) {
+            // Get heading's attributes (class, etc.) excluding id
+            $headingAttrs = $this->getElementAttributes($firstHeading, ['id', 'data-djot-explicit-id', 'data-djot-source-level']);
+
+            // Build combined attribute block with ID first
+            $attrParts = ['#' . $sectionId];
+            if ($headingAttrs !== '') {
+                // Add other attributes (already formatted with . prefix for classes)
+                $attrParts[] = $headingAttrs;
+            }
+            $prefix = '{' . implode(' ', $attrParts) . "}\n";
+
+            // Mark that we've handled the heading's attributes
+            $firstHeading->setAttribute('data-djot-attrs-handled', '1');
+        }
+
+        // Process section content as a normal block
+        $content = $this->processBlock($node);
+
+        return $prefix . $content;
+    }
+
     protected function processDiv(DOMElement $node): string
     {
+        // Check for admonition div (round-trip support)
+        if ($node->hasAttribute('data-djot-admonition-type')) {
+            return $this->processAdmonition($node);
+        }
+
         $classes = $this->getElementClassList($node);
         $fenceClass = array_shift($classes);
 
@@ -266,6 +366,162 @@ class HtmlToDjot
     }
 
     /**
+     * Process admonition div (with data-djot-admonition-type) for round-trip
+     */
+    protected function processAdmonition(DOMElement $node): string
+    {
+        $type = $node->getAttribute('data-djot-admonition-type');
+        $customTitle = $node->getAttribute('data-djot-admonition-title');
+
+        // Build attributes (excluding admonition-specific classes and data attributes)
+        $parts = [];
+        $id = $node->getAttribute('id');
+        if ($id !== '') {
+            $parts[] = '#' . $id;
+        }
+
+        // Add custom title if provided
+        if ($customTitle !== '') {
+            $parts[] = 'title=' . $this->quoteAttributeValue($customTitle);
+        }
+
+        // Get remaining classes (exclude 'admonition' and the type)
+        $classes = $this->getElementClassList($node);
+        foreach ($classes as $class) {
+            if ($class !== 'admonition' && $class !== $type) {
+                $parts[] = '.' . $class;
+            }
+        }
+
+        // Add other attributes (excluding special ones)
+        $skipAttrs = ['id', 'class', 'data-djot-admonition-type', 'data-djot-admonition-title', ...$this->skipAttributes];
+        /** @var \DOMAttr $attr */
+        foreach ($node->attributes as $attr) {
+            $name = $attr->name;
+            if (in_array($name, $skipAttrs, true) || str_starts_with($name, 'data-djot-')) {
+                continue;
+            }
+            $value = $attr->value;
+            $parts[] = $value === '' ? $name : $name . '=' . $this->quoteAttributeValue($value);
+        }
+
+        // Process content, excluding the title element
+        $content = $this->processAdmonitionContent($node);
+
+        $attrs = $parts === [] ? '' : '{' . implode(' ', $parts) . "}\n";
+        $output = $attrs . '::: ' . $type . "\n";
+        if ($content !== '') {
+            $output .= $content . "\n";
+        }
+
+        return $output . ":::\n\n";
+    }
+
+    /**
+     * Process admonition content, excluding the title element
+     */
+    protected function processAdmonitionContent(DOMElement $node): string
+    {
+        $output = '';
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $tag = strtolower($child->tagName);
+                // Skip the title element (p.admonition-title or summary)
+                if ($tag === 'p' && $this->hasClass($child, 'admonition-title')) {
+                    continue;
+                }
+                if ($tag === 'summary') {
+                    continue;
+                }
+            }
+            $output .= $this->processNode($child);
+        }
+
+        return trim($output);
+    }
+
+    /**
+     * Process details element (potentially collapsible admonition)
+     */
+    protected function processDetails(DOMElement $node): string
+    {
+        // Check for collapsible admonition (round-trip support)
+        if ($node->hasAttribute('data-djot-admonition-type')) {
+            return $this->processCollapsibleAdmonition($node);
+        }
+
+        // Otherwise treat as regular block
+        return $this->processBlock($node);
+    }
+
+    /**
+     * Process collapsible admonition (details element with data-djot-admonition-type)
+     */
+    protected function processCollapsibleAdmonition(DOMElement $node): string
+    {
+        $type = $node->getAttribute('data-djot-admonition-type');
+        $customTitle = $node->getAttribute('data-djot-admonition-title');
+        $isOpen = $node->hasAttribute('open');
+
+        // Build attributes
+        $parts = [];
+        $id = $node->getAttribute('id');
+        if ($id !== '') {
+            $parts[] = '#' . $id;
+        }
+
+        // Add collapsible attribute
+        $parts[] = $isOpen ? 'collapsible=open' : 'collapsible';
+
+        // Add custom title if provided
+        if ($customTitle !== '') {
+            $parts[] = 'title=' . $this->quoteAttributeValue($customTitle);
+        }
+
+        // Get remaining classes (exclude 'admonition' and the type)
+        $classes = $this->getElementClassList($node);
+        foreach ($classes as $class) {
+            if ($class !== 'admonition' && $class !== $type) {
+                $parts[] = '.' . $class;
+            }
+        }
+
+        // Add other attributes (excluding special ones)
+        $skipAttrs = ['id', 'class', 'open', 'data-djot-admonition-type', 'data-djot-admonition-title', ...$this->skipAttributes];
+        /** @var \DOMAttr $attr */
+        foreach ($node->attributes as $attr) {
+            $name = $attr->name;
+            if (in_array($name, $skipAttrs, true) || str_starts_with($name, 'data-djot-')) {
+                continue;
+            }
+            $value = $attr->value;
+            $parts[] = $value === '' ? $name : $name . '=' . $this->quoteAttributeValue($value);
+        }
+
+        // Process content, excluding the summary (title) element
+        $content = $this->processAdmonitionContent($node);
+
+        // Collapsible admonitions always have at least the 'collapsible' attribute
+        $attrs = '{' . implode(' ', $parts) . "}\n";
+        $output = $attrs . '::: ' . $type . "\n";
+        if ($content !== '') {
+            $output .= $content . "\n";
+        }
+
+        return $output . ":::\n\n";
+    }
+
+    /**
+     * Check if an element has a specific class
+     */
+    protected function hasClass(DOMElement $node, string $className): bool
+    {
+        $classes = $this->getElementClassList($node);
+
+        return in_array($className, $classes, true);
+    }
+
+    /**
      * @return list<string>
      */
     protected function getElementClassList(DOMElement $node): array
@@ -309,7 +565,19 @@ class HtmlToDjot
         }
         $content = trim($this->processChildren($node));
         $prefix = str_repeat('#', $level) . ' ';
-        $attrs = $this->formatBlockAttributes($node, ['data-djot-source-level']);
+
+        // Check if attributes were already handled by processSection
+        if ($node->hasAttribute('data-djot-attrs-handled')) {
+            return $prefix . $content . "\n\n";
+        }
+
+        // Skip ID attribute unless it was explicitly set (marked by data-djot-explicit-id)
+        // Auto-generated IDs should not be preserved in round-trip
+        $skipAttrs = ['data-djot-source-level', 'data-djot-explicit-id', 'data-djot-attrs-handled'];
+        if (!$node->hasAttribute('data-djot-explicit-id')) {
+            $skipAttrs[] = 'id';
+        }
+        $attrs = $this->formatBlockAttributes($node, $skipAttrs);
 
         return $attrs . $prefix . $content . "\n\n";
     }
@@ -338,6 +606,21 @@ class HtmlToDjot
 
         $backticks = StringUtil::findSafeCodeFence($content, 1);
         $attrs = $this->formatInlineAttributes($node);
+
+        // Add spaces around content if needed to distinguish from fence
+        // Only add space if content starts/ends with backtick but NOT already a space
+        // (If there's already a space, it was preserved from the original)
+        if (strlen($backticks) > 1) {
+            $needsStartSpace = str_starts_with($content, '`') && !str_starts_with($content, ' ');
+            $needsEndSpace = str_ends_with($content, '`') && !str_ends_with($content, ' ');
+
+            if ($needsStartSpace || $needsEndSpace) {
+                $start = $needsStartSpace ? ' ' : '';
+                $end = $needsEndSpace ? ' ' : '';
+
+                return $backticks . $start . $content . $end . $backticks . $attrs;
+            }
+        }
 
         return $backticks . $content . $backticks . $attrs;
     }
@@ -399,6 +682,13 @@ class HtmlToDjot
                 : '[[' . $target . '|' . $displayText . ']]';
         }
 
+        // Check for regular footnote reference (round-trip support)
+        if ($node->hasAttribute('data-djot-footnote-label')) {
+            $label = $node->getAttribute('data-djot-footnote-label');
+
+            return '[^' . $label . ']';
+        }
+
         if ($node->hasAttribute('data-djot-inline-footnote-html')) {
             $html = $node->getAttribute('data-djot-inline-footnote-html');
             preg_match('/^\s+/u', $html, $leadingWhitespaceMatch);
@@ -425,6 +715,52 @@ class HtmlToDjot
             $text = $href;
         }
 
+        // Check for @mention (round-trip support for MentionsExtension)
+        if ($node->hasAttribute('data-username')) {
+            $username = $node->getAttribute('data-username');
+            // Verify the link text matches @username pattern
+            if ($text === '@' . $username) {
+                return '@' . $username;
+            }
+        }
+
+        // Check for autolink (round-trip support)
+        if ($node->hasAttribute('data-djot-autolink')) {
+            // Skip href and data-djot-autolink since they're in the autolink syntax
+            $attrs = $this->formatInlineAttributes($node, ['href', 'data-djot-autolink']);
+
+            // Email autolinks have mailto: prefix - strip it for output
+            if (str_starts_with($href, 'mailto:')) {
+                $email = substr($href, 7);
+
+                return '<' . $email . '>' . $attrs;
+            }
+
+            return '<' . $href . '>' . $attrs;
+        }
+
+        // Check for reference link (round-trip support)
+        if ($node->hasAttribute('data-djot-ref')) {
+            $refLabel = $node->getAttribute('data-djot-ref');
+            // Skip href, title, and data-djot-ref since they're in the reference syntax
+            $attrs = $this->formatInlineAttributes($node, ['href', 'title', 'data-djot-ref']);
+
+            // Collect reference definition
+            // For collapsed reference (empty label), use the link text as label
+            $defLabel = $refLabel === '' ? $text : $refLabel;
+            if (!isset($this->referenceDefinitions[$defLabel])) {
+                $this->referenceDefinitions[$defLabel] = $href;
+            }
+
+            // Output reference link syntax
+            if ($refLabel === '') {
+                // Collapsed reference [text][]
+                return '[' . $text . '][]' . $attrs;
+            }
+
+            return '[' . $text . '][' . $refLabel . ']' . $attrs;
+        }
+
         // Skip href and title since they're in the link syntax
         $attrs = $this->formatInlineAttributes($node, ['href', 'title']);
 
@@ -440,6 +776,28 @@ class HtmlToDjot
         $src = $node->getAttribute('src');
         $alt = $node->getAttribute('alt');
         $title = $node->getAttribute('title');
+
+        // Check for reference image (round-trip support)
+        if ($node->hasAttribute('data-djot-ref')) {
+            $refLabel = $node->getAttribute('data-djot-ref');
+            // Skip src, alt, title, and data-djot-ref since they're in the reference syntax
+            $attrs = $this->formatInlineAttributes($node, ['src', 'alt', 'title', 'data-djot-ref']);
+
+            // Collect reference definition
+            // For collapsed reference (empty label), use the alt text as label
+            $defLabel = $refLabel === '' ? $alt : $refLabel;
+            if (!isset($this->referenceDefinitions[$defLabel])) {
+                $this->referenceDefinitions[$defLabel] = $src;
+            }
+
+            // Output reference image syntax
+            if ($refLabel === '') {
+                // Collapsed reference ![alt][]
+                return '![' . $alt . '][]' . $attrs;
+            }
+
+            return '![' . $alt . '][' . $refLabel . ']' . $attrs;
+        }
 
         // Skip src, alt, title since they're in the image syntax
         $attrs = $this->formatInlineAttributes($node, ['src', 'alt', 'title']);
@@ -718,7 +1076,8 @@ class HtmlToDjot
             if ($colWidthsAttr !== '') {
                 $colWidths = array_map('intval', explode(',', $colWidthsAttr));
                 foreach ($colWidths as $width) {
-                    $separator[] = $this->buildTableSeparator(max(3, $width), $alignments[count($separator)] ?? TableCell::ALIGN_DEFAULT);
+                    // Use exact width from original for round-trip fidelity
+                    $separator[] = $this->buildTableSeparator($width, $alignments[count($separator)] ?? TableCell::ALIGN_DEFAULT);
                 }
                 // Fill remaining columns with default width
                 $separatorCount = count($separator);
@@ -732,7 +1091,7 @@ class HtmlToDjot
                 }
             }
 
-            $output .= '| ' . implode(' | ', $separator) . ' |' . "\n";
+            $output .= '|' . implode('|', $separator) . '|' . "\n";
         }
 
         $output .= implode("\n", $rows) . "\n";
@@ -808,11 +1167,14 @@ class HtmlToDjot
 
     protected function buildTableSeparator(int $width, string $alignment): string
     {
+        // Width represents the number of dashes in the separator
+        // For alignment markers, we add colons around the dashes
+        // Minimum is 1 dash for center, 2 for others (Djot allows 2-dash separators)
         return match ($alignment) {
-            TableCell::ALIGN_LEFT => ':' . str_repeat('-', max(2, $width - 1)),
-            TableCell::ALIGN_RIGHT => str_repeat('-', max(2, $width - 1)) . ':',
-            TableCell::ALIGN_CENTER => ':' . str_repeat('-', max(1, $width - 2)) . ':',
-            default => str_repeat('-', max(3, $width)),
+            TableCell::ALIGN_LEFT => ':' . str_repeat('-', max(2, $width)),
+            TableCell::ALIGN_RIGHT => str_repeat('-', max(2, $width)) . ':',
+            TableCell::ALIGN_CENTER => ':' . str_repeat('-', max(1, $width)) . ':',
+            default => str_repeat('-', max(2, $width)),
         };
     }
 
@@ -998,6 +1360,73 @@ class HtmlToDjot
         }
 
         return true;
+    }
+
+    /**
+     * Process the footnotes endnotes section and extract definitions
+     */
+    protected function processEndnotesSection(DOMElement $node): string
+    {
+        // Find the <ol> containing footnote definitions
+        $ol = $node->getElementsByTagName('ol')->item(0);
+        if (!$ol instanceof DOMElement) {
+            return '';
+        }
+
+        // Process each <li> footnote definition
+        $listItems = $ol->getElementsByTagName('li');
+        foreach ($listItems as $li) {
+            // Skip inline footnotes (handled separately)
+            if ($li->hasAttribute('data-djot-inline-footnote')) {
+                continue;
+            }
+
+            // Get footnote label from data attribute
+            $label = $li->getAttribute('data-djot-footnote-label');
+            if ($label === '') {
+                // Fallback: extract from id attribute (fn1 -> 1)
+                $id = $li->getAttribute('id');
+                if (str_starts_with($id, 'fn')) {
+                    $label = substr($id, 2);
+                } else {
+                    continue;
+                }
+            }
+
+            // Extract content, removing the backlink
+            $content = $this->processFootnoteContent($li);
+            if ($content !== '') {
+                $this->footnoteDefinitions[$label] = $content;
+            }
+        }
+
+        // Return empty - footnote definitions are appended at the end
+        return '';
+    }
+
+    /**
+     * Process footnote content, removing backlinks
+     */
+    protected function processFootnoteContent(DOMElement $li): string
+    {
+        // Clone the node so we can remove backlinks without affecting the original
+        $clone = $li->cloneNode(true);
+
+        // Remove all backlink elements
+        $ownerDocument = $clone->ownerDocument;
+        if ($ownerDocument !== null) {
+            $xpath = new DOMXPath($ownerDocument);
+            /** @var \DOMNodeList<\DOMElement> $backlinks */
+            $backlinks = $xpath->query('.//a[@role="doc-backlink"]', $clone);
+            foreach ($backlinks as $backlink) {
+                $backlink->parentNode?->removeChild($backlink);
+            }
+        }
+
+        // Process the remaining content
+        $content = trim($this->processChildren($clone));
+
+        return $content;
     }
 
     protected function cleanup(string $djot): string

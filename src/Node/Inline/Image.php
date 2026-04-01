@@ -9,11 +9,27 @@ namespace Djot\Node\Inline;
  */
 class Image extends InlineNode
 {
+    /**
+     * The reference label if this image was created from a reference image
+     * like ![alt][ref] or ![alt][]. Null for inline images.
+     */
+    protected ?string $referenceLabel = null;
+
     public function __construct(
         protected string $source = '',
         protected string $alt = '',
         protected ?string $title = null,
     ) {
+    }
+
+    public function getReferenceLabel(): ?string
+    {
+        return $this->referenceLabel;
+    }
+
+    public function setReferenceLabel(string $label): void
+    {
+        $this->referenceLabel = $label;
     }
 
     public function getSource(): string

@@ -6,6 +6,7 @@ namespace Djot\Test\TestCase;
 
 use Djot\Converter\HtmlToDjot;
 use Djot\DjotConverter;
+use Djot\Extension\AdmonitionExtension;
 use Djot\Extension\CodeGroupExtension;
 use Djot\Extension\MermaidExtension;
 use Djot\Extension\TabsExtension;
@@ -29,6 +30,7 @@ class RoundTripTest extends TestCase
         $this->converter->addExtension(new CodeGroupExtension());
         $this->converter->addExtension(new TabsExtension());
         $this->converter->addExtension(new MermaidExtension());
+        $this->converter->addExtension(new AdmonitionExtension());
         $this->htmlToDjot = new HtmlToDjot();
     }
 
@@ -517,5 +519,424 @@ DJOT;
         $djot = ":::: tabs\n::: tab\n### Tab\nContent\n:::\n::::";
         $html = $this->converter->convert($djot);
         $this->assertHasDjotSrc($html, 'Tabs should have data-djot-src');
+    }
+
+    // =========================================================================
+    // Headings with Custom IDs
+    // =========================================================================
+
+    public function testHeadingWithCustomId(): void
+    {
+        $djot = <<<'DJOT'
+{#my-custom-id}
+# Heading
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testHeadingWithCustomIdAndClass(): void
+    {
+        $djot = <<<'DJOT'
+{#special .fancy}
+## Styled Heading
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testMultipleHeadingsWithCustomIds(): void
+    {
+        $djot = <<<'DJOT'
+{#intro}
+# Introduction
+
+Some text.
+
+{#methods}
+## Methods
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testHeadingWithoutCustomId(): void
+    {
+        // Auto-generated IDs should not be preserved
+        $djot = '# Simple Heading';
+        $html = $this->converter->convert($djot);
+        $back = trim($this->htmlToDjot->convert($html));
+        // Should NOT have ID attribute in round-trip
+        $this->assertSame($djot, $back);
+    }
+
+    // =========================================================================
+    // Inline Code with Backticks
+    // =========================================================================
+
+    public function testInlineCodeWithBackticks(): void
+    {
+        $djot = 'Use `` `backtick` `` in code.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testInlineCodeWithMultipleBackticks(): void
+    {
+        $djot = 'Show ``` ``double`` ``` ticks.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testInlineCodeStartingWithBacktick(): void
+    {
+        $djot = 'Use `` `start`` end.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testInlineCodeEndingWithBacktick(): void
+    {
+        $djot = 'Use ``end` `` done.';
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Tables with Various Formats
+    // =========================================================================
+
+    public function testTableWithMinimalSeparator(): void
+    {
+        $djot = <<<'DJOT'
+| A | B |
+|--|--|
+| 1 | 2 |
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testTableWithAlignment(): void
+    {
+        $djot = <<<'DJOT'
+| Left | Center | Right |
+|:--|:--:|--:|
+| L | C | R |
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testTableWithWiderSeparators(): void
+    {
+        $djot = <<<'DJOT'
+| Header 1 | Header 2 |
+|----------|----------|
+| Data 1 | Data 2 |
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testTableWithMixedWidths(): void
+    {
+        $djot = <<<'DJOT'
+| A | Longer |
+|--|-------|
+| 1 | Data |
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Nested Lists (with correct Djot syntax)
+    // =========================================================================
+
+    public function testNestedListsWithBlankLines(): void
+    {
+        $djot = <<<'DJOT'
+- Parent
+
+  - Child
+
+    - Grandchild
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testNestedOrderedLists(): void
+    {
+        // Djot nested lists use 2-space indentation per level
+        // Blank lines between items may not be preserved (tight vs loose list)
+        $djot = <<<'DJOT'
+1. First
+
+  1. Nested first
+  2. Nested second
+2. Second
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Definition Lists (with correct Djot syntax)
+    // =========================================================================
+
+    public function testDefinitionList(): void
+    {
+        $djot = <<<'DJOT'
+: Term
+
+  Definition text here
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testDefinitionListMultipleTerms(): void
+    {
+        $djot = <<<'DJOT'
+: First Term
+
+  First definition
+
+: Second Term
+
+  Second definition
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Reference Links
+    // =========================================================================
+
+    public function testReferenceLinkExplicit(): void
+    {
+        $djot = <<<'DJOT'
+See [the documentation][docs] for more info.
+
+[docs]: https://example.com/docs
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testReferenceLinkCollapsed(): void
+    {
+        $djot = <<<'DJOT'
+Check [Example][] for details.
+
+[Example]: https://example.com
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testReferenceImageExplicit(): void
+    {
+        $djot = <<<'DJOT'
+![Alt text][logo]
+
+[logo]: https://example.com/logo.png
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testReferenceImageCollapsed(): void
+    {
+        $djot = <<<'DJOT'
+![My Logo][]
+
+[My Logo]: https://example.com/my-logo.png
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testMultipleReferencesSharedDefinition(): void
+    {
+        $djot = <<<'DJOT'
+See [here][site] and [there][site] for more.
+
+[site]: https://example.com
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testMixedReferencesAndInlineLinks(): void
+    {
+        $djot = <<<'DJOT'
+Check [Ref Link][ref] and [inline](https://inline.com).
+
+[ref]: https://ref.com
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Autolinks
+    // =========================================================================
+
+    public function testAutolinkUrl(): void
+    {
+        $djot = 'Visit <https://example.com> for more info.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAutolinkEmail(): void
+    {
+        $djot = 'Contact <user@example.com> for help.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAutolinkWithAttributes(): void
+    {
+        $djot = 'See <https://example.com>{.external} for details.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testMixedAutolinksAndRegularLinks(): void
+    {
+        $djot = 'Visit <https://auto.com> or [click here](https://regular.com).';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAutolinkWithScheme(): void
+    {
+        $djot = 'Use <ftp://files.example.com> to download.';
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Footnotes
+    // =========================================================================
+
+    public function testSimpleFootnote(): void
+    {
+        $djot = <<<'DJOT'
+Text[^1].
+
+[^1]: Footnote content.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testNamedFootnote(): void
+    {
+        $djot = <<<'DJOT'
+Text[^note].
+
+[^note]: Named footnote.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testMultipleFootnotes(): void
+    {
+        $djot = <<<'DJOT'
+First[^1] and second[^2].
+
+[^1]: First note.
+[^2]: Second note.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testFootnoteWithFormatting(): void
+    {
+        $djot = <<<'DJOT'
+Text[^1].
+
+[^1]: Footnote with *emphasis* and `code`.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testFootnoteWithLink(): void
+    {
+        $djot = <<<'DJOT'
+Text[^1].
+
+[^1]: Footnote with [link](http://example.com).
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    // =========================================================================
+    // Admonitions (via AdmonitionExtension)
+    // =========================================================================
+
+    public function testSimpleAdmonitionNote(): void
+    {
+        $djot = <<<'DJOT'
+::: note
+Content here.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAdmonitionWarning(): void
+    {
+        $djot = <<<'DJOT'
+::: warning
+Warning content.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAdmonitionWithMultipleParagraphs(): void
+    {
+        $djot = <<<'DJOT'
+::: note
+First paragraph.
+
+Second paragraph.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAdmonitionWithFormatting(): void
+    {
+        $djot = <<<'DJOT'
+::: note
+This is *important* text.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAdmonitionWithCustomTitle(): void
+    {
+        $djot = <<<'DJOT'
+{title="My Custom Title"}
+::: note
+Content with custom title.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testCollapsibleAdmonition(): void
+    {
+        $djot = <<<'DJOT'
+{collapsible}
+::: tip
+Collapsible content.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testCollapsibleAdmonitionOpen(): void
+    {
+        $djot = <<<'DJOT'
+{collapsible=open}
+::: danger
+Expanded by default.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testCollapsibleAdmonitionWithTitle(): void
+    {
+        $djot = <<<'DJOT'
+{collapsible title="Click me"}
+::: note
+Hidden content.
+:::
+DJOT;
+        $this->assertRoundTrip($djot);
     }
 }
