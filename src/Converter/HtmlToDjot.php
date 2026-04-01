@@ -57,6 +57,13 @@ class HtmlToDjot
     protected array $abbreviationDefinitions = [];
 
     /**
+     * Abbreviation definition lookup for round-trip preservation.
+     *
+     * @var array<string, string>
+     */
+    protected array $abbreviationMap = [];
+
+    /**
      * Attributes to skip when converting (these don't translate well to Djot)
      *
      * @var array<string>
@@ -80,6 +87,7 @@ class HtmlToDjot
         $this->referenceDefinitions = [];
         $this->footnoteDefinitions = [];
         $this->abbreviationDefinitions = [];
+        $this->abbreviationMap = [];
 
         // Wrap in root element if needed
         if (!preg_match('/<(html|body|div)[^>]*>/i', $html)) {
@@ -146,6 +154,9 @@ class HtmlToDjot
                     $line = trim($line);
                     if ($line !== '') {
                         $this->abbreviationDefinitions[] = $line;
+                        if (preg_match('/^\*\[([^\]]+)\]:\s*(.*)$/', $line, $matches) === 1) {
+                            $this->abbreviationMap[$matches[1]] = $matches[2];
+                        }
                     }
                 }
                 // Remove the template element so it's not processed
@@ -221,6 +232,10 @@ class HtmlToDjot
             'mark' => $this->processInlineFormatting($node, '{=', '=}'),
             'sup' => $this->processInlineFormatting($node, '^', '^'),
             'sub' => $this->processInlineFormatting($node, '~', '~'),
+            'kbd' => $this->processSemanticSpan($node, 'kbd'),
+            'dfn' => $this->processSemanticSpan($node, 'dfn'),
+            'abbr' => $this->processSemanticSpan($node, 'abbr'),
+            'q' => $this->processInlineQuote($node),
             'code' => $this->processCode($node),
             'pre' => $this->processPreBlock($node),
             'a' => $this->processLink($node),
@@ -1601,6 +1616,75 @@ class HtmlToDjot
         $backticks = StringUtil::findSafeCodeFence($content, 1);
 
         return $backticks . $content . $backticks . '{=' . $format . '}';
+    }
+
+    /**
+     * Process semantic HTML elements to Djot span syntax
+     *
+     * Converts semantic HTML inline elements to Djot span syntax
+     * for round-trip support with SemanticSpanExtension.
+     *
+     * @param \DOMElement $node The semantic element
+     * @param string $type The element type (kbd, dfn, abbr)
+     */
+    protected function processSemanticSpan(DOMElement $node, string $type): string
+    {
+        $content = $this->processChildren($node);
+
+        // Preserve definition-based abbreviations when the round-trip template
+        // already restored the matching abbreviation definition.
+        if ($type === 'abbr') {
+            $title = $node->getAttribute('title');
+            if (($this->abbreviationMap[$content] ?? null) === $title) {
+                return $content;
+            }
+        }
+
+        // Build attribute parts
+        $attrParts = [];
+
+        // For abbr and dfn, the title attribute becomes the attribute value
+        $title = $node->getAttribute('title');
+        if ($title !== '' && ($type === 'abbr' || $type === 'dfn')) {
+            // Escape quotes and backslashes in title
+            $escapedTitle = str_replace(['\\', '"'], ['\\\\', '\\"'], $title);
+            $attrParts[] = $type . '="' . $escapedTitle . '"';
+        } else {
+            // For kbd or title-less dfn/abbr, use the attribute name as a flag.
+            $attrParts[] = $type;
+        }
+
+        // Add any other attributes (id, class, data-*)
+        $otherAttrs = $this->getElementAttributes($node, ['title']);
+        if ($otherAttrs !== '') {
+            $attrParts[] = $otherAttrs;
+        }
+
+        return '[' . $content . ']{' . implode(' ', $attrParts) . '}';
+    }
+
+    /**
+     * Process inline quote element to Djot
+     *
+     * Converts <q> to quoted text. If the q element has a cite attribute,
+     * it's preserved as an attribute on a span.
+     */
+    protected function processInlineQuote(DOMElement $node): string
+    {
+        $content = $this->processChildren($node);
+
+        // Wrap in quotes
+        $quoted = '"' . $content . '"';
+
+        // If there's a cite attribute, wrap in span with the attribute
+        $cite = $node->getAttribute('cite');
+        if ($cite !== '') {
+            $escapedCite = str_replace(['\\', '"'], ['\\\\', '\\"'], $cite);
+
+            return '[' . $quoted . ']{cite="' . $escapedCite . '"}';
+        }
+
+        return $quoted;
     }
 
     /**

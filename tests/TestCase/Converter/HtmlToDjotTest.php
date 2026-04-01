@@ -1558,4 +1558,105 @@ DJOT;
 
         $this->assertSame('$``x`y``$', $result);
     }
+
+    // ==================== Semantic Span Elements ====================
+
+    public function testKbdElement(): void
+    {
+        $html = '<p>Press <kbd>Ctrl+C</kbd> to copy</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('Press [Ctrl+C]{kbd} to copy', $result);
+    }
+
+    public function testDfnElementWithTitle(): void
+    {
+        $html = '<p>The <dfn title="Application Programming Interface">API</dfn> is documented.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('The [API]{dfn="Application Programming Interface"} is documented.', $result);
+    }
+
+    public function testDfnElementWithoutTitle(): void
+    {
+        $html = '<p>A <dfn>term</dfn> is defined here.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('A [term]{dfn} is defined here.', $result);
+    }
+
+    public function testAbbrElementWithTitle(): void
+    {
+        $html = '<p>Use <abbr title="HyperText Markup Language">HTML</abbr> for structure.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('Use [HTML]{abbr="HyperText Markup Language"} for structure.', $result);
+    }
+
+    public function testAbbrMatchingRoundTripDefinitionFallsBackToPlainText(): void
+    {
+        $html = '<template data-djot-abbreviations>*[HTML]: HyperText Markup Language</template>'
+            . '<p>Use <abbr title="HyperText Markup Language">HTML</abbr> for structure.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame("*[HTML]: HyperText Markup Language\n\nUse HTML for structure.", $result);
+    }
+
+    public function testAbbrWithDifferentTitleStillUsesSemanticSpanSyntax(): void
+    {
+        $html = '<template data-djot-abbreviations>*[HTML]: HyperText Markup Language</template>'
+            . '<p>Use <abbr title="HyperText Markup Language">HTML</abbr> and <abbr title="Hyperlink Reference">HREF</abbr>.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $expected = <<<'DJOT'
+*[HTML]: HyperText Markup Language
+
+Use HTML and [HREF]{abbr="Hyperlink Reference"}.
+DJOT;
+
+        $this->assertSame($expected, $result);
+    }
+
+    public function testQElement(): void
+    {
+        $html = '<p>She said <q>Hello</q> to me.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('She said "Hello" to me.', $result);
+    }
+
+    public function testQElementWithCite(): void
+    {
+        $html = '<p>As stated: <q cite="https://example.com">Quote here</q>.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame('As stated: ["Quote here"]{cite="https://example.com"}.', $result);
+    }
+
+    public function testSemanticSpanWithAdditionalAttributes(): void
+    {
+        $html = '<p>Press <kbd id="shortcut" class="key">Ctrl+S</kbd> to save.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertStringContainsString('[Ctrl+S]{kbd', $result);
+        $this->assertStringContainsString('#shortcut', $result);
+        $this->assertStringContainsString('.key', $result);
+    }
+
+    public function testNestedSemanticElements(): void
+    {
+        $html = '<p>Press <kbd><kbd>Ctrl</kbd>+<kbd>C</kbd></kbd> to copy.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertStringContainsString('[Ctrl]{kbd}', $result);
+        $this->assertStringContainsString('[C]{kbd}', $result);
+    }
+
+    public function testAbbrTitleWithQuotes(): void
+    {
+        $html = '<p>The <abbr title="The &quot;Best&quot; Practice">TBP</abbr> guide.</p>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertStringContainsString('[TBP]{abbr="The \\"Best\\" Practice"}', $result);
+    }
 }
