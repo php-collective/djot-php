@@ -1064,4 +1064,36 @@ DJOT;
         $djot = 'Mix of \* and \_ and \[ escapes.';
         $this->assertRoundTrip($djot);
     }
+
+    public function testEscapedAtBoundaries(): void
+    {
+        $djot = '\*starts and ends\*';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testConsecutiveEscapedCharacters(): void
+    {
+        $djot = 'Multiple \*\*\* consecutive escapes.';
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAbbreviationWithSpecialChars(): void
+    {
+        $djot = <<<'DJOT'
+*[C++]: C Plus Plus
+
+The C++ language is powerful.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
+
+    public function testAbbreviationWithDots(): void
+    {
+        $djot = <<<'DJOT'
+*[e.g.]: for example
+
+Use it e.g. in sentences.
+DJOT;
+        $this->assertRoundTrip($djot);
+    }
 }
