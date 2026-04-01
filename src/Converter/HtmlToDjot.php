@@ -50,6 +50,8 @@ class HtmlToDjot
     /**
      * Collected abbreviation definitions for round-trip support
      *
+     * Stores complete definition lines in Djot format: "*[ABBR]: Definition"
+     *
      * @var array<string>
      */
     protected array $abbreviationDefinitions = [];
