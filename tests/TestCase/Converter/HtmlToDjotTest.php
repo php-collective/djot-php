@@ -1561,20 +1561,28 @@ DJOT;
         $this->assertSame('Use [HTML]{abbr="HyperText Markup Language"} for structure.', $result);
     }
 
-    public function testSampElement(): void
+    public function testAbbrMatchingRoundTripDefinitionFallsBackToPlainText(): void
     {
-        $html = '<p>The output was <samp>Hello World</samp>.</p>';
+        $html = '<template data-djot-abbreviations>*[HTML]: HyperText Markup Language</template>'
+            . '<p>Use <abbr title="HyperText Markup Language">HTML</abbr> for structure.</p>';
         $result = trim($this->converter->convert($html));
 
-        $this->assertSame('The output was [Hello World]{samp}.', $result);
+        $this->assertSame("*[HTML]: HyperText Markup Language\n\nUse HTML for structure.", $result);
     }
 
-    public function testVarElement(): void
+    public function testAbbrWithDifferentTitleStillUsesSemanticSpanSyntax(): void
     {
-        $html = '<p>The variable <var>x</var> represents the input.</p>';
+        $html = '<template data-djot-abbreviations>*[HTML]: HyperText Markup Language</template>'
+            . '<p>Use <abbr title="HyperText Markup Language">HTML</abbr> and <abbr title="Hyperlink Reference">HREF</abbr>.</p>';
         $result = trim($this->converter->convert($html));
 
-        $this->assertSame('The variable [x]{var} represents the input.', $result);
+        $expected = <<<'DJOT'
+*[HTML]: HyperText Markup Language
+
+Use HTML and [HREF]{abbr="Hyperlink Reference"}.
+DJOT;
+
+        $this->assertSame($expected, $result);
     }
 
     public function testQElement(): void

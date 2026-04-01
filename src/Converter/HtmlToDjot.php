@@ -57,6 +57,13 @@ class HtmlToDjot
     protected array $abbreviationDefinitions = [];
 
     /**
+     * Abbreviation definition lookup for round-trip preservation.
+     *
+     * @var array<string, string>
+     */
+    protected array $abbreviationMap = [];
+
+    /**
      * Attributes to skip when converting (these don't translate well to Djot)
      *
      * @var array<string>
@@ -80,6 +87,7 @@ class HtmlToDjot
         $this->referenceDefinitions = [];
         $this->footnoteDefinitions = [];
         $this->abbreviationDefinitions = [];
+        $this->abbreviationMap = [];
 
         // Wrap in root element if needed
         if (!preg_match('/<(html|body|div)[^>]*>/i', $html)) {
@@ -146,6 +154,9 @@ class HtmlToDjot
                     $line = trim($line);
                     if ($line !== '') {
                         $this->abbreviationDefinitions[] = $line;
+                        if (preg_match('/^\*\[([^\]]+)\]:\s*(.*)$/', $line, $matches) === 1) {
+                            $this->abbreviationMap[$matches[1]] = $matches[2];
+                        }
                     }
                 }
                 // Remove the template element so it's not processed
@@ -224,8 +235,6 @@ class HtmlToDjot
             'kbd' => $this->processSemanticSpan($node, 'kbd'),
             'dfn' => $this->processSemanticSpan($node, 'dfn'),
             'abbr' => $this->processSemanticSpan($node, 'abbr'),
-            'samp' => $this->processSemanticSpan($node, 'samp'),
-            'var' => $this->processSemanticSpan($node, 'var'),
             'q' => $this->processInlineQuote($node),
             'code' => $this->processCode($node),
             'pre' => $this->processPreBlock($node),
@@ -1610,20 +1619,23 @@ class HtmlToDjot
     /**
      * Process semantic HTML elements to Djot span syntax
      *
-     * Converts <kbd>, <dfn>, <abbr>, <samp>, <var> to [content]{attr} format
+     * Converts semantic HTML inline elements to Djot span syntax
      * for round-trip support with SemanticSpanExtension.
      *
      * @param \DOMElement $node The semantic element
-     * @param string $type The element type (kbd, dfn, abbr, samp, var)
+     * @param string $type The element type (kbd, dfn, abbr)
      */
     protected function processSemanticSpan(DOMElement $node, string $type): string
     {
         $content = $this->processChildren($node);
 
-        // For abbr elements: if we have abbreviation definitions from round-trip,
-        // the abbr is from AbbreviationExtension - just return the text content
-        if ($type === 'abbr' && $this->abbreviationDefinitions !== []) {
-            return $content;
+        // Preserve definition-based abbreviations when the round-trip template
+        // already restored the matching abbreviation definition.
+        if ($type === 'abbr') {
+            $title = $node->getAttribute('title');
+            if (($this->abbreviationMap[$content] ?? null) === $title) {
+                return $content;
+            }
         }
 
         // Build attribute parts
@@ -1636,7 +1648,7 @@ class HtmlToDjot
             $escapedTitle = str_replace(['\\', '"'], ['\\\\', '\\"'], $title);
             $attrParts[] = $type . '="' . $escapedTitle . '"';
         } else {
-            // For kbd, samp, var - just use the attribute name as a flag
+            // For kbd or title-less dfn/abbr, use the attribute name as a flag.
             $attrParts[] = $type;
         }
 
