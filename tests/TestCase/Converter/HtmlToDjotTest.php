@@ -402,6 +402,14 @@ HTML;
         $this->assertStringContainsString('^ cap', $result);
     }
 
+    public function testFigureWithMultilineCaptionKeepsAllCaptionTextInsideCaption(): void
+    {
+        $html = '<figure><img src="photo.jpg" alt="Photo"><figcaption><p>cap one</p><p>cap two</p></figcaption></figure>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame("![Photo](photo.jpg)\n^ cap one\ncap two", $result);
+    }
+
     public function testEndnotesSectionDoesNotTreatNestedListItemsAsFootnotes(): void
     {
         $html = '<section role="doc-endnotes"><ol><li id="fn1"><p>top</p><ol><li>nested</li></ol><p><a role="doc-backlink" href="#fnref1">↩︎</a></p></li></ol></section>';
@@ -427,6 +435,14 @@ HTML;
 
         $this->assertStringContainsString('| Month | Sales |', $result);
         $this->assertStringContainsString('^ Monthly Sales Data', $result);
+    }
+
+    public function testTableWithMultilineCaptionKeepsAllCaptionTextInsideCaption(): void
+    {
+        $html = '<table><caption><p>cap one</p><p>cap two</p></caption><tr><td>x</td></tr></table>';
+        $result = trim($this->converter->convert($html));
+
+        $this->assertSame("| x |\n^ cap one\ncap two", $result);
     }
 
     public function testCaptionRoundtrip(): void
@@ -1412,6 +1428,22 @@ DJOT;
 
         $this->assertStringContainsString('> Famous quote', $result);
         $this->assertStringContainsString('> Author Name', $result);
+    }
+
+    public function testBlockquoteWithMultilineFooterAttributionKeepsAllLinesQuoted(): void
+    {
+        $html = '<blockquote><p>quote</p><footer><p>By <strong>A</strong></p><p>Work</p></footer></blockquote>';
+        $result = trim($this->converter->convert($html));
+
+        $expected = <<<'DJOT'
+> quote
+>
+> By *A*
+>
+> Work
+DJOT;
+
+        $this->assertSame($expected, $result);
     }
 
     public function testBlockquoteWithoutAttribution(): void
