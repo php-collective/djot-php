@@ -130,6 +130,24 @@ class HtmlToDjotTest extends TestCase
         $this->assertSame("[Example](https://example.com \"a \\\"quote\\\" here\")\n", $result);
     }
 
+    public function testLinkEscapesClosingBracketInLabel(): void
+    {
+        $result = $this->converter->convert('<a href="https://example.com">a ] b</a>');
+
+        $this->assertSame("[a \\] b](https://example.com)\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<a href="https://example.com">a ] b</a>', $htmlBack);
+    }
+
+    public function testLinkEscapesBackslashInLabel(): void
+    {
+        $result = $this->converter->convert('<a href="https://example.com">a \\ b</a>');
+
+        $this->assertSame("[a \\\\ b](https://example.com)\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<a href="https://example.com">a \ b</a>', $htmlBack);
+    }
+
     // ==================== Images ====================
 
     public function testImage(): void
@@ -148,6 +166,33 @@ class HtmlToDjotTest extends TestCase
     {
         $result = $this->converter->convert('<img src="image.jpg" alt="Alt" title="a &quot;quote&quot; here">');
         $this->assertSame("![Alt](image.jpg \"a \\\"quote\\\" here\")\n", $result);
+    }
+
+    public function testImageWithBracketInAltFallsBackToRawHtml(): void
+    {
+        $result = $this->converter->convert('<img src="img.png" alt="a [ b">');
+
+        $this->assertSame("`<img src=\"img.png\" alt=\"a [ b\">`{=html}\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<img src="img.png" alt="a [ b">', $htmlBack);
+    }
+
+    public function testImageWithBackslashInAltFallsBackToRawHtml(): void
+    {
+        $result = $this->converter->convert('<img src="img.png" alt="a \\ b">');
+
+        $this->assertSame("`<img src=\"img.png\" alt=\"a \ b\">`{=html}\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<img src="img.png" alt="a \\ b">', $htmlBack);
+    }
+
+    public function testLinkWrappingProblematicImageFallsBackToRawHtml(): void
+    {
+        $result = $this->converter->convert('<a href="https://example.com"><img src="img.png" alt="a [ b"></a>');
+
+        $this->assertSame("`<a href=\"https://example.com\"><img src=\"img.png\" alt=\"a [ b\"></a>`{=html}\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<a href="https://example.com"><img src="img.png" alt="a [ b"></a>', $htmlBack);
     }
 
     // ==================== Code ====================
@@ -450,6 +495,18 @@ HTML;
         $this->assertStringNotContainsString("\n1. nested", $result);
     }
 
+    public function testEndnotesSectionKeepsMultilineFootnoteInsideDefinition(): void
+    {
+        $html = '<section role="doc-endnotes"><ol><li id="fn1" data-djot-footnote-label="1"><p>One</p><p>Two</p><p><a role="doc-backlink" href="#fnref1">↩︎</a></p></li></ol></section>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("[^1]: One\n  \n  Two\n", $result);
+
+        $htmlBack = (new DjotConverter())->convert("ref[^1]\n\n" . $result);
+        $this->assertStringContainsString('<p>One</p>', $htmlBack);
+        $this->assertStringContainsString('<p>Two<a href="#fnref1"', $htmlBack);
+    }
+
     public function testTableWithCaption(): void
     {
         $html = <<<'HTML'
@@ -464,6 +521,26 @@ HTML;
 
         $this->assertStringContainsString('| Month | Sales |', $result);
         $this->assertStringContainsString('^ Monthly Sales Data', $result);
+    }
+
+    public function testTableCellWithMultipleParagraphsFallsBackToSingleLineCellText(): void
+    {
+        $html = '<table><tr><td><p>One</p><p>Two</p></td></tr></table>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("| One Two |\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<td>One Two</td>', $htmlBack);
+    }
+
+    public function testTableCellWithNestedListFallsBackToSingleLineCellText(): void
+    {
+        $html = '<table><tr><td><ul><li>Item</li></ul></td></tr></table>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("| - Item |\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<td>- Item</td>', $htmlBack);
     }
 
     public function testTableWithMultilineCaptionKeepsAllCaptionTextInsideCaption(): void

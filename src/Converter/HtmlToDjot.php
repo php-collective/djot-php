@@ -889,6 +889,10 @@ class HtmlToDjot
 
     protected function processLink(DOMElement $node): string
     {
+        if ($this->linkRequiresRawHtmlFallback($node)) {
+            return $this->processRawHtmlInlineElement($node);
+        }
+
         if ($node->hasAttribute('data-djot-heading-ref')) {
             $target = $node->getAttribute('data-djot-heading-ref');
             $displayText = $node->getAttribute('data-djot-heading-ref-display');
@@ -933,6 +937,8 @@ class HtmlToDjot
         if ($text === '') {
             $text = $href;
         }
+
+        $text = $this->escapeLinkOrImageLabel($text);
 
         // Check for @mention (round-trip support for MentionsExtension)
         if ($node->hasAttribute('data-username')) {
@@ -993,8 +999,14 @@ class HtmlToDjot
     protected function processImage(DOMElement $node): string
     {
         $src = $node->getAttribute('src');
-        $alt = $node->getAttribute('alt');
+        $rawAlt = $node->getAttribute('alt');
         $title = $node->getAttribute('title');
+
+        if ($this->requiresRawImageFallback($rawAlt)) {
+            return $this->processRawHtmlInlineElement($node);
+        }
+
+        $alt = $this->escapeLinkOrImageLabel($rawAlt);
 
         // Check for reference image (round-trip support)
         if ($node->hasAttribute('data-djot-ref')) {
@@ -1413,7 +1425,7 @@ class HtmlToDjot
                     $tag = strtolower($cell->tagName);
                     if ($tag === 'th' || $tag === 'td') {
                         // Get cell content with cell attributes
-                        $cellContent = trim($this->processChildren($cell));
+                        $cellContent = $this->serializeTableCellContent($cell);
                         $cellAttrs = $this->getElementAttributes($cell);
                         if ($cellAttrs !== '') {
                             // Cell attributes go after opening pipe: |{.class} content |
@@ -1522,6 +1534,24 @@ class HtmlToDjot
         }
 
         return $rows;
+    }
+
+    protected function serializeTableCellContent(DOMElement $cell): string
+    {
+        $hasBlockChildren = false;
+
+        foreach ($cell->childNodes as $child) {
+            if ($child instanceof DOMElement && in_array(strtolower($child->tagName), $this->blockElements, true)) {
+                $hasBlockChildren = true;
+
+                break;
+            }
+        }
+
+        $content = $hasBlockChildren ? $this->processBlock($cell) : $this->processChildren($cell);
+        $content = trim($content);
+
+        return preg_replace('/\s+/', ' ', $content) ?? $content;
     }
 
     protected function findFirstDirectChildByTagName(DOMElement $node, string $tagName): ?DOMElement
@@ -1695,6 +1725,33 @@ class HtmlToDjot
         $backticks = StringUtil::findSafeCodeFence($content, 1);
 
         return $backticks . $content . $backticks . '{=' . $format . '}';
+    }
+
+    protected function processRawHtmlInlineElement(DOMElement $node): string
+    {
+        $html = $node->ownerDocument?->saveHTML($node);
+        if (!is_string($html)) {
+            $html = '';
+        }
+
+        $backticks = StringUtil::findSafeCodeFence($html, 1);
+
+        return $backticks . $html . $backticks . '{=html}';
+    }
+
+    protected function linkRequiresRawHtmlFallback(DOMElement $node): bool
+    {
+        foreach ($node->childNodes as $child) {
+            if (
+                $child instanceof DOMElement
+                && strtolower($child->tagName) === 'img'
+                && $this->requiresRawImageFallback($child->getAttribute('alt'))
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -2094,7 +2151,7 @@ class HtmlToDjot
         }
 
         // Process the remaining content
-        $content = trim($this->processChildren($clone));
+        $content = trim($this->processBlock($clone));
 
         return $content;
     }
@@ -2107,13 +2164,24 @@ class HtmlToDjot
         $formatted = '[^' . $label . ']: ' . $firstLine;
 
         foreach ($lines as $line) {
-            $formatted .= "\n";
-            if ($line !== '') {
-                $formatted .= '  ' . $line;
-            }
+            $formatted .= "\n  " . $line;
         }
 
         return $formatted;
+    }
+
+    protected function escapeLinkOrImageLabel(string $text): string
+    {
+        return str_replace(
+            ['\\', '[', ']'],
+            ['\\\\', '\[', '\]'],
+            $text,
+        );
+    }
+
+    protected function requiresRawImageFallback(string $alt): bool
+    {
+        return strpbrk($alt, '[]\\') !== false;
     }
 
     protected function cleanup(string $djot): string
@@ -2123,6 +2191,7 @@ class HtmlToDjot
         $inCodeBlock = false;
         $inDefinitionList = false;
         $inList = false;
+        $inFootnote = false;
         $result = [];
 
         foreach ($lines as $line) {
@@ -2140,10 +2209,20 @@ class HtmlToDjot
                 continue;
             }
 
+            if (preg_match('/^\[\^[^\]]+\]:\s*/', $line) === 1) {
+                $result[] = $line;
+                $inDefinitionList = false;
+                $inList = false;
+                $inFootnote = true;
+
+                continue;
+            }
+
             // Track definition lists (`: term` starts one)
             if (str_starts_with($line, ': ')) {
                 $inDefinitionList = true;
                 $inList = false;
+                $inFootnote = false;
                 $result[] = $line;
 
                 continue;
@@ -2154,6 +2233,7 @@ class HtmlToDjot
                 $result[] = $line;
                 $inDefinitionList = false;
                 $inList = true;
+                $inFootnote = false;
 
                 continue;
             }
@@ -2186,9 +2266,15 @@ class HtmlToDjot
                 continue;
             }
 
+            if ($inFootnote && preg_match('/^\s{2,}\S/', $line)) {
+                $result[] = $line;
+
+                continue;
+            }
+
             // Blank line (or whitespace-only line) ends definition list context but not list context
             if (trim($line) === '') {
-                $result[] = ''; // Normalize to empty string
+                $result[] = $inFootnote ? '  ' : ''; // Normalize to empty string unless footnote continuation needs indentation
 
                 continue;
             }
@@ -2197,6 +2283,7 @@ class HtmlToDjot
             $result[] = ltrim($line);
             $inDefinitionList = false;
             $inList = false;
+            $inFootnote = false;
         }
 
         $djot = implode("\n", $result);
