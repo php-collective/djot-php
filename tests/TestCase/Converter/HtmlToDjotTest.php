@@ -170,12 +170,46 @@ class HtmlToDjotTest extends TestCase
         $this->assertStringContainsString("```php\n", $result);
     }
 
+    public function testCodeBlockUsesDirectChildCodeElement(): void
+    {
+        $html = '<pre><div><code>nested</code></div><code class="language-php">direct</code></pre>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString("```php\n", $result);
+        $this->assertStringContainsString("direct\n", $result);
+        $this->assertStringNotContainsString("nested\n```", $result);
+    }
+
+    public function testCodeBlockPreservesNonWordLanguageName(): void
+    {
+        $result = $this->converter->convert('<pre><code class="language-c++">int main() {}</code></pre>');
+
+        $this->assertStringContainsString("```c++\n", $result);
+    }
+
+    public function testLineBlockWithParagraphChildrenPreservesSeparateLines(): void
+    {
+        $result = $this->converter->convert('<div class="line-block"><p>one</p><p>two</p></div>');
+
+        $this->assertSame("| one\n| two\n", $result);
+    }
+
     // ==================== Block Elements ====================
 
     public function testBlockquote(): void
     {
         $result = $this->converter->convert('<blockquote>Quoted text</blockquote>');
         $this->assertStringContainsString('> Quoted text', $result);
+    }
+
+    public function testBlockquoteWithMultipleParagraphsPreservesParagraphBreaks(): void
+    {
+        $djot = $this->converter->convert('<blockquote><p>one</p><p>two</p></blockquote>');
+
+        $this->assertStringContainsString("> one\n>\n> two", $djot);
+
+        $html = (new DjotConverter())->convert($djot);
+        $this->assertStringContainsString("<blockquote>\n<p>one</p>\n<p>two</p>\n</blockquote>", $html);
     }
 
     public function testHorizontalRule(): void
@@ -217,6 +251,16 @@ class HtmlToDjotTest extends TestCase
 
         $this->assertStringContainsString('- Item 1', $result);
         $this->assertStringContainsString('  - Nested', $result);
+    }
+
+    public function testNestedCheckboxDoesNotTurnParentIntoTaskItem(): void
+    {
+        $html = '<ul><li>Parent<ul><li><input type="checkbox" checked>Child</li></ul></li></ul>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('- Parent', $result);
+        $this->assertStringNotContainsString('- [x] Parent', $result);
+        $this->assertStringContainsString('  - [x] Child', $result);
     }
 
     public function testOrderedListWithStart(): void
@@ -321,6 +365,13 @@ HTML;
         $this->assertSame("[text]{#n1 .note}\n", $result);
     }
 
+    public function testSpanAttributeEscapesBackslashesAndQuotes(): void
+    {
+        $result = $this->converter->convert('<span data-note="C:\\path\\&quot;quoted&quot; value">x</span>');
+
+        $this->assertSame("[x]{data-note=\"C:\\\\path\\\\\\\"quoted\\\" value\"}\n", $result);
+    }
+
     // ==================== Figures ====================
 
     public function testFigure(): void
@@ -339,6 +390,27 @@ HTML;
 
         $this->assertStringContainsString('> A profound quote', $result);
         $this->assertStringContainsString('^ The Author', $result);
+    }
+
+    public function testFigureUsesDirectChildBlockquoteInsteadOfNestedImage(): void
+    {
+        $html = '<figure><blockquote><p>quote</p><img src="inside.png" alt="inside"></blockquote><figcaption>cap</figcaption></figure>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString('> quote', $result);
+        $this->assertFalse(str_starts_with($result, '![inside](inside.png)'));
+        $this->assertStringContainsString('^ cap', $result);
+    }
+
+    public function testEndnotesSectionDoesNotTreatNestedListItemsAsFootnotes(): void
+    {
+        $html = '<section role="doc-endnotes"><ol><li id="fn1"><p>top</p><ol><li>nested</li></ol><p><a role="doc-backlink" href="#fnref1">↩︎</a></p></li></ol></section>';
+        $result = $this->converter->convert($html);
+
+        $this->assertStringContainsString("[^1]: top\n", $result);
+        $this->assertStringContainsString("  1. nested\n", $result);
+        $this->assertStringNotContainsString('[^nested]:', $result);
+        $this->assertStringNotContainsString("\n1. nested", $result);
     }
 
     public function testTableWithCaption(): void
