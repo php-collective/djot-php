@@ -1037,8 +1037,9 @@ class HtmlToDjot
 
                 // Check for task list item (has checkbox input)
                 $checkbox = '';
-                if ($isTaskList || $this->hasCheckbox($child)) {
-                    $isChecked = $this->isCheckboxChecked($child);
+                $checkboxInput = $this->getDirectCheckboxInput($child);
+                if ($isTaskList || $checkboxInput !== null) {
+                    $isChecked = $checkboxInput?->hasAttribute('checked') ?? false;
                     $checkbox = $isChecked ? '[x] ' : '[ ] ';
                 }
 
@@ -1110,31 +1111,19 @@ class HtmlToDjot
     /**
      * Check if a list item contains a checkbox input
      */
-    protected function hasCheckbox(DOMElement $li): bool
+    protected function getDirectCheckboxInput(DOMElement $li): ?DOMElement
     {
-        $inputs = $li->getElementsByTagName('input');
-        foreach ($inputs as $input) {
-            if ($input->getAttribute('type') === 'checkbox') {
-                return true;
+        foreach ($li->childNodes as $child) {
+            if (
+                $child instanceof DOMElement
+                && strtolower($child->tagName) === 'input'
+                && $child->getAttribute('type') === 'checkbox'
+            ) {
+                return $child;
             }
         }
 
-        return false;
-    }
-
-    /**
-     * Check if a list item's checkbox is checked
-     */
-    protected function isCheckboxChecked(DOMElement $li): bool
-    {
-        $inputs = $li->getElementsByTagName('input');
-        foreach ($inputs as $input) {
-            if ($input->getAttribute('type') === 'checkbox') {
-                return $input->hasAttribute('checked');
-            }
-        }
-
-        return false;
+        return null;
     }
 
     /**
@@ -1263,7 +1252,7 @@ class HtmlToDjot
     }
 
     /**
-     * @return list<DOMElement>
+     * @return list<\DOMElement>
      */
     protected function getDirectTableRows(DOMElement $table): array
     {
@@ -1446,9 +1435,9 @@ class HtmlToDjot
         $output = "\n";
 
         // Find img, blockquote, and figcaption
-        $img = $node->getElementsByTagName('img')->item(0);
-        $blockquote = $node->getElementsByTagName('blockquote')->item(0);
-        $caption = $node->getElementsByTagName('figcaption')->item(0);
+        $img = $this->findFirstDirectChildByTagName($node, 'img');
+        $blockquote = $this->findFirstDirectChildByTagName($node, 'blockquote');
+        $caption = $this->findFirstDirectChildByTagName($node, 'figcaption');
 
         if ($img instanceof DOMElement) {
             $output .= $this->processImage($img) . "\n";
@@ -1558,12 +1547,7 @@ class HtmlToDjot
                 // Boolean attribute
                 $parts[] = $name;
             } else {
-                // Quote value if it contains spaces or special chars
-                if (preg_match('/[\s"\'{}]/', $value)) {
-                    $parts[] = $name . '="' . str_replace('"', '\\"', $value) . '"';
-                } else {
-                    $parts[] = $name . '=' . $value;
-                }
+                $parts[] = $name . '=' . $this->quoteAttributeValue($value);
             }
         }
 
@@ -1596,8 +1580,13 @@ class HtmlToDjot
             return false;
         }
 
-        $listItems = $node->getElementsByTagName('li');
-        if ($listItems->length === 0) {
+        $ol = $this->findFirstDirectChildByTagName($node, 'ol');
+        if (!$ol instanceof DOMElement) {
+            return false;
+        }
+
+        $listItems = $this->getDirectChildElementsByTagName($ol, 'li');
+        if ($listItems === []) {
             return false;
         }
 
@@ -1616,13 +1605,13 @@ class HtmlToDjot
     protected function processEndnotesSection(DOMElement $node): string
     {
         // Find the <ol> containing footnote definitions
-        $ol = $node->getElementsByTagName('ol')->item(0);
+        $ol = $this->findFirstDirectChildByTagName($node, 'ol');
         if (!$ol instanceof DOMElement) {
             return '';
         }
 
         // Process each <li> footnote definition
-        $listItems = $ol->getElementsByTagName('li');
+        $listItems = $this->getDirectChildElementsByTagName($ol, 'li');
         foreach ($listItems as $li) {
             // Skip inline footnotes (handled separately)
             if ($li->hasAttribute('data-djot-inline-footnote')) {
@@ -1650,6 +1639,23 @@ class HtmlToDjot
 
         // Return empty - footnote definitions are appended at the end
         return '';
+    }
+
+    /**
+     * @return list<DOMElement>
+     */
+    protected function getDirectChildElementsByTagName(DOMElement $node, string $tagName): array
+    {
+        $matches = [];
+        $tagName = strtolower($tagName);
+
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement && strtolower($child->tagName) === $tagName) {
+                $matches[] = $child;
+            }
+        }
+
+        return $matches;
     }
 
     /**
