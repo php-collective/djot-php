@@ -148,6 +148,23 @@ class HtmlToDjotTest extends TestCase
         $this->assertStringContainsString('<a href="https://example.com">a \ b</a>', $htmlBack);
     }
 
+    public function testCollapsedReferenceLinkWithUnsafeLabelFallsBackToInlineLink(): void
+    {
+        $result = $this->converter->convert('<a href="https://example.com" data-djot-ref="">a ] b</a>');
+
+        $this->assertSame("[a \\] b](https://example.com)\n", $result);
+        $this->assertStringNotContainsString("\n[a \\] b]:", $result);
+    }
+
+    public function testReferenceLinkWithUnsafeReferenceLabelFallsBackToInlineLink(): void
+    {
+        $result = $this->converter->convert('<a href="https://example.com" data-djot-ref="ref]x">txt</a>');
+
+        $this->assertSame("[txt](https://example.com)\n", $result);
+        $this->assertStringNotContainsString('[txt][', $result);
+        $this->assertStringNotContainsString("\n[ref]x]:", $result);
+    }
+
     // ==================== Images ====================
 
     public function testImage(): void
@@ -193,6 +210,14 @@ class HtmlToDjotTest extends TestCase
         $this->assertSame("`<a href=\"https://example.com\"><img src=\"img.png\" alt=\"a [ b\"></a>`{=html}\n", $result);
         $htmlBack = (new DjotConverter())->convert($result);
         $this->assertStringContainsString('<a href="https://example.com"><img src="img.png" alt="a [ b"></a>', $htmlBack);
+    }
+
+    public function testRawImageFallbackStripsDjotMetadata(): void
+    {
+        $result = $this->converter->convert('<img src="img.png" alt="a [ b" data-djot-ref="">');
+
+        $this->assertSame("`<img src=\"img.png\" alt=\"a [ b\">`{=html}\n", $result);
+        $this->assertStringNotContainsString('data-djot-ref', $result);
     }
 
     // ==================== Code ====================
@@ -342,8 +367,8 @@ HTML;
 
         $result = $this->converter->convert($html);
 
-        $this->assertStringContainsString('| outer', $result);
-        $this->assertSame(1, substr_count($result, '| inner |'));
+        $this->assertSame("| outer \\| inner \\| |\n", $result);
+        $this->assertStringNotContainsString("\n| inner |", $result);
     }
 
     public function testDivWithoutClassPreservesAttributes(): void
@@ -541,6 +566,27 @@ HTML;
         $this->assertSame("| - Item |\n", $result);
         $htmlBack = (new DjotConverter())->convert($result);
         $this->assertStringContainsString('<td>- Item</td>', $htmlBack);
+    }
+
+    public function testTableCellEscapesLiteralPipeCharacters(): void
+    {
+        $html = '<table><tr><td>A | B</td></tr></table>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("| A \\| B |\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<td>A | B</td>', $htmlBack);
+        $this->assertStringNotContainsString('<td>A</td>', $htmlBack);
+    }
+
+    public function testTableCellEscapesPipeCharactersAfterBlockDegradation(): void
+    {
+        $html = '<table><tr><td><p>A | B</p><p>C</p></td></tr></table>';
+        $result = $this->converter->convert($html);
+
+        $this->assertSame("| A \\| B C |\n", $result);
+        $htmlBack = (new DjotConverter())->convert($result);
+        $this->assertStringContainsString('<td>A | B C</td>', $htmlBack);
     }
 
     public function testTableWithMultilineCaptionKeepsAllCaptionTextInsideCaption(): void

@@ -970,6 +970,22 @@ class HtmlToDjot
             // Skip href, title, and data-djot-ref since they're in the reference syntax
             $attrs = $this->formatInlineAttributes($node, ['href', 'title', 'data-djot-ref']);
 
+            if ($refLabel === '' && !$this->isSafeReferenceLabel($text)) {
+                if ($title !== '') {
+                    return '[' . $text . '](' . $href . ' ' . $this->quoteLinkTitle($title) . ')' . $attrs;
+                }
+
+                return '[' . $text . '](' . $href . ')' . $attrs;
+            }
+
+            if ($refLabel !== '' && !$this->isSafeReferenceLabel($refLabel)) {
+                if ($title !== '') {
+                    return '[' . $text . '](' . $href . ' ' . $this->quoteLinkTitle($title) . ')' . $attrs;
+                }
+
+                return '[' . $text . '](' . $href . ')' . $attrs;
+            }
+
             // Collect reference definition
             // For collapsed reference (empty label), use the link text as label
             $defLabel = $refLabel === '' ? $text : $refLabel;
@@ -1013,6 +1029,22 @@ class HtmlToDjot
             $refLabel = $node->getAttribute('data-djot-ref');
             // Skip src, alt, title, and data-djot-ref since they're in the reference syntax
             $attrs = $this->formatInlineAttributes($node, ['src', 'alt', 'title', 'data-djot-ref']);
+
+            if ($refLabel === '' && !$this->isSafeReferenceLabel($alt)) {
+                if ($title !== '') {
+                    return '![' . $alt . '](' . $src . ' ' . $this->quoteLinkTitle($title) . ')' . $attrs;
+                }
+
+                return '![' . $alt . '](' . $src . ')' . $attrs;
+            }
+
+            if ($refLabel !== '' && !$this->isSafeReferenceLabel($refLabel)) {
+                if ($title !== '') {
+                    return '![' . $alt . '](' . $src . ' ' . $this->quoteLinkTitle($title) . ')' . $attrs;
+                }
+
+                return '![' . $alt . '](' . $src . ')' . $attrs;
+            }
 
             // Collect reference definition
             // For collapsed reference (empty label), use the alt text as label
@@ -1551,7 +1583,9 @@ class HtmlToDjot
         $content = $hasBlockChildren ? $this->processBlock($cell) : $this->processChildren($cell);
         $content = trim($content);
 
-        return preg_replace('/\s+/', ' ', $content) ?? $content;
+        $content = preg_replace('/\s+/', ' ', $content) ?? $content;
+
+        return str_replace('|', '\|', $content);
     }
 
     protected function findFirstDirectChildByTagName(DOMElement $node, string $tagName): ?DOMElement
@@ -1729,7 +1763,12 @@ class HtmlToDjot
 
     protected function processRawHtmlInlineElement(DOMElement $node): string
     {
-        $html = $node->ownerDocument?->saveHTML($node);
+        $clone = $node->cloneNode(true);
+        if ($clone instanceof DOMElement) {
+            $this->stripDjotDataAttributes($clone);
+        }
+
+        $html = $clone instanceof DOMElement ? $clone->ownerDocument?->saveHTML($clone) : null;
         if (!is_string($html)) {
             $html = '';
         }
@@ -1752,6 +1791,32 @@ class HtmlToDjot
         }
 
         return false;
+    }
+
+    protected function isSafeReferenceLabel(string $label): bool
+    {
+        return strpbrk($label, '[]\\') === false;
+    }
+
+    protected function stripDjotDataAttributes(DOMElement $node): void
+    {
+        $toRemove = [];
+        /** @var \DOMAttr $attr */
+        foreach ($node->attributes as $attr) {
+            if (str_starts_with($attr->name, 'data-djot-')) {
+                $toRemove[] = $attr->name;
+            }
+        }
+
+        foreach ($toRemove as $name) {
+            $node->removeAttribute($name);
+        }
+
+        foreach ($node->childNodes as $child) {
+            if ($child instanceof DOMElement) {
+                $this->stripDjotDataAttributes($child);
+            }
+        }
     }
 
     /**
