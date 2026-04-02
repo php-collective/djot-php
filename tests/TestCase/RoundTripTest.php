@@ -989,6 +989,12 @@ DJOT;
         $this->assertRoundTrip($djot);
     }
 
+    public function testRawInlineHtmlEmphasis(): void
+    {
+        $djot = 'abc `<em>xy</em>`{=html}';
+        $this->assertRoundTrip($djot);
+    }
+
     public function testRawInlineNonHtml(): void
     {
         // Non-HTML formats are preserved in round-trip mode
