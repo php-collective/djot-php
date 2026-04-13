@@ -1500,6 +1500,14 @@ class BlockParser
                             if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle) {
                                 break;
                             }
+                            // After a blank line, content dropping back to base indent
+                            // starts a new block outside the list - let parent handle it.
+                            if ($sawBlankLine) {
+                                $lastItemHadBlankAfter = true;
+                                $brokeForParentContent = true;
+
+                                break;
+                            }
                             // Content at base indent that's not a matching list marker
                             // Check if it's a block element - if so, end list content collection
                             // Use isBlockElementStart() which detects blocks regardless of mode

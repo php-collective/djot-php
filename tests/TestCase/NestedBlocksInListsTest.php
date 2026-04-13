@@ -633,4 +633,39 @@ DJOT;
         // Should NOT be inline code
         $this->assertStringNotContainsString('<p><code>', $result);
     }
+
+    /**
+     * After a nested block inside a list item and a blank line, an
+     * unindented paragraph must terminate the list rather than being
+     * absorbed as a sub-item of the previous list item.
+     *
+     * @see https://github.com/php-collective/djot-php/issues/176
+     */
+    public function testIssue176UnindentedParagraphAfterNestedCodeBlockEndsList(): void
+    {
+        $djot = <<<'DJOT'
+1. Item 1
+2. Item 2
+
+   ```
+   Example
+   ```
+
+New list:
+
+* New item 1
+* New item 2
+DJOT;
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('</ol>', $result);
+        // The "New list:" paragraph must appear after the ordered list closes.
+        $olClose = strpos($result, '</ol>');
+        $paragraph = strpos($result, '<p>New list:</p>');
+        $this->assertNotFalse($paragraph);
+        $this->assertGreaterThan($olClose, $paragraph);
+        // And the following bullet list must be a sibling, not nested in <li>.
+        $this->assertMatchesRegularExpression('#</ol>\s*<p>New list:</p>\s*<ul>#', $result);
+    }
 }
