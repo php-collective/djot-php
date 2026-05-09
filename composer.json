@@ -4,6 +4,7 @@
     "type": "library",
     "license": "MIT",
     "keywords": ["djot", "markup", "parser", "markdown"],
+    "homepage": "https://php-collective.github.io/djot-php/",
     "authors": [
         {
             "name": "PHP Collective",
