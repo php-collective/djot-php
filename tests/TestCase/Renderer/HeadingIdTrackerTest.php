@@ -163,6 +163,26 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('h-1-Introduction', $this->tracker->normalizeId('1. Introduction'));
     }
 
+    /**
+     * Pins behaviour discussed in jgm/djot#391 (spec wording on auto-ID generation).
+     *
+     * djot-php sides with djot.js / djoths on remove-vs-replace (mid-word punctuation
+     * becomes `-`), and deliberately deviates on apostrophes / quotes / `;` / `:` by
+     * also replacing them, so generated IDs are valid CSS identifiers and safe to use
+     * with `querySelector()`.
+     */
+    public function testNormalizeIdSpecAlignmentEdgeCases(): void
+    {
+        $this->assertSame('A-B-C', $this->tracker->normalizeId('A+B=C'));
+        $this->assertSame('Emphasis-strong', $this->tracker->normalizeId('Emphasis/strong'));
+        $this->assertSame('That-s-all', $this->tracker->normalizeId("That's all"));
+        $this->assertSame('foo-bar', $this->tracker->normalizeId('foo...bar'));
+        $this->assertSame('Uber-uns', $this->tracker->normalizeId('Uber uns'));
+        $this->assertSame('Über-uns', $this->tracker->normalizeId('Über uns'));
+        $this->assertSame('h-2024-recap', $this->tracker->normalizeId('2024 recap'));
+        $this->assertSame('heading', $this->tracker->normalizeId('!!!'));
+    }
+
     public function testGetPlainText(): void
     {
         $heading = new Heading(2);

@@ -251,7 +251,7 @@ DJOT);
 
     public function testUserAuthoredLinkWithMatchingPlaceholderIsNotRewritten(): void
     {
-        $extension = new class('heading-ref') extends HeadingReferenceExtension {
+        $extension = new class ('heading-ref') extends HeadingReferenceExtension {
             protected function generatePlaceholderPrefix(): string
             {
                 return 'collision-placeholder-';

@@ -144,7 +144,7 @@ The ID is `Introduction`, not `Introduction1` or `Introduction[^1]`.
 
 ## CSS-Safe Heading IDs
 
-**Related:** [php-collective/djot-php#92](https://github.com/php-collective/djot-php/pull/92)
+**Related:** [php-collective/djot-php#92](https://github.com/php-collective/djot-php/pull/92), [jgm/djot#391](https://github.com/jgm/djot/issues/391)
 
 **Status:** Implemented in djot-php
 
@@ -216,6 +216,22 @@ You can always override with an explicit ID attribute:
 ```
 
 Explicit IDs are used as-is without normalization.
+
+### Spec Alignment
+
+The djot spec's wording on auto-ID generation is being clarified in [jgm/djot#391](https://github.com/jgm/djot/issues/391). djot-php's normalization aligns with the proposed direction in most respects and deliberately deviates in two places — both motivated by producing valid CSS identifiers for `querySelector()` consumers.
+
+| Aspect | djot.js / djoths (proposed spec) | djot-php |
+|--------|---------------------------------|----------|
+| Mid-word punctuation (`A+B=C`) | replace with `-` → `A-B-C` | replace with `-` → `A-B-C` |
+| Non-ASCII letters (`Über uns`) | preserve → `Über-uns` | preserve → `Über-uns` |
+| Consecutive punctuation (`foo...bar`) | collapse to single `-` → `foo-bar` | collapse to single `-` → `foo-bar` |
+| Apostrophe (`That's all`) | preserve → `That's-all` | replace with `-` → `That-s-all` |
+| Double quote / `;` / `:` | preserve | replace with `-` |
+| Leading digit (`2024 recap`) | unspecified | prefix with `h-` → `h-2024-recap` |
+| Empty result (`!!!`) | unspecified | fallback → `heading` |
+
+The apostrophe / quote / semicolon / colon deviation is deliberate: these characters are not valid in unescaped CSS identifiers, so preserving them per the spec would force every JS consumer to round-trip through `CSS.escape()` before doing a selector lookup. The leading-digit and empty-result behaviors fill in spec gaps that other implementations handle inconsistently.
 
 ---
 
