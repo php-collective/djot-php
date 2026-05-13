@@ -36,6 +36,12 @@ if (!is_string($path)) {
 
 if ($path === '/__assets/livereload.js') {
     header('Content-Type: application/javascript; charset=utf-8');
+    // Never cache. Live-preview iterates fast and a stale livereload
+    // client (missing a new event listener, for example) leaves the user
+    // wondering why nothing reloads.
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     readfile($assetsDir . '/livereload.js');
 
     return true;
@@ -43,6 +49,7 @@ if ($path === '/__assets/livereload.js') {
 
 if ($path === '/__assets/style.css') {
     header('Content-Type: text/css; charset=utf-8');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
     if ($cssOverride !== '' && is_file($cssOverride)) {
         readfile($cssOverride);
     } else {
@@ -111,6 +118,11 @@ if ($path === '/__sse') {
 }
 
 if ($path === '/' || $path === '/index.html') {
+    // The HTML is regenerated from the current djot every request; caching
+    // would defeat the live-preview loop.
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     if (!is_file($target)) {
         http_response_code(404);
         echo "djot-watch: target file '{$target}' not found.";
