@@ -16,7 +16,9 @@ class FileWatcher
      */
     private array $fingerprints = [];
 
-    /** @param list<string> $paths */
+    /**
+     * @param list<string> $paths
+     */
     public function __construct(private readonly array $paths)
     {
         foreach ($this->paths as $path) {
@@ -38,7 +40,9 @@ class FileWatcher
         return $changed;
     }
 
-    /** @return array{mtime: int, size: int} */
+    /**
+     * @return array{mtime: int, size: int}
+     */
     private function fingerprint(string $path): array
     {
         clearstatcache(true, $path);

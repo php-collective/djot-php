@@ -36,6 +36,7 @@ $html = $converter->convert('Hello *world*!');
 - **Extensions**: Built-in extensions for external links, TOC, heading permalinks, @mentions, autolinks, default attributes
 - **Extensible**: Custom inline/block patterns, render events
 - **File support**: Parse and convert files directly
+- **CLI tools**: `bin/djot` (one-shot convert) and `bin/djot-watch` (live-reload preview server) — see [CLI reference](https://php-collective.github.io/djot-php/reference/cli)
 
 ## Example
 
