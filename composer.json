@@ -48,6 +48,7 @@
         }
     },
     "bin": [
-        "bin/djot"
+        "bin/djot",
+        "bin/djot-watch"
     ]
 }

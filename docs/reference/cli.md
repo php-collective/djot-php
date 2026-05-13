@@ -121,3 +121,51 @@ php -S localhost:8000 -t public
 | 1 | General error |
 | 2 | File not found |
 | 3 | Invalid format |
+
+## Live Preview: `djot-watch`
+
+A companion long-running command that serves a live-reloading HTML preview of a `.djot` file in your browser. Useful while drafting in any editor (Vim, Helix, VS Code, Zed, Sublime — anything).
+
+### Usage
+
+```bash
+./vendor/bin/djot-watch path/to/file.djot
+```
+
+This starts a local HTTP server on `http://127.0.0.1:8765/`, opens the URL in your default browser, and re-renders the file on every save. The browser tab refreshes automatically via Server-Sent Events.
+
+Press `Ctrl+C` to stop.
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `-p`, `--port PORT` | HTTP port (default `8765`; auto-bumps up to `+10` if taken). |
+| `--host HOST` | Bind host (default `127.0.0.1`). |
+| `--no-open` | Do not launch the browser on startup. |
+| `--css FILE` | Path to a custom CSS file served at `/__assets/style.css`. |
+| `-v`, `--version` | Print version. |
+| `-h`, `--help` | Print help text. |
+
+### Custom Styling
+
+The watcher ships a minimal default stylesheet (system fonts, sensible spacing, dark-mode aware). Override with `--css`:
+
+```bash
+./vendor/bin/djot-watch post.djot --css ./my-preview.css
+```
+
+### Editor Integration
+
+The watcher is editor-agnostic — it just watches the file you give it. Bind a key or task in your editor to run `./vendor/bin/djot-watch ${FILE}` so you can fire up the preview without leaving the editor. For Zed, see the [zed-djot extension README](https://github.com/php-collective/zed-djot) for a `tasks.json` snippet.
+
+### How It Works
+
+`djot-watch` boots a long-lived PHP process that:
+
+1. Renders your `.djot` file via the same `DjotConverter` used by `bin/djot`.
+2. Spawns `php -S` on the chosen port with a small router script.
+3. Polls the file for `(mtime, size)` changes every 250 ms; pushes a Server-Sent Events `reload` event when something changes.
+4. Injects a tiny JS client into the served HTML that reloads on the SSE event.
+
+No daemon, no config file, no global state. Just the binary and your file.
