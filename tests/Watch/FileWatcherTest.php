@@ -46,6 +46,17 @@ class FileWatcherTest extends TestCase
         @unlink($b);
     }
 
+    public function testDetectsSameSecondReplaceViaSizeChange(): void
+    {
+        $tmp = $this->makeFile("first\n");
+        $watcher = new FileWatcher([$tmp]);
+        // Write different-length content without advancing mtime past one-second resolution.
+        file_put_contents($tmp, "longer second content\n");
+        clearstatcache(true, $tmp);
+        $this->assertTrue($watcher->poll());
+        @unlink($tmp);
+    }
+
     private function makeFile(string $content): string
     {
         $path = tempnam(sys_get_temp_dir(), 'fw_test_');
