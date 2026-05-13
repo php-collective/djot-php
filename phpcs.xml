@@ -8,10 +8,7 @@
 
     <exclude-pattern>*/vendor/*</exclude-pattern>
 
-    <rule ref="PhpCollective">
-        <!-- Conflicts with Universal.WhiteSpace.AnonClassKeywordSpacing which PhpCollective enables -->
-        <exclude name="PSR12.Classes.AnonClassDeclaration.SpaceAfterKeyword"/>
-    </rule>
+    <rule ref="PhpCollective"/>
 
     <rule ref="SlevomatCodingStandard.Functions.RequireTrailingCommaInDeclaration"/>
     <rule ref="SlevomatCodingStandard.Functions.RequireTrailingCommaInClosureUse"/>
