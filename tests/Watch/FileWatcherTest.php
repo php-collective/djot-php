@@ -57,6 +57,19 @@ class FileWatcherTest extends TestCase
         @unlink($tmp);
     }
 
+    public function testDetectsSameSecondSameSizeReplaceViaContentHash(): void
+    {
+        // A typo fix that preserves file length and lands in the same
+        // one-second filemtime() bucket would be invisible to a (mtime, size)
+        // fingerprint. The content-hash component catches it.
+        $tmp = $this->makeFile("teh quick brown\n");
+        $watcher = new FileWatcher([$tmp]);
+        file_put_contents($tmp, "the quick brown\n");
+        clearstatcache(true, $tmp);
+        $this->assertTrue($watcher->poll());
+        @unlink($tmp);
+    }
+
     private function makeFile(string $content): string
     {
         $path = tempnam(sys_get_temp_dir(), 'fw_test_');

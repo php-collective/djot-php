@@ -39,10 +39,14 @@ class Server
             escapeshellarg($routerPath),
         );
 
+        // Discard php -S stdio. The dev server's request log otherwise fills
+        // the pipe buffer (a few thousand requests) and the worker blocks on
+        // write, making the server appear hung. We don't surface those logs
+        // anywhere; if they're ever wanted, swap '/dev/null' for a log file.
         $descriptors = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['file', '/dev/null', 'w'],
+            2 => ['file', '/dev/null', 'w'],
         ];
 
         $envForProc = array_merge($_ENV, $env);
