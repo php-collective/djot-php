@@ -170,6 +170,28 @@ Output:
 
 Note: Soft break rendering is controlled separately via `SoftBreakMode` - see the [Soft Break Modes](#soft-break-modes) section above.
 
+#### Lone marker lines are not blocks
+
+Hard-wrapped prose frequently starts a line with `-`, `*`, `+`, `>` or `|` as an
+arithmetic/comparison operator or pipe rather than a list/quote/table marker:
+
+```text
+Die Frage ist, wann ist x = 5
+* 3 + 17 wahr.
+```
+
+To avoid turning these into spurious lists, a **single** marker line followed by
+ordinary prose does *not* interrupt a paragraph. A bullet/blockquote/table
+marker only interrupts when it forms a *real* block:
+
+- two or more consecutive marker lines (`- a` / `- b`, or `> a` / `> b`), **or**
+- a marker line with an indented continuation (`- item` / `  more`), **or**
+- it is preceded by a blank line (then any single marker starts a block).
+
+This mirrors the existing rule that only `1.` (not `5.` or `1985.`) interrupts
+a paragraph as an ordered list. Headings (`#`) and code/comment/div fences are
+unambiguous and still interrupt on a single line.
+
 ### Preventing Block Interruption with Escaping
 
 In significant newlines mode, if you want to include literal block markers without triggering block parsing, escape the first character with a backslash:
@@ -177,15 +199,17 @@ In significant newlines mode, if you want to include literal block markers witho
 ```php
 $converter = DjotConverter::withSignificantNewlines();
 
-// Without escaping - creates a list
+// Without escaping - two markers form a list
 $result = $converter->convert("Price:
-- 10 dollars");
-// Output: <p>Price:</p><ul><li>10 dollars</li></ul>
+- 10 dollars
+- 5 cents");
+// Output: <p>Price:</p><ul><li>10 dollars</li><li>5 cents</li></ul>
 
-// With escaping - literal text
+// With escaping - literal text (first marker neutralized)
 $result = $converter->convert("Price:
-\\- 10 dollars");
-// Output: <p>Price:<br>- 10 dollars</p>
+\\- 10 dollars
+- 5 cents");
+// Output: <p>Price:<br>- 10 dollars<br>- 5 cents</p>
 ```
 
 Common escapes:
