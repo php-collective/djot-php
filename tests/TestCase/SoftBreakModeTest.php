@@ -131,9 +131,12 @@ DJOT;
             softBreakMode: SoftBreakMode::Space,
         );
 
+        // A real (2+ line) quote interrupts without a blank line; a single ">"
+        // line in prose is treated as a comparison operator, not a quote.
         $djot = <<<'DJOT'
 Some text
 > A quote
+> spanning two lines
 More text
 DJOT;
 

@@ -65,13 +65,26 @@ class SignificantNewlinesTest extends TestCase
 
     public function testBlockquoteInterruptsParagraph(): void
     {
+        // A lone ">" line in flowing prose is a comparison operator, not a
+        // quote ("if x\n> 5"). Interrupting requires a *real* (2+ line) quote.
         $parser = new BlockParser(significantNewlines: true);
-        $doc = $parser->parse("They said:\n> This is important");
+        $doc = $parser->parse("They said:\n> This is important\n> Pay attention");
 
         $children = $doc->getChildren();
         $this->assertCount(2, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
         $this->assertInstanceOf(BlockQuote::class, $children[1]);
+    }
+
+    public function testLoneBlockquoteMarkerDoesNotInterruptParagraph(): void
+    {
+        // "if x\n> 5 then ..." — the ">" is greater-than, not a blockquote.
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Wenn x\n> 5 dann ist die Bedingung wahr.");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
     }
 
     public function testOrderedListInterruptsParagraph(): void
@@ -238,7 +251,8 @@ class SignificantNewlinesTest extends TestCase
     {
         $converter = new DjotConverter(significantNewlines: true);
 
-        $djot = "They said:\n> Important";
+        // 2+ line quote required (a single ">" line is treated as prose).
+        $djot = "They said:\n> Important\n> Really";
         $result = $converter->convert($djot);
 
         $this->assertStringContainsString('<blockquote>', $result);
@@ -350,6 +364,81 @@ DJOT;
         // With blank line, any number can start a list
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("Continue from step\n\n5. Do this thing");
+
+        $children = $doc->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+    }
+
+    // ==================== Operator vs. List Marker (bullet/table) ====================
+    //
+    // In hard-wrapped prose a line can begin with -, *, +, > or | as an
+    // arithmetic/comparison operator or pipe. A *lone* marker line followed by
+    // ordinary prose must NOT become a list/quote/table; a real block requires
+    // 2+ marker lines or an indented continuation. (Mirrors the existing
+    // "only 1. interrupts" rule for ordered lists.)
+
+    public function testMultiplicationStarDoesNotBecomeList(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Die Frage ist, wann ist x = 5\n* 3 + 17 wahr. Leider eine Liste\nim Text.");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
+    public function testMinusOperatorDoesNotBecomeList(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Das Ergebnis von 10\n- 3 ist 7. Kein Listenpunkt.");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
+    public function testPlusOperatorDoesNotBecomeList(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Die Summe ist 5\n+ 3 ergibt 8. Keine Liste.");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
+    public function testLonePipeLineDoesNotSplitParagraph(): void
+    {
+        // Regression: a single "| ..." line is not a valid table, yet it used
+        // to sever the paragraph into two stray <p> blocks.
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Das berechnet a\n| b als bitweises Oder.");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
+    public function testTwoMarkersStillFormAList(): void
+    {
+        // The guard must not regress real lists: 2+ markers => list.
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Hier eine Liste:\n- erstes Element\n- zweites Element");
+
+        $children = $doc->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+    }
+
+    public function testSingleBulletWithIndentedContinuationIsList(): void
+    {
+        // One item but with an indented continuation line still reads as a
+        // real (multi-line) list, so it interrupts.
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Shopping:\n- milk and\n  some bread");
 
         $children = $doc->getChildren();
         $this->assertCount(2, $children);
