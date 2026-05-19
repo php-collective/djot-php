@@ -9,7 +9,7 @@ They are either on the way to get incorporated upstream - or may be incorporated
 
 - [Tab Indentation Support](#tab-indentation-support)
 - [Multiple Footnote References](#multiple-footnote-references)
-- [Section ID Excludes Footnote Markers](#section-id-excludes-footnote-markers)
+- [Section ID Excludes Footnote Markers and Symbols](#section-id-excludes-footnote-markers-and-symbols)
 - [CSS-Safe Heading IDs](#css-safe-heading-ids)
 - [Symbol Parsing in Time Formats](#symbol-parsing-in-time-formats)
 - [Em/En Dash with Unmatched Braces](#em-en-dash-with-unmatched-braces)
@@ -117,13 +117,15 @@ and third<a id="fnref1-3" href="#fn1" role="doc-noteref"><sup>1</sup></a>.</p>
 
 ---
 
-## Section ID Excludes Footnote Markers
+## Section ID Excludes Footnote Markers and Symbols
 
-**Related:** [jgm/djot#349](https://github.com/jgm/djot/issues/349)
+**Related:** [jgm/djot#349](https://github.com/jgm/djot/issues/349), [jgm/djot#393](https://github.com/jgm/djot/pull/393)
 
 **Status:** Implemented in djot-php
 
-Auto-generated section IDs correctly exclude footnote reference markers:
+Per the djot spec, an auto-generated identifier is formed from the plain text
+content of the heading *"excluding non-textual elements such as footnote
+references and symbols"*. djot-php excludes both:
 
 ```djot
 # Introduction[^1]
@@ -139,6 +141,16 @@ Auto-generated section IDs correctly exclude footnote reference markers:
 ```
 
 The ID is `Introduction`, not `Introduction1` or `Introduction[^1]`.
+
+Symbols are likewise dropped from the identifier (but kept in the
+human-readable plain text used for things like TOC labels):
+
+```djot
+# Release notes :tada:
+```
+
+The ID is `Release-notes`, not `Release-notes-tada`. A heading whose only
+content is a symbol falls back to a generated `s-N` ID.
 
 ---
 
@@ -219,19 +231,23 @@ Explicit IDs are used as-is without normalization.
 
 ### Spec Alignment
 
-The djot spec's wording on auto-ID generation is being clarified in [jgm/djot#391](https://github.com/jgm/djot/issues/391). djot-php's normalization aligns with the proposed direction in most respects and deliberately deviates in two places — both motivated by producing valid CSS identifiers for `querySelector()` consumers.
+The remove-vs-replace question raised in [jgm/djot#391](https://github.com/jgm/djot/issues/391) was settled by [jgm/djot#393](https://github.com/jgm/djot/pull/393), which reworded the spec to: *"replacing each maximal run of non-alphanumeric ASCII characters with `-`, removing any leading or trailing `-`"*. Note that #393 only changes the spec **prose** — the djot.js reference implementation is unchanged and (per djot's own changelog policy) remains the authoritative behavior. The new prose is actually broader than djot.js itself: it would also strip `_`, which djot.js keeps.
 
-| Aspect | djot.js / djoths (proposed spec) | djot-php |
-|--------|---------------------------------|----------|
-| Mid-word punctuation (`A+B=C`) | replace with `-` → `A-B-C` | replace with `-` → `A-B-C` |
-| Non-ASCII letters (`Über uns`) | preserve → `Über-uns` | preserve → `Über-uns` |
-| Consecutive punctuation (`foo...bar`) | collapse to single `-` → `foo-bar` | collapse to single `-` → `foo-bar` |
-| Apostrophe (`That's all`) | preserve → `That's-all` | replace with `-` → `That-s-all` |
-| Double quote / `;` / `:` | preserve | replace with `-` |
-| Leading digit (`2024 recap`) | unspecified | prefix with `h-` → `h-2024-recap` |
-| Empty result (`!!!`) | unspecified | fallback → `heading` |
+djot-php replaces (does not remove) mid-word punctuation — the direction #393 settled on — and tracks the djot.js **implementation** where the prose and implementation disagree, deliberately deviating only where required to produce valid CSS identifiers for `querySelector()` consumers.
 
-The apostrophe / quote / semicolon / colon deviation is deliberate: these characters are not valid in unescaped CSS identifiers, so preserving them per the spec would force every JS consumer to round-trip through `CSS.escape()` before doing a selector lookup. The leading-digit and empty-result behaviors fill in spec gaps that other implementations handle inconsistently.
+| Aspect | djot.js reference impl | #393 spec prose | djot-php |
+|--------|------------------------|-----------------|----------|
+| Mid-word punctuation (`A+B=C`) | `A-B-C` | `A-B-C` | `A-B-C` |
+| Non-ASCII letters (`Über uns`) | preserve → `Über-uns` | preserve → `Über-uns` | preserve → `Über-uns` |
+| Consecutive punctuation (`foo...bar`) | collapse → `foo-bar` | collapse → `foo-bar` | collapse → `foo-bar` |
+| Underscore (`foo_bar`) | keep → `foo_bar` | strip → `foo-bar` | keep → `foo_bar` (follows impl; CSS-valid) |
+| Apostrophe (`That's all`) | preserve → `That's-all` | replace → `That-s-all` | replace → `That-s-all` (CSS-safe) |
+| Double quote / `;` / `:` | preserve | replace | replace with `-` (CSS-safe) |
+| Leading digit (`2024 recap`) | `2024-recap` | `2024-recap` | prefix → `h-2024-recap` (CSS requires non-digit start) |
+| Empty result (`!!!`) | `s-N` family | unspecified | fallback → `heading` |
+| Symbols / footnote refs | excluded | excluded | excluded |
+
+The apostrophe / quote / semicolon / colon deviation is deliberate: these characters are not valid in unescaped CSS identifiers, so preserving them per djot.js would force every JS consumer to round-trip through `CSS.escape()` before doing a selector lookup. The leading-digit and empty-result behaviors fill in gaps that the spec and implementation handle inconsistently.
 
 ---
 

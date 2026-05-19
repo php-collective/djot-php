@@ -6,6 +6,7 @@ namespace Djot\Renderer;
 
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Code;
+use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Math;
 use Djot\Node\Inline\SoftBreak;
@@ -146,11 +147,21 @@ class HeadingIdTracker
 
     /**
      * Recursively extract plain text from a node tree
+     *
+     * When $forId is true, non-textual elements that the djot spec excludes
+     * from auto-generated heading identifiers are skipped: symbols (`:name:`)
+     * and footnote references (`[^label]`). See jgm/djot#393. Otherwise the
+     * full human-readable text is returned (e.g. for TOC labels), with
+     * symbols rendered as `:name:`.
      */
-    protected function extractPlainText(Node $node): string
+    protected function extractPlainText(Node $node, bool $forId = false): string
     {
         $text = '';
         foreach ($node->getChildren() as $child) {
+            if ($child instanceof FootnoteRef) {
+                continue;
+            }
+
             if ($child instanceof Text) {
                 $text .= $child->getContent();
             } elseif ($child instanceof SoftBreak || $child instanceof HardBreak) {
@@ -158,9 +169,11 @@ class HeadingIdTracker
             } elseif ($child instanceof Code || $child instanceof Math) {
                 $text .= $child->getContent();
             } elseif ($child instanceof Symbol) {
-                $text .= ':' . $child->getName() . ':';
+                if (!$forId) {
+                    $text .= ':' . $child->getName() . ':';
+                }
             } elseif ($child instanceof Node) {
-                $text .= $this->extractPlainText($child);
+                $text .= $this->extractPlainText($child, $forId);
             }
         }
 
@@ -195,17 +208,23 @@ class HeadingIdTracker
             return $id;
         }
 
-        // Generate from heading text
-        $headingText = $this->getPlainText($node);
+        // Warm the plain-text cache so display consumers (TOC, permalinks)
+        // still see the pre-mutation text including symbols.
+        $this->getPlainText($node);
 
-        if ($headingText === '') {
+        // The identifier itself is formed from the plain text content
+        // excluding non-textual elements such as symbols and footnote
+        // references (jgm/djot#393).
+        $idText = $this->extractPlainText($node, forId: true);
+
+        if ($idText === '') {
             // Generate fallback ID
             $this->sectionCounter++;
 
             return 's-' . $this->sectionCounter;
         }
 
-        $baseId = $this->normalizeId($headingText);
+        $baseId = $this->normalizeId($idText);
 
         // Track and deduplicate
         if (!isset($this->usedIds[$baseId])) {
