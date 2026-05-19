@@ -37,6 +37,11 @@ class Image extends InlineNode
         return $this->source;
     }
 
+    public function setSource(string $source): void
+    {
+        $this->source = $source;
+    }
+
     public function getAlt(): string
     {
         return $this->alt;

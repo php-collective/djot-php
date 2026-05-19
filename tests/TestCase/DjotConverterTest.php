@@ -1756,6 +1756,147 @@ DJOT;
         $this->assertStringContainsString('<h1>日本語の見出し</h1>', $result);
     }
 
+    /**
+     * Every explicit `{#id}` in the document (heading or not) must be
+     * reserved up-front, so a heading whose auto-generated id would
+     * otherwise collide takes the next free dedupe suffix instead of
+     * silently emitting a duplicate id.
+     *
+     * Critical case: the explicit `{#Foo-Bar}` appears *after* the
+     * heading whose text normalizes to `Foo-Bar`. Without an upfront
+     * pre-pass, inline tracking only catches the explicit id once
+     * encountered, and the heading rendered first wins the slot.
+     */
+    public function testExplicitIdsAreReservedBeforeAutoIds(): void
+    {
+        $result = $this->converter->convert("# Foo Bar\n\n{#Foo-Bar}\npara\n");
+
+        $this->assertStringContainsString('<section id="Foo-Bar-1">', $result);
+        $this->assertStringContainsString('<p id="Foo-Bar">', $result);
+        // Pre-fix master emits two `Foo-Bar` ids — guard against the regression.
+        $this->assertSame(1, substr_count($result, ' id="Foo-Bar"'));
+    }
+
+    /**
+     * Once explicit ids are reserved up-front, the heading dedup loop must
+     * also skip *suffix candidates* that are reserved — e.g. `# Foo`,
+     * `{#Foo-1}`, `# Foo` should resolve the second heading to `Foo-2`,
+     * not silently collide with the explicit `Foo-1`.
+     */
+    public function testHeadingDedupeSkipsReservedSuffixedIds(): void
+    {
+        $result = $this->converter->convert("# Foo\n\n{#Foo-1}\npara\n\n# Foo\n");
+
+        $this->assertStringContainsString('<section id="Foo">', $result);
+        $this->assertStringContainsString('<p id="Foo-1">', $result);
+        $this->assertStringContainsString('<section id="Foo-2">', $result);
+        $this->assertSame(1, substr_count($result, ' id="Foo-1"'));
+    }
+
+    /**
+     * After reserving explicit ids, the implicit-reference pass and the
+     * renderer must still produce matching anchors: a `[Heading][]` link
+     * has to land on the (possibly-deduped) section id, not the original
+     * line-based estimate. The post-parse rewrite re-targets refs.
+     */
+    public function testImplicitHeadingReferenceMatchesRenderedSectionId(): void
+    {
+        $result = $this->converter->convert("# Foo Bar\n\n{#Foo-Bar}\npara\n\n[Foo Bar][]\n");
+
+        $this->assertSame(
+            1,
+            preg_match('/<section id="(Foo-Bar(?:-\d+)?)">/', $result, $section),
+        );
+        $this->assertStringContainsString('href="#' . $section[1] . '"', $result);
+        $this->assertStringContainsString('<p id="Foo-Bar">', $result);
+    }
+
+    /**
+     * Implicit `[Heading][]` links resolve to the *first* heading with that
+     * text. Duplicate-heading auto-ids get suffixed (`Foo`, `Foo-1`, …) but
+     * the reference must keep pointing at the original.
+     */
+    public function testImplicitHeadingReferencePrefersFirstDuplicate(): void
+    {
+        $result = $this->converter->convert("# Foo\n\n# Foo\n\n[Foo][]\n");
+
+        $this->assertStringContainsString('href="#Foo"', $result);
+        $this->assertStringNotContainsString('href="#Foo-1"', $result);
+    }
+
+    /**
+     * After the post-parse rewrite recomputes heading ids, anchor-link
+     * validation must see the renderer-visible ids (no false "Broken anchor"
+     * warnings for valid links to deduped headings).
+     */
+    public function testAnchorValidationSeesPostRewriteHeadingIds(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("# Foo Bar\n\n{#Foo-Bar}\npara\n\n[x](#Foo-Bar-1)\n[y](#Foo-Bar)\n");
+
+        $brokenAnchorWarnings = array_filter(
+            $converter->getWarnings(),
+            static fn ($w): bool => str_contains($w->getMessage(), 'Broken anchor link'),
+        );
+
+        $this->assertSame([], $brokenAnchorWarnings, 'no broken-anchor warnings for valid links');
+    }
+
+    /**
+     * Parser state (incl. `headingReferenceLabels`) must reset between
+     * conversions on the same `DjotConverter` instance — otherwise a label
+     * marked as heading-owned in doc N silently lets doc N+1's rewrite
+     * overwrite an explicit `[Foo]: url` reference.
+     */
+    public function testHeadingReferenceLabelsResetBetweenConversions(): void
+    {
+        $converter = new DjotConverter();
+
+        // First conversion: heading registers "Foo" as a heading-owned label.
+        $converter->convert("# Foo\n");
+
+        // Second conversion: explicit `[Foo]: url` must win; the heading's
+        // auto-id must not retarget the link to `#Foo`.
+        $result = $converter->convert("[Foo][]\n\n[Foo]: https://example.com\n\n# Foo\n");
+
+        $this->assertStringContainsString('href="https://example.com"', $result);
+        $this->assertStringNotContainsString('href="#Foo"', $result);
+    }
+
+    /**
+     * Implicit `[…][]` references whose label contains formatted inlines
+     * (code, math, …) must still retarget to the correct heading id after
+     * dedupe. The lookup key must include the inline content the same way
+     * the heading's plain-text label does.
+     */
+    public function testImplicitReferenceWithCodeInLabelMatchesDedupedHeading(): void
+    {
+        $result = $this->converter->convert("# `Foo`\n\n{#Foo}\npara\n\n[`Foo`][]\n");
+
+        $this->assertSame(
+            1,
+            preg_match('/<section id="(Foo(?:-\d+)?)">/', $result, $section),
+        );
+        $this->assertStringContainsString('href="#' . $section[1] . '"', $result);
+    }
+
+    /**
+     * Reference-style images (`![alt][]`) share the implicit-reference
+     * lookup with links; their `src` must also be retargeted to the
+     * post-rewrite heading id, not the pre-dedupe estimate.
+     */
+    public function testImplicitReferenceImageRetargetsToDedupedHeading(): void
+    {
+        $result = $this->converter->convert("# Foo Bar\n\n{#Foo-Bar}\npara\n\n![Foo Bar][]\n");
+
+        $this->assertSame(
+            1,
+            preg_match('/<section id="(Foo-Bar(?:-\d+)?)">/', $result, $section),
+        );
+        $this->assertStringContainsString('src="#' . $section[1] . '"', $result);
+        $this->assertStringNotContainsString('src="#Foo-Bar"', $result);
+    }
+
     public function testUnicodeInLink(): void
     {
         $djot = '[リンク](https://example.com/日本語)';

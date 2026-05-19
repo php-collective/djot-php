@@ -333,6 +333,14 @@ class HtmlRenderer implements RendererInterface
      */
     protected function renderDocumentWithSections(Document $document): string
     {
+        // Reserve every explicit `{#id}` in the document (heading or not)
+        // before any heading auto-id is generated, so a later auto-id that
+        // would otherwise collide takes the next dedup suffix instead of
+        // emitting a duplicate. Mirrors the parser-side pre-reservation in
+        // BlockParser::extractHeadingReferences so both passes compute the
+        // same heading ids.
+        $this->getRenderContext()->headingIdTracker->reserveExplicitIds($document);
+
         $children = $document->getChildren();
         $html = '';
         /** @var array<int, int> $openSections Level => count of open sections at that level */
@@ -393,8 +401,8 @@ class HtmlRenderer implements RendererInterface
                 // Render heading without section wrapper
                 $html .= $this->renderHeadingContent($child);
             } else {
-                // Track IDs from non-heading elements for deduplication
-                $this->trackIdFromNode($child);
+                // Non-heading ids were already reserved by the upfront
+                // `reserveExplicitIds` pass above; just render the node.
                 $html .= $this->renderNode($child);
             }
         }
