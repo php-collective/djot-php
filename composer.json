@@ -14,6 +14,9 @@
     "require": {
         "php": "^8.2"
     },
+    "suggest": {
+        "ext-intl": "Recommended for heading-ID transliteration: enables ICU romanization of non-Latin scripts (e.g. CJK, Arabic). Without it, a baked map covers Latin/Cyrillic/Greek/punctuation identically and other scripts fall back to generated `s-N` ids."
+    },
     "require-dev": {
         "nikic/php-fuzzer": "^0.0.11",
         "php-collective/code-sniffer": "dev-master",
