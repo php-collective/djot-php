@@ -428,6 +428,30 @@ Attributes can be added to list items on the following indented line:
 
 Works with all list types (unordered, ordered, and task lists). The attribute line must be indented to the content indentation level.
 
+The `{...}` line attaches to the `<li>` **only when it is the last
+content line of the item**. If another block follows it within the
+same item, the `{...}` behaves as a standard djot block attribute for
+that following block, and the list / item are not terminated:
+
+```djot
+- item
+  {.note}
+  > a quoted aside inside the item
+```
+
+renders as:
+
+```html
+<ul>
+<li>
+item
+<blockquote class="note">
+<p>a quoted aside inside the item</p>
+</blockquote>
+</li>
+</ul>
+```
+
 #### Tight vs Loose Lists
 
 Lists in Djot can be *tight* or *loose*, which affects how list items are rendered.

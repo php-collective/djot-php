@@ -435,6 +435,11 @@ Works with all list types:
 - Attributes on next line at content indentation level
 - Uses standard `{.class #id key=value}` syntax
 - Works with unordered, ordered, and task lists
+- The `{...}` line attaches to the `<li>` **only when it is the last
+  content line of the item**. If another block follows the `{...}`
+  line within the same item, the `{...}` reverts to a standard djot
+  block attribute for that following block; the list and item are
+  not terminated.
 
 ---
 
