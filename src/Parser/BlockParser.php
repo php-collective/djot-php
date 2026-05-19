@@ -697,6 +697,8 @@ class BlockParser
     }
 
     /**
+     * @param \Djot\Node\Node $node
+     * @param \Djot\Renderer\HeadingIdTracker $tracker
      * @param array<string, string> $out
      */
     protected function collectHeadingIds(Node $node, HeadingIdTracker $tracker, array &$out): void
@@ -724,7 +726,9 @@ class BlockParser
     }
 
     /**
+     * @param \Djot\Node\Node $node
      * @param array<string, string> $newUrlByLabel
+     * @param \Djot\Renderer\HeadingIdTracker $tracker
      */
     protected function retargetHeadingLinks(Node $node, array $newUrlByLabel, HeadingIdTracker $tracker): void
     {
