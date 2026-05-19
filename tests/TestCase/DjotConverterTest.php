@@ -1067,14 +1067,17 @@ DJOT;
     public function testListItemAttributesFollowedByNestedListStaysInItem(): void
     {
         // G2: a nested list after a {...} line must stay nested, not
-        // escape to literal text outside the parent list.
+        // escape to literal text outside the parent list. The {.x}
+        // reverts to a block attribute attached to the nested <ul>.
         $djot = "- item\n  {.x}\n  - nested\n";
 
         $result = $this->converter->convert($djot);
 
-        // Expect two nested <ul>s, NOT a "<p>- nested</p>" escape.
-        $this->assertSame(2, substr_count($result, '<ul>'));
+        // Expect two nested <ul> opens (the outer <ul> and the inner
+        // one that picks up {.x}), NOT a "<p>- nested</p>" escape.
+        $this->assertSame(2, substr_count($result, '<ul'));
         $this->assertStringNotContainsString('<p>- nested</p>', $result);
+        $this->assertStringContainsString('<ul class="x">', $result);
     }
 
     public function testListItemAttributesLastLineUnchanged(): void

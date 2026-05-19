@@ -1653,18 +1653,74 @@ class BlockParser
                 $i++;
             }
 
-            // Check for list item attributes on the next line
+            // Check for list item attributes on the next line.
+            //
+            // Rule: a standalone {...} line attaches to the <li> ONLY when it
+            // is the last content line of the item. If another block follows
+            // within the same item, push the {...} back into itemLines so it
+            // is parsed as a standard djot block attribute for the following
+            // block inside the item. This keeps the list / item intact instead
+            // of terminating it on a mid-item {...} line.
             $itemAttributes = [];
+            $attrPushedBack = false;
             if ($i < $count) {
                 $potentialAttrLine = $lines[$i];
                 $trimmedAttrLine = ltrim($potentialAttrLine);
-                // Check if it's an attribute block at content indent level
                 if (
                     preg_match('/^\{([^{}]+)\}\s*$/', $trimmedAttrLine, $attrMatch) &&
                     IndentationHelper::getLeadingSpaces($potentialAttrLine) >= $contentIndent
                 ) {
-                    $itemAttributes = AttributeParser::parseOrdered($attrMatch[1]);
-                    $i++;
+                    // Peek ahead: is there more item content at content indent
+                    // (non-blank, non-sibling-marker)?
+                    $hasMoreItemContent = false;
+                    if ($i + 1 < $count) {
+                        $peekLine = $lines[$i + 1];
+                        if (!IndentationHelper::isBlankLine($peekLine)) {
+                            $peekIndent = IndentationHelper::getLeadingSpaces($peekLine);
+                            if ($peekIndent >= $contentIndent) {
+                                $hasMoreItemContent = true;
+                            }
+                        }
+                    }
+
+                    if ($hasMoreItemContent) {
+                        // {...} is not the item's attribute — it is a block
+                        // attribute for the next block in the item. Push it back
+                        // into itemLines (stripped of the item's content indent)
+                        // and keep consuming further indented continuation lines.
+                        // Insert a blank-line separator first so parseBlocks
+                        // recognizes the previously-consumed paragraph as closed
+                        // and reads {...} as a real block attribute for the
+                        // following block, instead of folding everything into
+                        // one paragraph (standard djot: paragraphs cannot be
+                        // interrupted without a blank line).
+                        if ($itemLines !== [] && $itemLines[array_key_last($itemLines)] !== '') {
+                            $itemLines[] = '';
+                        }
+                        $itemLines[] = IndentationHelper::stripLeadingIndent($potentialAttrLine, $contentIndent);
+                        $hasNonMarkerContinuation = true;
+                        $attrPushedBack = true;
+                        $i++;
+                        while ($i < $count) {
+                            $contLine = $lines[$i];
+                            if (IndentationHelper::isBlankLine($contLine)) {
+                                // A blank line ends the tight continuation here;
+                                // any further indented content will be picked up
+                                // by the existing loose-list path below.
+                                break;
+                            }
+                            $contIndent = IndentationHelper::getLeadingSpaces($contLine);
+                            if ($contIndent >= $contentIndent) {
+                                $itemLines[] = IndentationHelper::stripLeadingIndent($contLine, $contentIndent);
+                                $i++;
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        $itemAttributes = AttributeParser::parseOrdered($attrMatch[1]);
+                        $i++;
+                    }
                 }
             }
 
@@ -1674,8 +1730,10 @@ class BlockParser
             // still allowing blockquotes, code blocks, etc. to be properly recognized.
             if ($hasNonMarkerContinuation) {
                 $firstLine = $itemLines[0];
-                if ($this->isBlockElementStart($firstLine)) {
-                    // Content starts with a block element (blockquote, code fence, etc.)
+                if ($attrPushedBack || $this->isBlockElementStart($firstLine)) {
+                    // Content starts with a block element (blockquote, code fence,
+                    // etc.) or we pushed a {...} back into itemLines that must be
+                    // recognized as a block attribute for the next block.
                     $this->parseBlocks($listItem, $itemLines, 0);
                 } else {
                     $paragraph = new Paragraph();
