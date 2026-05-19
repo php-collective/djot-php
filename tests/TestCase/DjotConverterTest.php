@@ -1030,6 +1030,77 @@ DJOT;
         $this->assertStringContainsString('checked=""', $result);
     }
 
+    public function testListItemAttributesFollowedByBlockquoteStaysInItem(): void
+    {
+        // G2: a {...} line followed by more content within the same item
+        // must NOT terminate the list. The {...} reverts to a normal
+        // block-attribute for the following blockquote inside the item.
+        $djot = "- item\n  {.x}\n  > quote\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<ul>', $result);
+        $this->assertStringContainsString('<li>', $result);
+        $this->assertStringContainsString('<blockquote class="x">', $result);
+        $this->assertStringNotContainsString('&gt; quote', $result);
+    }
+
+    public function testListItemAttributesFollowedByParagraphStaysInItem(): void
+    {
+        // G2: continuation text after a {...} line must remain in the item,
+        // not escape to a sibling paragraph outside the list.
+        $djot = "- item one\n  {.x}\n  more text\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<ul>', $result);
+        $this->assertStringContainsString('item one', $result);
+        $this->assertStringContainsString('more text', $result);
+        // "more text" must be INSIDE the <ul>, not a sibling.
+        $ulClose = strpos($result, '</ul>');
+        $moreTextPos = strpos($result, 'more text');
+        $this->assertNotFalse($ulClose);
+        $this->assertNotFalse($moreTextPos);
+        $this->assertLessThan($ulClose, $moreTextPos);
+    }
+
+    public function testListItemAttributesFollowedByNestedListStaysInItem(): void
+    {
+        // G2: a nested list after a {...} line must stay nested, not
+        // escape to literal text outside the parent list.
+        $djot = "- item\n  {.x}\n  - nested\n";
+
+        $result = $this->converter->convert($djot);
+
+        // Expect two nested <ul>s, NOT a "<p>- nested</p>" escape.
+        $this->assertSame(2, substr_count($result, '<ul>'));
+        $this->assertStringNotContainsString('<p>- nested</p>', $result);
+    }
+
+    public function testListItemAttributesLastLineUnchanged(): void
+    {
+        // G2 regression guard: when {.x} IS the last line of the item it
+        // still attaches to the <li> exactly as before.
+        $djot = "- item\n  {.x}\n- second\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li class="x">', $result);
+    }
+
+    public function testListItemAttributesLooseListUnchanged(): void
+    {
+        // G2 regression guard: blank-line separator (loose item) keeps
+        // the previously-working behavior — {.x} attaches to the <li>,
+        // and the following blockquote sits inside the item.
+        $djot = "- item\n  {.x}\n\n  > quote\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li class="x">', $result);
+        $this->assertStringContainsString('<blockquote>', $result);
+    }
+
     public function testRomanNumeralList(): void
     {
         // x. is parsed as Roman numeral 10
