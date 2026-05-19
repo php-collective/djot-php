@@ -88,37 +88,43 @@ class HeadingIdTracker
     }
 
     /**
-     * Normalize text into a valid CSS identifier string
+     * Normalize heading text into an identifier (jgm/djot#393)
      *
-     * 1. Strip # characters entirely
-     * 2. Trim whitespace
-     * 3. Replace whitespace sequences (including Unicode spaces) with single dashes
-     * 4. Replace any remaining characters that are invalid in CSS identifiers
-     *    (anything other than Unicode letters/numbers, hyphens, and underscores)
-     *    with dashes
-     * 5. Collapse consecutive dashes and trim leading/trailing dashes
-     * 6. Prefix with 'h-' if the result starts with a digit, ensuring a valid
-     *    CSS ident start (digits are not allowed as the first character)
+     * Each maximal run of non-alphanumeric ASCII characters is replaced with
+     * a single `-`, and leading/trailing `-` are trimmed. Non-ASCII
+     * characters (Unicode letters, digits, punctuation, symbols) are
+     * preserved verbatim — they fall outside the spec's ASCII replacement
+     * set and are valid CSS identifier code points.
      *
-     * Producing a valid CSS identifier ensures that consumers such as HTMX,
-     * which call `querySelector` with the section ID for scroll-restoration,
-     * do not throw a SyntaxError when headings contain inline code or special
-     * characters (e.g. `$this->t($key, $params = [], $fallback = '')`).
+     * Two deliberate, documented deviations keep the result a valid CSS
+     * identifier for `querySelector()` / HTMX consumers:
+     *  - a leading ASCII digit gets an `h-` prefix (a CSS identifier cannot
+     *    start with a digit);
+     *  - an empty result is returned as `''` so the caller can fall back to
+     *    a generated `s-N` identifier (matching djot.js), rather than a
+     *    literal sentinel.
+     *
+     * @return string The identifier, or '' when the text has no usable content.
      */
     public function normalizeId(string $text): string
     {
-        $id = str_replace('#', '', $text);
-        $id = trim($id);
-        $id = preg_replace('/\s+/u', '-', $id) ?? $id;
-        $id = preg_replace('/[^\p{L}\p{N}_-]+/u', '-', $id) ?? $id;
-        $id = preg_replace('/-{2,}/', '-', $id) ?? $id;
+        // 0x30-0x39 = 0-9, 0x41-0x5A = A-Z, 0x61-0x7A = a-z. Every other
+        // byte in 0x00-0x7F is non-alphanumeric ASCII; bytes >= 0x80 (all
+        // UTF-8 multibyte sequences) are left untouched so non-ASCII text is
+        // preserved. No /u flag: the class only ever matches single ASCII
+        // bytes, never a continuation byte of a multibyte character.
+        $id = preg_replace('/[\x00-\x2F\x3A-\x40\x5B-\x60\x7B-\x7F]+/', '-', $text) ?? $text;
         $id = trim($id, '-');
 
-        if ($id !== '' && preg_match('/^\p{N}/u', $id)) {
+        if ($id === '') {
+            return '';
+        }
+
+        if (preg_match('/^[0-9]/', $id) === 1) {
             $id = 'h-' . $id;
         }
 
-        return $id !== '' ? $id : 'heading';
+        return $id;
     }
 
     /**
@@ -216,15 +222,23 @@ class HeadingIdTracker
         // excluding non-textual elements such as symbols and footnote
         // references (jgm/djot#393).
         $idText = $this->extractPlainText($node, forId: true);
-
-        if ($idText === '') {
-            // Generate fallback ID
-            $this->sectionCounter++;
-
-            return 's-' . $this->sectionCounter;
-        }
-
         $baseId = $this->normalizeId($idText);
+
+        if ($baseId === '') {
+            // No usable content (empty heading, or text that is entirely
+            // ASCII punctuation) — fall back to a generated `s-N`
+            // identifier, matching djot.js. Skip any `s-N` already taken by
+            // an explicit id or a heading whose text normalizes to it, so
+            // the fallback never produces a duplicate.
+            do {
+                $this->sectionCounter++;
+                $baseId = 's-' . $this->sectionCounter;
+            } while (isset($this->usedIds[$baseId]));
+
+            $this->usedIds[$baseId] = 0;
+
+            return $baseId;
+        }
 
         // Track and deduplicate
         if (!isset($this->usedIds[$baseId])) {

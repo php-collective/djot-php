@@ -160,18 +160,20 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('this-t-key-params-fallback', $this->tracker->normalizeId("\$this->t(\$key, \$params = [], \$fallback = '')"));
         $this->assertSame('My-title', $this->tracker->normalizeId('My --- title'));
         $this->assertSame('日本語の見出し', $this->tracker->normalizeId('日本語の見出し'));
-        $this->assertSame('heading', $this->tracker->normalizeId('###'));
+        $this->assertSame('', $this->tracker->normalizeId('###'));
         $this->assertSame('h-123-Things', $this->tracker->normalizeId('123 Things'));
         $this->assertSame('h-1-Introduction', $this->tracker->normalizeId('1. Introduction'));
     }
 
     /**
-     * Pins behaviour discussed in jgm/djot#391 (spec wording on auto-ID generation).
+     * Pins the auto-ID rule settled in jgm/djot#393: each maximal run of
+     * non-alphanumeric ASCII characters is replaced with `-`, leading/trailing
+     * `-` are trimmed, and non-ASCII characters are preserved verbatim.
      *
-     * djot-php sides with djot.js / djoths on remove-vs-replace (mid-word punctuation
-     * becomes `-`), and deliberately deviates on apostrophes / quotes / `;` / `:` by
-     * also replacing them, so generated IDs are valid CSS identifiers and safe to use
-     * with `querySelector()`.
+     * djot-php follows this prose, including dropping the previous `_`
+     * exception. The only deliberate deviations are the two CSS-validity
+     * adjustments (leading-digit `h-` prefix, empty result → `s-N` fallback),
+     * which the heading-level tests cover.
      */
     public function testNormalizeIdSpecAlignmentEdgeCases(): void
     {
@@ -179,10 +181,15 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('Emphasis-strong', $this->tracker->normalizeId('Emphasis/strong'));
         $this->assertSame('That-s-all', $this->tracker->normalizeId("That's all"));
         $this->assertSame('foo-bar', $this->tracker->normalizeId('foo...bar'));
+        $this->assertSame('foo-bar-baz', $this->tracker->normalizeId('foo_bar baz'));
         $this->assertSame('Uber-uns', $this->tracker->normalizeId('Uber uns'));
         $this->assertSame('Über-uns', $this->tracker->normalizeId('Über uns'));
+        // Non-ASCII punctuation/symbols are not "non-alphanumeric ASCII", so
+        // they are preserved (and are valid CSS identifier code points).
+        $this->assertSame('A–B', $this->tracker->normalizeId('A–B'));
+        $this->assertSame('café—bar', $this->tracker->normalizeId('café—bar'));
         $this->assertSame('h-2024-recap', $this->tracker->normalizeId('2024 recap'));
-        $this->assertSame('heading', $this->tracker->normalizeId('!!!'));
+        $this->assertSame('', $this->tracker->normalizeId('!!!'));
     }
 
     public function testGetPlainText(): void
@@ -348,17 +355,76 @@ class HeadingIdTrackerTest extends TestCase
     }
 
     /**
-     * djot.js keeps `_` (it is not in its punctuation denylist) and it is a
-     * valid CSS identifier character, so djot-php keeps it too. This pins the
-     * deliberate divergence from the looser #393 spec prose.
+     * Per the jgm/djot#393 wording, `_` is a non-alphanumeric ASCII character
+     * and is replaced with `-` like any other punctuation (the previous `_`
+     * exception is gone).
      */
-    public function testUnderscoreRetainedInId(): void
+    public function testUnderscoreReplacedInId(): void
     {
         $heading = new Heading(2);
         $heading->appendChild(new Text('foo_bar baz'));
 
         $id = $this->tracker->getIdForHeading($heading);
 
-        $this->assertSame('foo_bar-baz', $id);
+        $this->assertSame('foo-bar-baz', $id);
+    }
+
+    /**
+     * A heading whose text normalizes to nothing (all ASCII punctuation)
+     * falls back to a generated `s-N` identifier, matching djot.js — not the
+     * literal `heading` sentinel djot-php used previously.
+     */
+    public function testAllPunctuationHeadingGetsFallbackId(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('!!!'));
+
+        $id = $this->tracker->getIdForHeading($heading);
+
+        $this->assertSame('s-1', $id);
+    }
+
+    /**
+     * The generated `s-N` fallback must not collide with a real heading whose
+     * text normalizes to the same value (e.g. `# s 1` → `s-1`).
+     */
+    public function testFallbackIdDoesNotCollideWithNormalHeading(): void
+    {
+        $punct = new Heading(2);
+        $punct->appendChild(new Text('!!!'));
+
+        $sOne = new Heading(2);
+        $sOne->appendChild(new Text('s 1'));
+
+        $firstId = $this->tracker->getIdForHeading($punct);
+        $secondId = $this->tracker->getIdForHeading($sOne);
+
+        $this->assertSame('s-1', $firstId);
+        $this->assertNotSame($firstId, $secondId);
+    }
+
+    /**
+     * The fallback must also avoid explicitly tracked IDs.
+     */
+    public function testFallbackIdAvoidsTrackedExplicitId(): void
+    {
+        $this->tracker->trackId('s-1');
+
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('###'));
+
+        $id = $this->tracker->getIdForHeading($heading);
+
+        $this->assertSame('s-2', $id);
+    }
+
+    public function testNonAsciiPunctuationHeadingIsPreserved(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('Spec — Notes'));
+
+        $id = $this->tracker->getIdForHeading($heading);
+
+        $this->assertSame('Spec-—-Notes', $id);
     }
 }

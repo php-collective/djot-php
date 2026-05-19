@@ -156,22 +156,20 @@ content is a symbol falls back to a generated `s-N` ID.
 
 ## CSS-Safe Heading IDs
 
-**Related:** [php-collective/djot-php#92](https://github.com/php-collective/djot-php/pull/92), [jgm/djot#391](https://github.com/jgm/djot/issues/391)
+**Related:** [php-collective/djot-php#92](https://github.com/php-collective/djot-php/pull/92), [jgm/djot#391](https://github.com/jgm/djot/issues/391), [jgm/djot#393](https://github.com/jgm/djot/pull/393)
 
 **Status:** Implemented in djot-php
 
-Auto-generated heading IDs are normalized to be valid CSS selectors, ensuring compatibility with `querySelector()`, HTMX scroll restoration, and CSS attribute selectors.
+Auto-generated heading IDs follow the djot spec rule settled in [jgm/djot#393](https://github.com/jgm/djot/pull/393), with two small deviations that keep every ID a valid CSS selector — ensuring compatibility with `querySelector()`, HTMX scroll restoration, and CSS attribute selectors.
 
 ### Normalization Rules
 
-1. **Strip `#` characters** — Prevents invalid selectors
-2. **Trim whitespace** — Clean leading/trailing spaces
-3. **Whitespace to dashes** — Spaces become single `-`
-4. **Invalid characters to dashes** — Only Unicode letters (`\p{L}`), numbers (`\p{N}`), hyphens, and underscores are preserved
-5. **Collapse consecutive dashes** — `foo--bar` becomes `foo-bar`
-6. **Trim leading/trailing dashes** — `-foo-` becomes `foo`
-7. **Prefix digits** — IDs starting with a number get `h-` prefix (CSS requirement)
-8. **Fallback** — Empty results become `heading`
+1. **Exclude non-textual content** — Symbols (`:name:`) and footnote references do not contribute to the ID
+2. **Replace non-alphanumeric ASCII** — Each maximal run of non-alphanumeric ASCII characters (anything except `A–Z`, `a–z`, `0–9`) becomes a single `-`
+3. **Preserve non-ASCII** — Unicode letters, digits, punctuation, and symbols are kept verbatim (they are valid CSS identifier code points)
+4. **Trim leading/trailing dashes** — `-foo-` becomes `foo`
+5. **Prefix digits** *(CSS deviation)* — A result starting with an ASCII digit gets an `h-` prefix (a CSS identifier cannot start with a digit)
+6. **Empty fallback** *(CSS deviation)* — A result with no usable content falls back to a generated `s-N` identifier (matching djot.js)
 
 ### Examples
 
@@ -179,12 +177,14 @@ Auto-generated heading IDs are normalized to be valid CSS selectors, ensuring co
 |---------|--------------|
 | `# Hello World` | `Hello-World` |
 | `# Hello World!` | `Hello-World` |
+| `# foo_bar` | `foo-bar` |
 | `# 日本語の見出し` | `日本語の見出し` |
 | `# Привет мир` | `Привет-мир` |
+| `# Spec — Notes` | `Spec-—-Notes` |
 | `# E=mc^2` | `E-mc-2` |
 | `# 123 Numbers First` | `h-123-Numbers-First` |
 | `# $this->method()` | `this-method` |
-| `# ###` | `heading` |
+| `# ###` | `s-1` |
 
 ### Unicode Preservation
 
@@ -231,23 +231,27 @@ Explicit IDs are used as-is without normalization.
 
 ### Spec Alignment
 
-The remove-vs-replace question raised in [jgm/djot#391](https://github.com/jgm/djot/issues/391) was settled by [jgm/djot#393](https://github.com/jgm/djot/pull/393), which reworded the spec to: *"replacing each maximal run of non-alphanumeric ASCII characters with `-`, removing any leading or trailing `-`"*. Note that #393 only changes the spec **prose** — the djot.js reference implementation is unchanged and (per djot's own changelog policy) remains the authoritative behavior. The new prose is actually broader than djot.js itself: it would also strip `_`, which djot.js keeps.
+The remove-vs-replace question raised in [jgm/djot#391](https://github.com/jgm/djot/issues/391) was settled by [jgm/djot#393](https://github.com/jgm/djot/pull/393), which reworded the spec to: *"replacing each maximal run of non-alphanumeric ASCII characters with `-`, removing any leading or trailing `-`"*.
 
-djot-php replaces (does not remove) mid-word punctuation — the direction #393 settled on — and tracks the djot.js **implementation** where the prose and implementation disagree, deliberately deviating only where required to produce valid CSS identifiers for `querySelector()` consumers.
+djot-php follows that **prose verbatim**: every non-alphanumeric ASCII run (including `_`, `'`, `"`, `:`, `;`) becomes `-`, and every non-ASCII code point — letters, digits, and punctuation/symbols alike — is preserved. The only two deviations are the CSS-validity adjustments (leading-digit `h-` prefix, empty → `s-N`), which the spec leaves unspecified anyway.
 
-| Aspect | djot.js reference impl | #393 spec prose | djot-php |
-|--------|------------------------|-----------------|----------|
-| Mid-word punctuation (`A+B=C`) | `A-B-C` | `A-B-C` | `A-B-C` |
-| Non-ASCII letters (`Über uns`) | preserve → `Über-uns` | preserve → `Über-uns` | preserve → `Über-uns` |
-| Consecutive punctuation (`foo...bar`) | collapse → `foo-bar` | collapse → `foo-bar` | collapse → `foo-bar` |
-| Underscore (`foo_bar`) | keep → `foo_bar` | strip → `foo-bar` | keep → `foo_bar` (follows impl; CSS-valid) |
-| Apostrophe (`That's all`) | preserve → `That's-all` | replace → `That-s-all` | replace → `That-s-all` (CSS-safe) |
-| Double quote / `;` / `:` | preserve | replace | replace with `-` (CSS-safe) |
-| Leading digit (`2024 recap`) | `2024-recap` | `2024-recap` | prefix → `h-2024-recap` (CSS requires non-digit start) |
-| Empty result (`!!!`) | `s-N` family | unspecified | fallback → `heading` |
-| Symbols / footnote refs | excluded | excluded | excluded |
+| Aspect | #393 spec prose | djot-php |
+|--------|-----------------|----------|
+| Mid-word punctuation (`A+B=C`) | `A-B-C` | `A-B-C` |
+| Underscore (`foo_bar`) | replace → `foo-bar` | replace → `foo-bar` |
+| Apostrophe (`That's all`) | replace → `That-s-all` | replace → `That-s-all` |
+| Double quote / `;` / `:` | replace → `-` | replace → `-` |
+| Consecutive punctuation (`foo...bar`) | collapse → `foo-bar` | collapse → `foo-bar` |
+| Non-ASCII letters (`Über uns`) | preserve → `Über-uns` | preserve → `Über-uns` |
+| Non-ASCII punctuation / smart quotes (`Bob’s Guide`) | preserve → `Bob’s-Guide` | preserve → `Bob’s-Guide` |
+| Leading digit (`2024 recap`) | `2024-recap` | **`h-2024-recap`** *(CSS deviation)* |
+| Empty result (`!!!`, `###`) | unspecified | **`s-N` fallback** *(CSS deviation)* |
+| Symbols / footnote refs | excluded | excluded |
 
-The apostrophe / quote / semicolon / colon deviation is deliberate: these characters are not valid in unescaped CSS identifiers, so preserving them per djot.js would force every JS consumer to round-trip through `CSS.escape()` before doing a selector lookup. The leading-digit and empty-result behaviors fill in gaps that the spec and implementation handle inconsistently.
+> [!NOTE]
+> #393 only changed the spec **prose**, not the djot.js reference implementation, which still uses a fixed punctuation denylist that *preserves* `_ ' " : ;` and does not collapse `-` runs. So djot-php (following the prose) intentionally differs from current djot.js output on those ASCII characters. This prose-vs-implementation gap is tracked upstream in [jgm/djot#391](https://github.com/jgm/djot/issues/391); when smart punctuation is enabled, note that both the prose *and* djot.js preserve the resulting non-ASCII quotes, so `# Bob's Guide` → `id="Bob’s-Guide"` (the heading-reference extension stays consistent because the link target runs through the same normalization).
+
+The two CSS-validity deviations are deliberate: a leading digit makes `querySelector('#2col')` a syntax error, and an empty/sentinel id is worse than a stable generated `s-N`. Everything else is verbatim #393.
 
 ---
 

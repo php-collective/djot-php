@@ -172,16 +172,19 @@ DJOT);
         $converter = new DjotConverter();
         $converter->addExtension(new HeadingReferenceExtension());
 
-        // The parser converts straight quotes to smart quotes in heading text,
-        // but reference targets keep straight quotes. The extension normalizes
-        // quotes for matching so this should resolve correctly.
+        // The parser converts straight quotes to smart quotes in heading text.
+        // Per jgm/djot#393 the resulting non-ASCII quote characters are
+        // preserved in the identifier; the reference still resolves because
+        // both the heading ID and the link target run through the same
+        // normalization, so the href must equal the section id verbatim.
         $html = $converter->convert(<<<'DJOT'
 See [[Say "Hello"]].
 
 # Say "Hello"
 DJOT);
 
-        $this->assertStringContainsString('href="#Say-Hello"', $html);
+        $this->assertStringContainsString('id="Say-“Hello”"', $html);
+        $this->assertStringContainsString('href="#Say-“Hello”"', $html);
         $this->assertStringNotContainsString('[[Say "Hello"]]', $html);
     }
 
@@ -210,7 +213,10 @@ See [[Bob's Guide]].
 # Bob's Guide
 DJOT);
 
-        $this->assertStringContainsString('href="#Bob-s-Guide"', $html);
+        // Smart-punctuation turns the apostrophe into U+2019, which jgm/djot#393
+        // preserves (non-ASCII). The href must match the generated section id.
+        $this->assertStringContainsString('id="Bob’s-Guide"', $html);
+        $this->assertStringContainsString('href="#Bob’s-Guide"', $html);
         $this->assertStringNotContainsString('data-heading-ref=', $html);
         $this->assertStringNotContainsString('[[Bob\'s Guide]]', $html);
     }
