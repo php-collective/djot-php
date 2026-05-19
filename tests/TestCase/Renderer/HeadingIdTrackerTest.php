@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Renderer;
 
 use Djot\Node\Block\Heading;
+use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Strong;
+use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Renderer\HeadingIdTracker;
 use PHPUnit\Framework\TestCase;
@@ -277,5 +279,86 @@ class HeadingIdTrackerTest extends TestCase
         // Plain text should still return the cached original
         $text = $this->tracker->getPlainText($heading);
         $this->assertSame('Title', $text);
+    }
+
+    /**
+     * The djot spec (and jgm/djot#393) says auto-generated identifiers are formed
+     * from the plain text content "excluding non-textual elements such as footnote
+     * references and symbols". A symbol must not leak into the ID.
+     */
+    public function testSymbolsExcludedFromId(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('Introduction '));
+        $heading->appendChild(new Symbol('smile'));
+
+        $id = $this->tracker->getIdForHeading($heading);
+
+        $this->assertSame('Introduction', $id);
+    }
+
+    public function testHeadingWithOnlySymbolGetsFallbackId(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Symbol('tada'));
+
+        $id = $this->tracker->getIdForHeading($heading);
+
+        $this->assertSame('s-1', $id);
+    }
+
+    public function testSymbolBetweenWordsDoesNotProduceStrayDashes(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('Build'));
+        $heading->appendChild(new Symbol('rocket'));
+        $heading->appendChild(new Text('Status'));
+
+        $id = $this->tracker->getIdForHeading($heading);
+
+        $this->assertSame('BuildStatus', $id);
+    }
+
+    /**
+     * Footnote references are likewise excluded from the identifier:
+     * `# Introduction[^1]` generates `Introduction`, not `Introduction1`.
+     */
+    public function testFootnoteReferenceExcludedFromId(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('Introduction'));
+        $heading->appendChild(new FootnoteRef('1'));
+
+        $id = $this->tracker->getIdForHeading($heading);
+
+        $this->assertSame('Introduction', $id);
+    }
+
+    /**
+     * Symbols are still part of the human-readable plain text (e.g. for TOC
+     * labels); only the *identifier* excludes them. This pins that boundary.
+     */
+    public function testSymbolsRetainedInPlainText(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('Introduction '));
+        $heading->appendChild(new Symbol('smile'));
+
+        $this->assertSame('Introduction :smile:', $this->tracker->getPlainText($heading));
+    }
+
+    /**
+     * djot.js keeps `_` (it is not in its punctuation denylist) and it is a
+     * valid CSS identifier character, so djot-php keeps it too. This pins the
+     * deliberate divergence from the looser #393 spec prose.
+     */
+    public function testUnderscoreRetainedInId(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('foo_bar baz'));
+
+        $id = $this->tracker->getIdForHeading($heading);
+
+        $this->assertSame('foo_bar-baz', $id);
     }
 }
