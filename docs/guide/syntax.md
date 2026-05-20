@@ -1161,6 +1161,11 @@ And so are you.</p>
 
 ### Block Attributes
 
+For an overview of where attributes attach for each block construct
+(lists, definition lists, tables, etc.), see
+[Attachment Model](/reference/enhancements#attachment-model) in the
+reference.
+
 Apply attributes to the following block using `{...}` syntax.
 
 **Input:**

@@ -361,6 +361,34 @@ They said:
 
 These are djot syntax features we've implemented that aren't yet in the upstream spec.
 
+### Attachment Model
+
+This summarises where djot-php expects an attribute block (`{...}`)
+relative to its target. The governing principle is djot's own:
+**attributes precede their target; adjacency selects the tighter
+target where supported.** Two constructs (list items, `<dd>`) extend
+this with a deliberate exception for the *last content line* of the
+container.
+
+| Target | Attribute position | Notes |
+|--------|--------------------|-------|
+| Any block (list as a whole, table, fenced div, paragraph, etc.) | `{...}` on the **preceding** line | Standard djot. Applied to the next block. |
+| Inline span | `text{...}` **adjacent** (no space) | Standard djot. Adjacency selects the tightest target. |
+| List item `<li>` | `{...}` as the **last content line of the item**, at content indent | djot-php extension. If another block follows the `{...}` in the same item, `{...}` reverts to a preceding block-attribute for that following block. |
+| `<dt>` (term) | `{...}` on the **line after** the term, at content indent | djot-php extension. |
+| `<dd>` (definition) | `{...}` as the **last line** of the definition block | djot-php extension. Mirror of the list-item rule. |
+| `<dl>` (list as a whole) | `{...}` on the **preceding** line, before the first term | djot-php extension. |
+| Table row | `\| cell \|{...}` after the **final** pipe | djot-php extension. |
+| Table cell | `\|{...} content \|` after the **opening** pipe | djot-php extension. |
+| List **marker glyph** (the bullet / number) | — not addressable — | There is no AST node for the marker. Style the parent `<li>` (or the list) and target the marker via CSS `::marker`. |
+
+**Stripped names:** `start`, `type`, and `reversed` are HTML
+attributes valid only on `<ol>`. djot-php silently drops them from
+`<li>` / `<dd>` output to keep the HTML valid; use a preceding
+block-attribute line on the list itself to set them on `<ol>`.
+
+---
+
 ### Task List Underscore Notation
 
 **Related:** [jgm/djot#305](https://github.com/jgm/djot/issues/305)
