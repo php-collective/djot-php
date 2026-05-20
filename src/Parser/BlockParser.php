@@ -29,6 +29,7 @@ use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
+use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Parser\Block\FencedBlockParser;
@@ -115,6 +116,16 @@ class BlockParser
      * @var array<string, true>
      */
     protected array $headingIds = [];
+
+    /**
+     * Labels in $references that were registered by a heading (not by an
+     * explicit `[label]: url` definition). Only those are rewritten by the
+     * post-parse `rewriteHeadingReferences` pass — an explicit definition
+     * always wins over the heading's auto-id.
+     *
+     * @var array<string, true>
+     */
+    protected array $headingReferenceLabels = [];
 
     /**
      * Current line offset for nested parsing (0-indexed internally, 1-indexed for errors)
@@ -336,6 +347,7 @@ class BlockParser
         $this->usedReferences = [];
         $this->anchorLinks = [];
         $this->headingIds = [];
+        $this->headingReferenceLabels = [];
         $this->lineOffset = 0;
         $document = new Document();
         $lines = $this->splitLines($input);
@@ -353,6 +365,13 @@ class BlockParser
         foreach ($this->footnotes as $footnote) {
             $document->appendChild($footnote);
         }
+
+        // Third pass (post-parse): now that the AST exists we can pre-reserve
+        // every explicit `{#id}` (heading or non-heading, including inline
+        // attributes) and rewrite implicit heading references to the same
+        // deduped ids the renderer will emit, so `[Heading][]` anchors stay
+        // in sync with the rendered section id.
+        $this->rewriteHeadingReferences($document);
 
         // Validate references and anchor links if warnings are enabled
         if ($this->collectWarnings) {
@@ -572,6 +591,13 @@ class BlockParser
         $pendingId = null;
         $count = count($lines);
 
+        // NOTE: this pass is line-based and runs *before* the AST exists, so
+        // it cannot reliably pre-reserve every explicit id the way the
+        // renderer's AST-walking `reserveExplicitIds` does. As a result, the
+        // implicit-reference href computed here can disagree with the rendered
+        // section id when a heading's auto-id collides with a non-heading
+        // explicit id elsewhere in the document. Tracked as a follow-up.
+
         for ($i = 0; $i < $count; $i++) {
             $line = $lines[$i];
 
@@ -618,6 +644,9 @@ class BlockParser
                 $label = preg_replace('/\s+/', ' ', trim($plainText)) ?? $plainText;
                 if (!isset($this->references[$label])) {
                     $this->references[$label] = new ReferenceDefinition('#' . $id, [], $i);
+                    // Mark so the post-parse rewrite knows this came from a
+                    // heading; an explicit `[label]: url` always wins.
+                    $this->headingReferenceLabels[$label] = true;
                 }
             } else {
                 // Non-heading, non-attribute line - clear pending ID
@@ -625,6 +654,107 @@ class BlockParser
                     $pendingId = null;
                 }
             }
+        }
+    }
+
+    /**
+     * Rewrite implicit heading references against the parsed AST
+     *
+     * `extractHeadingReferences()` runs before the AST exists, so its
+     * estimated heading ids can disagree with the renderer once explicit
+     * `{#id}` attributes (especially on non-heading blocks or inline
+     * elements) force the renderer to dedupe. This post-parse pass walks
+     * the document with the same `reserveExplicitIds` the renderer uses,
+     * computes the actual heading ids, and re-targets both the references
+     * map and any built reference-Link nodes accordingly.
+     */
+    protected function rewriteHeadingReferences(Document $document): void
+    {
+        $tracker = new HeadingIdTracker();
+        $tracker->reserveExplicitIds($document);
+
+        /** @var array<string, string> $newUrlByLabel */
+        $newUrlByLabel = [];
+        $this->collectHeadingIds($document, $tracker, $newUrlByLabel);
+
+        // Only rewrite labels that came from a heading — an explicit
+        // `[label]: url` reference always wins over the heading's id.
+        $headingOnly = [];
+        foreach ($newUrlByLabel as $label => $url) {
+            if (isset($this->headingReferenceLabels[$label])) {
+                $headingOnly[$label] = $url;
+            }
+        }
+
+        foreach ($headingOnly as $label => $url) {
+            if (isset($this->references[$label])) {
+                $old = $this->references[$label];
+                $this->references[$label] = new ReferenceDefinition($url, $old->attributes, $old->line);
+            }
+        }
+
+        $this->retargetHeadingLinks($document, $headingOnly, $tracker);
+    }
+
+    /**
+     * @param \Djot\Node\Node $node
+     * @param \Djot\Renderer\HeadingIdTracker $tracker
+     * @param array<string, string> $out
+     */
+    protected function collectHeadingIds(Node $node, HeadingIdTracker $tracker, array &$out): void
+    {
+        foreach ($node->getChildren() as $child) {
+            if ($child instanceof Heading) {
+                $id = $tracker->getIdForHeading($child);
+                // Remember the renderer-visible id so `validateAnchorLinks`
+                // doesn't flag valid links to deduped headings as broken.
+                $this->headingIds[$id] = true;
+
+                $plain = $tracker->getPlainText($child);
+                $label = preg_replace('/\s+/', ' ', trim($plain)) ?? $plain;
+                // First-wins: an implicit `[Foo][]` link resolves to the
+                // first heading with that label, matching the line-based
+                // pass and djot.js. Later duplicates only get deduped ids.
+                if (!isset($out[$label])) {
+                    $out[$label] = '#' . $id;
+                }
+
+                continue;
+            }
+            $this->collectHeadingIds($child, $tracker, $out);
+        }
+    }
+
+    /**
+     * @param \Djot\Node\Node $node
+     * @param array<string, string> $newUrlByLabel
+     * @param \Djot\Renderer\HeadingIdTracker $tracker
+     */
+    protected function retargetHeadingLinks(Node $node, array $newUrlByLabel, HeadingIdTracker $tracker): void
+    {
+        foreach ($node->getChildren() as $child) {
+            // Both reference Links (`[Text][]`) and reference Images
+            // (`![Text][]`) carry the implicit-reference label and need
+            // their target rewritten when a heading id is deduped. Images
+            // store their text in the `alt` string; Links keep it as child
+            // nodes — extract each appropriately for the lookup key.
+            if (($child instanceof Link || $child instanceof Image) && $child->getReferenceLabel() !== null) {
+                $refLabel = $child->getReferenceLabel();
+                if ($refLabel === '') {
+                    $raw = $child instanceof Link ? $tracker->getPlainText($child) : $child->getAlt();
+                    $key = preg_replace('/\s+/', ' ', trim($raw)) ?? '';
+                } else {
+                    $key = preg_replace('/\s+/', ' ', trim($refLabel)) ?? $refLabel;
+                }
+                if ($key !== '' && isset($newUrlByLabel[$key])) {
+                    if ($child instanceof Link) {
+                        $child->setDestination($newUrlByLabel[$key]);
+                    } else {
+                        $child->setSource($newUrlByLabel[$key]);
+                    }
+                }
+            }
+            $this->retargetHeadingLinks($child, $newUrlByLabel, $tracker);
         }
     }
 

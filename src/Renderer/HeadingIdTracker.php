@@ -88,6 +88,26 @@ class HeadingIdTracker
     }
 
     /**
+     * Reserve every explicit `id` attribute in the document subtree
+     *
+     * Walks the AST and `trackId`s any node with an explicit `id`, so
+     * later heading auto-id generation dedupes against the entire
+     * document's explicit ids regardless of their position. Run once
+     * up-front by both the renderer and the implicit-reference pass so
+     * the two compute the same heading ids (parser/render parity).
+     */
+    public function reserveExplicitIds(Node $node): void
+    {
+        if ($node->hasAttribute('id')) {
+            $this->trackId((string)$node->getAttribute('id'));
+        }
+
+        foreach ($node->getChildren() as $child) {
+            $this->reserveExplicitIds($child);
+        }
+    }
+
+    /**
      * Normalize text into a valid CSS identifier string
      *
      * 1. Strip # characters entirely
@@ -218,10 +238,20 @@ class HeadingIdTracker
         $idText = $this->extractPlainText($node, forId: true);
 
         if ($idText === '') {
-            // Generate fallback ID
-            $this->sectionCounter++;
+            // Generate fallback ID, skipping any `s-N` already reserved
+            // (by `reserveExplicitIds`, an explicit `{#s-N}` heading, or a
+            // prior normalized heading), so the fallback never produces a
+            // duplicate. Both the renderer and the implicit-reference
+            // pass run `reserveExplicitIds` first, so this stays
+            // deterministic across passes.
+            do {
+                $this->sectionCounter++;
+                $fallback = 's-' . $this->sectionCounter;
+            } while (isset($this->usedIds[$fallback]));
 
-            return 's-' . $this->sectionCounter;
+            $this->usedIds[$fallback] = 0;
+
+            return $fallback;
         }
 
         $baseId = $this->normalizeId($idText);
@@ -233,9 +263,16 @@ class HeadingIdTracker
             return $baseId;
         }
 
-        // Already used, add suffix (first conflict is -1, second is -2, etc.)
-        $this->usedIds[$baseId]++;
+        // Already used. Find the next suffix that isn't itself reserved —
+        // an explicit `{#Foo-1}` must not be silently overridden by an
+        // auto-id collision on `# Foo`.
+        do {
+            $this->usedIds[$baseId]++;
+            $candidate = $baseId . '-' . $this->usedIds[$baseId];
+        } while (isset($this->usedIds[$candidate]));
 
-        return $baseId . '-' . $this->usedIds[$baseId];
+        $this->usedIds[$candidate] = 0;
+
+        return $candidate;
     }
 }

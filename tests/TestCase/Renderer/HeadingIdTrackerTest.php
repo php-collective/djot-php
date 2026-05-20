@@ -151,6 +151,21 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('Test', $id);
     }
 
+    /**
+     * The generated `s-N` fallback must dedupe against tracked ids: an
+     * earlier explicit `{#s-1}` makes the next empty/all-punctuation
+     * heading take `s-2`, not duplicate `s-1`. This is what makes the
+     * upfront `reserveExplicitIds` pre-pass effective end-to-end.
+     */
+    public function testFallbackIdSkipsReservedSN(): void
+    {
+        $this->tracker->trackId('s-1');
+
+        $heading = new Heading(2);
+
+        $this->assertSame('s-2', $this->tracker->getIdForHeading($heading));
+    }
+
     public function testNormalizeId(): void
     {
         $this->assertSame('Hello-World', $this->tracker->normalizeId('Hello World'));
