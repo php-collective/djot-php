@@ -1104,6 +1104,80 @@ DJOT;
         $this->assertStringContainsString('<blockquote>', $result);
     }
 
+    public function testListItemAttributeStartIsStrippedFromLi(): void
+    {
+        // G3: `start` is an HTML attribute valid only on <ol>. It must
+        // be stripped from <li> output, never feed <ol>, and never
+        // appear in HTML.
+        $djot = "1. item\n   {start=5}\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li>', $result);
+        $this->assertStringNotContainsString('<li start=', $result);
+        $this->assertStringNotContainsString('<ol start="5"', $result);
+    }
+
+    public function testListItemAttributeTypeIsStrippedFromLi(): void
+    {
+        // G3: `type` is an HTML attribute valid only on <ol>. Stripped
+        // from <li>; never overrides marker-derived <ol type=...>.
+        $djot = "(a) x\n   {type=i}\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<ol type="a">', $result);
+        $this->assertStringNotContainsString('<li type=', $result);
+        $this->assertStringNotContainsString('type="i"', $result);
+    }
+
+    public function testListItemAttributeReversedIsStrippedFromLi(): void
+    {
+        // G3: `reversed` is <ol>-only. Stripped from <li>.
+        $djot = "1. item\n   {reversed}\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li>', $result);
+        $this->assertStringNotContainsString('<li reversed', $result);
+        $this->assertStringNotContainsString('reversed=""', $result);
+    }
+
+    public function testListItemOtherAttributesUnchanged(): void
+    {
+        // G3 regression guard: only start/type/reversed are stripped.
+        // class, id, data-* pass through unchanged on <li>.
+        $djot = "1. item\n   {#anchor .step data-step=\"1\"}\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('id="anchor"', $result);
+        $this->assertStringContainsString('class="step"', $result);
+        $this->assertStringContainsString('data-step="1"', $result);
+    }
+
+    public function testOlStartFromBlockAttrUnchanged(): void
+    {
+        // G3 regression guard: a block-attribute line BEFORE a list
+        // applies to the <ol> and must still emit start/type as before.
+        $djot = "{start=5}\n1. item\n2. next\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<ol start="5"', $result);
+    }
+
+    public function testDefinitionListDdStartIsStripped(): void
+    {
+        // G3: same strip applies to <dd>.
+        $djot = ": term\n\n  definition\n  {start=5}\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<dd>', $result);
+        $this->assertStringNotContainsString('<dd start=', $result);
+    }
+
     public function testRomanNumeralList(): void
     {
         // x. is parsed as Roman numeral 10
