@@ -160,18 +160,19 @@ content is a symbol falls back to a generated `s-N` ID.
 
 **Status:** Implemented in djot-php
 
-Auto-generated heading IDs are normalized to be valid CSS selectors, ensuring compatibility with `querySelector()`, HTMX scroll restoration, and CSS attribute selectors.
+Auto-generated heading IDs are normalized to be valid CSS selectors **and ASCII-only**, so they work with `querySelector()` / HTMX scroll restoration *and* survive being copied around as URL fragments (see [Why ASCII](#why-ascii) below).
 
 ### Normalization Rules
 
-1. **Strip `#` characters** — Prevents invalid selectors
-2. **Trim whitespace** — Clean leading/trailing spaces
-3. **Whitespace to dashes** — Spaces become single `-`
-4. **Invalid characters to dashes** — Only Unicode letters (`\p{L}`), numbers (`\p{N}`), hyphens, and underscores are preserved
-5. **Collapse consecutive dashes** — `foo--bar` becomes `foo-bar`
-6. **Trim leading/trailing dashes** — `-foo-` becomes `foo`
-7. **Prefix digits** — IDs starting with a number get `h-` prefix (CSS requirement)
-8. **Fallback** — Empty results become `heading`
+1. **Transliterate to ASCII** — `Über`→`Uber`, `café`→`cafe`, `Привет`→`Privet`, smart quotes/dashes→`'"-` (then replaced)
+2. **Strip `#` characters** — Prevents invalid selectors
+3. **Trim whitespace**
+4. **Whitespace to dashes** — Spaces become single `-`
+5. **Invalid characters to dashes** — Anything other than letters, numbers, `-`, `_` becomes `-`
+6. **Collapse consecutive dashes** — `foo--bar` becomes `foo-bar`
+7. **Trim leading/trailing dashes**
+8. **Prefix digits** — IDs starting with a digit get an `h-` prefix (CSS requirement)
+9. **Fallback** — Empty results become `heading` (or a generated `s-N` for empty headings)
 
 ### Examples
 
@@ -179,45 +180,35 @@ Auto-generated heading IDs are normalized to be valid CSS selectors, ensuring co
 |---------|--------------|
 | `# Hello World` | `Hello-World` |
 | `# Hello World!` | `Hello-World` |
-| `# 日本語の見出し` | `日本語の見出し` |
-| `# Привет мир` | `Привет-мир` |
+| `# Über uns` | `Uber-uns` |
+| `# café résumé` | `cafe-resume` |
+| `# Привет мир` | `Privet-mir` |
+| `# Bob's Guide` (smart quotes) | `Bob-s-Guide` |
 | `# E=mc^2` | `E-mc-2` |
 | `# 123 Numbers First` | `h-123-Numbers-First` |
 | `# $this->method()` | `this-method` |
 | `# ###` | `heading` |
 
-### Unicode Preservation
+### Why ASCII {#why-ascii}
 
-International characters are preserved while special characters are normalized:
+Heading IDs end up as URL fragments (`…/page#Über-uns`) that get copied into chat, email and other documents, where **auto-linkers re-detect the URL heuristically**. Non-ASCII fragments are routinely:
 
-```djot
-# 日本語の見出し
+- **truncated** — the link is cut at the first non-ASCII byte (`#Über` → `#`), producing a silent dead link;
+- **percent-encoded inconsistently** — `’`→`%E2%80%99`, bloating and sometimes breaking the link;
+- **re-normalized differently** by the receiving app (NFC/NFD), so the pasted fragment no longer matches the page's `id`.
 
-# Cześć świecie
-```
+Transliterating to ASCII keeps shared deep links robust. It's a deliberate deviation from both the djot.js reference and the [jgm/djot#393](https://github.com/jgm/djot/pull/393) spec prose (both preserve non-ASCII) — see [Spec Alignment](#spec-alignment).
 
-**Output:**
-```html
-<h1 id="日本語の見出し">日本語の見出し</h1>
-<h1 id="Cześć-świecie">Cześć świecie</h1>
-```
+### Transliteration engine & determinism
 
-### Why This Matters
+Two engines produce the ASCII form:
 
-Without CSS-safe normalization, headings with special characters would break:
+- **ICU `Transliterator`** (`Any-Latin; Latin-ASCII`) when `ext-intl` is installed — also romanizes scripts the map doesn't cover (Greek, CJK, Arabic, …);
+- a **baked Unicode→ASCII map** (`src/Renderer/ascii_translit_map.php`) otherwise.
 
-```js
-// This would throw SyntaxError with unsafe IDs
-document.querySelector('#E=mc^2');  // Invalid selector
-htmx.scrollToElement('#$this->foo'); // Invalid selector
-```
+The baked map is generated *from the same ICU transform*, and the generator bakes a script **only if every code point in it transliterates context-free** (verified standalone, doubled, and between Latin letters). For those scripts — Latin (so all of German, French, Spanish, Polish, Czech, Turkish, Vietnamese, …), Cyrillic, punctuation, smart quotes, dashes, currency — the output is **byte-identical with or without `ext-intl`**, so shared anchors stay stable across environments.
 
-With normalization, these work correctly:
-
-```js
-document.querySelector('#E-mc-2');  // Works
-htmx.scrollToElement('#this-foo');  // Works
-```
+Scripts whose ICU romanization is context-sensitive (e.g. Greek: `αυ`→`au` but `υ`→`y`) are excluded *wholesale* — baking only their context-free letters would produce IDs that disagree with ICU, which is worse than not covering them. Those scripts, plus non-Latin scripts the map never covers (CJK, Arabic, …), behave one way: **with `ext-intl` they are romanized; without it they are dropped and the heading falls back to a generated `s-N` id**. `ext-intl` is therefore *recommended* (a `composer suggest`) but not required; the determinism guarantee above never depends on it.
 
 ### Explicit IDs
 
@@ -227,27 +218,27 @@ You can always override with an explicit ID attribute:
 # My Heading {#custom-id}
 ```
 
-Explicit IDs are used as-is without normalization.
+Explicit IDs are used as-is without normalization or transliteration.
 
-### Spec Alignment
+### Spec Alignment {#spec-alignment}
 
-The remove-vs-replace question raised in [jgm/djot#391](https://github.com/jgm/djot/issues/391) was settled by [jgm/djot#393](https://github.com/jgm/djot/pull/393), which reworded the spec to: *"replacing each maximal run of non-alphanumeric ASCII characters with `-`, removing any leading or trailing `-`"*. Note that #393 only changes the spec **prose** — the djot.js reference implementation is unchanged and (per djot's own changelog policy) remains the authoritative behavior. The new prose is actually broader than djot.js itself: it would also strip `_`, which djot.js keeps.
+The remove-vs-replace question raised in [jgm/djot#391](https://github.com/jgm/djot/issues/391) was settled by [jgm/djot#393](https://github.com/jgm/djot/pull/393), which reworded the spec to: *"replacing each maximal run of non-alphanumeric ASCII characters with `-`, removing any leading or trailing `-`"*. #393 changed only the spec **prose**; the djot.js reference implementation is unchanged.
 
-djot-php replaces (does not remove) mid-word punctuation — the direction #393 settled on — and tracks the djot.js **implementation** where the prose and implementation disagree, deliberately deviating only where required to produce valid CSS identifiers for `querySelector()` consumers.
+djot-php replaces (does not remove) mid-word punctuation — the direction #393 settled on — additionally replaces `' " ; :` so IDs are valid CSS identifiers, and **transliterates non-ASCII to ASCII** so IDs stay link-safe when shared. The last point is a deliberate deviation from *both* djot.js and the #393 prose, justified by the [Why ASCII](#why-ascii) failure mode.
 
 | Aspect | djot.js reference impl | #393 spec prose | djot-php |
 |--------|------------------------|-----------------|----------|
 | Mid-word punctuation (`A+B=C`) | `A-B-C` | `A-B-C` | `A-B-C` |
-| Non-ASCII letters (`Über uns`) | preserve → `Über-uns` | preserve → `Über-uns` | preserve → `Über-uns` |
 | Consecutive punctuation (`foo...bar`) | collapse → `foo-bar` | collapse → `foo-bar` | collapse → `foo-bar` |
-| Underscore (`foo_bar`) | keep → `foo_bar` | strip → `foo-bar` | keep → `foo_bar` (follows impl; CSS-valid) |
-| Apostrophe (`That's all`) | preserve → `That's-all` | replace → `That-s-all` | replace → `That-s-all` (CSS-safe) |
-| Double quote / `;` / `:` | preserve | replace | replace with `-` (CSS-safe) |
+| Underscore (`foo_bar`) | keep → `foo_bar` | strip → `foo-bar` | keep → `foo_bar` (CSS-valid, link-safe) |
+| Apostrophe / `"` / `;` / `:` | preserve | replace | replace → `-` (CSS-safe) |
+| Non-ASCII letters (`Über uns`) | preserve → `Über-uns` | preserve → `Über-uns` | **transliterate → `Uber-uns`** (link-safe) |
+| Non-ASCII / smart quotes (`Bob’s`) | preserve → `Bob’s` | preserve → `Bob’s` | **transliterate → `Bob-s`** (link-safe) |
 | Leading digit (`2024 recap`) | `2024-recap` | `2024-recap` | prefix → `h-2024-recap` (CSS requires non-digit start) |
 | Empty result (`!!!`) | `s-N` family | unspecified | fallback → `heading` |
 | Symbols / footnote refs | excluded | excluded | excluded |
 
-The apostrophe / quote / semicolon / colon deviation is deliberate: these characters are not valid in unescaped CSS identifiers, so preserving them per djot.js would force every JS consumer to round-trip through `CSS.escape()` before doing a selector lookup. The leading-digit and empty-result behaviors fill in gaps that the spec and implementation handle inconsistently.
+The deviations are deliberate: `' " ; :` are not valid in unescaped CSS identifiers, and non-ASCII fragments break when shared (see [Why ASCII](#why-ascii)). The leading-digit and empty-result behaviors fill in gaps the spec and reference handle inconsistently. A note proposing the spec clarify the non-ASCII question is tracked against [jgm/djot#391](https://github.com/jgm/djot/issues/391).
 
 ---
 

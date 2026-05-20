@@ -17,6 +17,7 @@ use Djot\Renderer\SoftBreakMode;
 use LengthException;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Transliterator;
 
 class DjotConverterTest extends TestCase
 {
@@ -1900,8 +1901,33 @@ DJOT;
         $djot = '# 日本語の見出し';
         $result = $this->converter->convert($djot);
 
-        $this->assertStringContainsString('<section id="日本語の見出し">', $result);
+        // The visible heading text is unchanged; only the ID is made
+        // ASCII-safe so it survives being shared as a URL fragment.
         $this->assertStringContainsString('<h1>日本語の見出し</h1>', $result);
+        $this->assertStringNotContainsString('id="日本語の見出し"', $result);
+        $this->assertMatchesRegularExpression('/<section id="[\x21-\x7E]+">/', $result);
+
+        if (class_exists(Transliterator::class)) {
+            // With ext-intl the CJK heading is romanized rather than dropped.
+            $this->assertStringContainsString('<section id="ri-ben-yuno-jian-chushi">', $result);
+        }
+    }
+
+    /**
+     * The implicit-heading-reference pass (BlockParser, fresh tracker) and the
+     * renderer must compute the same `s-N` fallback id, even when an explicit
+     * non-heading id exists. Regression guard: a render-only dedup once made
+     * the heading `s-2` while the reference still pointed at `#s-1`.
+     */
+    public function testGeneratedFallbackIdStaysConsistentWithImplicitReference(): void
+    {
+        $result = $this->converter->convert("{#s-1}\npara\n\n# !!!\n\n[!!!][]\n");
+
+        $this->assertSame(
+            1,
+            preg_match('/<section id="(s-\d+)">/', $result, $section),
+        );
+        $this->assertStringContainsString('href="#' . $section[1] . '"', $result);
     }
 
     /**

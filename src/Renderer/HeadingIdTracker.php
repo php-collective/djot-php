@@ -55,6 +55,13 @@ class HeadingIdTracker
      */
     protected array $resolvedTexts = [];
 
+    protected AsciiTransliterator $transliterator;
+
+    public function __construct(?AsciiTransliterator $transliterator = null)
+    {
+        $this->transliterator = $transliterator ?? new AsciiTransliterator();
+    }
+
     /**
      * Get the unique ID for a heading node
      *
@@ -108,17 +115,24 @@ class HeadingIdTracker
     }
 
     /**
-     * Normalize text into a valid CSS identifier string
+     * Normalize text into a valid, link-safe CSS identifier string
      *
-     * 1. Strip # characters entirely
-     * 2. Trim whitespace
-     * 3. Replace whitespace sequences (including Unicode spaces) with single dashes
-     * 4. Replace any remaining characters that are invalid in CSS identifiers
-     *    (anything other than Unicode letters/numbers, hyphens, and underscores)
+     * 1. Transliterate to ASCII (Über → Uber, café → cafe, Привет → Privet),
+     *    so the ID survives being shared as a URL fragment through
+     *    auto-linkers that truncate or mangle non-ASCII
+     * 2. Strip # characters entirely
+     * 3. Trim whitespace
+     * 4. Replace whitespace sequences with single dashes
+     * 5. Replace any remaining characters invalid in CSS identifiers
+     *    (anything other than letters, numbers, hyphens, and underscores)
      *    with dashes
-     * 5. Collapse consecutive dashes and trim leading/trailing dashes
-     * 6. Prefix with 'h-' if the result starts with a digit, ensuring a valid
+     * 6. Collapse consecutive dashes and trim leading/trailing dashes
+     * 7. Prefix with 'h-' if the result starts with a digit, ensuring a valid
      *    CSS ident start (digits are not allowed as the first character)
+     *
+     * Returns '' when nothing usable remains (e.g. all-punctuation text, or a
+     * script the transliterator cannot reduce to ASCII); the caller then
+     * falls back to a generated `s-N` id.
      *
      * Producing a valid CSS identifier ensures that consumers such as HTMX,
      * which call `querySelector` with the section ID for scroll-restoration,
@@ -127,7 +141,8 @@ class HeadingIdTracker
      */
     public function normalizeId(string $text): string
     {
-        $id = str_replace('#', '', $text);
+        $id = $this->transliterator->transliterate($text);
+        $id = str_replace('#', '', $id);
         $id = trim($id);
         $id = preg_replace('/\s+/u', '-', $id) ?? $id;
         $id = preg_replace('/[^\p{L}\p{N}_-]+/u', '-', $id) ?? $id;
@@ -138,7 +153,7 @@ class HeadingIdTracker
             $id = 'h-' . $id;
         }
 
-        return $id !== '' ? $id : 'heading';
+        return $id;
     }
 
     /**
@@ -236,14 +251,17 @@ class HeadingIdTracker
         // excluding non-textual elements such as symbols and footnote
         // references (jgm/djot#393).
         $idText = $this->extractPlainText($node, forId: true);
+        $baseId = $this->normalizeId($idText);
 
-        if ($idText === '') {
-            // Generate fallback ID, skipping any `s-N` already reserved
-            // (by `reserveExplicitIds`, an explicit `{#s-N}` heading, or a
-            // prior normalized heading), so the fallback never produces a
-            // duplicate. Both the renderer and the implicit-reference
-            // pass run `reserveExplicitIds` first, so this stays
-            // deterministic across passes.
+        if ($baseId === '') {
+            // No usable content: empty heading, all-punctuation text, or a
+            // script the transliterator could not reduce to ASCII. Fall
+            // back to a generated `s-N` id, skipping any `s-N` already
+            // reserved (by `reserveExplicitIds`, an explicit `{#s-N}`, or
+            // a prior heading) so the fallback never produces a duplicate.
+            // Parser/render parity is preserved by `BlockParser`'s
+            // post-parse rewrite (#184) which re-targets implicit refs to
+            // the renderer-visible deduped id.
             do {
                 $this->sectionCounter++;
                 $fallback = 's-' . $this->sectionCounter;
@@ -253,8 +271,6 @@ class HeadingIdTracker
 
             return $fallback;
         }
-
-        $baseId = $this->normalizeId($idText);
 
         // Track and deduplicate
         if (!isset($this->usedIds[$baseId])) {

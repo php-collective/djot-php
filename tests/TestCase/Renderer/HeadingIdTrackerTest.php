@@ -11,6 +11,7 @@ use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Strong;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
+use Djot\Renderer\AsciiTransliterator;
 use Djot\Renderer\HeadingIdTracker;
 use PHPUnit\Framework\TestCase;
 
@@ -174,30 +175,36 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('Multiple-Spaces', $this->tracker->normalizeId('Multiple   Spaces'));
         $this->assertSame('this-t-key-params-fallback', $this->tracker->normalizeId("\$this->t(\$key, \$params = [], \$fallback = '')"));
         $this->assertSame('My-title', $this->tracker->normalizeId('My --- title'));
-        $this->assertSame('日本語の見出し', $this->tracker->normalizeId('日本語の見出し'));
-        $this->assertSame('heading', $this->tracker->normalizeId('###'));
+        // Non-ASCII is transliterated to keep shared anchors link-safe; the
+        // Latin/Cyrillic output is deterministic with or without ext-intl.
+        $this->assertSame('Privet-mir', $this->tracker->normalizeId('Привет мир'));
+        $this->assertSame('', $this->tracker->normalizeId('###'));
         $this->assertSame('h-123-Things', $this->tracker->normalizeId('123 Things'));
         $this->assertSame('h-1-Introduction', $this->tracker->normalizeId('1. Introduction'));
     }
 
     /**
-     * Pins behaviour discussed in jgm/djot#391 (spec wording on auto-ID generation).
+     * Pins djot-php's heading-ID behaviour around jgm/djot#391.
      *
-     * djot-php sides with djot.js / djoths on remove-vs-replace (mid-word punctuation
-     * becomes `-`), and deliberately deviates on apostrophes / quotes / `;` / `:` by
-     * also replacing them, so generated IDs are valid CSS identifiers and safe to use
-     * with `querySelector()`.
+     * djot-php replaces (not removes) mid-word punctuation, additionally
+     * replaces apostrophes / quotes / `;` / `:` so IDs are valid CSS
+     * identifiers, and transliterates non-ASCII to ASCII so the IDs survive
+     * being shared as URL fragments through auto-linkers. All cases below
+     * are deterministic with or without ext-intl.
      */
     public function testNormalizeIdSpecAlignmentEdgeCases(): void
     {
         $this->assertSame('A-B-C', $this->tracker->normalizeId('A+B=C'));
         $this->assertSame('Emphasis-strong', $this->tracker->normalizeId('Emphasis/strong'));
         $this->assertSame('That-s-all', $this->tracker->normalizeId("That's all"));
+        $this->assertSame('That-s-all', $this->tracker->normalizeId('That’s all'));
         $this->assertSame('foo-bar', $this->tracker->normalizeId('foo...bar'));
         $this->assertSame('Uber-uns', $this->tracker->normalizeId('Uber uns'));
-        $this->assertSame('Über-uns', $this->tracker->normalizeId('Über uns'));
+        $this->assertSame('Uber-uns', $this->tracker->normalizeId('Über uns'));
+        $this->assertSame('cafe-resume', $this->tracker->normalizeId('café résumé'));
+        $this->assertSame('Strasse', $this->tracker->normalizeId('Straße'));
         $this->assertSame('h-2024-recap', $this->tracker->normalizeId('2024 recap'));
-        $this->assertSame('heading', $this->tracker->normalizeId('!!!'));
+        $this->assertSame('', $this->tracker->normalizeId('!!!'));
     }
 
     public function testGetPlainText(): void
@@ -375,5 +382,49 @@ class HeadingIdTrackerTest extends TestCase
         $id = $this->tracker->getIdForHeading($heading);
 
         $this->assertSame('foo_bar-baz', $id);
+    }
+
+    /**
+     * When transliteration removes the entire heading text (a script outside
+     * the baked map, no ext-intl), the heading must fall back to a stable
+     * generated `s-N` id — not the legacy `heading` sentinel.
+     */
+    public function testHeadingThatTransliteratesToNothingGetsFallbackId(): void
+    {
+        $tracker = new HeadingIdTracker(new AsciiTransliterator(useIntl: false));
+
+        $cjk = new Heading(2);
+        $cjk->appendChild(new Text('日本語の見出し'));
+
+        $next = new Heading(2);
+        $next->appendChild(new Text('عنوان عربي'));
+
+        $this->assertSame('s-1', $tracker->getIdForHeading($cjk));
+        $this->assertSame('s-2', $tracker->getIdForHeading($next));
+    }
+
+    public function testAllPunctuationHeadingGetsFallbackId(): void
+    {
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('!!!'));
+
+        $this->assertSame('s-1', $this->tracker->getIdForHeading($heading));
+    }
+
+    /**
+     * The `s-N` fallback dedupes against reserved IDs: an earlier explicit
+     * `{#s-1}` forces the next all-punct/empty heading to take `s-2`,
+     * skipping the taken slot. Parser/render parity is preserved by
+     * BlockParser's post-parse rewrite (see #184), so the do-while here is
+     * safe — both passes seed their tracker with `reserveExplicitIds`.
+     */
+    public function testFallbackIdSkipsReservedSNCollision(): void
+    {
+        $this->tracker->trackId('s-1');
+
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('###'));
+
+        $this->assertSame('s-2', $this->tracker->getIdForHeading($heading));
     }
 }
