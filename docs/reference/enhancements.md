@@ -441,6 +441,12 @@ Works with all list types:
   block attribute for that following block; the list and item are
   not terminated.
 
+**Stripped attribute names:** `start`, `type`, and `reversed` are HTML
+attributes valid only on `<ol>`. When authored on a list item they are
+silently dropped from the rendered `<li>` to keep output HTML valid.
+To set `<ol start="5">`, use a standard block-attribute line **before**
+the list: `{start=5}` followed by `1. ...`.
+
 ---
 
 ### Table Row and Cell Attributes
@@ -748,6 +754,9 @@ Attributes can be attached to individual `<dl>`, `<dt>`, and `<dd>` elements:
 - `{...}` before first term → applies to `<dl>`
 - `{...}` on line after term → applies to that `<dt>`
 - `{...}` as last line in definition block → applies to that `<dd>` (consistent with list items)
+
+**Stripped attribute names:** the same `start`, `type`, `reversed`
+strip applies to `<dd>` output.
 
 ---
 

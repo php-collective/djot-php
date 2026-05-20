@@ -88,6 +88,15 @@ class HtmlRenderer implements RendererInterface
      */
     protected array $nodeRenderers = [];
 
+    /**
+     * Attribute names valid on <ol> but not on <li>/<dd>. Stripped from
+     * <li>/<dd> output to avoid emitting invalid HTML when authors put
+     * these names on a list item (e.g. as a postfix {start=5} line).
+     *
+     * @var array<int, string>
+     */
+    protected const OL_ONLY_ATTRIBUTES = ['start', 'type', 'reversed'];
+
     public function __construct(protected bool $xhtml = false)
     {
         $this->sharedRenderContext = new RenderContext();
@@ -741,7 +750,7 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderListItem(ListItem $node, bool $tight = true): string
     {
-        $attrs = $this->renderAttributes($node);
+        $attrs = $this->renderAttributesExcluding($node, self::OL_ONLY_ATTRIBUTES);
         $content = $this->renderChildren($node);
 
         if ($tight) {
@@ -1239,7 +1248,7 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderDefinitionDescription(DefinitionDescription $node): string
     {
-        $attrs = $this->renderAttributes($node);
+        $attrs = $this->renderAttributesExcluding($node, self::OL_ONLY_ATTRIBUTES);
         $content = $this->renderChildren($node);
 
         // Content goes on separate lines
