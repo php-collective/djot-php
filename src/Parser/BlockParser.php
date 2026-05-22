@@ -1924,15 +1924,24 @@ class BlockParser
                             continue;
                         }
                         $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
-                        if ($lineIndent >= $nestedIndent) {
-                            $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $nestedIndent);
-                            $i++;
-                        } elseif ($lineIndent === $baseIndent) {
-                            // Back to parent level - check if it's a sibling item
-                            break;
-                        } else {
+                        // Membership is the item's content indent, not the first
+                        // nested line's (possibly deeper) indent: a line that drops
+                        // back to the content indent is still item content and must
+                        // be kept here, otherwise an over-indented first nested line
+                        // would detach it into a top-level block and end the list early.
+                        if ($lineIndent < $contentIndent) {
+                            // Back to the parent (or a shallower) level: this item's
+                            // nested content is done.
                             break;
                         }
+                        // Normalize the over-indented nested block by its own indent
+                        // so it starts at column 0 (required for the sub-parse to
+                        // recognize it as a block); lines that fall back to the item
+                        // content indent are stripped by that instead, keeping them
+                        // in the item rather than letting them escape.
+                        $strip = $lineIndent >= $nestedIndent ? $nestedIndent : $contentIndent;
+                        $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $strip);
+                        $i++;
                     }
                     if ($subLines !== []) {
                         $this->parseBlocks($listItem, $subLines, 0);
@@ -3302,19 +3311,12 @@ class BlockParser
             return true;
         }
 
-        // List markers - these indicate a new list at this level
-        // Bullet lists: -, *, + followed by space
-        if (preg_match('/^[-*+] /', $line)) {
-            return true;
-        }
-
-        // Ordered lists: digit(s) or letter followed by . or ) and space
-        if (preg_match('/^(\d+|[a-zA-Z])[.)] /', $line)) {
-            return true;
-        }
-
-        // Task lists: - [ ] or - [x]
-        if (preg_match('/^- \[[xX ]\] /', $line)) {
+        // List markers (bullet, ordered, and task). Delegate to the canonical
+        // list-marker parser so nested-block detection recognizes every marker
+        // form it supports - including "(1)", "(a)", and roman numerals such as
+        // "iv." - instead of a narrower subset that silently degraded those into
+        // plain paragraph text.
+        if ($this->listParser->parseListItemMarker($line) !== null) {
             return true;
         }
 

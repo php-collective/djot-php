@@ -101,10 +101,11 @@ class TabIndentationTest extends TestCase
     }
 
     /**
-     * Nested list with tabs - current behavior.
+     * Nested list with tabs and no blank line.
      *
-     * Without blank lines, nested markers are not recognized as nested lists
-     * (this matches djot spec - blank line required for nesting).
+     * With nested blocks in lists enabled, tab indentation alone introduces a
+     * nested list even without a preceding blank line (the spec default would
+     * require one).
      */
     public function testNestedListWithTabsNoBlankLine(): void
     {

@@ -88,4 +88,57 @@ class NestedBlocksInListsOptionTest extends TestCase
         $this->assertStringContainsString('Unterpunkt', $result);
         $this->assertStringContainsString('Noch einer', $result);
     }
+
+    /**
+     * Parenthesized ordered markers must nest like "1." markers do. These are
+     * recognized by the list-marker parser, so the nested-block detection has
+     * to recognize them too (otherwise they degrade to plain paragraph text).
+     */
+    public function testNestedOrderedListWithParenthesizedMarkers(): void
+    {
+        $parser = new BlockParser(nestedBlocksInLists: true);
+        $doc = $parser->parse("- Item\n    (1) First\n    (2) Second");
+
+        $item = $doc->getChildren()[0]->getChildren()[0];
+        $children = $item->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+        $this->assertSame(ListBlock::TYPE_ORDERED, $children[1]->getListType());
+        $this->assertCount(2, $children[1]->getChildren());
+    }
+
+    /**
+     * Multi-character roman-numeral markers must nest as a single ordered list,
+     * not split across the parent paragraph and a detached sublist.
+     */
+    public function testNestedOrderedListWithRomanMarkers(): void
+    {
+        $parser = new BlockParser(nestedBlocksInLists: true);
+        $doc = $parser->parse("- Item\n    iv. Fourth\n    v. Fifth");
+
+        $item = $doc->getChildren()[0]->getChildren()[0];
+        $children = $item->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+        $this->assertSame(ListBlock::TYPE_ORDERED, $children[1]->getListType());
+        $this->assertCount(2, $children[1]->getChildren());
+    }
+
+    /**
+     * When the first nested line is over-indented relative to the item content
+     * indent and a following line drops back to the content indent, that
+     * following line must stay part of the list item instead of detaching into
+     * a top-level paragraph (which would also terminate the list early).
+     */
+    public function testOverIndentedNestedBlockKeepsTrailingItemContent(): void
+    {
+        $parser = new BlockParser(nestedBlocksInLists: true);
+        $doc = $parser->parse("- a\n      - x\n  more text");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(ListBlock::class, $children[0]);
+    }
 }
