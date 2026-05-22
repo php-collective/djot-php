@@ -10,6 +10,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [AutolinkExtension](#autolinkextension) | Auto-links bare URLs and email addresses |
 | [CodeGroupExtension](#codegroupextension) | Transforms code-group divs into tabbed code block interfaces |
 | [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
+| [CitationsExtension](#citationsextension) | Parses experimental Pandoc/Citum-style citation groups into semantic inline spans |
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
 | [FrontmatterExtension](#frontmatterextension) | Parses YAML/NEON/TOML/JSON frontmatter at document start |
 | [HeadingReferenceExtension](#headingreferenceextension) | Resolves `[[Heading Text]]` links to headings in the current document |
@@ -602,7 +603,7 @@ Thanks @johndoe for the help!
 <p>Thanks <a href="/users/view/johndoe" data-username="johndoe" class="mention">@johndoe</a> for the help!</p>
 ```
 
-## ExperimentalCitationsExtension
+## CitationsExtension
 
 Parses experimental Pandoc/Citum-style citations into semantic inline spans.
 
@@ -613,12 +614,12 @@ This extension is intentionally narrow:
 - It is explicitly experimental because Djot does not have an official citation syntax yet.
 
 ```php
-use Djot\Extension\ExperimentalCitationsExtension;
+use Djot\Extension\CitationsExtension;
 
-$converter->addExtension(new ExperimentalCitationsExtension());
+$converter->addExtension(new CitationsExtension());
 
 // Optional: resolve parsed groups to rendered inline strings
-$converter->addExtension(new ExperimentalCitationsExtension(
+$converter->addExtension(new CitationsExtension(
     resolver: function (array $groups, \Djot\Node\Document $document): array {
         $resolved = [];
         foreach ($groups as $group) {
@@ -659,9 +660,9 @@ The resolver callback receives the full list of parsed citation groups in docume
 
 ```php
 use Djot\Extension\CitationGroup;
-use Djot\Extension\ExperimentalCitationsExtension;
+use Djot\Extension\CitationsExtension;
 
-$converter->addExtension(new ExperimentalCitationsExtension(
+$converter->addExtension(new CitationsExtension(
     resolver: function (array $groups, \Djot\Node\Document $document): array {
         return array_reduce(
             $groups,

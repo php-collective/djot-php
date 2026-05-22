@@ -6,16 +6,16 @@ namespace Djot\Test\TestCase\Extension;
 
 use Djot\DjotConverter;
 use Djot\Extension\CitationGroup;
-use Djot\Extension\ExperimentalCitationsExtension;
+use Djot\Extension\CitationsExtension;
 use Djot\Node\Document;
 use PHPUnit\Framework\TestCase;
 
-class ExperimentalCitationsExtensionTest extends TestCase
+class CitationsExtensionTest extends TestCase
 {
     public function testParentheticalCitation(): void
     {
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension());
+        $converter->addExtension(new CitationsExtension());
 
         $html = $converter->convert('Parenthetical: [@kuhn1962].');
 
@@ -28,7 +28,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
     public function testIntegralCitation(): void
     {
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension());
+        $converter->addExtension(new CitationsExtension());
 
         $html = $converter->convert('[+@smith2010, p. 10] argues the point.');
 
@@ -40,7 +40,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
     public function testSuppressAuthorCitation(): void
     {
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension());
+        $converter->addExtension(new CitationsExtension());
 
         $html = $converter->convert('[-@watson1953, p. 737].');
 
@@ -50,7 +50,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
     public function testMultiCitation(): void
     {
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension());
+        $converter->addExtension(new CitationsExtension());
 
         $html = $converter->convert('[@kuhn1962; @watson1953, ch. 2]');
 
@@ -64,7 +64,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
     public function testCitationResolverCanReplaceRenderedText(): void
     {
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension(
+        $converter->addExtension(new CitationsExtension(
             resolver: static function (array $groups, Document $document): array {
                 $resolved = [];
                 foreach ($groups as $group) {
@@ -90,7 +90,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
         $seenIds = [];
 
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension(
+        $converter->addExtension(new CitationsExtension(
             resolver: static function (array $groups, Document $document) use (&$seenIds): array {
                 $resolved = [];
                 foreach ($groups as $group) {
@@ -111,7 +111,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
     public function testCitationLikeBracketFollowedByLinkDestinationStillParsesAsLink(): void
     {
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension());
+        $converter->addExtension(new CitationsExtension());
 
         $html = $converter->convert('Read [+@kuhn1962](https://example.com).');
 
@@ -122,7 +122,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
     public function testNonCitationBracketStaysPlainText(): void
     {
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension());
+        $converter->addExtension(new CitationsExtension());
 
         $html = $converter->convert('[not a citation]');
 
@@ -134,7 +134,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
         $captured = [];
 
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension(
+        $converter->addExtension(new CitationsExtension(
             resolver: static function (array $groups, Document $document) use (&$captured): array {
                 $captured = $groups;
 
@@ -163,7 +163,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
         $seenDocument = null;
 
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension(
+        $converter->addExtension(new CitationsExtension(
             resolver: static function (array $groups, Document $document) use (&$seenDocument): array {
                 $seenDocument = $document;
 
@@ -180,7 +180,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
     public function testResolverMayReturnEmptyMap(): void
     {
         $converter = new DjotConverter();
-        $converter->addExtension(new ExperimentalCitationsExtension(
+        $converter->addExtension(new CitationsExtension(
             resolver: static fn (array $groups, Document $document): array => [],
         ));
 

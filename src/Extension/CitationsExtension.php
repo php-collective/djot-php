@@ -14,7 +14,7 @@ use Djot\Parser\InlineParser;
 use JsonException;
 
 /**
- * Experimental Pandoc/Citum-style citations for Djot.
+ * Pandoc/Citum-style citations for Djot.
  *
  * Supported forms:
  * - [@key]
@@ -26,7 +26,7 @@ use JsonException;
  * This extension only parses and semantically marks citation groups. Proper
  * bibliography processing remains the responsibility of an external engine.
  */
-class ExperimentalCitationsExtension implements ExtensionInterface, BeforeRenderExtensionInterface
+class CitationsExtension implements ExtensionInterface, BeforeRenderExtensionInterface
 {
     protected ?InlineParser $inlineParser = null;
 
