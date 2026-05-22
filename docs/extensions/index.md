@@ -602,6 +602,107 @@ Thanks @johndoe for the help!
 <p>Thanks <a href="/users/view/johndoe" data-username="johndoe" class="mention">@johndoe</a> for the help!</p>
 ```
 
+## ExperimentalCitationsExtension
+
+Parses experimental Pandoc/Citum-style citations into semantic inline spans.
+
+This extension is intentionally narrow:
+
+- It recognizes citation syntax such as `[@key]`, `[+@key]`, `[-@key]`, `[@a; @b]`, and `[@key, p. 10]`.
+- It does **not** ship a CSL processor or bibliography engine.
+- It is explicitly experimental because Djot does not have an official citation syntax yet.
+
+```php
+use Djot\Extension\ExperimentalCitationsExtension;
+
+$converter->addExtension(new ExperimentalCitationsExtension());
+
+// Optional: resolve parsed groups to rendered inline strings
+$converter->addExtension(new ExperimentalCitationsExtension(
+    resolver: function (array $groups, \Djot\Node\Document $document): array {
+        $resolved = [];
+        foreach ($groups as $group) {
+            $resolved[$group->id] = '(citation ' . count($group->references) . ')';
+        }
+
+        return $resolved;
+    },
+));
+```
+
+**Input:**
+```djot
+Parenthetical: [@kuhn1962].
+
+Integral: [+@smith2010, p. 10] argues the point.
+
+Author suppressed: [-@watson1953, p. 737].
+
+Multi-cite: [@kuhn1962; @watson1953, ch. 2].
+```
+
+**Default HTML output:**
+```html
+<p>Parenthetical: <span class="citation experimental-citation citation-single" data-citation-id="citation-1" data-citation-source="[@kuhn1962]" data-citation-keys="kuhn1962" data-citation-items="{...}">[@kuhn1962]</span>.</p>
+```
+
+**Configuration options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `resolver` | `callable|null` | `null` | Optional callback that receives all parsed `CitationGroup` objects for the document and returns a `groupId => rendered string` map |
+| `cssClass` | `string` | `'citation experimental-citation'` | CSS classes added to each citation span |
+
+### Resolver Contract
+
+The resolver callback receives the full list of parsed citation groups in document order plus the parsed `Document` AST:
+
+```php
+use Djot\Extension\CitationGroup;
+use Djot\Extension\ExperimentalCitationsExtension;
+
+$converter->addExtension(new ExperimentalCitationsExtension(
+    resolver: function (array $groups, \Djot\Node\Document $document): array {
+        return array_reduce(
+            $groups,
+            function (array $carry, CitationGroup $group): array {
+                $carry[$group->id] = '[' . implode(', ', array_map(
+                    static fn ($reference) => $reference->key,
+                    $group->references,
+                )) . ']';
+
+                return $carry;
+            },
+            [],
+        );
+    },
+));
+```
+
+Use the `Document` argument when bibliography placement, document-level metadata, or other AST-aware decisions matter. Ignore it when a pure `groups => rendered string` mapping is enough.
+
+The extension re-parses each resolved string as Djot inline content, so the resolver may emit plain text or simple Djot inline markup.
+
+### Data Attributes
+
+Each parsed citation span stores the source and normalized references:
+
+- `data-citation-id`
+- `data-citation-source`
+- `data-citation-keys`
+- `data-citation-items` (JSON payload)
+
+This makes the extension useful even without a resolver, because downstream tools can inspect the citation metadata from the rendered HTML.
+
+### Scope and Status
+
+This extension follows Citum's current experimental Djot direction rather than an official Djot spec:
+
+- News / rationale: https://citum.org/news/citum-is-on-crates-io-and-jsr-io.html
+- Integration guide: https://docs.citum.org/guides/integrations/djot.html
+
+Because upstream Djot citation syntax is still unsettled, prefer this extension for opt-in experiments and integrations, not for long-term format guarantees.
+
 ## MermaidExtension
 
 Transforms code blocks with language `mermaid` into Mermaid.js-compatible markup for rendering diagrams. Mermaid supports flowcharts, sequence diagrams, class diagrams, state diagrams, ER diagrams, Gantt charts, pie charts, git graphs, and more.
