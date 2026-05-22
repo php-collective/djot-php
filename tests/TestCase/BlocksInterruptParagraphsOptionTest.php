@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Test\TestCase;
 
+use Djot\DjotConverter;
 use Djot\Node\Block\ListBlock;
 use Djot\Node\Block\Paragraph;
 use Djot\Parser\BlockParser;
@@ -100,5 +101,40 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         $parser->setNestedBlocksInLists(false);
         $this->assertTrue($parser->getSignificantNewlines());
         $this->assertFalse($parser->getNestedBlocksInLists());
+    }
+
+    public function testConverterConstructorParameter(): void
+    {
+        $converter = new DjotConverter(blocksInterruptParagraphs: true);
+        $result = $converter->convert("Here:\n- one\n- two");
+
+        $this->assertStringContainsString('<p>Here:</p>', $result);
+        $this->assertStringContainsString('<ul>', $result);
+    }
+
+    public function testConverterFactory(): void
+    {
+        $converter = DjotConverter::withBlocksInterruptParagraphs();
+        $result = $converter->convert("Here:\n- one\n- two");
+
+        $this->assertStringContainsString('<ul>', $result);
+    }
+
+    public function testConverterFactoryDoesNotNest(): void
+    {
+        $converter = DjotConverter::withBlocksInterruptParagraphs();
+        $result = $converter->convert("- a\n  - b");
+
+        // Interruption-only must not nest: exactly one <ul>.
+        $this->assertSame(1, substr_count($result, '<ul>'));
+    }
+
+    public function testWithSignificantNewlinesStillEnablesBoth(): void
+    {
+        $converter = DjotConverter::withSignificantNewlines();
+        $result = $converter->convert("- a\n  - b");
+
+        // significantNewlines still nests: two <ul>.
+        $this->assertSame(2, substr_count($result, '<ul>'));
     }
 }
