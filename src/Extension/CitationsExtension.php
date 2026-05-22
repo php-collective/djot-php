@@ -43,7 +43,7 @@ class CitationsExtension implements ExtensionInterface, BeforeRenderExtensionInt
      */
     public function __construct(
         callable|Closure|null $resolver = null,
-        protected string $cssClass = 'citation experimental-citation',
+        protected string $cssClass = 'citation',
     ) {
         $this->resolver = $resolver !== null ? Closure::fromCallable($resolver) : null;
     }

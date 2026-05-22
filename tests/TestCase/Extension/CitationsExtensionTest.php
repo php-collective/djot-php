@@ -19,7 +19,7 @@ class CitationsExtensionTest extends TestCase
 
         $html = $converter->convert('Parenthetical: [@kuhn1962].');
 
-        $this->assertStringContainsString('class="citation experimental-citation citation-single"', $html);
+        $this->assertStringContainsString('class="citation citation-single"', $html);
         $this->assertStringContainsString('data-citation-source="[@kuhn1962]"', $html);
         $this->assertStringContainsString('data-citation-keys="kuhn1962"', $html);
         $this->assertStringContainsString('&quot;mode&quot;:&quot;parenthetical&quot;', $html);
