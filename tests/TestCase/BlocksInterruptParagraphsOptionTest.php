@@ -40,6 +40,18 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         $this->assertInstanceOf(ListBlock::class, $children[1]);
     }
 
+    public function testParagraphNotInterruptedWhenDisabled(): void
+    {
+        // Default: blocksInterruptParagraphs is off, so a list after prose
+        // (no blank line) stays inside the paragraph.
+        $parser = new BlockParser();
+        $doc = $parser->parse("Here:\n- one\n- two");
+
+        $children = $doc->getChildren();
+        $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
     public function testInterruptionWithoutNesting(): void
     {
         // blocksInterruptParagraphs alone must NOT enable list nesting:
