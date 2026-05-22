@@ -1763,12 +1763,13 @@ class BlockParser
 
                 // Content at content indent or more is continuation (even if it looks like a list marker)
                 // In djot, "  - b" after "- a" (no blank line) is literal text, not a nested list
-                // Unless significantNewlines is enabled, then indented block markers start nested blocks
+                // Unless nested blocks in lists are enabled, indented block markers
+                // are treated as plain continuation text here.
                 if ($nextIndent >= $contentIndent) {
-                    // Check if significantNewlines mode allows immediate nested blocks
+                    // Check if list nesting mode allows immediate nested blocks
                     if ($this->significantNewlines) {
                         // Check for any block starter (list, blockquote, code fence, div)
-                        if ($this->startsNewBlock($nextTrimmed) || $this->listParser->parseListItemMarker($nextTrimmed) !== null) {
+                        if ($this->isBlockElementStart($nextTrimmed)) {
                             // This is a nested block - break out to let normal nesting handle it
                             break;
                         }
@@ -1874,7 +1875,8 @@ class BlockParser
                 $this->parseBlocks($listItem, $itemLines, 0);
             }
 
-            // In significantNewlines mode, check for immediate nested content (any block type)
+            // When nested blocks in lists are enabled, check for immediate
+            // nested content after the initial item paragraph.
             if ($this->significantNewlines && $i < $count) {
                 $nextLine = $lines[$i];
                 $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
@@ -1882,6 +1884,7 @@ class BlockParser
                 // If there's indented content that could be a nested block
                 if ($nextIndent >= $contentIndent) {
                     $subLines = [];
+                    $nestedIndent = $nextIndent;
                     while ($i < $count) {
                         $subLine = $lines[$i];
                         if (IndentationHelper::isBlankLine($subLine)) {
@@ -1892,8 +1895,8 @@ class BlockParser
                             continue;
                         }
                         $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
-                        if ($lineIndent >= $contentIndent) {
-                            $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $contentIndent);
+                        if ($lineIndent >= $nestedIndent) {
+                            $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $nestedIndent);
                             $i++;
                         } elseif ($lineIndent === $baseIndent) {
                             // Back to parent level - check if it's a sibling item

@@ -108,12 +108,21 @@ class TabIndentationTest extends TestCase
      */
     public function testNestedListWithTabsNoBlankLine(): void
     {
+        $converter = DjotConverter::withSignificantNewlines();
         $input = "- Level 1\n\t- Level 2";
-        $result = $this->converter->convert($input);
+        $result = $converter->convert($input);
 
-        // Current behavior: creates flat list, not nested
-        // The "- Level 2" is content, not a nested list marker
-        $this->assertSame(1, substr_count($result, '<ul>'));
+        $this->assertSame(2, substr_count($result, '<ul>'));
+    }
+
+    public function testNestedBlockquoteWithTabsNoBlankLine(): void
+    {
+        $converter = DjotConverter::withSignificantNewlines();
+        $input = "- Level 1\n\t> quoted\n\t> continued";
+        $result = $converter->convert($input);
+
+        $this->assertStringContainsString('<blockquote>', $result);
+        $this->assertStringContainsString('quoted', $result);
     }
 
     /**

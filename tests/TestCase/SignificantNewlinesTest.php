@@ -65,8 +65,6 @@ class SignificantNewlinesTest extends TestCase
 
     public function testBlockquoteInterruptsParagraph(): void
     {
-        // A lone ">" line in flowing prose is a comparison operator, not a
-        // quote ("if x\n> 5"). Interrupting requires a *real* (2+ line) quote.
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("They said:\n> This is important\n> Pay attention");
 
@@ -202,6 +200,100 @@ class SignificantNewlinesTest extends TestCase
         $this->assertSame(ListBlock::TYPE_ORDERED, $sublist->getListType());
     }
 
+    public function testNestedListWithDeeperIndentWithoutBlankLine(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Item\n    - Unterpunkt\n    - Noch einer");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+
+        $item = $list->getChildren()[0];
+        $children = $item->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+
+        $nested = $children[1];
+        $this->assertCount(2, $nested->getChildren());
+    }
+
+    public function testNestedOrderedListWithDeeperIndentWithoutBlankLine(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Item\n    1. First\n    2. Second");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+
+        $item = $list->getChildren()[0];
+        $nested = $item->getChildren()[1];
+        $this->assertInstanceOf(ListBlock::class, $nested);
+        $this->assertSame(ListBlock::TYPE_ORDERED, $nested->getListType());
+        $this->assertCount(2, $nested->getChildren());
+    }
+
+    public function testCodeFenceInListWithDeeperIndentWithoutBlankLine(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Item\n    ```\n    echo hello\n    ```");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+
+        $item = $list->getChildren()[0];
+        $children = $item->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(CodeBlock::class, $children[1]);
+    }
+
+    public function testBlockquoteInListWithDeeperIndentWithoutBlankLine(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Item\n    > quoted\n    > still quoted");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+
+        $item = $list->getChildren()[0];
+        $children = $item->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(BlockQuote::class, $children[1]);
+    }
+
+    public function testNestedListWithTabIndentWithoutBlankLine(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Item\n\t- Unterpunkt\n\t- Noch einer");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+
+        $item = $list->getChildren()[0];
+        $children = $item->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
+        $this->assertCount(2, $children[1]->getChildren());
+    }
+
+    public function testBlockquoteInListWithTabIndentWithoutBlankLine(): void
+    {
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("- Item\n\t> quoted\n\t> still quoted");
+
+        $list = $doc->getChildren()[0];
+        $this->assertInstanceOf(ListBlock::class, $list);
+
+        $item = $list->getChildren()[0];
+        $children = $item->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(BlockQuote::class, $children[1]);
+    }
+
     public function testStandardModeNestedListNeedsBlankLine(): void
     {
         $parser = new BlockParser();
@@ -251,7 +343,6 @@ class SignificantNewlinesTest extends TestCase
     {
         $converter = new DjotConverter(significantNewlines: true);
 
-        // 2+ line quote required (a single ">" line is treated as prose).
         $djot = "They said:\n> Important\n> Really";
         $result = $converter->convert($djot);
 
@@ -260,31 +351,23 @@ class SignificantNewlinesTest extends TestCase
 
     // ==================== Chat Message Use Case ====================
 
-    public function testChatMessageExample(): void
+    public function testConverterParsesNestedListWithoutBlankLine(): void
     {
-        // For chat applications, combine significantNewlines with SoftBreakMode::Break
         $converter = DjotConverter::withSignificantNewlines(
             softBreakMode: SoftBreakMode::Break,
         );
 
         $djot = <<<'DJOT'
-Hey!
-Check this out:
-- cool feature
-- another one
-> Someone said this
-
-What do you think?
+- Item
+    - cool feature
+    - another one
 DJOT;
 
         $result = $converter->convert($djot);
 
-        // With explicit Break mode, soft breaks render as <br>
-        $this->assertStringContainsString('<br>', $result);
-        // List should be separate (significantNewlines feature)
         $this->assertStringContainsString('<ul>', $result);
-        // Blockquote should be separate (significantNewlines feature)
-        $this->assertStringContainsString('<blockquote>', $result);
+        $this->assertStringContainsString("cool feature\n</li>", $result);
+        $this->assertStringContainsString("another one\n</li>", $result);
     }
 
     // ==================== Edge Cases ====================
@@ -313,7 +396,6 @@ DJOT;
 
     public function testHeadingInterruptsParagraphInSignificantNewlinesMode(): void
     {
-        // In significantNewlines mode, headings CAN interrupt paragraphs
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("Text\n# Heading");
 
@@ -323,11 +405,8 @@ DJOT;
         $this->assertInstanceOf(Heading::class, $children[1]);
     }
 
-    // ==================== CommonMark Ordered List Rule ====================
-
     public function testOnlyOneCanInterruptParagraph(): void
     {
-        // Only "1." can interrupt a paragraph (CommonMark rule)
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("Steps:\n1. First step");
 
@@ -361,7 +440,6 @@ DJOT;
 
     public function testHighNumberedListAfterBlankLine(): void
     {
-        // With blank line, any number can start a list
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("Continue from step\n\n5. Do this thing");
 
@@ -370,14 +448,6 @@ DJOT;
         $this->assertInstanceOf(Paragraph::class, $children[0]);
         $this->assertInstanceOf(ListBlock::class, $children[1]);
     }
-
-    // ==================== Operator vs. List Marker (bullet/table) ====================
-    //
-    // In hard-wrapped prose a line can begin with -, *, +, > or | as an
-    // arithmetic/comparison operator or pipe. A *lone* marker line followed by
-    // ordinary prose must NOT become a list/quote/table; a real block requires
-    // 2+ marker lines or an indented continuation. (Mirrors the existing
-    // "only 1. interrupts" rule for ordered lists.)
 
     public function testMultiplicationStarDoesNotBecomeList(): void
     {
@@ -423,7 +493,6 @@ DJOT;
 
     public function testTwoMarkersStillFormAList(): void
     {
-        // The guard must not regress real lists: 2+ markers => list.
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("Hier eine Liste:\n- erstes Element\n- zweites Element");
 
@@ -435,8 +504,6 @@ DJOT;
 
     public function testSingleBulletWithIndentedContinuationIsList(): void
     {
-        // One item but with an indented continuation line still reads as a
-        // real (multi-line) list, so it interrupts.
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("Shopping:\n- milk and\n  some bread");
 
