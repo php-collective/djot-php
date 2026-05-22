@@ -700,4 +700,78 @@ DJOT;
 
         $this->assertSame($expected, $this->converter->convert($markdown));
     }
+
+    public function testKbdTag(): void
+    {
+        $markdown = 'Press <kbd>Ctrl</kbd> to copy';
+        $expected = 'Press [Ctrl]{kbd} to copy';
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testSampTag(): void
+    {
+        $markdown = 'Output: <samp>done</samp>';
+        $expected = 'Output: [done]{samp}';
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testVarTag(): void
+    {
+        $markdown = 'The <var>x</var> value';
+        $expected = 'The [x]{var} value';
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testAbbrTagWithTitle(): void
+    {
+        $markdown = '<abbr title="HyperText Markup Language">HTML</abbr> spec';
+        $expected = '[HTML]{abbr="HyperText Markup Language"} spec';
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testAbbrTagWithoutTitle(): void
+    {
+        // A title-less abbr is preserved as a flag span (matches HtmlToDjot),
+        // so it round-trips back to <abbr>.
+        $markdown = 'A plain <abbr>CSS</abbr> abbreviation';
+        $expected = 'A plain [CSS]{abbr} abbreviation';
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testDfnTagWithTitle(): void
+    {
+        $markdown = 'A <dfn title="A definition">term</dfn> here';
+        $expected = 'A [term]{dfn="A definition"} here';
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testDfnTagWithoutTitle(): void
+    {
+        $markdown = 'A <dfn>term</dfn> here';
+        $expected = 'A [term]{dfn} here';
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testAbbrTitleEscapesBackslash(): void
+    {
+        $markdown = '<abbr title="a\\b">X</abbr>';
+        $expected = '[X]{abbr="a\\\\b"}';
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testAbbrTitleWithApostropheInDoubleQuotes(): void
+    {
+        $markdown = '<abbr title="Bob\'s API">API</abbr>';
+        $expected = '[API]{abbr="Bob\'s API"}';
+
+        $this->assertSame($expected, $this->converter->convert($markdown));
+    }
 }
