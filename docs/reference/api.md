@@ -26,6 +26,7 @@ public function __construct(
     ?BlockParser $parser = null,
     ?RendererInterface $renderer = null,
     bool $nestedBlocksInLists = false,
+    bool $blocksInterruptParagraphs = false,
 )
 ```
 
@@ -34,16 +35,19 @@ public function __construct(
 - `$strict`: When `true`, throws `ParseException` on parse errors (see [Error Handling](#error-handling)).
 - `$safeMode`: When `true` or a `SafeMode` instance, enables XSS protection (see [Safe Mode](#safe-mode)).
 - `$profile`: A `Profile` instance for feature restriction (see [Profiles](/guide/profiles)).
-- `$significantNewlines`: When `true`, enables markdown-like parsing where block elements can interrupt paragraphs (see [Significant Newlines Mode](#significant-newlines-mode)).
+- `$significantNewlines`: **Deprecated.** Convenience shorthand for `blocksInterruptParagraphs: true, nestedBlocksInLists: true`. Prefer the two granular levers. See [Significant Newlines Mode](#significant-newlines-mode).
 - `$softBreakMode`: Override how soft breaks are rendered. When `null`, uses the renderer's default (newline for HTML).
 - `$roundTripMode`: When `true`, adds round-trip metadata for Djot→HTML→Djot workflows (HTML renderer only).
 - `$parser`: Optional pre-configured parser. When provided, inline parser constructor flags such as `warnings`, `strict`, and `significantNewlines` are ignored.
 - `$renderer`: Optional pre-configured renderer. When provided, inline renderer constructor flags such as `xhtml`, `safeMode`, `softBreakMode`, and `roundTripMode` are ignored.
 - `$nestedBlocksInLists`: When `true`, indentation alone introduces nested blocks inside list items without a blank line, while top-level paragraph interruption stays spec-compliant (see [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode)). Implied by `$significantNewlines`.
+- `$blocksInterruptParagraphs`: When `true`, top-level block elements (lists, blockquotes, headings, fences) can interrupt a paragraph without a preceding blank line, while list-item nesting stays spec-compliant (see [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode)). Implied by `$significantNewlines`.
 
 ### Factory Methods
 
 #### withSignificantNewlines()
+
+> **Deprecated.** Prefer using `new DjotConverter(blocksInterruptParagraphs: true, nestedBlocksInLists: true)` or the two dedicated factory methods. See [Significant Newlines Mode](/guide/parser-options#significant-newlines-mode).
 
 ```php
 public static function withSignificantNewlines(
@@ -57,7 +61,7 @@ public static function withSignificantNewlines(
 ): self
 ```
 
-Creates a converter with significant newlines mode enabled. See [Significant Newlines Mode](#significant-newlines-mode).
+Creates a converter with significant newlines mode enabled (equivalent to `blocksInterruptParagraphs: true` + `nestedBlocksInLists: true`). See [Significant Newlines Mode](/guide/parser-options#significant-newlines-mode).
 
 #### withNestedBlocksInLists()
 
@@ -74,6 +78,22 @@ public static function withNestedBlocksInLists(
 ```
 
 Creates a converter that enables nested blocks in list items without requiring blank lines, while leaving top-level paragraph interruption at the spec default. See [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode).
+
+#### withBlocksInterruptParagraphs()
+
+```php
+public static function withBlocksInterruptParagraphs(
+    bool $xhtml = false,
+    bool $warnings = false,
+    bool $strict = false,
+    bool|SafeMode|null $safeMode = null,
+    ?Profile $profile = null,
+    ?SoftBreakMode $softBreakMode = null,
+    bool $roundTripMode = false,
+): self
+```
+
+Creates a converter that allows top-level block elements (lists, blockquotes, headings, fences) to interrupt a paragraph without a preceding blank line, while list-item nesting stays spec-compliant. See [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode).
 
 ### Methods
 
@@ -519,6 +539,7 @@ $parser = new BlockParser(
     strictMode: false,
     significantNewlines: false,
     nestedBlocksInLists: false,
+    blocksInterruptParagraphs: false,
 );
 $document = $parser->parse($djotString);
 
@@ -526,7 +547,7 @@ $document = $parser->parse($djotString);
 // Get exception on errors (if strictMode: true)
 $warnings = $parser->getWarnings();
 
-// Enable/disable significant newlines mode
+// Enable/disable significant newlines mode (deprecated: enables both levers below)
 $parser->setSignificantNewlines(true);
 $isEnabled = $parser->getSignificantNewlines();
 
@@ -534,6 +555,11 @@ $isEnabled = $parser->getSignificantNewlines();
 // (significant newlines mode enables this implicitly)
 $parser->setNestedBlocksInLists(true);
 $isEnabled = $parser->getNestedBlocksInLists();
+
+// Enable/disable top-level paragraph interruption only
+// (significant newlines mode enables this implicitly)
+$parser->setBlocksInterruptParagraphs(true);
+$isEnabled = $parser->getBlocksInterruptParagraphs();
 ```
 
 #### Custom Block Patterns
@@ -886,18 +912,28 @@ $node->addClass(string $class): void
 
 ## Significant Newlines Mode
 
+> **Deprecated.** `significantNewlines` is a convenience shorthand for
+> `blocksInterruptParagraphs: true` + `nestedBlocksInLists: true`.
+> Prefer the two granular levers or their factory methods.
+
 An optional parsing mode for chat messages, comments, and quick notes where markdown-like behavior is more intuitive.
 
 ### Enabling
 
 ```php
-// Via factory method (recommended)
+// Via factory method (deprecated)
 $converter = DjotConverter::withSignificantNewlines();
 
-// Via constructor parameter
+// Via constructor parameter (deprecated)
 $converter = new DjotConverter(significantNewlines: true);
 
-// Via parser directly
+// Preferred: use the two granular levers
+$converter = new DjotConverter(
+    blocksInterruptParagraphs: true,
+    nestedBlocksInLists: true,
+);
+
+// Via parser directly (deprecated)
 $parser = new BlockParser(significantNewlines: true);
 
 // Via setter (for runtime switching)

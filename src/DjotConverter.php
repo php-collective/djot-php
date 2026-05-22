@@ -67,7 +67,7 @@ class DjotConverter
      *
      * // Custom parser
      * $converter = DjotConverter::create(
-     *     parser: new BlockParser(significantNewlines: true),
+     *     parser: new BlockParser(blocksInterruptParagraphs: true),
      *     renderer: new HtmlRenderer(xhtml: true),
      * );
      * ```

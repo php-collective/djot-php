@@ -15,7 +15,8 @@ $converter = new DjotConverter();
 // With options
 $converter = new DjotConverter(
     xhtml: true,
-    significantNewlines: true,
+    blocksInterruptParagraphs: true,
+    nestedBlocksInLists: true,
 );
 ```
 
@@ -35,7 +36,7 @@ use Djot\Renderer\HtmlRenderer;
 
 // Full control via create()
 $converter = DjotConverter::create(
-    new BlockParser(significantNewlines: true),
+    new BlockParser(blocksInterruptParagraphs: true),
     new HtmlRenderer(xhtml: true),
 );
 ```
@@ -101,6 +102,23 @@ And so are you</p>
 Note: Use `\` at end of line for hard breaks (always renders as `<br>`) regardless of soft break mode.
 
 ## Significant Newlines Mode
+
+::: warning Deprecated
+`significantNewlines` is now a convenience shorthand equal to enabling both
+`blocksInterruptParagraphs` and `nestedBlocksInLists` together. It is
+deprecated in favor of the two granular levers. Migrate as shown below.
+
+```php
+// Deprecated:
+$converter = DjotConverter::withSignificantNewlines();
+
+// Equivalent (preferred):
+$converter = new DjotConverter(
+    blocksInterruptParagraphs: true,
+    nestedBlocksInLists: true,
+);
+```
+:::
 
 By default, djot-php follows the djot specification where block elements (lists, blockquotes, headings) **cannot interrupt paragraphs** - they require a blank line before them.
 
@@ -344,3 +362,74 @@ Output:
 | Lists/blockquotes/headings interrupt top-level paragraphs | No | No                    | Yes                   |
 
 Note: `significantNewlines` implies `nestedBlocksInLists` - enabling the former turns on the latter automatically.
+
+## Block Interrupts Paragraphs Mode
+
+`blocksInterruptParagraphs` is the complementary counterpart to [Nested Blocks in Lists](#nested-blocks-in-lists-mode) mode. It allows top-level block elements — lists, blockquotes, headings, and fenced code — to interrupt a paragraph without a preceding blank line. It does **not** enable nesting inside list items (that is `nestedBlocksInLists`).
+
+Use it when you want markdown-like top-level interruption but otherwise spec-compliant djot: indented content inside a list item still requires a blank line.
+
+### Enabling Block Interrupts Paragraphs Mode
+
+```php
+use Djot\DjotConverter;
+use Djot\Parser\BlockParser;
+
+// Method 1: Factory method
+$converter = DjotConverter::withBlocksInterruptParagraphs();
+
+// Method 2: Constructor parameter
+$converter = new DjotConverter(blocksInterruptParagraphs: true);
+
+// Method 3: Directly on the parser
+$parser = new BlockParser(blocksInterruptParagraphs: true);
+$parser->setBlocksInterruptParagraphs(true);
+```
+
+### Behavior
+
+A block element can follow a paragraph without a blank line:
+
+```php
+$converter = DjotConverter::withBlocksInterruptParagraphs();
+$result = $converter->convert("Here:\n- one\n- two");
+```
+
+Output:
+```html
+<p>Here:</p>
+<ul>
+<li>
+one
+</li>
+<li>
+two
+</li>
+</ul>
+```
+
+But indented content inside a list item does **not** nest (this is what differs from significant newlines mode):
+
+```php
+$converter = DjotConverter::withBlocksInterruptParagraphs();
+$result = $converter->convert("- a\n  - b");
+```
+
+Output:
+```html
+<ul>
+<li>
+a
+- b
+</li>
+</ul>
+```
+
+### blocksInterruptParagraphs vs significantNewlines
+
+| Behavior                                              | Default | `blocksInterruptParagraphs` | `significantNewlines` |
+|------------------------------------------------------|---------|-----------------------------|-----------------------|
+| Lists/blockquotes/headings interrupt top-level paragraphs | No | **Yes**                | Yes                   |
+| Nested blocks in list items without a blank line     | No      | No                          | Yes                   |
+
+The two granular levers are independent. `blocksInterruptParagraphs` alone does not nest list items; `nestedBlocksInLists` alone does not interrupt top-level paragraphs. `significantNewlines` enables both simultaneously.
