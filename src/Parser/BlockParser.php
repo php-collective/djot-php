@@ -152,14 +152,22 @@ class BlockParser
      */
     protected bool $significantNewlines = false;
 
+    /**
+     * When true, indentation alone can introduce nested blocks inside list items
+     * without enabling global paragraph interruption.
+     */
+    protected bool $nestedBlocksInLists = false;
+
     public function __construct(
         bool $collectWarnings = false,
         bool $strictMode = false,
         bool $significantNewlines = false,
+        bool $nestedBlocksInLists = false,
     ) {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
         $this->significantNewlines = $significantNewlines;
+        $this->nestedBlocksInLists = $nestedBlocksInLists || $significantNewlines;
         $this->inlineParser = new InlineParser($this);
         $this->listParser = new ListParser();
         $this->tableParser = new TableParser();
@@ -179,6 +187,9 @@ class BlockParser
     public function setSignificantNewlines(bool $value): self
     {
         $this->significantNewlines = $value;
+        if ($value) {
+            $this->nestedBlocksInLists = true;
+        }
 
         return $this;
     }
@@ -189,6 +200,24 @@ class BlockParser
     public function getSignificantNewlines(): bool
     {
         return $this->significantNewlines;
+    }
+
+    /**
+     * Enable or disable nested blocks in list items without blank lines.
+     */
+    public function setNestedBlocksInLists(bool $value): self
+    {
+        $this->nestedBlocksInLists = $value;
+
+        return $this;
+    }
+
+    /**
+     * Check if nested blocks in list items are enabled.
+     */
+    public function getNestedBlocksInLists(): bool
+    {
+        return $this->nestedBlocksInLists;
     }
 
     /**
@@ -1763,12 +1792,13 @@ class BlockParser
 
                 // Content at content indent or more is continuation (even if it looks like a list marker)
                 // In djot, "  - b" after "- a" (no blank line) is literal text, not a nested list
-                // Unless significantNewlines is enabled, then indented block markers start nested blocks
+                // Unless nested blocks in lists are enabled, indented block markers
+                // are treated as plain continuation text here.
                 if ($nextIndent >= $contentIndent) {
-                    // Check if significantNewlines mode allows immediate nested blocks
-                    if ($this->significantNewlines) {
+                    // Check if list nesting mode allows immediate nested blocks
+                    if ($this->nestedBlocksInLists) {
                         // Check for any block starter (list, blockquote, code fence, div)
-                        if ($this->startsNewBlock($nextTrimmed) || $this->listParser->parseListItemMarker($nextTrimmed) !== null) {
+                        if ($this->isBlockElementStart($nextTrimmed)) {
                             // This is a nested block - break out to let normal nesting handle it
                             break;
                         }
@@ -1874,14 +1904,16 @@ class BlockParser
                 $this->parseBlocks($listItem, $itemLines, 0);
             }
 
-            // In significantNewlines mode, check for immediate nested content (any block type)
-            if ($this->significantNewlines && $i < $count) {
+            // When nested blocks in lists are enabled, check for immediate
+            // nested content after the initial item paragraph.
+            if ($this->nestedBlocksInLists && $i < $count) {
                 $nextLine = $lines[$i];
                 $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
 
                 // If there's indented content that could be a nested block
                 if ($nextIndent >= $contentIndent) {
                     $subLines = [];
+                    $nestedIndent = $nextIndent;
                     while ($i < $count) {
                         $subLine = $lines[$i];
                         if (IndentationHelper::isBlankLine($subLine)) {
@@ -1892,15 +1924,24 @@ class BlockParser
                             continue;
                         }
                         $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
-                        if ($lineIndent >= $contentIndent) {
-                            $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $contentIndent);
-                            $i++;
-                        } elseif ($lineIndent === $baseIndent) {
-                            // Back to parent level - check if it's a sibling item
-                            break;
-                        } else {
+                        // Membership is the item's content indent, not the first
+                        // nested line's (possibly deeper) indent: a line that drops
+                        // back to the content indent is still item content and must
+                        // be kept here, otherwise an over-indented first nested line
+                        // would detach it into a top-level block and end the list early.
+                        if ($lineIndent < $contentIndent) {
+                            // Back to the parent (or a shallower) level: this item's
+                            // nested content is done.
                             break;
                         }
+                        // Normalize the over-indented nested block by its own indent
+                        // so it starts at column 0 (required for the sub-parse to
+                        // recognize it as a block); lines that fall back to the item
+                        // content indent are stripped by that instead, keeping them
+                        // in the item rather than letting them escape.
+                        $strip = $lineIndent >= $nestedIndent ? $nestedIndent : $contentIndent;
+                        $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $strip);
+                        $i++;
                     }
                     if ($subLines !== []) {
                         $this->parseBlocks($listItem, $subLines, 0);
@@ -3270,19 +3311,12 @@ class BlockParser
             return true;
         }
 
-        // List markers - these indicate a new list at this level
-        // Bullet lists: -, *, + followed by space
-        if (preg_match('/^[-*+] /', $line)) {
-            return true;
-        }
-
-        // Ordered lists: digit(s) or letter followed by . or ) and space
-        if (preg_match('/^(\d+|[a-zA-Z])[.)] /', $line)) {
-            return true;
-        }
-
-        // Task lists: - [ ] or - [x]
-        if (preg_match('/^- \[[xX ]\] /', $line)) {
+        // List markers (bullet, ordered, and task). Delegate to the canonical
+        // list-marker parser so nested-block detection recognizes every marker
+        // form it supports - including "(1)", "(a)", and roman numerals such as
+        // "iv." - instead of a narrower subset that silently degraded those into
+        // plain paragraph text.
+        if ($this->listParser->parseListItemMarker($line) !== null) {
             return true;
         }
 

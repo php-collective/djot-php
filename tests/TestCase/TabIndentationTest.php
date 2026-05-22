@@ -101,19 +101,29 @@ class TabIndentationTest extends TestCase
     }
 
     /**
-     * Nested list with tabs - current behavior.
+     * Nested list with tabs and no blank line.
      *
-     * Without blank lines, nested markers are not recognized as nested lists
-     * (this matches djot spec - blank line required for nesting).
+     * With nested blocks in lists enabled, tab indentation alone introduces a
+     * nested list even without a preceding blank line (the spec default would
+     * require one).
      */
     public function testNestedListWithTabsNoBlankLine(): void
     {
+        $converter = DjotConverter::withNestedBlocksInLists();
         $input = "- Level 1\n\t- Level 2";
-        $result = $this->converter->convert($input);
+        $result = $converter->convert($input);
 
-        // Current behavior: creates flat list, not nested
-        // The "- Level 2" is content, not a nested list marker
-        $this->assertSame(1, substr_count($result, '<ul>'));
+        $this->assertSame(2, substr_count($result, '<ul>'));
+    }
+
+    public function testNestedBlockquoteWithTabsNoBlankLine(): void
+    {
+        $converter = DjotConverter::withNestedBlocksInLists();
+        $input = "- Level 1\n\t> quoted\n\t> continued";
+        $result = $converter->convert($input);
+
+        $this->assertStringContainsString('<blockquote>', $result);
+        $this->assertStringContainsString('quoted', $result);
     }
 
     /**

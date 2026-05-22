@@ -268,3 +268,79 @@ $converter = new DjotConverter(
     softBreakMode: SoftBreakMode::Break, // Optional: visible line breaks
 );
 ```
+
+## Nested Blocks in Lists Mode
+
+`nestedBlocksInLists` is a focused subset of [Significant Newlines](#significant-newlines-mode) mode. It lets indentation alone introduce nested blocks - sublists, blockquotes, and fenced code - inside an already-open list item, **without** enabling paragraph interruption anywhere else.
+
+Use it when you want markdown-like nested lists but otherwise spec-compliant djot: top-level paragraphs still require a blank line before any block.
+
+### Enabling Nested Blocks in Lists Mode
+
+```php
+use Djot\DjotConverter;
+use Djot\Parser\BlockParser;
+
+// Method 1: Factory method
+$converter = DjotConverter::withNestedBlocksInLists();
+
+// Method 2: Constructor parameter
+$converter = new DjotConverter(nestedBlocksInLists: true);
+
+// Method 3: Directly on the parser
+$parser = new BlockParser(nestedBlocksInLists: true);
+$parser->setNestedBlocksInLists(true);
+```
+
+### Behavior
+
+Indented content nests inside the open list item, even without a blank line:
+
+```php
+$converter = DjotConverter::withNestedBlocksInLists();
+$result = $converter->convert("- Item
+    - Nested one
+    - Nested two");
+```
+
+Output:
+```html
+<ul>
+<li>
+Item
+<ul>
+<li>
+Nested one
+</li>
+<li>
+Nested two
+</li>
+</ul>
+</li>
+</ul>
+```
+
+But a top-level block still does **not** interrupt a paragraph (this is what differs from significant newlines mode):
+
+```php
+$converter = DjotConverter::withNestedBlocksInLists();
+$result = $converter->convert("Here is a list:
+- one
+- two");
+```
+
+Output:
+```html
+<p>Here is a list:
+- one
+- two</p>
+```
+
+### nestedBlocksInLists vs significantNewlines
+
+| Behavior                                              | Default | `nestedBlocksInLists` | `significantNewlines` |
+|------------------------------------------------------|---------|-----------------------|-----------------------|
+| Nested blocks in list items without a blank line     | No      | **Yes**               | Yes                   |
+| Lists/blockquotes/headings interrupt top-level paragraphs | No | No                    | Yes                   |
+
+Note: `significantNewlines` implies `nestedBlocksInLists` - enabling the former turns on the latter automatically.

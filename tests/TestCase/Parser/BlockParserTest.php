@@ -544,8 +544,6 @@ DJOT;
 
     public function testSignificantNewlinesBlockquoteInterruptsParagraph(): void
     {
-        // A lone ">" line in prose is a comparison operator; interrupting a
-        // paragraph requires a real (2+ line) quote.
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("They said:\n> This is important\n> Pay attention");
 

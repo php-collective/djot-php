@@ -25,6 +25,7 @@ public function __construct(
     bool $roundTripMode = false,
     ?BlockParser $parser = null,
     ?RendererInterface $renderer = null,
+    bool $nestedBlocksInLists = false,
 )
 ```
 
@@ -38,6 +39,7 @@ public function __construct(
 - `$roundTripMode`: When `true`, adds round-trip metadata for Djot→HTML→Djot workflows (HTML renderer only).
 - `$parser`: Optional pre-configured parser. When provided, inline parser constructor flags such as `warnings`, `strict`, and `significantNewlines` are ignored.
 - `$renderer`: Optional pre-configured renderer. When provided, inline renderer constructor flags such as `xhtml`, `safeMode`, `softBreakMode`, and `roundTripMode` are ignored.
+- `$nestedBlocksInLists`: When `true`, indentation alone introduces nested blocks inside list items without a blank line, while top-level paragraph interruption stays spec-compliant (see [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode)). Implied by `$significantNewlines`.
 
 ### Factory Methods
 
@@ -56,6 +58,22 @@ public static function withSignificantNewlines(
 ```
 
 Creates a converter with significant newlines mode enabled. See [Significant Newlines Mode](#significant-newlines-mode).
+
+#### withNestedBlocksInLists()
+
+```php
+public static function withNestedBlocksInLists(
+    bool $xhtml = false,
+    bool $warnings = false,
+    bool $strict = false,
+    bool|SafeMode|null $safeMode = null,
+    ?Profile $profile = null,
+    ?SoftBreakMode $softBreakMode = null,
+    bool $roundTripMode = false,
+): self
+```
+
+Creates a converter that enables nested blocks in list items without requiring blank lines, while leaving top-level paragraph interruption at the spec default. See [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode).
 
 ### Methods
 
@@ -500,6 +518,7 @@ $parser = new BlockParser(
     collectWarnings: false,
     strictMode: false,
     significantNewlines: false,
+    nestedBlocksInLists: false,
 );
 $document = $parser->parse($djotString);
 
@@ -510,6 +529,11 @@ $warnings = $parser->getWarnings();
 // Enable/disable significant newlines mode
 $parser->setSignificantNewlines(true);
 $isEnabled = $parser->getSignificantNewlines();
+
+// Enable/disable nested blocks in list items only
+// (significant newlines mode enables this implicitly)
+$parser->setNestedBlocksInLists(true);
+$isEnabled = $parser->getNestedBlocksInLists();
 ```
 
 #### Custom Block Patterns
