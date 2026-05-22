@@ -108,7 +108,7 @@ class TabIndentationTest extends TestCase
      */
     public function testNestedListWithTabsNoBlankLine(): void
     {
-        $converter = DjotConverter::withSignificantNewlines();
+        $converter = DjotConverter::withNestedBlocksInLists();
         $input = "- Level 1\n\t- Level 2";
         $result = $converter->convert($input);
 
@@ -117,7 +117,7 @@ class TabIndentationTest extends TestCase
 
     public function testNestedBlockquoteWithTabsNoBlankLine(): void
     {
-        $converter = DjotConverter::withSignificantNewlines();
+        $converter = DjotConverter::withNestedBlocksInLists();
         $input = "- Level 1\n\t> quoted\n\t> continued";
         $result = $converter->convert($input);
 
