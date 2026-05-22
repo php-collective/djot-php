@@ -260,6 +260,38 @@ class MarkdownToDjot
         // <code>text</code> → `text`
         $line = preg_replace('/<code>([^<]+)<\/code>/i', '`$1`', $line) ?? $line;
 
+        // Semantic spans rendered via attribute syntax (matches HtmlToDjot).
+        // <kbd>text</kbd> → [text]{kbd}
+        $line = preg_replace('/<kbd>([^<]+)<\/kbd>/i', '[$1]{kbd}', $line) ?? $line;
+
+        // <samp>text</samp> → [text]{samp}
+        $line = preg_replace('/<samp>([^<]+)<\/samp>/i', '[$1]{samp}', $line) ?? $line;
+
+        // <var>text</var> → [text]{var}
+        $line = preg_replace('/<var>([^<]+)<\/var>/i', '[$1]{var}', $line) ?? $line;
+
+        // <abbr title="...">text</abbr> → [text]{abbr="..."}
+        // The quote char is captured and back-referenced so a title may contain
+        // the other quote (e.g. title="Bob's API").
+        $line = preg_replace_callback(
+            '/<abbr\s+title=(["\'])(.*?)\1\s*>([^<]+)<\/abbr>/i',
+            static fn (array $matches): string => '[' . $matches[3] . ']{abbr="' . str_replace(['\\', '"'], ['\\\\', '\\"'], $matches[2]) . '"}',
+            $line,
+        ) ?? $line;
+
+        // <abbr>text</abbr> → [text]{abbr}
+        $line = preg_replace('/<abbr>([^<]+)<\/abbr>/i', '[$1]{abbr}', $line) ?? $line;
+
+        // <dfn title="...">text</dfn> → [text]{dfn="..."}
+        $line = preg_replace_callback(
+            '/<dfn\s+title=(["\'])(.*?)\1\s*>([^<]+)<\/dfn>/i',
+            static fn (array $matches): string => '[' . $matches[3] . ']{dfn="' . str_replace(['\\', '"'], ['\\\\', '\\"'], $matches[2]) . '"}',
+            $line,
+        ) ?? $line;
+
+        // <dfn>text</dfn> → [text]{dfn}
+        $line = preg_replace('/<dfn>([^<]+)<\/dfn>/i', '[$1]{dfn}', $line) ?? $line;
+
         // Convert $$math$$ to $$`math` (Djot display math) - must come before inline
         $line = preg_replace('/\$\$([^$]+)\$\$/', '$$`$1`', $line) ?? $line;
 
