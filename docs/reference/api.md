@@ -38,7 +38,7 @@ public function __construct(
 - `$significantNewlines`: **Deprecated.** Convenience shorthand for `blocksInterruptParagraphs: true, nestedBlocksInLists: true`. Prefer the two granular levers. See [Significant Newlines Mode](#significant-newlines-mode).
 - `$softBreakMode`: Override how soft breaks are rendered. When `null`, uses the renderer's default (newline for HTML).
 - `$roundTripMode`: When `true`, adds round-trip metadata for Djot→HTML→Djot workflows (HTML renderer only).
-- `$parser`: Optional pre-configured parser. When provided, inline parser constructor flags such as `warnings`, `strict`, and `significantNewlines` are ignored.
+- `$parser`: Optional pre-configured parser. When provided, inline parser constructor flags such as `warnings`, `strict`, and `significantNewlines` (deprecated) are ignored.
 - `$renderer`: Optional pre-configured renderer. When provided, inline renderer constructor flags such as `xhtml`, `safeMode`, `softBreakMode`, and `roundTripMode` are ignored.
 - `$nestedBlocksInLists`: When `true`, indentation alone introduces nested blocks inside list items without a blank line, while top-level paragraph interruption stays spec-compliant (see [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode)). Implied by `$significantNewlines`.
 - `$blocksInterruptParagraphs`: When `true`, top-level block elements (lists, blockquotes, headings, fences) can interrupt a paragraph without a preceding blank line, while list-item nesting stays spec-compliant (see [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode)). Implied by `$significantNewlines`.

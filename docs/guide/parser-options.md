@@ -130,13 +130,13 @@ The "significant newlines" mode provides markdown-like behavior where block elem
 use Djot\DjotConverter;
 use Djot\Parser\BlockParser;
 
-// Method 1: Factory method
+// Method 1: Factory method (deprecated)
 $converter = DjotConverter::withSignificantNewlines();
 
-// Method 2: Constructor parameter
+// Method 2: Constructor parameter (deprecated)
 $converter = new DjotConverter(significantNewlines: true);
 
-// Method 3: With other output formats
+// Method 3: With other output formats (deprecated)
 $converter = DjotConverter::markdown(
     new BlockParser(significantNewlines: true),
 );
@@ -282,7 +282,7 @@ use Djot\Renderer\SoftBreakMode;
 // Significant newlines with safe mode for user-generated content
 $converter = new DjotConverter(
     safeMode: new SafeMode(),
-    significantNewlines: true,
+    significantNewlines: true, // deprecated: prefer blocksInterruptParagraphs + nestedBlocksInLists
     softBreakMode: SoftBreakMode::Break, // Optional: visible line breaks
 );
 ```
@@ -361,7 +361,7 @@ Output:
 | Nested blocks in list items without a blank line     | No      | **Yes**               | Yes                   |
 | Lists/blockquotes/headings interrupt top-level paragraphs | No | No                    | Yes                   |
 
-Note: `significantNewlines` implies `nestedBlocksInLists` - enabling the former turns on the latter automatically.
+Note: `significantNewlines` is deprecated; it enables both `blocksInterruptParagraphs` and `nestedBlocksInLists`. Prefer setting the two granular levers directly.
 
 ## Block Interrupts Paragraphs Mode
 
