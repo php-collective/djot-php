@@ -9,8 +9,25 @@ namespace Djot\Extension;
  */
 final readonly class CitationReference
 {
+    /**
+     * Standard parenthetical citation.
+     *
+     * @var string
+     */
     public const MODE_PARENTHESES = 'parenthetical';
+
+    /**
+     * Narrative / author-in-text citation.
+     *
+     * @var string
+     */
     public const MODE_INTEGRAL = 'integral';
+
+    /**
+     * Citation with suppressed author.
+     *
+     * @var string
+     */
     public const MODE_SUPPRESS_AUTHOR = 'suppress-author';
 
     public function __construct(

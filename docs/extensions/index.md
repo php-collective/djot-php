@@ -619,7 +619,7 @@ $converter->addExtension(new ExperimentalCitationsExtension());
 
 // Optional: resolve parsed groups to rendered inline strings
 $converter->addExtension(new ExperimentalCitationsExtension(
-    resolver: function (array $groups): array {
+    resolver: function (array $groups, \Djot\Node\Document $document): array {
         $resolved = [];
         foreach ($groups as $group) {
             $resolved[$group->id] = '(citation ' . count($group->references) . ')';
@@ -655,14 +655,14 @@ Multi-cite: [@kuhn1962; @watson1953, ch. 2].
 
 ### Resolver Contract
 
-The resolver callback receives the full list of parsed citation groups in document order:
+The resolver callback receives the full list of parsed citation groups in document order plus the parsed `Document` AST:
 
 ```php
 use Djot\Extension\CitationGroup;
 use Djot\Extension\ExperimentalCitationsExtension;
 
 $converter->addExtension(new ExperimentalCitationsExtension(
-    resolver: function (array $groups): array {
+    resolver: function (array $groups, \Djot\Node\Document $document): array {
         return array_reduce(
             $groups,
             function (array $carry, CitationGroup $group): array {
@@ -678,6 +678,8 @@ $converter->addExtension(new ExperimentalCitationsExtension(
     },
 ));
 ```
+
+Use the `Document` argument when bibliography placement, document-level metadata, or other AST-aware decisions matter. Ignore it when a pure `groups => rendered string` mapping is enough.
 
 The extension re-parses each resolved string as Djot inline content, so the resolver may emit plain text or simple Djot inline markup.
 

@@ -9,12 +9,12 @@ namespace Djot\Extension;
  */
 final readonly class CitationGroup
 {
-    /**
-     * @param list<\Djot\Extension\CitationReference> $references
-     */
     public function __construct(
         public string $id,
         public string $source,
+        /**
+         * @var list<\Djot\Extension\CitationReference>
+         */
         public array $references,
     ) {
     }

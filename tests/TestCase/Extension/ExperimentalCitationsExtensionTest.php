@@ -7,6 +7,7 @@ namespace Djot\Test\TestCase\Extension;
 use Djot\DjotConverter;
 use Djot\Extension\CitationGroup;
 use Djot\Extension\ExperimentalCitationsExtension;
+use Djot\Node\Document;
 use PHPUnit\Framework\TestCase;
 
 class ExperimentalCitationsExtensionTest extends TestCase
@@ -64,7 +65,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
     {
         $converter = new DjotConverter();
         $converter->addExtension(new ExperimentalCitationsExtension(
-            resolver: static function (array $groups): array {
+            resolver: static function (array $groups, Document $document): array {
                 $resolved = [];
                 foreach ($groups as $group) {
                     $keys = array_map(
@@ -90,7 +91,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
 
         $converter = new DjotConverter();
         $converter->addExtension(new ExperimentalCitationsExtension(
-            resolver: static function (array $groups) use (&$seenIds): array {
+            resolver: static function (array $groups, Document $document) use (&$seenIds): array {
                 $resolved = [];
                 foreach ($groups as $group) {
                     $seenIds[] = $group->id;
@@ -134,7 +135,7 @@ class ExperimentalCitationsExtensionTest extends TestCase
 
         $converter = new DjotConverter();
         $converter->addExtension(new ExperimentalCitationsExtension(
-            resolver: static function (array $groups) use (&$captured): array {
+            resolver: static function (array $groups, Document $document) use (&$captured): array {
                 $captured = $groups;
 
                 return array_reduce(
@@ -155,5 +156,37 @@ class ExperimentalCitationsExtensionTest extends TestCase
         $this->assertSame('kuhn1962', $captured[0]->references[0]->key);
         $this->assertSame('suppress-author', $captured[0]->references[1]->mode);
         $this->assertSame('ch. 2', $captured[0]->references[1]->suffix);
+    }
+
+    public function testResolverReceivesDocumentContext(): void
+    {
+        $seenDocument = null;
+
+        $converter = new DjotConverter();
+        $converter->addExtension(new ExperimentalCitationsExtension(
+            resolver: static function (array $groups, Document $document) use (&$seenDocument): array {
+                $seenDocument = $document;
+
+                return [$groups[0]->id => $groups[0]->source];
+            },
+        ));
+
+        $converter->convert('# Heading' . "\n\n" . '[@kuhn1962]');
+
+        $this->assertInstanceOf(Document::class, $seenDocument);
+        $this->assertCount(2, $seenDocument->getChildren());
+    }
+
+    public function testResolverMayReturnEmptyMap(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new ExperimentalCitationsExtension(
+            resolver: static fn (array $groups, Document $document): array => [],
+        ));
+
+        $html = $converter->convert('[@kuhn1962]');
+
+        $this->assertStringContainsString('[@kuhn1962]', $html);
+        $this->assertStringNotContainsString('data-citation-rendered="resolved"', $html);
     }
 }

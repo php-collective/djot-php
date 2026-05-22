@@ -162,6 +162,7 @@ class ExperimentalCitationsExtension implements ExtensionInterface, BeforeRender
     }
 
     /**
+     * @param \Djot\Node\Node $node
      * @param array<int, \Djot\Node\Inline\Span> $spans
      * @param array<string, \Djot\Extension\CitationGroup> $groups
      */
