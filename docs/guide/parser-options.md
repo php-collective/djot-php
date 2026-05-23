@@ -36,7 +36,7 @@ use Djot\Renderer\HtmlRenderer;
 
 // Full control via create()
 $converter = DjotConverter::create(
-    new BlockParser(blocksInterruptParagraphs: true),
+    new BlockParser(blocksInterruptParagraphs: true, nestedBlocksInLists: true),
     new HtmlRenderer(xhtml: true),
 );
 ```
@@ -356,16 +356,16 @@ Output:
 
 ### nestedBlocksInLists vs significantNewlines
 
-| Behavior                                              | Default | `nestedBlocksInLists` | `significantNewlines` |
-|------------------------------------------------------|---------|-----------------------|-----------------------|
-| Nested blocks in list items without a blank line     | No      | **Yes**               | Yes                   |
-| Lists/blockquotes/headings interrupt top-level paragraphs | No | No                    | Yes                   |
+| Behavior                                                       | Default | `nestedBlocksInLists` | `significantNewlines` |
+|----------------------------------------------------------------|---------|-----------------------|-----------------------|
+| Nested blocks in list items without a blank line               | No      | **Yes**               | Yes                   |
+| Block elements interrupt top-level paragraphs                  | No      | No                    | Yes                   |
 
 Note: `significantNewlines` is deprecated; it enables both `blocksInterruptParagraphs` and `nestedBlocksInLists`. Prefer setting the two granular levers directly.
 
 ## Block Interrupts Paragraphs Mode
 
-`blocksInterruptParagraphs` is the complementary counterpart to [Nested Blocks in Lists](#nested-blocks-in-lists-mode) mode. It allows top-level block elements — lists, blockquotes, headings, and fenced code — to interrupt a paragraph without a preceding blank line. It does **not** enable nesting inside list items (that is `nestedBlocksInLists`).
+`blocksInterruptParagraphs` is the complementary counterpart to [Nested Blocks in Lists](#nested-blocks-in-lists-mode) mode. It allows top-level block elements — lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences — to interrupt a paragraph without a preceding blank line. It does **not** enable nesting inside list items (that is `nestedBlocksInLists`).
 
 Use it when you want markdown-like top-level interruption but otherwise spec-compliant djot: indented content inside a list item still requires a blank line.
 
@@ -427,9 +427,9 @@ a
 
 ### blocksInterruptParagraphs vs significantNewlines
 
-| Behavior                                              | Default | `blocksInterruptParagraphs` | `significantNewlines` |
-|------------------------------------------------------|---------|-----------------------------|-----------------------|
-| Lists/blockquotes/headings interrupt top-level paragraphs | No | **Yes**                | Yes                   |
-| Nested blocks in list items without a blank line     | No      | No                          | Yes                   |
+| Behavior                                                       | Default | `blocksInterruptParagraphs` | `significantNewlines` |
+|----------------------------------------------------------------|---------|-----------------------------|-----------------------|
+| Block elements interrupt top-level paragraphs                  | No      | **Yes**                     | Yes                   |
+| Nested blocks in list items without a blank line               | No      | No                          | Yes                   |
 
 The two granular levers are independent. `blocksInterruptParagraphs` alone does not nest list items; `nestedBlocksInLists` alone does not interrupt top-level paragraphs. `significantNewlines` enables both simultaneously.

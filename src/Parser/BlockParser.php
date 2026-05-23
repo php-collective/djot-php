@@ -142,10 +142,11 @@ class BlockParser
     protected array $customBlockPatterns = [];
 
     /**
-     * When true, a top-level block element (list, blockquote, heading, fence)
-     * may interrupt a paragraph without a preceding blank line. This is the
-     * behavior the now-deprecated significantNewlines flag exposed for the
-     * top level; it also governs the lone-marker rule.
+     * When true, a top-level block element (lists, blockquotes, headings,
+     * tables, thematic breaks, and code/div/comment fences) may interrupt a
+     * paragraph without a preceding blank line. This is the behavior the
+     * now-deprecated significantNewlines flag exposed for the top level; it
+     * also governs the lone-marker rule.
      */
     protected bool $blocksInterruptParagraphs = false;
 

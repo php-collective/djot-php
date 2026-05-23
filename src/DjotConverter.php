@@ -67,7 +67,7 @@ class DjotConverter
      *
      * // Custom parser
      * $converter = DjotConverter::create(
-     *     parser: new BlockParser(blocksInterruptParagraphs: true),
+     *     parser: new BlockParser(blocksInterruptParagraphs: true, nestedBlocksInLists: true),
      *     renderer: new HtmlRenderer(xhtml: true),
      * );
      * ```
@@ -126,7 +126,7 @@ class DjotConverter
      * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
      * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (HTML renderer only)
      * @param bool $roundTripMode Add data attributes for Djot→HTML→Djot round-trips (HTML renderer only)
-     * @param \Djot\Parser\BlockParser|null $parser Pre-configured parser (ignores warnings/strict/significantNewlines if set)
+     * @param \Djot\Parser\BlockParser|null $parser Pre-configured parser (ignores warnings/strict/significantNewlines/nestedBlocksInLists/blocksInterruptParagraphs if set)
      * @param \Djot\Renderer\RendererInterface|null $renderer Pre-configured renderer (ignores xhtml/safeMode/softBreakMode/roundTripMode if set)
      * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines
      * @param bool $blocksInterruptParagraphs Allow top-level block elements to interrupt paragraphs without a blank line
@@ -256,9 +256,9 @@ class DjotConverter
     /**
      * Create a converter that only enables top-level paragraph interruption.
      *
-     * Block elements (lists, blockquotes, headings, fences) can interrupt a
-     * paragraph without a preceding blank line, but list items still require a
-     * blank line to nest.
+     * Block elements (lists, blockquotes, headings, tables, thematic breaks,
+     * and code/div/comment fences) can interrupt a paragraph without a
+     * preceding blank line, but list items still require a blank line to nest.
      *
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
