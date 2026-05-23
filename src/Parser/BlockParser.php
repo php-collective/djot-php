@@ -142,15 +142,13 @@ class BlockParser
     protected array $customBlockPatterns = [];
 
     /**
-     * When true, enables "significant newlines" mode:
-     * - Block elements can interrupt paragraphs without blank lines
-     * - Nested blocks in lists don't need blank lines
-     * - More markdown-like, chat-friendly parsing
-     *
-     * This deviates from djot spec but provides more intuitive behavior
-     * for chat messages, comments, and quick notes.
+     * When true, a top-level block element (lists, blockquotes, headings,
+     * tables, thematic breaks, and code/div/comment fences) may interrupt a
+     * paragraph without a preceding blank line. This is the behavior the
+     * now-deprecated significantNewlines flag exposed for the top level; it
+     * also governs the lone-marker rule.
      */
-    protected bool $significantNewlines = false;
+    protected bool $blocksInterruptParagraphs = false;
 
     /**
      * When true, indentation alone can introduce nested blocks inside list items
@@ -163,10 +161,12 @@ class BlockParser
         bool $strictMode = false,
         bool $significantNewlines = false,
         bool $nestedBlocksInLists = false,
+        bool $blocksInterruptParagraphs = false,
     ) {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
-        $this->significantNewlines = $significantNewlines;
+        // significantNewlines is the deprecated union of the two granular levers.
+        $this->blocksInterruptParagraphs = $blocksInterruptParagraphs || $significantNewlines;
         $this->nestedBlocksInLists = $nestedBlocksInLists || $significantNewlines;
         $this->inlineParser = new InlineParser($this);
         $this->listParser = new ListParser();
@@ -175,31 +175,46 @@ class BlockParser
     }
 
     /**
-     * Enable or disable significant newlines mode
+     * Enable or disable significant newlines mode.
      *
-     * When enabled:
-     * - Lists, blockquotes, code blocks can interrupt paragraphs
-     * - Nested blocks in list items don't need preceding blank lines
-     * - Indentation alone triggers block nesting
-     *
-     * This provides markdown-like behavior for chat and quick note use cases.
+     * @deprecated Use setBlocksInterruptParagraphs() and/or
+     *   setNestedBlocksInLists(). significantNewlines is the union of both.
      */
     public function setSignificantNewlines(bool $value): self
     {
-        $this->significantNewlines = $value;
-        if ($value) {
-            $this->nestedBlocksInLists = true;
-        }
+        $this->blocksInterruptParagraphs = $value;
+        $this->nestedBlocksInLists = $value;
 
         return $this;
     }
 
     /**
-     * Check if significant newlines mode is enabled
+     * Check if significant newlines mode is enabled.
+     *
+     * @deprecated Use getBlocksInterruptParagraphs() / getNestedBlocksInLists().
+     *   Returns the top-level interruption bit for backward compatibility.
      */
     public function getSignificantNewlines(): bool
     {
-        return $this->significantNewlines;
+        return $this->blocksInterruptParagraphs;
+    }
+
+    /**
+     * Enable or disable top-level paragraph interruption by block elements.
+     */
+    public function setBlocksInterruptParagraphs(bool $value): self
+    {
+        $this->blocksInterruptParagraphs = $value;
+
+        return $this;
+    }
+
+    /**
+     * Check if top-level paragraph interruption is enabled.
+     */
+    public function getBlocksInterruptParagraphs(): bool
+    {
+        return $this->blocksInterruptParagraphs;
     }
 
     /**
@@ -3132,8 +3147,8 @@ class BlockParser
             return true;
         }
 
-        // In significantNewlines mode, block elements can interrupt paragraphs
-        if ($this->significantNewlines) {
+        // When enabled, block elements can interrupt paragraphs without a blank line
+        if ($this->blocksInterruptParagraphs) {
             return $this->startsNewBlockSignificant($line, $lines, $index);
         }
 

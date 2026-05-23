@@ -67,7 +67,7 @@ class DjotConverter
      *
      * // Custom parser
      * $converter = DjotConverter::create(
-     *     parser: new BlockParser(significantNewlines: true),
+     *     parser: new BlockParser(blocksInterruptParagraphs: true, nestedBlocksInLists: true),
      *     renderer: new HtmlRenderer(xhtml: true),
      * );
      * ```
@@ -126,9 +126,10 @@ class DjotConverter
      * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
      * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (HTML renderer only)
      * @param bool $roundTripMode Add data attributes for Djot→HTML→Djot round-trips (HTML renderer only)
-     * @param \Djot\Parser\BlockParser|null $parser Pre-configured parser (ignores warnings/strict/significantNewlines if set)
+     * @param \Djot\Parser\BlockParser|null $parser Pre-configured parser (ignores warnings/strict/significantNewlines/nestedBlocksInLists/blocksInterruptParagraphs if set)
      * @param \Djot\Renderer\RendererInterface|null $renderer Pre-configured renderer (ignores xhtml/safeMode/softBreakMode/roundTripMode if set)
      * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines
+     * @param bool $blocksInterruptParagraphs Allow top-level block elements to interrupt paragraphs without a blank line
      */
     public function __construct(
         bool $xhtml = false,
@@ -142,6 +143,7 @@ class DjotConverter
         ?BlockParser $parser = null,
         ?RendererInterface $renderer = null,
         bool $nestedBlocksInLists = false,
+        bool $blocksInterruptParagraphs = false,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
@@ -150,7 +152,7 @@ class DjotConverter
         if ($parser !== null) {
             $this->parser = $parser;
         } else {
-            $this->parser = new BlockParser($warnings, $strict, $significantNewlines, $nestedBlocksInLists);
+            $this->parser = new BlockParser($warnings, $strict, $significantNewlines, $nestedBlocksInLists, $blocksInterruptParagraphs);
         }
 
         // Use provided renderer or create one from parameters
@@ -191,6 +193,9 @@ class DjotConverter
      *
      * Note: This does NOT change how soft breaks are rendered. Use setSoftBreakMode()
      * or the softBreakMode parameter if you also want visible line breaks.
+     *
+     * @deprecated Use withBlocksInterruptParagraphs() and/or
+     *   withNestedBlocksInLists(). significantNewlines is the union of both.
      *
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
@@ -245,6 +250,42 @@ class DjotConverter
             softBreakMode: $softBreakMode,
             roundTripMode: $roundTripMode,
             nestedBlocksInLists: true,
+        );
+    }
+
+    /**
+     * Create a converter that only enables top-level paragraph interruption.
+     *
+     * Block elements (lists, blockquotes, headings, tables, thematic breaks,
+     * and code/div/comment fences) can interrupt a paragraph without a
+     * preceding blank line, but list items still require a blank line to nest.
+     *
+     * @param bool $xhtml Whether to use XHTML-compatible output
+     * @param bool $warnings Whether to collect warnings during parsing
+     * @param bool $strict Whether to throw exceptions on parse errors
+     * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode
+     * @param \Djot\Profile|null $profile Profile for feature restriction
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (HTML renderer only)
+     * @param bool $roundTripMode Add data attributes for round-trips (HTML renderer only)
+     */
+    public static function withBlocksInterruptParagraphs(
+        bool $xhtml = false,
+        bool $warnings = false,
+        bool $strict = false,
+        bool|SafeMode|null $safeMode = null,
+        ?Profile $profile = null,
+        ?SoftBreakMode $softBreakMode = null,
+        bool $roundTripMode = false,
+    ): self {
+        return new self(
+            xhtml: $xhtml,
+            warnings: $warnings,
+            strict: $strict,
+            safeMode: $safeMode,
+            profile: $profile,
+            softBreakMode: $softBreakMode,
+            roundTripMode: $roundTripMode,
+            blocksInterruptParagraphs: true,
         );
     }
 
