@@ -135,7 +135,7 @@ class AdmonitionExtension implements ExtensionInterface
         protected string $titleTag = 'p',
         protected string $titleClass = 'admonition-title',
         protected string $containerClass = 'admonition',
-        bool|array $icons = false,
+        array|bool $icons = false,
         protected string $iconClass = 'admonition-icon',
     ) {
         $this->resolvedIcons = $this->resolveIcons($icons);
@@ -148,7 +148,7 @@ class AdmonitionExtension implements ExtensionInterface
      *
      * @return array<string, string>
      */
-    protected function resolveIcons(bool|array $icons): array
+    protected function resolveIcons(array|bool $icons): array
     {
         if ($icons === false) {
             return [];

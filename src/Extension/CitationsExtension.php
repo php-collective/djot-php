@@ -42,7 +42,7 @@ class CitationsExtension implements ExtensionInterface, BeforeRenderExtensionInt
      * @param string $cssClass CSS classes added to parsed citation spans
      */
     public function __construct(
-        callable|Closure|null $resolver = null,
+        Closure|callable|null $resolver = null,
         protected string $cssClass = 'citation',
     ) {
         $this->resolver = $resolver !== null ? Closure::fromCallable($resolver) : null;
