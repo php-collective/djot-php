@@ -461,8 +461,11 @@ class BlockParser
                 continue;
             }
 
-            // Match reference definition: [label]: url (requires whitespace after colon, url can be empty)
-            if (preg_match('/^\[([^\]]+)\]:(?:[ \t]+(.*))?[ \t]*$/', $line, $matches)) {
+            // Match reference definition: [label]: url
+            // - whitespace required after colon (jgm/djot.js#107)
+            // - URL must be a single non-whitespace token; trailing junk like Markdown
+            //   `"Title"` makes the line not a reference definition (matches djot.js)
+            if (preg_match('/^\[([^\]]+)\]:(?:[ \t]+(\S*))?[ \t]*$/', $line, $matches)) {
                 // Normalize label: collapse whitespace, trim
                 $label = preg_replace('/\s+/', ' ', trim($matches[1]));
                 $url = trim($matches[2] ?? '');
@@ -2958,8 +2961,9 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Match reference definition: [label]: url (requires whitespace after colon, url can be empty)
-        if (!preg_match('/^\[([^\]]+)\]:(?:[ \t]+(.*))?[ \t]*$/', $line, $matches)) {
+        // Match reference definition: [label]: url
+        // URL must be a single non-whitespace token; see extractReferences().
+        if (!preg_match('/^\[([^\]]+)\]:(?:[ \t]+(\S*))?[ \t]*$/', $line, $matches)) {
             return null;
         }
 
