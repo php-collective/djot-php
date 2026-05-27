@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Djot\Parser\Block;
 
+use Djot\Parser\Utility\AttributeParser;
+
 /**
  * Parser utilities for fenced blocks (code blocks, divs, raw blocks).
  *
@@ -75,9 +77,13 @@ class FencedBlockParser
     /**
      * Check if a line opens a div fence.
      *
+     * Supports two opener styles:
+     * - Bareword class: `::: foo` (spec)
+     * - Attribute block: `::: {#id .foo}` (extension, lenient parse)
+     *
      * @param string $line The line to check
      *
-     * @return array{fence: string, length: int, className: string}|null
+     * @return array{fence: string, length: int, className: string, attributes: array<string, string>}|null
      */
     public function parseDivFenceOpener(string $line): ?array
     {
@@ -86,15 +92,32 @@ class FencedBlockParser
             return null;
         }
 
-        // Match opening fence: 3+ colons with optional class
+        // Match opening fence: 3+ colons with optional class or attribute block
         if (!preg_match('/^(:{3,})\s*(.*)$/', $line, $matches)) {
             return null;
+        }
+
+        $tail = trim($matches[2]);
+        $className = '';
+        $attributes = [];
+
+        if ($tail !== '') {
+            if (str_starts_with($tail, '{') && str_ends_with($tail, '}')) {
+                $attributes = AttributeParser::parse(substr($tail, 1, -1));
+                if (isset($attributes['class'])) {
+                    $className = $attributes['class'];
+                    unset($attributes['class']);
+                }
+            } else {
+                $className = $tail;
+            }
         }
 
         return [
             'fence' => $matches[1],
             'length' => strlen($matches[1]),
-            'className' => trim($matches[2]),
+            'className' => $className,
+            'attributes' => $attributes,
         ];
     }
 

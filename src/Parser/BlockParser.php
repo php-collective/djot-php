@@ -461,11 +461,11 @@ class BlockParser
                 continue;
             }
 
-            // Match reference definition: [label]: url (url can be empty, on next line)
-            if (preg_match('/^\[([^\]]+)\]:\s*(.*)$/', $line, $matches)) {
+            // Match reference definition: [label]: url (requires whitespace after colon, url can be empty)
+            if (preg_match('/^\[([^\]]+)\]:(?:[ \t]+(.*))?[ \t]*$/', $line, $matches)) {
                 // Normalize label: collapse whitespace, trim
                 $label = preg_replace('/\s+/', ' ', trim($matches[1]));
-                $url = trim($matches[2]);
+                $url = trim($matches[2] ?? '');
 
                 // Collect continuation lines (URL can start on continuation line)
                 $j = $i + 1;
@@ -475,7 +475,7 @@ class BlockParser
                         break;
                     }
                     // Check if next line starts a new reference definition
-                    if (preg_match('/^\[([^\]]+)\]:/', $nextLine)) {
+                    if (preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)/', $nextLine)) {
                         break;
                     }
                     if ($this->startsNewBlock($nextLine)) {
@@ -518,10 +518,10 @@ class BlockParser
         while ($i < $count) {
             $line = $lines[$i];
 
-            // Match footnote definition: [^label]: content
-            if (preg_match('/^\[\^([^\]]+)\]:\s*(.*)$/', $line, $matches)) {
+            // Match footnote definition: [^label]: content (requires whitespace after colon)
+            if (preg_match('/^\[\^([^\]]+)\]:(?:[ \t]+(.*))?[ \t]*$/', $line, $matches)) {
                 $label = $matches[1];
-                $content = $matches[2];
+                $content = $matches[2] ?? '';
 
                 // Determine base indentation (2 spaces for footnotes)
                 $baseIndent = 2;
@@ -592,10 +592,10 @@ class BlockParser
         while ($i < $count) {
             $line = $lines[$i];
 
-            // Match abbreviation definition: *[abbr]: definition
-            if (preg_match('/^\*\[([^\]]+)\]:\s*(.*)$/', $line, $matches)) {
+            // Match abbreviation definition: *[abbr]: definition (requires whitespace after colon)
+            if (preg_match('/^\*\[([^\]]+)\]:(?:[ \t]+(.*))?[ \t]*$/', $line, $matches)) {
                 $abbr = $matches[1];
-                $definition = trim($matches[2]);
+                $definition = trim($matches[2] ?? '');
 
                 // Collect continuation lines (indented)
                 $j = $i + 1;
@@ -605,7 +605,7 @@ class BlockParser
                         break;
                     }
                     // Check if next line starts a new abbreviation definition
-                    if (preg_match('/^\*\[([^\]]+)\]:/', $nextLine)) {
+                    if (preg_match('/^\*\[([^\]]+)\]:(?=[ \t]|$)/', $nextLine)) {
                         break;
                     }
                     if ($this->startsNewBlock($nextLine)) {
@@ -934,7 +934,7 @@ class BlockParser
             while ($nextIdx < $count && IndentationHelper::isBlankLine($lines[$nextIdx])) {
                 $nextIdx++;
             }
-            if ($nextIdx < $count && preg_match('/^\[([^\]]+)\]:/', $lines[$nextIdx])) {
+            if ($nextIdx < $count && preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)/', $lines[$nextIdx])) {
                 // Attributes precede a reference definition, don't store them as block attrs
                 return 1;
             }
@@ -1298,10 +1298,15 @@ class BlockParser
 
         $fenceLength = $divInfo['length'];
         $className = $divInfo['className'];
+        $openerAttributes = $divInfo['attributes'];
 
         $div = new Div();
         if ($className !== '') {
-            $div->addClass($className);
+            foreach (preg_split('/\s+/', $className) ?: [] as $class) {
+                if ($class !== '') {
+                    $div->addClass($class);
+                }
+            }
         }
 
         // Save and clear pending attributes - they apply to the div, not inner content
@@ -1373,6 +1378,11 @@ class BlockParser
         $this->lineOffset = $previousOffset + $start + 1;
         $this->parseBlocks($div, $innerLines, 0);
         $this->lineOffset = $previousOffset;
+
+        // Apply opener-line attributes (from `::: {#id .class key=value}` syntax)
+        foreach ($openerAttributes as $name => $value) {
+            $div->setAttribute($name, $value);
+        }
 
         // Apply the saved attributes to the div, merging classes instead of replacing
         foreach ($divAttributes as $name => $value) {
@@ -2912,8 +2922,8 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Match footnote definition: [^label]: content
-        if (!preg_match('/^\[\^([^\]]+)\]:\s*/', $line)) {
+        // Match footnote definition: [^label]: content (requires whitespace after colon)
+        if (!preg_match('/^\[\^([^\]]+)\]:(?=[ \t]|$)/', $line)) {
             return null;
         }
 
@@ -2948,8 +2958,8 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Match reference definition: [label]: url (url can be empty, on next line)
-        if (!preg_match('/^\[([^\]]+)\]:\s*(.*)$/', $line, $matches)) {
+        // Match reference definition: [label]: url (requires whitespace after colon, url can be empty)
+        if (!preg_match('/^\[([^\]]+)\]:(?:[ \t]+(.*))?[ \t]*$/', $line, $matches)) {
             return null;
         }
 
@@ -2963,7 +2973,7 @@ class BlockParser
                 break;
             }
             // Check if next line starts a new reference definition
-            if (preg_match('/^\[([^\]]+)\]:/', $nextLine)) {
+            if (preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)/', $nextLine)) {
                 break;
             }
             if ($this->startsNewBlock($nextLine)) {
@@ -2989,8 +2999,8 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Match abbreviation definition: *[abbr]: definition
-        if (!preg_match('/^\*\[([^\]]+)\]:\s*/', $line)) {
+        // Match abbreviation definition: *[abbr]: definition (requires whitespace after colon)
+        if (!preg_match('/^\*\[([^\]]+)\]:(?=[ \t]|$)/', $line)) {
             return null;
         }
 
@@ -3004,7 +3014,7 @@ class BlockParser
                 break;
             }
             // Check if next line starts a new abbreviation definition
-            if (preg_match('/^\*\[([^\]]+)\]:/', $nextLine)) {
+            if (preg_match('/^\*\[([^\]]+)\]:(?=[ \t]|$)/', $nextLine)) {
                 break;
             }
             if ($this->startsNewBlock($nextLine)) {
