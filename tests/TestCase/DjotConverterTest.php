@@ -3183,6 +3183,17 @@ DJOT;
         $this->assertSame('reference', $warnings[0]->getCategory());
     }
 
+    public function testUnusedNumericReferenceWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert("Some text.\n\n[1]: https://example.com");
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString("Reference '1' defined but never used", $warnings[0]->getMessage());
+        $this->assertSame('reference', $warnings[0]->getCategory());
+    }
+
     public function testNoUnusedWarningForUsedReference(): void
     {
         $converter = new DjotConverter(warnings: true);
