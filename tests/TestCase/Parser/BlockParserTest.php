@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Test\TestCase\Parser;
 
+use Djot\DjotConverter;
 use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\DefinitionList;
@@ -361,6 +362,77 @@ DJOT;
         // Nested div should have both 'warning' and 'custom-nested' merged
         $this->assertStringContainsString('warning', $nestedClass);
         $this->assertStringContainsString('custom-nested', $nestedClass);
+    }
+
+    public function testParseFencedDivWithAttributeBlockOnOpener(): void
+    {
+        // ::: {.foo} on the opener line should be parsed as attributes,
+        // not as a literal class name "{.foo}"
+        $doc = $this->parser->parse("::: {.note}\nContent\n:::");
+
+        $div = $doc->getChildren()[0];
+        $this->assertInstanceOf(Div::class, $div);
+        $this->assertSame('note', $div->getAttribute('class'));
+    }
+
+    public function testParseFencedDivWithIdAndClassOnOpener(): void
+    {
+        $doc = $this->parser->parse("::: {#warn .alert .red}\nContent\n:::");
+
+        $div = $doc->getChildren()[0];
+        $this->assertInstanceOf(Div::class, $div);
+        $this->assertSame('warn', $div->getAttribute('id'));
+        $class = $div->getAttribute('class') ?? '';
+        $this->assertStringContainsString('alert', $class);
+        $this->assertStringContainsString('red', $class);
+    }
+
+    public function testParseFencedDivWithKeyValueOnOpener(): void
+    {
+        $doc = $this->parser->parse("::: {.foo data-x=\"1\"}\nContent\n:::");
+
+        $div = $doc->getChildren()[0];
+        $this->assertInstanceOf(Div::class, $div);
+        $this->assertSame('foo', $div->getAttribute('class'));
+        $this->assertSame('1', $div->getAttribute('data-x'));
+    }
+
+    public function testReferenceDefinitionRequiresWhitespaceAfterColon(): void
+    {
+        // [foo]:bar (no whitespace) should NOT define a reference -
+        // it should be rendered as a paragraph instead.
+        $converter = new DjotConverter();
+        $html = $converter->convert("[foo]:bar\n\n[link][foo]");
+
+        $this->assertStringNotContainsString('href="bar"', $html);
+        $this->assertStringContainsString('[foo]:bar', $html);
+    }
+
+    public function testReferenceDefinitionAcceptsWhitespaceAfterColon(): void
+    {
+        $converter = new DjotConverter();
+        $html = $converter->convert("[foo]: bar\n\n[link][foo]");
+
+        $this->assertStringContainsString('href="bar"', $html);
+    }
+
+    public function testFootnoteDefinitionRequiresWhitespaceAfterColon(): void
+    {
+        // [^a]:content (no whitespace) should NOT define a footnote.
+        $converter = new DjotConverter();
+        $html = $converter->convert("Text[^a]\n\n[^a]:content");
+
+        // Without whitespace the line is not consumed as a footnote definition.
+        $this->assertStringNotContainsString('<p>content', $html);
+    }
+
+    public function testAbbreviationDefinitionRequiresWhitespaceAfterColon(): void
+    {
+        $converter = new DjotConverter();
+        $html = $converter->convert("Use ABBR here.\n\n*[ABBR]:no-space-here");
+
+        $this->assertStringNotContainsString('<abbr', $html);
+        $this->assertStringContainsString('*[ABBR]:no-space-here', $html);
     }
 
     public function testParseTable(): void
