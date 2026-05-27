@@ -3407,7 +3407,7 @@ class BlockParser
             if (
                 !isset($this->usedReferences[$label])
                 && !str_starts_with($def->url, '#')
-                && !str_starts_with($label, '^')
+                && !str_starts_with((string)$label, '^')
             ) {
                 $this->addWarning(
                     "Reference '{$label}' defined but never used",
