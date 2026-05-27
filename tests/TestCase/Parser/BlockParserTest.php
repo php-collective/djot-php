@@ -426,6 +426,28 @@ DJOT;
         $this->assertStringNotContainsString('<p>content', $html);
     }
 
+    public function testReferenceDefinitionRejectsTrailingTitle(): void
+    {
+        // Markdown-style trailing `"Title"` makes the line invalid as a djot
+        // reference definition (matches djot.js behavior). Previously the
+        // entire tail leaked into the URL.
+        $converter = new DjotConverter();
+        $html = $converter->convert("[bar]: http://x.com \"Title\"\n\n[link][bar]");
+
+        $this->assertStringNotContainsString('&quot;', $html);
+        $this->assertStringNotContainsString('href="http://x.com', $html);
+        $this->assertStringContainsString('[bar]: http://x.com', $html);
+    }
+
+    public function testReferenceDefinitionRejectsUrlWithInternalWhitespace(): void
+    {
+        // URL containing inline whitespace is not a valid reference definition.
+        $converter = new DjotConverter();
+        $html = $converter->convert("[bar]: http://x.com extra-stuff\n\n[link][bar]");
+
+        $this->assertStringNotContainsString('href="http://x.com', $html);
+    }
+
     public function testAbbreviationDefinitionRequiresWhitespaceAfterColon(): void
     {
         $converter = new DjotConverter();
