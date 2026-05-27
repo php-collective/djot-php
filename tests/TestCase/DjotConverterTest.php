@@ -1092,6 +1092,24 @@ DJOT;
         $this->assertStringContainsString('<li class="x">', $result);
     }
 
+    public function testSequentialListItemAttributesAreMerged(): void
+    {
+        $djot = "- item\n  {.x}\n  {.y}\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li class="x y">', $result);
+    }
+
+    public function testMultipleSequentialListItemAttributesAreMerged(): void
+    {
+        $djot = "- item\n  {.a}\n  {.b}\n  {.c}\n";
+
+        $result = $this->converter->convert($djot);
+
+        $this->assertStringContainsString('<li class="a b c">', $result);
+    }
+
     public function testListItemAttributesLooseListUnchanged(): void
     {
         // G2 regression guard: blank-line separator (loose item) keeps
