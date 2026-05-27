@@ -223,7 +223,7 @@ class CodeGroupExtension implements ResettableExtensionInterface
 
         // Add data-djot-src for round-trip support
         if ($renderer->isRoundTripMode()) {
-            $djotSrc = $this->reconstructDjotSource($wrapper, $codeBlocks);
+            $djotSrc = $wrapper->getSource() ?? $this->reconstructDjotSource($wrapper, $codeBlocks);
             $attrs .= ' data-djot-src="' . StringUtil::escapeHtml($djotSrc) . '"';
         }
 
