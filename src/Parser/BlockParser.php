@@ -77,6 +77,13 @@ class BlockParser
     protected array $pendingAttributes = [];
 
     /**
+     * Source lines for pending block attributes.
+     *
+     * @var array<string>
+     */
+    protected array $pendingAttributeSourceLines = [];
+
+    /**
      * Whether to collect warnings during parsing
      */
     protected bool $collectWarnings = false;
@@ -387,6 +394,7 @@ class BlockParser
         $this->footnotes = [];
         $this->abbreviations = [];
         $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
         $this->warnings = [];
         $this->usedReferences = [];
         $this->anchorLinks = [];
@@ -932,6 +940,7 @@ class BlockParser
             }
 
             $this->parseAttributeString($attrStr);
+            $this->pendingAttributeSourceLines[] = $line;
 
             return 1;
         }
@@ -940,10 +949,12 @@ class BlockParser
         // Collect lines until we find the closing }
         $count = count($lines);
         $attrContent = substr($line, 1); // Remove opening {
+        $sourceLines = [$line];
         $i = $start + 1;
 
         while ($i < $count) {
             $nextLine = $lines[$i];
+            $sourceLines[] = $nextLine;
 
             // Check if this line ends the attribute block
             if (preg_match('/^(.*)\}\s*$/', $nextLine, $closeMatch)) {
@@ -956,6 +967,7 @@ class BlockParser
                     return null;
                 }
                 $this->parseAttributeString($attrStr);
+                array_push($this->pendingAttributeSourceLines, ...$sourceLines);
 
                 return $i - $start + 1;
             }
@@ -989,6 +1001,7 @@ class BlockParser
         if ($this->pendingAttributes !== []) {
             $node->setAttributes($this->pendingAttributes);
             $this->pendingAttributes = [];
+            $this->pendingAttributeSourceLines = [];
         }
     }
 
@@ -1018,6 +1031,7 @@ class BlockParser
     {
         $attrs = $this->pendingAttributes;
         $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
 
         return $attrs;
     }
@@ -1292,9 +1306,12 @@ class BlockParser
 
         // Save and clear pending attributes - they apply to the div, not inner content
         $divAttributes = $this->pendingAttributes;
+        $divAttributeSourceLines = $this->pendingAttributeSourceLines;
         $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
 
         $innerLines = [];
+        $sourceLines = [...$divAttributeSourceLines, $line];
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
@@ -1312,6 +1329,7 @@ class BlockParser
                     $inCodeBlock = true;
                     $codeBlockFence = $codeFenceInfo['char'];
                     $codeBlockFenceLength = $codeFenceInfo['length'];
+                    $sourceLines[] = $currentLine;
                     $innerLines[] = $currentLine;
                     $i++;
 
@@ -1323,6 +1341,7 @@ class BlockParser
                 if ($this->fencedBlockParser->isCodeFenceCloser($currentLine, $codeBlockFence, $codeBlockFenceLength)) {
                     $inCodeBlock = false;
                 }
+                $sourceLines[] = $currentLine;
                 $innerLines[] = $currentLine;
                 $i++;
 
@@ -1331,18 +1350,22 @@ class BlockParser
 
             // Check for closing fence (equal or longer) - only when not in code block
             if ($this->fencedBlockParser->isDivFenceCloser($currentLine, $fenceLength)) {
+                $sourceLines[] = $currentLine;
                 $i++;
                 $closed = true;
 
                 break;
             }
 
+            $sourceLines[] = $currentLine;
             $innerLines[] = $currentLine;
             $i++;
         }
 
         if (!$closed) {
             $this->addWarning('Unclosed div', $start, 1, true);
+        } else {
+            $div->setSource(implode("\n", $sourceLines));
         }
 
         // Parse inner content as blocks (track line offset for nested content)
@@ -1490,6 +1513,7 @@ class BlockParser
         // Save and clear pending attributes - they apply to the blockquote, not inner content
         $quoteAttributes = $this->pendingAttributes;
         $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
 
         $innerLines = [];
 
@@ -1587,6 +1611,7 @@ class BlockParser
         // Save and clear pending attributes - they apply to the list, not inner content
         $listAttributes = $this->pendingAttributes;
         $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
 
         $i = $start;
         $count = count($lines);
@@ -2047,6 +2072,7 @@ class BlockParser
         // Save pending attributes for the definition list before parsing children
         $defListAttributes = $this->pendingAttributes;
         $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
 
         $i = $start;
         $count = count($lines);

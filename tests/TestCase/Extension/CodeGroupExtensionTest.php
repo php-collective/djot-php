@@ -584,4 +584,34 @@ DJOT;
         $this->assertStringContainsString('[Composer]', $html);
         $this->assertStringContainsString('[NPM]', $html);
     }
+
+    public function testRoundTripModePreservesOriginalDjotSrc(): void
+    {
+        $renderer = new HtmlRenderer();
+        $renderer->setRoundTripMode(true);
+        $converter = DjotConverter::create(renderer: $renderer);
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+::: code-group
+
+```php [From an array]
+echo "Hello";
+```
+
+```bash [CLI]
+bin/cake test
+```
+
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString(
+            "data-djot-src=\"::: code-group\n\n```php [From an array]\necho &quot;Hello&quot;;\n```\n\n```bash [CLI]\nbin/cake test\n```\n\n:::\"",
+            $html,
+        );
+        $this->assertStringNotContainsString('data-djot-src="::: code-group' . "\n" . '``` php', $html);
+    }
 }
