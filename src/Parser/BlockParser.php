@@ -1837,7 +1837,7 @@ class BlockParser
             // block inside the item. This keeps the list / item intact instead
             // of terminating it on a mid-item {...} line.
             $itemAttributes = [];
-            $attrPushedBack = false;
+            $parseItemLinesAsBlocks = false;
             if ($i < $count) {
                 $potentialAttrLine = $lines[$i];
                 $trimmedAttrLine = ltrim($potentialAttrLine);
@@ -1858,7 +1858,58 @@ class BlockParser
                         }
                     }
 
-                    if ($hasMoreItemContent) {
+                    // @todo #189: Default mode still treats tight nested-list
+                    // markers as continuation text here. nestedBlocksInLists
+                    // handles the natural nested-item/block-attribute case.
+                    $peekLineIsAttribute = $hasMoreItemContent
+                        && preg_match('/^\{([^{}]+)\}\s*$/', ltrim($lines[$i + 1]), $peekAttrMatch);
+
+                    if ($peekLineIsAttribute) {
+                        $itemAttributes = AttributeParser::parseAndMerge($itemAttributes, $attrMatch[1]);
+                        $itemAttributes = AttributeParser::parseAndMerge($itemAttributes, $peekAttrMatch[1]);
+                        $i += 2;
+
+                        while ($i < $count) {
+                            $contLine = $lines[$i];
+                            if (IndentationHelper::isBlankLine($contLine)) {
+                                break;
+                            }
+                            $contIndent = IndentationHelper::getLeadingSpaces($contLine);
+                            if ($contIndent < $contentIndent) {
+                                break;
+                            }
+                            $contTrimmed = ltrim($contLine);
+                            if (!preg_match('/^\{([^{}]+)\}\s*$/', $contTrimmed, $contAttrMatch)) {
+                                break;
+                            }
+                            $itemAttributes = AttributeParser::parseAndMerge($itemAttributes, $contAttrMatch[1]);
+                            $i++;
+                        }
+
+                        if ($i < $count && !IndentationHelper::isBlankLine($lines[$i])) {
+                            $contIndent = IndentationHelper::getLeadingSpaces($lines[$i]);
+                            if ($contIndent >= $contentIndent) {
+                                if ($itemLines !== [] && $itemLines[array_key_last($itemLines)] !== '') {
+                                    $itemLines[] = '';
+                                }
+                                $hasNonMarkerContinuation = true;
+                                $parseItemLinesAsBlocks = true;
+                                while ($i < $count) {
+                                    $contLine = $lines[$i];
+                                    if (IndentationHelper::isBlankLine($contLine)) {
+                                        break;
+                                    }
+                                    $contIndent = IndentationHelper::getLeadingSpaces($contLine);
+                                    if ($contIndent >= $contentIndent) {
+                                        $itemLines[] = IndentationHelper::stripLeadingIndent($contLine, $contentIndent);
+                                        $i++;
+                                    } else {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    } elseif ($hasMoreItemContent) {
                         // {...} is not the item's attribute — it is a block
                         // attribute for the next block in the item. Push it back
                         // into itemLines (stripped of the item's content indent)
@@ -1874,7 +1925,7 @@ class BlockParser
                         }
                         $itemLines[] = IndentationHelper::stripLeadingIndent($potentialAttrLine, $contentIndent);
                         $hasNonMarkerContinuation = true;
-                        $attrPushedBack = true;
+                        $parseItemLinesAsBlocks = true;
                         $i++;
                         while ($i < $count) {
                             $contLine = $lines[$i];
@@ -1905,7 +1956,7 @@ class BlockParser
             // still allowing blockquotes, code blocks, etc. to be properly recognized.
             if ($hasNonMarkerContinuation) {
                 $firstLine = $itemLines[0];
-                if ($attrPushedBack || $this->isBlockElementStart($firstLine)) {
+                if ($parseItemLinesAsBlocks || $this->isBlockElementStart($firstLine)) {
                     // Content starts with a block element (blockquote, code fence,
                     // etc.) or we pushed a {...} back into itemLines that must be
                     // recognized as a block attribute for the next block.

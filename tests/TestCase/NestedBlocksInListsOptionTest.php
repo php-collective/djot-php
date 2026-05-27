@@ -70,6 +70,17 @@ class NestedBlocksInListsOptionTest extends TestCase
         $this->assertInstanceOf(BlockQuote::class, $children[1]);
     }
 
+    public function testNestedListItemAttributeBeforeBlockquote(): void
+    {
+        $converter = DjotConverter::withNestedBlocksInLists();
+        $result = $converter->convert("- outer\n  - inner\n    {.x}\n    > q\n");
+
+        $this->assertSame(2, substr_count($result, '<ul>'));
+        $this->assertStringContainsString('<blockquote class="x">', $result);
+        $this->assertStringContainsString('<p>q</p>', $result);
+        $this->assertStringNotContainsString('&gt; q', $result);
+    }
+
     public function testConverterHelperKeepsTopLevelSpecBehavior(): void
     {
         $converter = DjotConverter::withNestedBlocksInLists();
