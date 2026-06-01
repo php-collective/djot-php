@@ -23,6 +23,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [TabsExtension](#tabsextension) | Transforms divs into accessible tabbed content interfaces |
 | [WikilinksExtension](#wikilinksextension) | Converts `[[Page Name]]` patterns to wiki-style links |
 | [CitationsExtension](#citationsextension) | Parses experimental Pandoc/Citum-style citation groups into semantic inline spans |
+| [TransclusionExtension](#transclusionextension) | Experimental: expands {{name\|args}} fragment calls via a host resolver, with parsed arguments |
 
 ## Basic Usage
 
@@ -1625,6 +1626,88 @@ This extension follows Citum's current experimental Djot direction rather than a
 - Integration guide: https://docs.citum.org/guides/integrations/djot.html
 
 Because upstream Djot citation syntax is still unsettled, prefer this extension for opt-in experiments and integrations, not for long-term format guarantees.
+
+## TransclusionExtension
+
+Expands experimental `{{name|args}}` fragment calls through a host-supplied resolver. This extension is a proof of concept for carrying template arguments as parsed Djot child nodes rather than flat attribute strings. It is not part of the Djot specification; it exists to explore the approach discussed at https://github.com/jgm/djot/discussions/366.
+
+**Syntax:**
+
+```djot
+{{name|pos1|key=value}}
+```
+
+The first segment is the transclusion name. Later segments become `TransclusionArgument` nodes. Arguments can be positional (`pos1`) or named (`key=value`). Argument values are parsed as Djot inline content before the resolver receives them.
+
+This spike has deliberate syntax limits:
+
+- Nested `{{ }}` is not supported.
+- Literal braces inside arguments are not supported.
+- Raw `|` is always the argument separator, so a literal `|` inside an argument is not supported.
+
+**Basic usage:**
+
+```php
+use Djot\DjotConverter;
+use Djot\Extension\TransclusionExtension;
+use Djot\Node\Inline\Span;
+use Djot\Node\Node;
+
+$converter = new DjotConverter();
+$converter->addExtension(new TransclusionExtension(
+    resolver: function (string $name, array $args): ?Node {
+        if ($name !== 'badge') {
+            return null;
+        }
+
+        $span = new Span();
+        $span->addClass('badge');
+        foreach ($args[0]->getChildren() as $child) {
+            $span->appendChild($child);
+        }
+
+        return $span;
+    },
+));
+
+$html = $converter->convert('Status: {{badge|_Draft_}}');
+// Output: <p>Status: <span class="badge"><em>Draft</em></span></p>
+```
+
+### Resolver Contract
+
+The resolver signature is:
+
+```php
+Closure(string $name, array<int, \Djot\Node\Inline\TransclusionArgument> $args): ?\Djot\Node\Node
+```
+
+Return a Djot AST node to replace the invocation, or `null` to leave it unresolved.
+
+Each `TransclusionArgument` provides:
+
+- `getKey(): ?string` returns the named argument key, or `null` for positional arguments.
+- `getIndex(): int` returns the 0-based source-order index. Named and positional arguments both increment it.
+- `isNamed(): bool` returns whether the argument used `key=value` syntax.
+- `getChildren()` returns the parsed inline nodes for the argument value.
+
+Resolver output is not scanned again for nested transclusions in this spike.
+
+### Unresolved Fallback
+
+If no resolver is configured, or the resolver returns `null`, the extension replaces the call with a span containing the literal `{{name}}`:
+
+```html
+<span class="transclusion-unresolved">{{name}}</span>
+```
+
+Customize the fallback class with `unresolvedCssClass`:
+
+```php
+$converter->addExtension(new TransclusionExtension(
+    unresolvedCssClass: 'missing-fragment',
+));
+```
 
 ## Creating Custom Extensions
 
