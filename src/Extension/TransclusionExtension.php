@@ -70,7 +70,8 @@ class TransclusionExtension implements BeforeRenderExtensionInterface
                     }
 
                     $arg = new TransclusionArgument($key, $index);
-                    $parser->parse($arg, trim($value, " \t"));
+                    $argParser = clone $parser;
+                    $argParser->parse($arg, trim($value));
                     $node->appendChild($arg);
                 }
 
