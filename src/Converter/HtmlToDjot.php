@@ -824,18 +824,16 @@ class HtmlToDjot
         $backticks = StringUtil::findSafeCodeFence($content, 1);
         $attrs = $this->formatInlineAttributes($node);
 
-        // Add spaces around content if needed to distinguish from fence
-        // Only add space if content starts/ends with backtick but NOT already a space
-        // (If there's already a space, it was preserved from the original)
+        // Separate the content from the fence when it begins or ends with a
+        // backtick. Djot only strips padding when both ends have a space, so the
+        // padding must be symmetric: a lone pad space would be kept as content
+        // and corrupt the value on the next parse.
         if (strlen($backticks) > 1) {
-            $needsStartSpace = str_starts_with($content, '`') && !str_starts_with($content, ' ');
-            $needsEndSpace = str_ends_with($content, '`') && !str_ends_with($content, ' ');
+            $needsSpace = (str_starts_with($content, '`') && !str_starts_with($content, ' '))
+                || (str_ends_with($content, '`') && !str_ends_with($content, ' '));
 
-            if ($needsStartSpace || $needsEndSpace) {
-                $start = $needsStartSpace ? ' ' : '';
-                $end = $needsEndSpace ? ' ' : '';
-
-                return $backticks . $start . $content . $end . $backticks . $attrs;
+            if ($needsSpace) {
+                return $backticks . ' ' . $content . ' ' . $backticks . $attrs;
             }
         }
 
