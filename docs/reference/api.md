@@ -27,6 +27,7 @@ public function __construct(
     ?RendererInterface $renderer = null,
     bool $nestedBlocksInLists = false,
     bool $blocksInterruptParagraphs = false,
+    bool $nestedListsWithoutBlankLine = false,
 )
 ```
 
@@ -38,10 +39,11 @@ public function __construct(
 - `$significantNewlines`: **Deprecated.** Convenience shorthand for `blocksInterruptParagraphs: true, nestedBlocksInLists: true`. Prefer the two granular levers. See [Significant Newlines Mode](#significant-newlines-mode).
 - `$softBreakMode`: Override how soft breaks are rendered. When `null`, uses the renderer's default (newline for HTML).
 - `$roundTripMode`: When `true`, adds round-trip metadata for Djot→HTML→Djot workflows (HTML renderer only).
-- `$parser`: Optional pre-configured parser. When provided, inline parser constructor flags such as `warnings`, `strict`, `significantNewlines` (deprecated), `nestedBlocksInLists`, and `blocksInterruptParagraphs` are ignored.
+- `$parser`: Optional pre-configured parser. When provided, inline parser constructor flags such as `warnings`, `strict`, `significantNewlines` (deprecated), `nestedBlocksInLists`, `blocksInterruptParagraphs`, and `nestedListsWithoutBlankLine` are ignored.
 - `$renderer`: Optional pre-configured renderer. When provided, inline renderer constructor flags such as `xhtml`, `safeMode`, `softBreakMode`, and `roundTripMode` are ignored.
 - `$nestedBlocksInLists`: When `true`, indentation alone introduces nested blocks inside list items without a blank line, while top-level paragraph interruption stays spec-compliant (see [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode)). Implied by `$significantNewlines`.
-- `$blocksInterruptParagraphs`: When `true`, top-level block elements (lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences) can interrupt a paragraph without a preceding blank line, while list-item nesting stays spec-compliant (see [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode)). Implied by `$significantNewlines`.
+- `$blocksInterruptParagraphs`: When `true`, top-level block elements (lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences) can interrupt a paragraph without a preceding blank line. It **also** nests an indented non-list block (blockquote, heading, fenced code, thematic break) inside a list item without a blank line; it does not nest sublists (see [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode)). Implied by `$significantNewlines`.
+- `$nestedListsWithoutBlankLine`: When `true`, a sublist nests inside a list item without a blank line. Only sublists nest; non-list blocks under the item stay literal and top-level paragraph interruption is unaffected (see [Nested Lists Without Blank Line Mode](/guide/parser-options#nested-lists-without-blank-line-mode)). Not set by `$significantNewlines` directly, but `$significantNewlines` produces the same sublist nesting through the deprecated `$nestedBlocksInLists`.
 
 ### Factory Methods
 
@@ -93,7 +95,23 @@ public static function withBlocksInterruptParagraphs(
 ): self
 ```
 
-Creates a converter that allows top-level block elements (lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences) to interrupt a paragraph without a preceding blank line, while list-item nesting stays spec-compliant. See [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode).
+Creates a converter that allows top-level block elements (lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences) to interrupt a paragraph without a preceding blank line, and nests indented non-list blocks inside list items without a blank line. Sublist nesting stays spec-compliant. See [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode).
+
+#### withNestedListsWithoutBlankLine()
+
+```php
+public static function withNestedListsWithoutBlankLine(
+    bool $xhtml = false,
+    bool $warnings = false,
+    bool $strict = false,
+    bool|SafeMode|null $safeMode = null,
+    ?Profile $profile = null,
+    ?SoftBreakMode $softBreakMode = null,
+    bool $roundTripMode = false,
+): self
+```
+
+Creates a converter that nests a sublist inside a list item without requiring a blank line. Only sublists nest; non-list blocks under the item stay literal and top-level paragraph interruption stays at the spec default. See [Nested Lists Without Blank Line Mode](/guide/parser-options#nested-lists-without-blank-line-mode).
 
 ### Methods
 
@@ -540,6 +558,7 @@ $parser = new BlockParser(
     significantNewlines: false,
     nestedBlocksInLists: false,
     blocksInterruptParagraphs: false,
+    nestedListsWithoutBlankLine: false,
 );
 $document = $parser->parse($djotString);
 
@@ -556,10 +575,16 @@ $isEnabled = $parser->getSignificantNewlines();
 $parser->setNestedBlocksInLists(true);
 $isEnabled = $parser->getNestedBlocksInLists();
 
-// Enable/disable top-level paragraph interruption only
+// Enable/disable top-level paragraph interruption and non-list
+// block nesting in list items
 // (significant newlines mode enables this implicitly)
 $parser->setBlocksInterruptParagraphs(true);
 $isEnabled = $parser->getBlocksInterruptParagraphs();
+
+// Enable/disable sublist nesting in list items only
+// (significant newlines mode enables this implicitly)
+$parser->setNestedListsWithoutBlankLine(true);
+$isEnabled = $parser->getNestedListsWithoutBlankLine();
 ```
 
 #### Custom Block Patterns
