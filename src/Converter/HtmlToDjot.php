@@ -269,10 +269,40 @@ class HtmlToDjot
     {
         $output = '';
         foreach ($node->childNodes as $child) {
-            $output .= $this->processNode($child);
+            $piece = $this->processNode($child);
+            if ($piece === '') {
+                continue;
+            }
+
+            if ($output !== '' && $this->needsInlineSeparator($output, $piece)) {
+                $output .= '{}';
+            }
+
+            $output .= $piece;
         }
 
         return $output;
+    }
+
+    /**
+     * Two adjacent inline runs that share a delimiter (`_a__b_`, `*a**b*`,
+     * `` `a``b` ``) merge into a single malformed token on the next parse. An
+     * empty attribute group `{}` between them keeps them separate without
+     * affecting the rendered output.
+     */
+    protected function needsInlineSeparator(string $left, string $right): bool
+    {
+        $last = substr($left, -1);
+        if ($last === '' || $last !== $right[0]) {
+            return false;
+        }
+
+        if (!in_array($last, ['_', '*', '~', '^', '`'], true)) {
+            return false;
+        }
+
+        // A trailing escaped delimiter (`\_`) is literal text, not a real one.
+        return substr($left, -2) !== '\\' . $last;
     }
 
     /**

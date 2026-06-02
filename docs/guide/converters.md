@@ -227,7 +227,7 @@ echo "Hello";
 
 ### Round-Trip Mode
 
-For perfect Djot→HTML→Djot round-trips, enable round-trip mode. This adds data attributes to preserve Djot-specific syntax that would otherwise be lost:
+For lossless Djot→HTML→Djot round-trips of supported constructs, enable round-trip mode. This adds data attributes to preserve Djot-specific syntax that would otherwise be lost. Round-trips preserve semantics and Djot-specific syntax markers; purely cosmetic details (such as the exact fence length of a code block) are normalized.
 
 ```php
 use Djot\DjotConverter;
@@ -263,7 +263,7 @@ $back = $htmlToDjot->convert($html);
 | Shifted headings | `data-djot-source-level` | Preserves original Djot heading level during HTML round-trips |
 | Inline footnotes | `data-djot-inline-footnote-*` | Preserves inline-footnote syntax and custom footnote class |
 | Table separator widths | `data-djot-col-widths` | Preserves original table separator widths during HTML round-trips |
-| Code blocks | `data-djot-src` | Preserves fence length, language, and content |
+| Code blocks | `data-djot-src` | Preserves language and content (fence length is normalized to the shortest safe length) |
 | Mermaid diagrams | `data-djot-src` | Preserves full mermaid source |
 | Code groups | `data-djot-src` | Preserves code group structure |
 | Tabs | `data-djot-src` | Preserves tab structure |

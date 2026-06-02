@@ -120,6 +120,38 @@ class HtmlToDjotRoundTripPropertyTest extends TestCase
         $this->assertSame(1, substr_count($out, '<ul'));
     }
 
+    /**
+     * Two adjacent inline elements that share a Djot delimiter must not merge
+     * into one malformed token on the round-trip. `<em>a</em><em>b</em>` has to
+     * stay two emphasis runs, not collapse to `_a__b_` -> `<em>a_</em>b_`.
+     *
+     * @return array<string, array{string}>
+     */
+    public static function adjacentInlineProvider(): array
+    {
+        $tags = ['em', 'strong', 'sub', 'sup', 'code', 'del', 'mark', 'ins'];
+
+        $cases = [];
+        foreach ($tags as $tag) {
+            $cases["two {$tag}"] = ["<p><{$tag}>a</{$tag}><{$tag}>b</{$tag}></p>"];
+            $cases["three {$tag}"] = ["<p><{$tag}>a</{$tag}><{$tag}>b</{$tag}><{$tag}>c</{$tag}></p>"];
+        }
+        // Mixed delimiters already serialize unambiguously; guard against regressions.
+        $cases['em then strong'] = ['<p><em>a</em><strong>b</strong></p>'];
+        $cases['em space em'] = ['<p><em>a</em> <em>b</em></p>'];
+
+        return $cases;
+    }
+
+    #[DataProvider('adjacentInlineProvider')]
+    public function testAdjacentInlineElementsRoundTrip(string $html): void
+    {
+        $djot = $this->converter->convert($html);
+        $out = trim($this->renderer->convert($djot));
+
+        $this->assertSame($html, $out, 'Djot intermediate: ' . $djot);
+    }
+
     protected function alnum(string $value): string
     {
         return strtolower((string)preg_replace('/[^a-z0-9]/i', '', $value));
