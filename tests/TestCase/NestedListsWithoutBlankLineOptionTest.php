@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Test\TestCase;
 
+use Djot\DjotConverter;
 use Djot\Node\Block\ListBlock;
 use Djot\Node\Block\Paragraph;
 use Djot\Parser\BlockParser;
@@ -72,5 +73,29 @@ class NestedListsWithoutBlankLineOptionTest extends TestCase
         $children = $doc->getChildren();
         $this->assertCount(1, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
+    public function testConverterConstructorParameter(): void
+    {
+        $converter = new DjotConverter(nestedListsWithoutBlankLine: true);
+        $result = $converter->convert("- Item\n  - Nested A\n  - Nested B");
+
+        $this->assertSame(2, substr_count($result, '<ul>'));
+    }
+
+    public function testConverterFactory(): void
+    {
+        $converter = DjotConverter::withNestedListsWithoutBlankLine();
+        $result = $converter->convert("- Item\n  - Nested A");
+
+        $this->assertSame(2, substr_count($result, '<ul>'));
+    }
+
+    public function testConverterFactoryDoesNotNestBlockquote(): void
+    {
+        $converter = DjotConverter::withNestedListsWithoutBlankLine();
+        $result = $converter->convert("- Item\n  > quoted");
+
+        $this->assertStringNotContainsString('<blockquote>', $result);
     }
 }
