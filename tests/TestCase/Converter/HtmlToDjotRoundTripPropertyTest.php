@@ -152,6 +152,42 @@ class HtmlToDjotRoundTripPropertyTest extends TestCase
         $this->assertSame($html, $out, 'Djot intermediate: ' . $djot);
     }
 
+    /**
+     * The same-delimiter separator must apply on every inline concatenation
+     * path, not only paragraphs: bare top-level inline (processBlock buffer) and
+     * list items (processListItemContent) buffer inline output manually.
+     *
+     * @return array<string, array{string, string}>
+     */
+    public static function adjacentInlineContextProvider(): array
+    {
+        $cases = [];
+        foreach (['em', 'strong', 'sub', 'sup', 'code'] as $tag) {
+            $pair = "<{$tag}>a</{$tag}><{$tag}>b</{$tag}>";
+            $clean = "<{$tag}>a</{$tag}><{$tag}>b</{$tag}>";
+            $cases["bare {$tag}"] = [$pair, $clean];
+            $cases["list {$tag}"] = ["<ul><li>{$pair}</li></ul>", $clean];
+        }
+
+        return $cases;
+    }
+
+    #[DataProvider('adjacentInlineContextProvider')]
+    public function testAdjacentInlineSeparatedInAllContexts(string $html, string $cleanPair): void
+    {
+        $djot = $this->converter->convert($html);
+        $out = $this->renderer->convert($djot);
+
+        // Normalize whitespace between tags so list/paragraph wrapping is ignored.
+        $normalized = (string)preg_replace('/>\s+</', '><', trim($out));
+
+        $this->assertStringContainsString(
+            $cleanPair,
+            $normalized,
+            "Adjacent inline merged.\nDjot: {$djot}\nOut: {$out}",
+        );
+    }
+
     protected function alnum(string $value): string
     {
         return strtolower((string)preg_replace('/[^a-z0-9]/i', '', $value));
