@@ -193,12 +193,16 @@ class HtmlToDjot
     {
         if ($node instanceof DOMText) {
             $text = $node->textContent;
-            if (!$this->inPre && !$this->preserveTextWhitespace) {
+            if ($this->inPre) {
+                // Verbatim code context: never normalize or escape.
+                return $text;
+            }
+            if (!$this->preserveTextWhitespace) {
                 // Normalize whitespace outside pre blocks
                 $text = preg_replace('/\s+/', ' ', $text) ?? $text;
             }
 
-            return $text;
+            return $this->escapeDjotText($text, $this->isBlockLineStart($node));
         }
 
         if (!($node instanceof DOMElement)) {
@@ -935,10 +939,13 @@ class HtmlToDjot
         $title = $node->getAttribute('title');
 
         if ($text === '') {
-            $text = $href;
+            // Raw href used as label still needs full escaping.
+            $text = $this->escapeLinkOrImageLabel($href);
+        } else {
+            // Child text was already escaped as inline content; only the
+            // label-closing bracket remains to be escaped here.
+            $text = str_replace(']', '\]', $text);
         }
-
-        $text = $this->escapeLinkOrImageLabel($text);
 
         // Check for @mention (round-trip support for MentionsExtension)
         if ($node->hasAttribute('data-username')) {
@@ -2242,6 +2249,97 @@ class HtmlToDjot
             ['\\\\', '\[', '\]'],
             $text,
         );
+    }
+
+    /**
+     * Escape text extracted from HTML so Djot-significant characters survive as
+     * literal text on the next Djot parse.
+     *
+     * HTML that originates outside Djot (WYSIWYG editors, CMS exports, pasted
+     * content) routinely carries characters such as `*`, `_`, `[` or a leading
+     * `-` as ordinary prose. Without escaping, the round-trip Djot would re-parse
+     * them as emphasis, links or list markers and silently change the document.
+     */
+    protected function escapeDjotText(string $text, bool $atLineStart): string
+    {
+        $escaped = preg_replace('/[\\\\`*\[{~^<]/', '\\\\$0', $text) ?? $text;
+
+        // Underscores only delimit emphasis at word boundaries; intraword `_`
+        // (snake_case, SCREAMING_CASE, file_name) is literal in Djot, so leave
+        // it unescaped to keep imported identifiers and URLs readable.
+        $escaped = preg_replace('/(?<![\p{L}\p{N}])_|_(?![\p{L}\p{N}])/u', '\\\\$0', $escaped) ?? $escaped;
+
+        if ($atLineStart) {
+            $escaped = $this->escapeLeadingBlockMarker($escaped);
+        }
+
+        return $escaped;
+    }
+
+    /**
+     * Escape a leading block-level marker so a paragraph that happens to begin
+     * with `-`, `+`, `#`, `>` or `1.` is not re-parsed as a list, heading or
+     * blockquote.
+     *
+     * Runs after inline escaping, so a leading inline marker (for example `*`)
+     * has already been neutralized and is no longer a block concern here.
+     */
+    protected function escapeLeadingBlockMarker(string $text): string
+    {
+        if (preg_match('/^(\d+)[.)](\s|$)/', $text, $matches) === 1) {
+            return $matches[1] . '\\' . substr($text, strlen($matches[1]));
+        }
+
+        if (preg_match('/^[-+#>]/', $text) === 1) {
+            return '\\' . $text;
+        }
+
+        return $text;
+    }
+
+    /**
+     * Determine whether a text node begins a Djot line at column zero, where a
+     * leading block marker would be significant. True only for the first inline
+     * child of a block container that renders its content flush left.
+     */
+    protected function isBlockLineStart(DOMText $node): bool
+    {
+        // Walk up through inline wrappers (`<span>`, `<em>`, ...): pasted HTML
+        // often opens a paragraph with `<span>- x</span>`, where the marker is
+        // still at column zero once the wrapper produces no leading syntax.
+        $current = $node;
+        while (true) {
+            if ($current->previousSibling !== null) {
+                return false;
+            }
+
+            $parent = $current->parentNode;
+            if (!$parent instanceof DOMElement) {
+                return false;
+            }
+
+            $tag = strtolower($parent->tagName);
+            if (!$this->isInlineWrapperTag($tag)) {
+                // First non-inline ancestor: a line start only if it lays its
+                // content out flush left (paragraph, list item, ...), not a
+                // heading or table cell whose Djot syntax prefixes the content.
+                return in_array($tag, [
+                    'p', 'li', 'dd', 'dt', 'div', 'section', 'blockquote',
+                    'article', 'main', 'aside', 'header', 'footer', 'figcaption',
+                ], true);
+            }
+
+            $current = $parent;
+        }
+    }
+
+    protected function isInlineWrapperTag(string $tag): bool
+    {
+        return in_array($tag, [
+            'span', 'a', 'em', 'strong', 'b', 'i', 'u', 's', 'strike', 'del',
+            'ins', 'mark', 'sub', 'sup', 'small', 'kbd', 'code', 'samp', 'var',
+            'dfn', 'abbr', 'q', 'cite', 'time', 'bdi', 'bdo', 'label', 'font',
+        ], true);
     }
 
     protected function requiresRawImageFallback(string $alt): bool

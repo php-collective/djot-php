@@ -213,6 +213,12 @@ echo "Hello";
 **Behavior:**
 - Strips `<script>`, `<style>`, and `<noscript>` tags
 - Normalizes whitespace (multiple spaces/newlines become single space)
+- Escapes Djot-significant characters in text so literal content survives the
+  next parse. Text such as `a *b* c`, a leading `- item`, or `[text](url)` that
+  came from outside Djot (a WYSIWYG editor, CMS export, or pasted HTML) stays
+  literal instead of being re-interpreted as emphasis, a list, or a link.
+  Intraword underscores (`snake_case`) are left untouched, and verbatim contexts
+  (`<pre>`/code) are never escaped.
 - Preserves whitespace inside `<pre>` blocks
 - Detects code language from `class="language-xxx"` attribute
 - Converts `<span>` with class/id to Djot span syntax
