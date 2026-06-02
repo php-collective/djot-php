@@ -533,7 +533,7 @@ A list is loose if *any* item is separated by a blank line. One blank line makes
   - Nested item B
 ```
 
-With `significantNewlines` mode enabled, nested lists can appear immediately without a blank line:
+With `nestedListsWithoutBlankLine` mode enabled, nested lists can appear immediately without a blank line:
 
 ```djot
 - Parent item
@@ -541,7 +541,7 @@ With `significantNewlines` mode enabled, nested lists can appear immediately wit
   - Nested item B
 ```
 
-See the [API Reference](/reference/api#significant-newlines-mode) for more on `significantNewlines` mode.
+See the [Parser Options guide](/guide/parser-options#nested-lists-without-blank-line-mode) for more on `nestedListsWithoutBlankLine` mode.
 
 ### Definition Lists
 

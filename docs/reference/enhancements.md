@@ -14,7 +14,8 @@ They are either on the way to get incorporated upstream - or may be incorporated
 - [Symbol Parsing in Time Formats](#symbol-parsing-in-time-formats)
 - [Em/En Dash with Unmatched Braces](#em-en-dash-with-unmatched-braces)
 - [Optional Modes](#optional-modes)
-  - [Significant Newlines Mode](#significant-newlines-mode)
+  - [Block Interrupts Paragraphs Mode](#block-interrupts-paragraphs-mode)
+  - [Nested Lists Without Blank Line Mode](#nested-lists-without-blank-line-mode)
 - [Language Features Beyond Spec](#language-features-beyond-spec)
   - [Task List Underscore Notation](#task-list-underscore-notation)
   - [List Item Attributes](#list-item-attributes)
@@ -288,32 +289,20 @@ Unmatched `{-` does not prevent em/en-dash conversion:
 
 These are optional parser modes that deviate from spec behavior for specific use cases.
 
-### Significant Newlines Mode
+### Block Interrupts Paragraphs Mode
 
 **Related:** [jgm/djot#161](https://github.com/jgm/djot/issues/161)
 
 **Status:** Implemented in djot-php (opt-in)
 
-An optional mode for chat messages, comments, and quick notes where markdown-like behavior is more intuitive.
+Lets a block element interrupt a paragraph without a preceding blank line. This applies both to top-level paragraphs and to a list item's lead paragraph, so an indented non-list block (blockquote, heading, fenced code, or thematic break) nests inside the item without a blank line. It does not nest sublists - use [Nested Lists Without Blank Line Mode](#nested-lists-without-blank-line-mode) for that.
 
 **Enable via:**
 ```php
-// Factory method
-$converter = DjotConverter::withSignificantNewlines();
-
-// Constructor parameter
-$converter = new DjotConverter(significantNewlines: true);
-
-// Parser directly
-$parser = new BlockParser(significantNewlines: true);
+$converter = DjotConverter::withBlocksInterruptParagraphs();
+$converter = new DjotConverter(blocksInterruptParagraphs: true);
+$parser = new BlockParser(blocksInterruptParagraphs: true);
 ```
-
-**Changes from spec:**
-
-| Behavior | Standard Mode | Significant Newlines Mode |
-|----------|---------------|---------------------------|
-| Block elements interrupt paragraphs | No (blank line required) | Yes |
-| Nested lists need blank lines | Yes | No |
 
 Note: Soft break rendering is controlled separately via `SoftBreakMode` and is not affected by this setting.
 
@@ -331,12 +320,16 @@ Here is a list:
 - item two</p>
 ```
 
-**Significant newlines mode output:**
+**Block interrupts paragraphs mode output:**
 ```html
 <p>Here is a list:</p>
 <ul>
-<li>item one</li>
-<li>item two</li>
+<li>
+item one
+</li>
+<li>
+item two
+</li>
 </ul>
 ```
 
@@ -345,6 +338,21 @@ Here is a list:
 They said:
 \> This is not a blockquote
 ```
+
+### Nested Lists Without Blank Line Mode
+
+**Status:** Implemented in djot-php (opt-in)
+
+Lets a sublist nest inside a list item without a blank line between the item's content and the sublist. Only sublists are affected; other block types stay spec-strict (use [Block Interrupts Paragraphs Mode](#block-interrupts-paragraphs-mode) for non-list blocks).
+
+**Enable via:**
+```php
+$converter = DjotConverter::withNestedListsWithoutBlankLine();
+$converter = new DjotConverter(nestedListsWithoutBlankLine: true);
+$parser = new BlockParser(nestedListsWithoutBlankLine: true);
+```
+
+> **Deprecated:** `significantNewlines` (equivalent to enabling both levers) and `nestedBlocksInLists` (broad in-list nesting of all block types). Prefer the two granular levers above. See the [Parser Options guide](/guide/parser-options).
 
 ---
 
@@ -1002,9 +1010,10 @@ vendor/bin/phpunit
 
 ### Optional Modes
 
-| Mode                  | Upstream Issue                              | Status            |
-|-----------------------|---------------------------------------------|-------------------|
-| Significant newlines  | [#161](https://github.com/jgm/djot/issues/161) | djot-php (opt-in) |
+| Mode                          | Upstream Issue                                 | Status            |
+|-------------------------------|------------------------------------------------|-------------------|
+| Block interrupts paragraphs   | [#161](https://github.com/jgm/djot/issues/161) | djot-php (opt-in) |
+| Nested lists without blank line | -                                            | djot-php (opt-in) |
 
 These enhancements may be adopted into the official spec. We track upstream discussions and adjust our implementation accordingly.
 
