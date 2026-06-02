@@ -269,19 +269,29 @@ class HtmlToDjot
     {
         $output = '';
         foreach ($node->childNodes as $child) {
-            $piece = $this->processNode($child);
-            if ($piece === '') {
-                continue;
-            }
-
-            if ($output !== '' && $this->needsInlineSeparator($output, $piece)) {
-                $output .= '{}';
-            }
-
-            $output .= $piece;
+            $output = $this->appendInline($output, $this->processNode($child));
         }
 
         return $output;
+    }
+
+    /**
+     * Append an inline piece to a buffer, inserting a separator first when the
+     * junction would otherwise merge two same-delimiter runs. Shared by every
+     * site that concatenates inline output (paragraphs, implicit blocks, list
+     * items) so the round-trip behaves the same everywhere.
+     */
+    protected function appendInline(string $buffer, string $piece): string
+    {
+        if ($piece === '') {
+            return $buffer;
+        }
+
+        if ($buffer !== '' && $this->needsInlineSeparator($buffer, $piece)) {
+            $buffer .= '{}';
+        }
+
+        return $buffer . $piece;
     }
 
     /**
@@ -342,7 +352,7 @@ class HtmlToDjot
                 $content .= $this->processNode($child);
             } else {
                 // Accumulate inline content
-                $inlineBuffer .= $this->processNode($child);
+                $inlineBuffer = $this->appendInline($inlineBuffer, $this->processNode($child));
             }
         }
 
@@ -1326,10 +1336,10 @@ class HtmlToDjot
                                 $contentParts[] = $content;
                             }
                         } else {
-                            $inlineBuffer .= $this->processNode($liChild);
+                            $inlineBuffer = $this->appendInline($inlineBuffer, $this->processNode($liChild));
                         }
                     } else {
-                        $inlineBuffer .= $this->processNode($liChild);
+                        $inlineBuffer = $this->appendInline($inlineBuffer, $this->processNode($liChild));
                     }
                 }
 
