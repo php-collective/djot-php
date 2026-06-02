@@ -1875,13 +1875,10 @@ class BlockParser
                 // Unless nested blocks in lists are enabled, indented block markers
                 // are treated as plain continuation text here.
                 if ($nextIndent >= $contentIndent) {
-                    // Check if list nesting mode allows immediate nested blocks
-                    if ($this->nestedBlocksInLists) {
-                        // Check for any block starter (list, blockquote, code fence, div)
-                        if ($this->isBlockElementStart($nextTrimmed)) {
-                            // This is a nested block - break out to let normal nesting handle it
-                            break;
-                        }
+                    // If the active list-nesting mode treats this indented line
+                    // as a nested block, break out so normal nesting handles it.
+                    if ($this->allowsImmediateNestedBlock($nextTrimmed)) {
+                        break;
                     }
                     // Properly indented continuation - include with original indentation relative to content
                     $itemLines[] = IndentationHelper::stripLeadingIndent($nextLine, $contentIndent);
@@ -2035,14 +2032,25 @@ class BlockParser
                 $this->parseBlocks($listItem, $itemLines, 0);
             }
 
-            // When nested blocks in lists are enabled, check for immediate
-            // nested content after the initial item paragraph.
-            if ($this->nestedBlocksInLists && $i < $count) {
+            // When a list-nesting mode is active, check for immediate nested
+            // content after the initial item paragraph.
+            $nestingModeActive = $this->nestedBlocksInLists
+                || $this->nestedListsWithoutBlankLine
+                || $this->blocksInterruptParagraphs;
+            if ($nestingModeActive && $i < $count) {
                 $nextLine = $lines[$i];
                 $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
 
+                // Broad nestedBlocksInLists collects any indented content (its
+                // original behavior). The granular levers only enter nesting
+                // when the leading line actually opens a nestable block.
+                $enterNesting = $nextIndent >= $contentIndent;
+                if ($enterNesting && !$this->nestedBlocksInLists) {
+                    $enterNesting = $this->allowsImmediateNestedBlock(ltrim($nextLine));
+                }
+
                 // If there's indented content that could be a nested block
-                if ($nextIndent >= $contentIndent) {
+                if ($enterNesting) {
                     $subLines = [];
                     $nestedIndent = $nextIndent;
                     while ($i < $count) {
@@ -3391,6 +3399,37 @@ class BlockParser
             'table' => isset($t[0]) && $t[0] === '|',
             default => true,
         };
+    }
+
+    /**
+     * Decide whether an indented line under an already-open list item should
+     * open a nested block (vs. be folded in as plain continuation text).
+     *
+     * - nestedBlocksInLists (deprecated, broad): any block element.
+     * - nestedListsWithoutBlankLine: list markers only (compact sublists).
+     * - blocksInterruptParagraphs: non-list blocks (a block interrupts the
+     *   item's lead paragraph, mirroring top-level interruption). Sublists are
+     *   intentionally NOT covered here - they require nestedListsWithoutBlankLine.
+     *
+     * @param string $trimmed The left-trimmed candidate line.
+     */
+    protected function allowsImmediateNestedBlock(string $trimmed): bool
+    {
+        if ($this->nestedBlocksInLists) {
+            return $this->isBlockElementStart($trimmed);
+        }
+
+        $isListMarker = $this->listParser->parseListItemMarker($trimmed) !== null;
+
+        if ($this->nestedListsWithoutBlankLine && $isListMarker) {
+            return true;
+        }
+
+        if ($this->blocksInterruptParagraphs && !$isListMarker && $this->isBlockElementStart($trimmed)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

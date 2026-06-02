@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase;
 
 use Djot\DjotConverter;
+use Djot\Node\Block\BlockQuote;
+use Djot\Node\Block\Heading;
 use Djot\Node\Block\ListBlock;
 use Djot\Node\Block\Paragraph;
 use Djot\Parser\BlockParser;
@@ -136,5 +138,42 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
 
         // significantNewlines still nests: two <ul>.
         $this->assertSame(2, substr_count($result, '<ul>'));
+    }
+
+    public function testBlockquoteNestsInListItem(): void
+    {
+        // Semantic expansion: a blockquote interrupts the item's lead paragraph.
+        $parser = new BlockParser(blocksInterruptParagraphs: true);
+        $doc = $parser->parse("- Item\n  > quoted");
+
+        $item = $doc->getChildren()[0]->getChildren()[0];
+        $children = $item->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(BlockQuote::class, $children[1]);
+    }
+
+    public function testHeadingNestsInListItem(): void
+    {
+        $parser = new BlockParser(blocksInterruptParagraphs: true);
+        $doc = $parser->parse("- Item\n  # Head");
+
+        $item = $doc->getChildren()[0]->getChildren()[0];
+        $children = $item->getChildren();
+        $this->assertCount(2, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(Heading::class, $children[1]);
+    }
+
+    public function testSublistDoesNotNestWithInterruptionAlone(): void
+    {
+        // A sublist needs nestedListsWithoutBlankLine, not blocksInterruptParagraphs.
+        $parser = new BlockParser(blocksInterruptParagraphs: true);
+        $doc = $parser->parse("- Item\n  - sub");
+
+        $item = $doc->getChildren()[0]->getChildren()[0];
+        foreach ($item->getChildren() as $child) {
+            $this->assertNotInstanceOf(ListBlock::class, $child);
+        }
     }
 }
