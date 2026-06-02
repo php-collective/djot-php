@@ -2276,8 +2276,8 @@ class HtmlToDjot
 
     /**
      * Escape a leading block-level marker so a paragraph that happens to begin
-     * with `-`, `+`, `#`, `>` or `1.` is not re-parsed as a list, heading or
-     * blockquote.
+     * with `-`, `+`, `#`, `>`, `:` or `1.` is not re-parsed as a list, heading,
+     * blockquote, definition list or fenced div.
      *
      * Runs after inline escaping, so a leading inline marker (for example `*`)
      * has already been neutralized and is no longer a block concern here.
@@ -2288,7 +2288,10 @@ class HtmlToDjot
             return $matches[1] . '\\' . substr($text, strlen($matches[1]));
         }
 
-        if (preg_match('/^[-+#>]/', $text) === 1) {
+        // A leading colon opens a definition-list item (`: term`) and a run of
+        // three or more opens a fenced div (`::: name`); escaping the first
+        // colon neutralizes both.
+        if (preg_match('/^[-+#>:]/', $text) === 1) {
             return '\\' . $text;
         }
 
