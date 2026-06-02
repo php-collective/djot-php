@@ -128,7 +128,7 @@ class DjotConverter
      * @param bool $roundTripMode Add data attributes for Djot→HTML→Djot round-trips (HTML renderer only)
      * @param \Djot\Parser\BlockParser|null $parser Pre-configured parser (ignores warnings/strict/significantNewlines/nestedBlocksInLists/blocksInterruptParagraphs/nestedListsWithoutBlankLine if set)
      * @param \Djot\Renderer\RendererInterface|null $renderer Pre-configured renderer (ignores xhtml/safeMode/softBreakMode/roundTripMode if set)
-     * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines
+     * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines (deprecated; prefer blocksInterruptParagraphs + nestedListsWithoutBlankLine)
      * @param bool $blocksInterruptParagraphs Allow top-level block elements to interrupt paragraphs without a blank line
      * @param bool $nestedListsWithoutBlankLine Allow sublists to nest in list items without a blank line
      */
@@ -197,7 +197,7 @@ class DjotConverter
      * or the softBreakMode parameter if you also want visible line breaks.
      *
      * @deprecated Use withBlocksInterruptParagraphs() and/or
-     *   withNestedBlocksInLists(). significantNewlines is the union of both.
+     *   withNestedListsWithoutBlankLine(). significantNewlines is the union of both.
      *
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
@@ -225,6 +225,8 @@ class DjotConverter
      * Paragraph interruption remains standard djot behavior, but indentation
      * alone can introduce nested sublists, blockquotes, and fenced blocks
      * inside an already-open list item.
+     *
+     * @deprecated Broad nesting of all block types in list items. Prefer withBlocksInterruptParagraphs() (non-list blocks) and/or withNestedListsWithoutBlankLine() (sublists).
      *
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing

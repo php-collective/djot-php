@@ -160,6 +160,9 @@ class BlockParser
     /**
      * When true, indentation alone can introduce nested blocks inside list items
      * without enabling global paragraph interruption.
+     *
+     * @deprecated Broad deprecated lever superseded by the two granular levers
+     *   blocksInterruptParagraphs (non-list blocks) and nestedListsWithoutBlankLine (sublists).
      */
     protected bool $nestedBlocksInLists = false;
 
@@ -194,7 +197,7 @@ class BlockParser
      * Enable or disable significant newlines mode.
      *
      * @deprecated Use setBlocksInterruptParagraphs() and/or
-     *   setNestedBlocksInLists(). significantNewlines is the union of both.
+     *   setNestedListsWithoutBlankLine(). significantNewlines is the union of both.
      */
     public function setSignificantNewlines(bool $value): self
     {
@@ -207,7 +210,7 @@ class BlockParser
     /**
      * Check if significant newlines mode is enabled.
      *
-     * @deprecated Use getBlocksInterruptParagraphs() / getNestedBlocksInLists().
+     * @deprecated Use getBlocksInterruptParagraphs() / getNestedListsWithoutBlankLine().
      *   Returns the top-level interruption bit for backward compatibility.
      */
     public function getSignificantNewlines(): bool
@@ -235,6 +238,8 @@ class BlockParser
 
     /**
      * Enable or disable nested blocks in list items without blank lines.
+     *
+     * @deprecated Broad nesting of all block types in list items. Prefer setBlocksInterruptParagraphs() (non-list blocks) and/or setNestedListsWithoutBlankLine() (sublists).
      */
     public function setNestedBlocksInLists(bool $value): self
     {
@@ -245,6 +250,8 @@ class BlockParser
 
     /**
      * Check if nested blocks in list items are enabled.
+     *
+     * @deprecated Prefer getBlocksInterruptParagraphs() / getNestedListsWithoutBlankLine().
      */
     public function getNestedBlocksInLists(): bool
     {
@@ -3410,6 +3417,8 @@ class BlockParser
      * - blocksInterruptParagraphs: non-list blocks (a block interrupts the
      *   item's lead paragraph, mirroring top-level interruption). Sublists are
      *   intentionally NOT covered here - they require nestedListsWithoutBlankLine.
+     *
+     * @todo The blocksInterruptParagraphs branch uses single-line isBlockElementStart() rather than the top-level lone-marker lookahead (startsNewBlockSignificant()), so a lone-marker line such as "> 5" indented under a list item nests as a block, while the same line at top level stays literal. Reconcile if real-world reports justify it.
      *
      * @param string $trimmed The left-trimmed candidate line.
      */
