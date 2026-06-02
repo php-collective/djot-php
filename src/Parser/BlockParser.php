@@ -163,18 +163,27 @@ class BlockParser
      */
     protected bool $nestedBlocksInLists = false;
 
+    /**
+     * When true, indentation alone can introduce a nested *list* inside a list
+     * item without a blank line, while every other block type stays
+     * spec-strict. Focused successor to the deprecated nestedBlocksInLists.
+     */
+    protected bool $nestedListsWithoutBlankLine = false;
+
     public function __construct(
         bool $collectWarnings = false,
         bool $strictMode = false,
         bool $significantNewlines = false,
         bool $nestedBlocksInLists = false,
         bool $blocksInterruptParagraphs = false,
+        bool $nestedListsWithoutBlankLine = false,
     ) {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
         // significantNewlines is the deprecated union of the two granular levers.
         $this->blocksInterruptParagraphs = $blocksInterruptParagraphs || $significantNewlines;
         $this->nestedBlocksInLists = $nestedBlocksInLists || $significantNewlines;
+        $this->nestedListsWithoutBlankLine = $nestedListsWithoutBlankLine;
         $this->inlineParser = new InlineParser($this);
         $this->listParser = new ListParser();
         $this->tableParser = new TableParser();
@@ -240,6 +249,24 @@ class BlockParser
     public function getNestedBlocksInLists(): bool
     {
         return $this->nestedBlocksInLists;
+    }
+
+    /**
+     * Enable or disable nested lists in list items without blank lines.
+     */
+    public function setNestedListsWithoutBlankLine(bool $value): self
+    {
+        $this->nestedListsWithoutBlankLine = $value;
+
+        return $this;
+    }
+
+    /**
+     * Check if nested lists in list items without blank lines are enabled.
+     */
+    public function getNestedListsWithoutBlankLine(): bool
+    {
+        return $this->nestedListsWithoutBlankLine;
     }
 
     /**
