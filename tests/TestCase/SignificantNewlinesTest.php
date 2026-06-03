@@ -74,15 +74,19 @@ class SignificantNewlinesTest extends TestCase
         $this->assertInstanceOf(BlockQuote::class, $children[1]);
     }
 
-    public function testLoneBlockquoteMarkerDoesNotInterruptParagraph(): void
+    public function testLoneBlockquoteMarkerInterruptsInSignificantMode(): void
     {
-        // "if x\n> 5 then ..." — the ">" is greater-than, not a blockquote.
+        // significantNewlines/blocksInterruptParagraphs is an opt-in markdown/
+        // chat-like mode: a line-leading ">" interrupts the paragraph as a quote,
+        // so genuine single-line and lazily-wrapped quotes are preserved. The
+        // trade-off is that an ambiguous "Wenn x\n> 5 ..." is read as a quote too.
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("Wenn x\n> 5 dann ist die Bedingung wahr.");
 
         $children = $doc->getChildren();
-        $this->assertCount(1, $children);
+        $this->assertCount(2, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(BlockQuote::class, $children[1]);
     }
 
     public function testOrderedListInterruptsParagraph(): void
@@ -451,45 +455,62 @@ DJOT;
         $this->assertInstanceOf(ListBlock::class, $children[1]);
     }
 
-    public function testMultiplicationStarDoesNotBecomeList(): void
+    public function testWrappedStarMarkerInterruptsInSignificantMode(): void
     {
+        // Opt-in markdown/chat-like mode: a line-leading "* " interrupts as a
+        // list. The cost is that a wrapped multiplication ("x = 5\n* 3 + 17")
+        // is read as a list; the benefit is genuine single/wrapped lists survive.
         $parser = new BlockParser(significantNewlines: true);
-        $doc = $parser->parse("Die Frage ist, wann ist x = 5\n* 3 + 17 wahr. Leider eine Liste\nim Text.");
+        $doc = $parser->parse("Die Frage ist, wann ist x = 5\n* 3 + 17 wahr.");
 
         $children = $doc->getChildren();
-        $this->assertCount(1, $children);
+        $this->assertCount(2, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
     }
 
-    public function testMinusOperatorDoesNotBecomeList(): void
+    public function testWrappedMinusMarkerInterruptsInSignificantMode(): void
     {
         $parser = new BlockParser(significantNewlines: true);
-        $doc = $parser->parse("Das Ergebnis von 10\n- 3 ist 7. Kein Listenpunkt.");
+        $doc = $parser->parse("Das Ergebnis von 10\n- 3 ist 7.");
 
         $children = $doc->getChildren();
-        $this->assertCount(1, $children);
+        $this->assertCount(2, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
     }
 
-    public function testPlusOperatorDoesNotBecomeList(): void
+    public function testWrappedPlusMarkerInterruptsInSignificantMode(): void
     {
         $parser = new BlockParser(significantNewlines: true);
-        $doc = $parser->parse("Die Summe ist 5\n+ 3 ergibt 8. Keine Liste.");
+        $doc = $parser->parse("Die Summe ist 5\n+ 3 ergibt 8.");
 
         $children = $doc->getChildren();
-        $this->assertCount(1, $children);
+        $this->assertCount(2, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
     }
 
-    public function testLonePipeLineDoesNotSplitParagraph(): void
+    public function testNonTablePipeLineStaysProse(): void
     {
-        // Regression: a single "| ..." line is not a valid table, yet it used
-        // to sever the paragraph into two stray <p> blocks.
+        // A pipe in prose ("a\n| b als Oder.") is not a valid table row, so it
+        // does not interrupt: only a real "| a | b |" row would (see below).
         $parser = new BlockParser(significantNewlines: true);
         $doc = $parser->parse("Das berechnet a\n| b als bitweises Oder.");
 
         $children = $doc->getChildren();
         $this->assertCount(1, $children);
+        $this->assertInstanceOf(Paragraph::class, $children[0]);
+    }
+
+    public function testTableRowInterruptsInSignificantMode(): void
+    {
+        // A valid one-row table interrupts the paragraph.
+        $parser = new BlockParser(significantNewlines: true);
+        $doc = $parser->parse("Intro\n| a | b |");
+
+        $children = $doc->getChildren();
+        $this->assertCount(2, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
     }
 

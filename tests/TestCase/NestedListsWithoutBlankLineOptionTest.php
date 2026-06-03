@@ -146,12 +146,12 @@ class NestedListsWithoutBlankLineOptionTest extends TestCase
         $this->assertStringContainsString('<blockquote>', $result);
     }
 
-    public function testLoneMarkerInItemStaysLiteralLikeTopLevel(): void
+    public function testLoneMarkerInItemInterruptsWithBlocksInterrupt(): void
     {
-        // Consistency: the in-list interrupt path uses the SAME lone-marker
-        // lookahead as the top-level path, so a lone "> 5" comparison line
-        // under a list item stays literal (it does NOT nest as a blockquote),
-        // exactly as "if x\n> 5 then" stays literal at top level.
+        // blocksInterruptParagraphs is the aggressive opt-in mode: a line-leading
+        // ">" interrupts at every level, so it nests as a blockquote inside the
+        // item (consistent with top-level interruption). nestedListsWithoutBlankLine
+        // alone would leave it literal (it nests only sublists).
         $parser = new BlockParser(blocksInterruptParagraphs: true);
         $doc = $parser->parse("- if x\n  > 5 then");
 
@@ -159,8 +159,12 @@ class NestedListsWithoutBlankLineOptionTest extends TestCase
         $this->assertInstanceOf(ListBlock::class, $list);
 
         $item = $list->getChildren()[0];
+        $hasQuote = false;
         foreach ($item->getChildren() as $child) {
-            $this->assertNotInstanceOf(BlockQuote::class, $child);
+            if ($child instanceof BlockQuote) {
+                $hasQuote = true;
+            }
         }
+        $this->assertTrue($hasQuote);
     }
 }
