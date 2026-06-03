@@ -126,10 +126,11 @@ class DjotConverter
      * @param bool $significantNewlines Enable significant newlines mode (markdown-like paragraph interruption)
      * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (HTML renderer only)
      * @param bool $roundTripMode Add data attributes for Djot→HTML→Djot round-trips (HTML renderer only)
-     * @param \Djot\Parser\BlockParser|null $parser Pre-configured parser (ignores warnings/strict/significantNewlines/nestedBlocksInLists/blocksInterruptParagraphs if set)
+     * @param \Djot\Parser\BlockParser|null $parser Pre-configured parser (ignores warnings/strict/significantNewlines/nestedBlocksInLists/blocksInterruptParagraphs/nestedListsWithoutBlankLine if set)
      * @param \Djot\Renderer\RendererInterface|null $renderer Pre-configured renderer (ignores xhtml/safeMode/softBreakMode/roundTripMode if set)
-     * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines
+     * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines (deprecated; prefer blocksInterruptParagraphs + nestedListsWithoutBlankLine)
      * @param bool $blocksInterruptParagraphs Allow top-level block elements to interrupt paragraphs without a blank line
+     * @param bool $nestedListsWithoutBlankLine Allow sublists to nest in list items without a blank line
      */
     public function __construct(
         bool $xhtml = false,
@@ -144,6 +145,7 @@ class DjotConverter
         ?RendererInterface $renderer = null,
         bool $nestedBlocksInLists = false,
         bool $blocksInterruptParagraphs = false,
+        bool $nestedListsWithoutBlankLine = false,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
@@ -152,7 +154,7 @@ class DjotConverter
         if ($parser !== null) {
             $this->parser = $parser;
         } else {
-            $this->parser = new BlockParser($warnings, $strict, $significantNewlines, $nestedBlocksInLists, $blocksInterruptParagraphs);
+            $this->parser = new BlockParser($warnings, $strict, $significantNewlines, $nestedBlocksInLists, $blocksInterruptParagraphs, $nestedListsWithoutBlankLine);
         }
 
         // Use provided renderer or create one from parameters
@@ -195,7 +197,7 @@ class DjotConverter
      * or the softBreakMode parameter if you also want visible line breaks.
      *
      * @deprecated Use withBlocksInterruptParagraphs() and/or
-     *   withNestedBlocksInLists(). significantNewlines is the union of both.
+     *   withNestedListsWithoutBlankLine(). significantNewlines is the union of both.
      *
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
@@ -223,6 +225,8 @@ class DjotConverter
      * Paragraph interruption remains standard djot behavior, but indentation
      * alone can introduce nested sublists, blockquotes, and fenced blocks
      * inside an already-open list item.
+     *
+     * @deprecated Broad nesting of all block types in list items. Prefer withBlocksInterruptParagraphs() (non-list blocks) and/or withNestedListsWithoutBlankLine() (sublists).
      *
      * @param bool $xhtml Whether to use XHTML-compatible output
      * @param bool $warnings Whether to collect warnings during parsing
@@ -286,6 +290,44 @@ class DjotConverter
             softBreakMode: $softBreakMode,
             roundTripMode: $roundTripMode,
             blocksInterruptParagraphs: true,
+        );
+    }
+
+    /**
+     * Create a converter that only enables nested lists in list items.
+     *
+     * A sublist may follow its parent item without a blank line (markdown-style
+     * compact lists). Every other block type, and top-level paragraph
+     * interruption, stays standard djot.
+     * This is the list-only counterpart of the deprecated withNestedBlocksInLists();
+     * for the broad behavior, combine withBlocksInterruptParagraphs() with this.
+     *
+     * @param bool $xhtml Whether to use XHTML-compatible output
+     * @param bool $warnings Whether to collect warnings during parsing
+     * @param bool $strict Whether to throw exceptions on parse errors
+     * @param \Djot\SafeMode|bool|null $safeMode Enable safe mode
+     * @param \Djot\Profile|null $profile Profile for feature restriction
+     * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (HTML renderer only)
+     * @param bool $roundTripMode Add data attributes for round-trips (HTML renderer only)
+     */
+    public static function withNestedListsWithoutBlankLine(
+        bool $xhtml = false,
+        bool $warnings = false,
+        bool $strict = false,
+        SafeMode|bool|null $safeMode = null,
+        ?Profile $profile = null,
+        ?SoftBreakMode $softBreakMode = null,
+        bool $roundTripMode = false,
+    ): self {
+        return new self(
+            xhtml: $xhtml,
+            warnings: $warnings,
+            strict: $strict,
+            safeMode: $safeMode,
+            profile: $profile,
+            softBreakMode: $softBreakMode,
+            roundTripMode: $roundTripMode,
+            nestedListsWithoutBlankLine: true,
         );
     }
 

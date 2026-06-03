@@ -175,8 +175,10 @@ class SignificantNewlinesTest extends TestCase
 
     public function testBlockquoteInListWithoutBlankLine(): void
     {
+        // A real (multi-line) blockquote nests; a lone single-line "> ..." line
+        // stays literal via the shared lone-marker lookahead (matches top level).
         $parser = new BlockParser(significantNewlines: true);
-        $doc = $parser->parse("- Item\n  > quoted");
+        $doc = $parser->parse("- Item\n  > a\n  > b");
 
         $list = $doc->getChildren()[0];
         $item = $list->getChildren()[0];

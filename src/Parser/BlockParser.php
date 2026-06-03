@@ -160,8 +160,18 @@ class BlockParser
     /**
      * When true, indentation alone can introduce nested blocks inside list items
      * without enabling global paragraph interruption.
+     *
+     * @deprecated Broad deprecated lever superseded by the two granular levers
+     *   blocksInterruptParagraphs (non-list blocks) and nestedListsWithoutBlankLine (sublists).
      */
     protected bool $nestedBlocksInLists = false;
+
+    /**
+     * When true, indentation alone can introduce a nested *list* inside a list
+     * item without a blank line, while every other block type stays
+     * spec-strict. Focused successor to the deprecated nestedBlocksInLists.
+     */
+    protected bool $nestedListsWithoutBlankLine = false;
 
     public function __construct(
         bool $collectWarnings = false,
@@ -169,12 +179,15 @@ class BlockParser
         bool $significantNewlines = false,
         bool $nestedBlocksInLists = false,
         bool $blocksInterruptParagraphs = false,
+        bool $nestedListsWithoutBlankLine = false,
     ) {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
-        // significantNewlines is the deprecated union of the two granular levers.
+        // significantNewlines is the deprecated union of blocksInterruptParagraphs
+        // and nestedListsWithoutBlankLine (NOT the broad nestedBlocksInLists).
         $this->blocksInterruptParagraphs = $blocksInterruptParagraphs || $significantNewlines;
-        $this->nestedBlocksInLists = $nestedBlocksInLists || $significantNewlines;
+        $this->nestedBlocksInLists = $nestedBlocksInLists;
+        $this->nestedListsWithoutBlankLine = $nestedListsWithoutBlankLine || $significantNewlines;
         $this->inlineParser = new InlineParser($this);
         $this->listParser = new ListParser();
         $this->tableParser = new TableParser();
@@ -185,12 +198,12 @@ class BlockParser
      * Enable or disable significant newlines mode.
      *
      * @deprecated Use setBlocksInterruptParagraphs() and/or
-     *   setNestedBlocksInLists(). significantNewlines is the union of both.
+     *   setNestedListsWithoutBlankLine(). significantNewlines is the union of both.
      */
     public function setSignificantNewlines(bool $value): self
     {
         $this->blocksInterruptParagraphs = $value;
-        $this->nestedBlocksInLists = $value;
+        $this->nestedListsWithoutBlankLine = $value;
 
         return $this;
     }
@@ -198,7 +211,7 @@ class BlockParser
     /**
      * Check if significant newlines mode is enabled.
      *
-     * @deprecated Use getBlocksInterruptParagraphs() / getNestedBlocksInLists().
+     * @deprecated Use getBlocksInterruptParagraphs() / getNestedListsWithoutBlankLine().
      *   Returns the top-level interruption bit for backward compatibility.
      */
     public function getSignificantNewlines(): bool
@@ -226,6 +239,8 @@ class BlockParser
 
     /**
      * Enable or disable nested blocks in list items without blank lines.
+     *
+     * @deprecated Broad nesting of all block types in list items. Prefer setBlocksInterruptParagraphs() (non-list blocks) and/or setNestedListsWithoutBlankLine() (sublists).
      */
     public function setNestedBlocksInLists(bool $value): self
     {
@@ -236,10 +251,30 @@ class BlockParser
 
     /**
      * Check if nested blocks in list items are enabled.
+     *
+     * @deprecated Prefer getBlocksInterruptParagraphs() / getNestedListsWithoutBlankLine().
      */
     public function getNestedBlocksInLists(): bool
     {
         return $this->nestedBlocksInLists;
+    }
+
+    /**
+     * Enable or disable nested lists in list items without blank lines.
+     */
+    public function setNestedListsWithoutBlankLine(bool $value): self
+    {
+        $this->nestedListsWithoutBlankLine = $value;
+
+        return $this;
+    }
+
+    /**
+     * Check if nested lists in list items without blank lines are enabled.
+     */
+    public function getNestedListsWithoutBlankLine(): bool
+    {
+        return $this->nestedListsWithoutBlankLine;
     }
 
     /**
@@ -1848,13 +1883,10 @@ class BlockParser
                 // Unless nested blocks in lists are enabled, indented block markers
                 // are treated as plain continuation text here.
                 if ($nextIndent >= $contentIndent) {
-                    // Check if list nesting mode allows immediate nested blocks
-                    if ($this->nestedBlocksInLists) {
-                        // Check for any block starter (list, blockquote, code fence, div)
-                        if ($this->isBlockElementStart($nextTrimmed)) {
-                            // This is a nested block - break out to let normal nesting handle it
-                            break;
-                        }
+                    // If the active list-nesting mode treats this indented line
+                    // as a nested block, break out so normal nesting handles it.
+                    if ($this->allowsImmediateNestedBlock($nextTrimmed, $lines, $i)) {
+                        break;
                     }
                     // Properly indented continuation - include with original indentation relative to content
                     $itemLines[] = IndentationHelper::stripLeadingIndent($nextLine, $contentIndent);
@@ -2008,14 +2040,25 @@ class BlockParser
                 $this->parseBlocks($listItem, $itemLines, 0);
             }
 
-            // When nested blocks in lists are enabled, check for immediate
-            // nested content after the initial item paragraph.
-            if ($this->nestedBlocksInLists && $i < $count) {
+            // When a list-nesting mode is active, check for immediate nested
+            // content after the initial item paragraph.
+            $nestingModeActive = $this->nestedBlocksInLists
+                || $this->nestedListsWithoutBlankLine
+                || $this->blocksInterruptParagraphs;
+            if ($nestingModeActive && $i < $count) {
                 $nextLine = $lines[$i];
                 $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
 
+                // Broad nestedBlocksInLists collects any indented content (its
+                // original behavior). The granular levers only enter nesting
+                // when the leading line actually opens a nestable block.
+                $enterNesting = $nextIndent >= $contentIndent;
+                if ($enterNesting && !$this->nestedBlocksInLists) {
+                    $enterNesting = $this->allowsImmediateNestedBlock(ltrim($nextLine), $lines, $i);
+                }
+
                 // If there's indented content that could be a nested block
-                if ($nextIndent >= $contentIndent) {
+                if ($enterNesting) {
                     $subLines = [];
                     $nestedIndent = $nextIndent;
                     while ($i < $count) {
@@ -3364,6 +3407,44 @@ class BlockParser
             'table' => isset($t[0]) && $t[0] === '|',
             default => true,
         };
+    }
+
+    /**
+     * Decide whether an indented line under an already-open list item should
+     * open a nested block (vs. be folded in as plain continuation text).
+     *
+     * - nestedBlocksInLists (deprecated, broad): any block element.
+     * - nestedListsWithoutBlankLine: list markers only (compact sublists).
+     * - blocksInterruptParagraphs: non-list blocks (a block interrupts the
+     *   item's lead paragraph, mirroring top-level interruption including the
+     *   lone-marker lookahead). Sublists are intentionally NOT covered here -
+     *   they require nestedListsWithoutBlankLine.
+     *
+     * @param string $trimmed The left-trimmed candidate line.
+     * @param array<string> $lines All lines being parsed (lookahead context).
+     * @param int $index Index of the candidate line within $lines.
+     */
+    protected function allowsImmediateNestedBlock(string $trimmed, array $lines, int $index): bool
+    {
+        if ($this->nestedBlocksInLists) {
+            return $this->isBlockElementStart($trimmed);
+        }
+
+        $isListMarker = $this->listParser->parseListItemMarker($trimmed) !== null;
+
+        if ($this->nestedListsWithoutBlankLine && $isListMarker) {
+            return true;
+        }
+
+        if ($this->blocksInterruptParagraphs && !$isListMarker) {
+            // Use the SAME lone-marker-aware decision the top-level
+            // paragraph-interruption path uses, so an indented "> 5" / "| x"
+            // under a list item is treated identically to top level, while
+            // unambiguous openers (#, code fence, :::, ---) still interrupt.
+            return $this->startsNewBlockSignificant($trimmed, $lines, $index);
+        }
+
+        return false;
     }
 
     /**

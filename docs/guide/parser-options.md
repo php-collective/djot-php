@@ -16,7 +16,7 @@ $converter = new DjotConverter();
 $converter = new DjotConverter(
     xhtml: true,
     blocksInterruptParagraphs: true,
-    nestedBlocksInLists: true,
+    nestedListsWithoutBlankLine: true,
 );
 ```
 
@@ -36,7 +36,7 @@ use Djot\Renderer\HtmlRenderer;
 
 // Full control via create()
 $converter = DjotConverter::create(
-    new BlockParser(blocksInterruptParagraphs: true, nestedBlocksInLists: true),
+    new BlockParser(blocksInterruptParagraphs: true, nestedListsWithoutBlankLine: true),
     new HtmlRenderer(xhtml: true),
 );
 ```
@@ -105,7 +105,7 @@ Note: Use `\` at end of line for hard breaks (always renders as `<br>`) regardle
 
 ::: warning Deprecated
 `significantNewlines` is now a convenience shorthand equal to enabling both
-`blocksInterruptParagraphs` and `nestedBlocksInLists` together. It is
+`blocksInterruptParagraphs` and `nestedListsWithoutBlankLine` together. It is
 deprecated in favor of the two granular levers. Migrate as shown below.
 
 ```php
@@ -115,7 +115,7 @@ $converter = DjotConverter::withSignificantNewlines();
 // Equivalent (preferred):
 $converter = new DjotConverter(
     blocksInterruptParagraphs: true,
-    nestedBlocksInLists: true,
+    nestedListsWithoutBlankLine: true,
 );
 ```
 :::
@@ -282,7 +282,7 @@ use Djot\Renderer\SoftBreakMode;
 // Significant newlines with safe mode for user-generated content
 $converter = new DjotConverter(
     safeMode: new SafeMode(),
-    significantNewlines: true, // deprecated: prefer blocksInterruptParagraphs + nestedBlocksInLists
+    significantNewlines: true, // deprecated: prefer blocksInterruptParagraphs + nestedListsWithoutBlankLine
     softBreakMode: SoftBreakMode::Break, // Optional: visible line breaks
 );
 ```
@@ -361,13 +361,13 @@ Output:
 | Nested blocks in list items without a blank line               | No      | **Yes**               | Yes                   |
 | Block elements interrupt top-level paragraphs                  | No      | No                    | Yes                   |
 
-Note: `significantNewlines` is deprecated; it enables both `blocksInterruptParagraphs` and `nestedBlocksInLists`. Prefer setting the two granular levers directly.
+Note: `significantNewlines` is deprecated; it enables both `blocksInterruptParagraphs` and `nestedListsWithoutBlankLine`. Prefer setting the two granular levers directly. (`nestedBlocksInLists` is a separate, also-deprecated broad lever - it is no longer what `significantNewlines` sets.)
 
 ## Block Interrupts Paragraphs Mode
 
-`blocksInterruptParagraphs` is the complementary counterpart to [Nested Blocks in Lists](#nested-blocks-in-lists-mode) mode. It allows top-level block elements — lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences — to interrupt a paragraph without a preceding blank line. It does **not** enable nesting inside list items (that is `nestedBlocksInLists`).
+`blocksInterruptParagraphs` allows top-level block elements - lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences - to interrupt a paragraph without a preceding blank line. It **also** interrupts a list item's lead paragraph, so an indented non-list block (blockquote, heading, fenced code, or thematic break) nests inside the open item without a blank line. It does **not** nest a sublist inside a list item - that requires [Nested Lists Without Blank Line](#nested-lists-without-blank-line-mode) mode.
 
-Use it when you want markdown-like top-level interruption but otherwise spec-compliant djot: indented content inside a list item still requires a blank line.
+Use it when you want markdown-like top-level interruption and non-list nesting in list items, but otherwise spec-compliant djot: a sublist under a list item still requires a blank line.
 
 ### Enabling Block Interrupts Paragraphs Mode
 
@@ -408,19 +408,41 @@ two
 </ul>
 ```
 
-But indented content inside a list item does **not** nest (this is what differs from significant newlines mode):
+A non-list block also nests inside a list item without a blank line. For example, a blockquote under the item:
 
 ```php
 $converter = DjotConverter::withBlocksInterruptParagraphs();
-$result = $converter->convert("- a\n  - b");
+$result = $converter->convert("- Item\n  > a\n  > b");
 ```
 
 Output:
 ```html
 <ul>
 <li>
-a
-- b
+Item
+<blockquote>
+<p>a
+b</p>
+</blockquote>
+</li>
+</ul>
+```
+
+In-list interruption uses the **same** lone-marker lookahead as the top-level path: an ambiguous single-line marker (`>` comparison, `|`, a lone bullet) stays literal, while unambiguous openers (`#`, fenced code, `:::`, `---`) and real multi-line blocks nest. So `- Item\n  > quote` (a single `>` line) keeps `> quote` as literal text, exactly as `Foo\n> quote` does at the top level.
+
+A sublist does **not** nest with this flag alone (that requires [Nested Lists Without Blank Line](#nested-lists-without-blank-line-mode) mode):
+
+```php
+$converter = DjotConverter::withBlocksInterruptParagraphs();
+$result = $converter->convert("- Item\n  - sub");
+```
+
+Output:
+```html
+<ul>
+<li>
+Item
+- sub
 </li>
 </ul>
 ```
@@ -430,6 +452,83 @@ a
 | Behavior                                                       | Default | `blocksInterruptParagraphs` | `significantNewlines` |
 |----------------------------------------------------------------|---------|-----------------------------|-----------------------|
 | Block elements interrupt top-level paragraphs                  | No      | **Yes**                     | Yes                   |
-| Nested blocks in list items without a blank line               | No      | No                          | Yes                   |
+| Non-list block nests in list item without a blank line         | No      | **Yes**                     | Yes                   |
+| Sublist nests in list item without a blank line                | No      | No                          | Yes                   |
 
-The two granular levers are independent. `blocksInterruptParagraphs` alone does not nest list items; `nestedBlocksInLists` alone does not interrupt top-level paragraphs. `significantNewlines` enables both simultaneously.
+The two granular levers are independent. `blocksInterruptParagraphs` alone does not nest sublists; `nestedListsWithoutBlankLine` alone does not interrupt top-level paragraphs or nest non-list blocks. `significantNewlines` enables both simultaneously.
+
+## Nested Lists Without Blank Line Mode
+
+`nestedListsWithoutBlankLine` lets a sublist nest inside a list item without a blank line, while leaving everything else at the spec default. It nests **only** sublists: a non-list block (blockquote, heading, thematic break) under the item stays literal, and top-level paragraphs are **not** interrupted.
+
+Use it when you want markdown-like nested lists but otherwise spec-compliant djot: top-level paragraphs still require a blank line before any block, and only sublists nest in list items.
+
+### Enabling Nested Lists Without Blank Line Mode
+
+```php
+use Djot\DjotConverter;
+use Djot\Parser\BlockParser;
+
+// Method 1: Factory method
+$converter = DjotConverter::withNestedListsWithoutBlankLine();
+
+// Method 2: Constructor parameter
+$converter = new DjotConverter(nestedListsWithoutBlankLine: true);
+
+// Method 3: Directly on the parser
+$parser = new BlockParser(nestedListsWithoutBlankLine: true);
+$parser->setNestedListsWithoutBlankLine(true);
+```
+
+### Behavior
+
+A sublist nests inside the open list item, even without a blank line:
+
+```php
+$converter = DjotConverter::withNestedListsWithoutBlankLine();
+$result = $converter->convert("- Item\n  - Nested one\n  - Nested two");
+```
+
+Output:
+```html
+<ul>
+<li>
+Item
+<ul>
+<li>
+Nested one
+</li>
+<li>
+Nested two
+</li>
+</ul>
+</li>
+</ul>
+```
+
+But a non-list block (such as a blockquote) under the item stays literal - it does **not** nest with this flag (that is `blocksInterruptParagraphs`):
+
+```php
+$converter = DjotConverter::withNestedListsWithoutBlankLine();
+$result = $converter->convert("- Item\n  > quote");
+```
+
+Output:
+```html
+<ul>
+<li>
+Item
+&gt; quote
+</li>
+</ul>
+```
+
+### nestedListsWithoutBlankLine vs blocksInterruptParagraphs
+
+| Behavior                                               | Default | `nestedListsWithoutBlankLine` | `blocksInterruptParagraphs` | both |
+|--------------------------------------------------------|---------|-------------------------------|-----------------------------|------|
+| Sublist nests in list item without a blank line        | No      | **Yes**                       | No                          | Yes  |
+| Non-list block nests in list item without a blank line | No      | No                            | **Yes**                     | Yes  |
+| Block elements interrupt top-level paragraphs          | No      | No                            | Yes                         | Yes  |
+
+Note: `blocksInterruptParagraphs` + `nestedListsWithoutBlankLine` together equal the deprecated `significantNewlines`; the deprecated `nestedBlocksInLists` enables the two in-list rows (sublist + non-list block) without top-level interruption.
