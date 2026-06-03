@@ -613,8 +613,11 @@ DJOT;
 
     public function testSignificantNewlinesBlockquoteInList(): void
     {
+        // A real (multi-line) blockquote nests in a list item under
+        // significantNewlines. A lone single-line "> ..." stays literal via the
+        // shared lone-marker lookahead (consistent with top-level interruption).
         $parser = new BlockParser(significantNewlines: true);
-        $doc = $parser->parse("- Item\n  > quoted");
+        $doc = $parser->parse("- Item\n  > a\n  > b");
 
         $list = $doc->getChildren()[0];
         $item = $list->getChildren()[0];

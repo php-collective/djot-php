@@ -134,40 +134,33 @@ class NestedListsWithoutBlankLineOptionTest extends TestCase
 
     public function testBothLeversComposeAdditively(): void
     {
-        // Both granular levers on: sublist nests (list flag) AND blockquote
-        // nests (interrupt flag) inside the same item.
+        // Both granular levers on: sublist nests (list flag) AND a real
+        // multi-line blockquote nests (interrupt flag) inside list items.
         $converter = new DjotConverter(
             blocksInterruptParagraphs: true,
             nestedListsWithoutBlankLine: true,
         );
-        $result = $converter->convert("- Item\n  - sub\n\n- Two\n  > quoted");
+        $result = $converter->convert("- Item\n  - sub\n\n- Two\n  > a\n  > b");
 
         $this->assertSame(2, substr_count($result, '<ul>'));
         $this->assertStringContainsString('<blockquote>', $result);
     }
 
-    public function testLoneMarkerInItemUnderInterruptionIsScoped(): void
+    public function testLoneMarkerInItemStaysLiteralLikeTopLevel(): void
     {
-        // Behavior-locking test (documents current SCOPED behavior, not an
-        // endorsement): the in-list interrupt path uses a single-line block
-        // check, so a lone-marker-style line under a list item with
-        // blocksInterruptParagraphs is handled by the current implementation.
-        // This test pins whatever the current output is so future changes to
-        // the lone-marker handling are caught deliberately rather than by
-        // accident. Assert against the ACTUAL current output.
+        // Consistency: the in-list interrupt path uses the SAME lone-marker
+        // lookahead as the top-level path, so a lone "> 5" comparison line
+        // under a list item stays literal (it does NOT nest as a blockquote),
+        // exactly as "if x\n> 5 then" stays literal at top level.
         $parser = new BlockParser(blocksInterruptParagraphs: true);
         $doc = $parser->parse("- if x\n  > 5 then");
 
         $list = $doc->getChildren()[0];
         $this->assertInstanceOf(ListBlock::class, $list);
 
-        // Observed current behavior: under blocksInterruptParagraphs the
-        // "  > 5 then" line nests as a BlockQuote inside the item (it is NOT
-        // kept as literal paragraph text). Item children are [Paragraph, BlockQuote].
         $item = $list->getChildren()[0];
-        $children = $item->getChildren();
-        $this->assertCount(2, $children);
-        $this->assertInstanceOf(Paragraph::class, $children[0]);
-        $this->assertInstanceOf(BlockQuote::class, $children[1]);
+        foreach ($item->getChildren() as $child) {
+            $this->assertNotInstanceOf(BlockQuote::class, $child);
+        }
     }
 }

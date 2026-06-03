@@ -84,7 +84,8 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
     {
         $parser = new BlockParser(significantNewlines: true);
         $this->assertTrue($parser->getBlocksInterruptParagraphs());
-        $this->assertTrue($parser->getNestedBlocksInLists());
+        $this->assertTrue($parser->getNestedListsWithoutBlankLine());
+        $this->assertFalse($parser->getNestedBlocksInLists());
     }
 
     public function testSetSignificantNewlinesFalseDisablesBoth(): void
@@ -92,7 +93,7 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         $parser = new BlockParser(significantNewlines: true);
         $parser->setSignificantNewlines(false);
         $this->assertFalse($parser->getBlocksInterruptParagraphs());
-        $this->assertFalse($parser->getNestedBlocksInLists());
+        $this->assertFalse($parser->getNestedListsWithoutBlankLine());
     }
 
     public function testGetSignificantNewlinesReflectsInterruptionBit(): void
@@ -142,15 +143,31 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
 
     public function testBlockquoteNestsInListItem(): void
     {
-        // Semantic expansion: a blockquote interrupts the item's lead paragraph.
+        // Semantic expansion: a real (multi-line) blockquote interrupts the
+        // item's lead paragraph and nests, the same as at top level.
         $parser = new BlockParser(blocksInterruptParagraphs: true);
-        $doc = $parser->parse("- Item\n  > quoted");
+        $doc = $parser->parse("- Item\n  > a\n  > b");
 
         $item = $doc->getChildren()[0]->getChildren()[0];
         $children = $item->getChildren();
         $this->assertCount(2, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
         $this->assertInstanceOf(BlockQuote::class, $children[1]);
+    }
+
+    public function testSingleLineBlockquoteInItemStaysLiteralLikeTopLevel(): void
+    {
+        // Consistency with top-level interruption: a lone "> ..." line is
+        // ambiguous (comparison vs quote), so the same lone-marker lookahead
+        // the top-level path uses keeps a single-line quote literal inside a
+        // list item too. Only a multi-line quote nests (see test above).
+        $parser = new BlockParser(blocksInterruptParagraphs: true);
+        $doc = $parser->parse("- Item\n  > quoted");
+
+        $item = $doc->getChildren()[0]->getChildren()[0];
+        foreach ($item->getChildren() as $child) {
+            $this->assertNotInstanceOf(BlockQuote::class, $child);
+        }
     }
 
     public function testHeadingNestsInListItem(): void

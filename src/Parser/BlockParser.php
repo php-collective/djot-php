@@ -183,10 +183,11 @@ class BlockParser
     ) {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
-        // significantNewlines is the deprecated union of the two granular levers.
+        // significantNewlines is the deprecated union of blocksInterruptParagraphs
+        // and nestedListsWithoutBlankLine (NOT the broad nestedBlocksInLists).
         $this->blocksInterruptParagraphs = $blocksInterruptParagraphs || $significantNewlines;
-        $this->nestedBlocksInLists = $nestedBlocksInLists || $significantNewlines;
-        $this->nestedListsWithoutBlankLine = $nestedListsWithoutBlankLine;
+        $this->nestedBlocksInLists = $nestedBlocksInLists;
+        $this->nestedListsWithoutBlankLine = $nestedListsWithoutBlankLine || $significantNewlines;
         $this->inlineParser = new InlineParser($this);
         $this->listParser = new ListParser();
         $this->tableParser = new TableParser();
@@ -202,7 +203,7 @@ class BlockParser
     public function setSignificantNewlines(bool $value): self
     {
         $this->blocksInterruptParagraphs = $value;
-        $this->nestedBlocksInLists = $value;
+        $this->nestedListsWithoutBlankLine = $value;
 
         return $this;
     }
@@ -1884,7 +1885,7 @@ class BlockParser
                 if ($nextIndent >= $contentIndent) {
                     // If the active list-nesting mode treats this indented line
                     // as a nested block, break out so normal nesting handles it.
-                    if ($this->allowsImmediateNestedBlock($nextTrimmed)) {
+                    if ($this->allowsImmediateNestedBlock($nextTrimmed, $lines, $i)) {
                         break;
                     }
                     // Properly indented continuation - include with original indentation relative to content
@@ -2053,7 +2054,7 @@ class BlockParser
                 // when the leading line actually opens a nestable block.
                 $enterNesting = $nextIndent >= $contentIndent;
                 if ($enterNesting && !$this->nestedBlocksInLists) {
-                    $enterNesting = $this->allowsImmediateNestedBlock(ltrim($nextLine));
+                    $enterNesting = $this->allowsImmediateNestedBlock(ltrim($nextLine), $lines, $i);
                 }
 
                 // If there's indented content that could be a nested block
@@ -3415,14 +3416,15 @@ class BlockParser
      * - nestedBlocksInLists (deprecated, broad): any block element.
      * - nestedListsWithoutBlankLine: list markers only (compact sublists).
      * - blocksInterruptParagraphs: non-list blocks (a block interrupts the
-     *   item's lead paragraph, mirroring top-level interruption). Sublists are
-     *   intentionally NOT covered here - they require nestedListsWithoutBlankLine.
-     *
-     * @todo The blocksInterruptParagraphs branch uses single-line isBlockElementStart() rather than the top-level lone-marker lookahead (startsNewBlockSignificant()), so a lone-marker line such as "> 5" indented under a list item nests as a block, while the same line at top level stays literal. Reconcile if real-world reports justify it.
+     *   item's lead paragraph, mirroring top-level interruption including the
+     *   lone-marker lookahead). Sublists are intentionally NOT covered here -
+     *   they require nestedListsWithoutBlankLine.
      *
      * @param string $trimmed The left-trimmed candidate line.
+     * @param array<string> $lines All lines being parsed (lookahead context).
+     * @param int $index Index of the candidate line within $lines.
      */
-    protected function allowsImmediateNestedBlock(string $trimmed): bool
+    protected function allowsImmediateNestedBlock(string $trimmed, array $lines, int $index): bool
     {
         if ($this->nestedBlocksInLists) {
             return $this->isBlockElementStart($trimmed);
@@ -3434,8 +3436,12 @@ class BlockParser
             return true;
         }
 
-        if ($this->blocksInterruptParagraphs && !$isListMarker && $this->isBlockElementStart($trimmed)) {
-            return true;
+        if ($this->blocksInterruptParagraphs && !$isListMarker) {
+            // Use the SAME lone-marker-aware decision the top-level
+            // paragraph-interruption path uses, so an indented "> 5" / "| x"
+            // under a list item is treated identically to top level, while
+            // unambiguous openers (#, code fence, :::, ---) still interrupt.
+            return $this->startsNewBlockSignificant($trimmed, $lines, $index);
         }
 
         return false;
