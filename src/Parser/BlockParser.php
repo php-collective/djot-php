@@ -3414,11 +3414,13 @@ class BlockParser
      * open a nested block (vs. be folded in as plain continuation text).
      *
      * - nestedBlocksInLists (deprecated, broad): any block element.
-     * - nestedListsWithoutBlankLine: list markers only (compact sublists).
-     * - blocksInterruptParagraphs: non-list blocks (a block interrupts the
-     *   item's lead paragraph, mirroring top-level interruption including the
-     *   lone-marker lookahead). Sublists are intentionally NOT covered here -
-     *   they require nestedListsWithoutBlankLine.
+     * - nestedListsWithoutBlankLine: list markers only (compact sublists), the
+     *   narrow subset that always nests a sublist marker without lookahead.
+     * - blocksInterruptParagraphs: any block interrupts the item's lead
+     *   paragraph, mirroring top-level interruption including the lone-marker
+     *   lookahead. A list is a block, so sublists are covered here too (the
+     *   lookahead folds an ambiguous lone "- x" / "> x" in as continuation),
+     *   which makes nestedListsWithoutBlankLine a subset of this behavior.
      *
      * @param string $trimmed The left-trimmed candidate line.
      * @param array<string> $lines All lines being parsed (lookahead context).
@@ -3432,15 +3434,17 @@ class BlockParser
 
         $isListMarker = $this->listParser->parseListItemMarker($trimmed) !== null;
 
+        // Narrow subset: always nest a sublist marker, no lookahead.
         if ($this->nestedListsWithoutBlankLine && $isListMarker) {
             return true;
         }
 
-        if ($this->blocksInterruptParagraphs && !$isListMarker) {
+        if ($this->blocksInterruptParagraphs) {
             // Use the SAME lone-marker-aware decision the top-level
-            // paragraph-interruption path uses, so an indented "> 5" / "| x"
-            // under a list item is treated identically to top level, while
-            // unambiguous openers (#, code fence, :::, ---) still interrupt.
+            // paragraph-interruption path uses, so an indented "> 5" / "| x" / a
+            // sublist marker under a list item is treated identically to top
+            // level, while unambiguous openers (#, code fence, :::, ---) and
+            // real (multi-item) sublists interrupt.
             return $this->startsNewBlockSignificant($trimmed, $lines, $index);
         }
 
