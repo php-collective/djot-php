@@ -55,29 +55,39 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         $this->assertInstanceOf(Paragraph::class, $children[0]);
     }
 
-    public function testInterruptionWithoutNesting(): void
+    public function testInterruptionNestsSublist(): void
     {
-        // blocksInterruptParagraphs alone must NOT enable list nesting:
-        // "- a\n  - b" stays a single list (b is continuation text).
+        // A marker interrupts at every level, so blocksInterruptParagraphs nests
+        // an indented sublist inside a list item ("- a\n  - b" => two lists).
+        // nestedListsWithoutBlankLine remains the smaller subset (sublists only,
+        // no other-block interruption).
         $parser = new BlockParser(blocksInterruptParagraphs: true);
         $doc = $parser->parse("- a\n  - b");
 
         $list = $doc->getChildren()[0];
         $this->assertInstanceOf(ListBlock::class, $list);
         $item = $list->getChildren()[0];
+        $hasSublist = false;
         foreach ($item->getChildren() as $child) {
-            $this->assertNotInstanceOf(ListBlock::class, $child);
+            if ($child instanceof ListBlock) {
+                $hasSublist = true;
+            }
         }
+        $this->assertTrue($hasSublist);
     }
 
-    public function testLoneMarkerRuleStillApplies(): void
+    public function testWrappedMarkerInterrupts(): void
     {
+        // Opt-in aggressive mode: a line-leading marker interrupts the paragraph,
+        // so a wrapped "x = 5\n- 3 + 17" is read as a list (the bargain for
+        // keeping genuine single-line and lazily-wrapped lists).
         $parser = new BlockParser(blocksInterruptParagraphs: true);
         $doc = $parser->parse("x = 5\n- 3 + 17");
 
         $children = $doc->getChildren();
-        $this->assertCount(1, $children);
+        $this->assertCount(2, $children);
         $this->assertInstanceOf(Paragraph::class, $children[0]);
+        $this->assertInstanceOf(ListBlock::class, $children[1]);
     }
 
     public function testSignificantNewlinesEnablesBothLevers(): void
@@ -123,13 +133,13 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         $this->assertStringContainsString('<ul>', $result);
     }
 
-    public function testConverterFactoryDoesNotNest(): void
+    public function testConverterFactoryNestsSublist(): void
     {
         $converter = DjotConverter::withBlocksInterruptParagraphs();
         $result = $converter->convert("- a\n  - b");
 
-        // Interruption-only must not nest: exactly one <ul>.
-        $this->assertSame(1, substr_count($result, '<ul>'));
+        // A marker interrupts at every level, so the sublist nests: two <ul>.
+        $this->assertSame(2, substr_count($result, '<ul>'));
     }
 
     public function testWithSignificantNewlinesStillEnablesBoth(): void
@@ -155,19 +165,21 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         $this->assertInstanceOf(BlockQuote::class, $children[1]);
     }
 
-    public function testSingleLineBlockquoteInItemStaysLiteralLikeTopLevel(): void
+    public function testSingleLineBlockquoteNestsInListItem(): void
     {
-        // Consistency with top-level interruption: a lone "> ..." line is
-        // ambiguous (comparison vs quote), so the same lone-marker lookahead
-        // the top-level path uses keeps a single-line quote literal inside a
-        // list item too. Only a multi-line quote nests (see test above).
+        // A marker interrupts at every level, so even a single-line quote nests
+        // inside a list item (consistent with top-level interruption).
         $parser = new BlockParser(blocksInterruptParagraphs: true);
         $doc = $parser->parse("- Item\n  > quoted");
 
         $item = $doc->getChildren()[0]->getChildren()[0];
+        $hasQuote = false;
         foreach ($item->getChildren() as $child) {
-            $this->assertNotInstanceOf(BlockQuote::class, $child);
+            if ($child instanceof BlockQuote) {
+                $hasQuote = true;
+            }
         }
+        $this->assertTrue($hasQuote);
     }
 
     public function testHeadingNestsInListItem(): void
@@ -196,20 +208,21 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         $this->assertInstanceOf(ListBlock::class, $children[1]);
     }
 
-    public function testLoneSublistItemStaysLiteralLikeTopLevel(): void
+    public function testLoneSublistItemNestsInListItem(): void
     {
-        // Consistency with top-level interruption: a lone "- x" line is
-        // ambiguous (operator vs list), so the same lone-marker lookahead keeps
-        // a single-item sublist literal inside a list item. Only a multi-item
-        // sublist nests (see test above). nestedListsWithoutBlankLine is the
-        // narrow subset that nests even this lone case.
+        // A marker interrupts at every level, so even a single-item sublist nests
+        // inside a list item (consistent with top-level interruption).
         $parser = new BlockParser(blocksInterruptParagraphs: true);
         $doc = $parser->parse("- Item\n  - sub");
 
         $item = $doc->getChildren()[0]->getChildren()[0];
+        $hasSublist = false;
         foreach ($item->getChildren() as $child) {
-            $this->assertNotInstanceOf(ListBlock::class, $child);
+            if ($child instanceof ListBlock) {
+                $hasSublist = true;
+            }
         }
+        $this->assertTrue($hasSublist);
     }
 
     public function testSublistMarkerSetMatchesTopLevelInterruption(): void
@@ -228,18 +241,24 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         }
     }
 
-    public function testNestedListsOptionIsSubsetOfInterruption(): void
+    public function testNestedListsOptionIsSmallerSubset(): void
     {
-        // The narrow lever nests a lone single-item sublist that interruption's
-        // lookahead folds in, confirming it as a distinct, blunter subset.
-        $narrow = (new BlockParser(nestedListsWithoutBlankLine: true))->parse("- Item\n  - sub");
+        // nestedListsWithoutBlankLine is the smaller subset: it nests a sublist
+        // in a list item but, unlike blocksInterruptParagraphs, does NOT let a
+        // non-list block (here a blockquote) interrupt the item's paragraph.
+        $narrow = (new BlockParser(nestedListsWithoutBlankLine: true))->parse("- Item\n  - sub\n  > quote");
         $item = $narrow->getChildren()[0]->getChildren()[0];
         $hasSublist = false;
+        $hasQuote = false;
         foreach ($item->getChildren() as $child) {
             if ($child instanceof ListBlock) {
                 $hasSublist = true;
             }
+            if ($child instanceof BlockQuote) {
+                $hasQuote = true;
+            }
         }
         $this->assertTrue($hasSublist);
+        $this->assertFalse($hasQuote);
     }
 }
