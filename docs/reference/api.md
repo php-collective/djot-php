@@ -36,20 +36,20 @@ public function __construct(
 - `$strict`: When `true`, throws `ParseException` on parse errors (see [Error Handling](#error-handling)).
 - `$safeMode`: When `true` or a `SafeMode` instance, enables XSS protection (see [Safe Mode](#safe-mode)).
 - `$profile`: A `Profile` instance for feature restriction (see [Profiles](/guide/profiles)).
-- `$significantNewlines`: **Deprecated.** Convenience shorthand for `blocksInterruptParagraphs: true, nestedBlocksInLists: true`. Prefer the two granular levers. See [Significant Newlines Mode](#significant-newlines-mode).
+- `$significantNewlines`: **Deprecated.** Convenience shorthand for `blocksInterruptParagraphs: true, nestedListsWithoutBlankLine: true`. Prefer the two granular levers. See [Significant Newlines Mode](#significant-newlines-mode).
 - `$softBreakMode`: Override how soft breaks are rendered. When `null`, uses the renderer's default (newline for HTML).
 - `$roundTripMode`: When `true`, adds round-trip metadata for Djot→HTML→Djot workflows (HTML renderer only).
 - `$parser`: Optional pre-configured parser. When provided, inline parser constructor flags such as `warnings`, `strict`, `significantNewlines` (deprecated), `nestedBlocksInLists`, `blocksInterruptParagraphs`, and `nestedListsWithoutBlankLine` are ignored.
 - `$renderer`: Optional pre-configured renderer. When provided, inline renderer constructor flags such as `xhtml`, `safeMode`, `softBreakMode`, and `roundTripMode` are ignored.
-- `$nestedBlocksInLists`: When `true`, indentation alone introduces nested blocks inside list items without a blank line, while top-level paragraph interruption stays spec-compliant (see [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode)). Implied by `$significantNewlines`.
-- `$blocksInterruptParagraphs`: When `true`, top-level block elements (lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences) can interrupt a paragraph without a preceding blank line. It **also** nests an indented non-list block (blockquote, heading, fenced code, thematic break) inside a list item without a blank line; it does not nest sublists (see [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode)). Implied by `$significantNewlines`.
-- `$nestedListsWithoutBlankLine`: When `true`, a sublist nests inside a list item without a blank line. Only sublists nest; non-list blocks under the item stay literal and top-level paragraph interruption is unaffected (see [Nested Lists Without Blank Line Mode](/guide/parser-options#nested-lists-without-blank-line-mode)). Not set by `$significantNewlines` directly, but `$significantNewlines` produces the same sublist nesting through the deprecated `$nestedBlocksInLists`.
+- `$nestedBlocksInLists`: **Deprecated.** When `true`, indentation alone introduces nested blocks of **any** type inside list items without a blank line (broad, eager - no lone-marker lookahead), while top-level paragraph interruption stays spec-compliant (see [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode)). Prefer `$blocksInterruptParagraphs` + `$nestedListsWithoutBlankLine`. No longer implied by `$significantNewlines`.
+- `$blocksInterruptParagraphs`: When `true`, top-level block elements (lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences) can interrupt a paragraph without a preceding blank line. It **also** interrupts a list item's lead paragraph, so an indented non-list block nests inside the item without a blank line, using the **same** lone-marker lookahead as the top level: unambiguous openers (`#`, fenced code, `:::`, `---`) and real multi-line blocks nest, while a single ambiguous marker line (`>`, `|`) stays literal. It does not nest sublists (see [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode)). Implied by `$significantNewlines`.
+- `$nestedListsWithoutBlankLine`: When `true`, a sublist nests inside a list item without a blank line. Only sublists nest; non-list blocks under the item stay literal and top-level paragraph interruption is unaffected (see [Nested Lists Without Blank Line Mode](/guide/parser-options#nested-lists-without-blank-line-mode)). Implied by `$significantNewlines`.
 
 ### Factory Methods
 
 #### withSignificantNewlines()
 
-> **Deprecated.** Prefer using `new DjotConverter(blocksInterruptParagraphs: true, nestedBlocksInLists: true)` or the two dedicated factory methods. See [Significant Newlines Mode](/guide/parser-options#significant-newlines-mode).
+> **Deprecated.** Prefer using `new DjotConverter(blocksInterruptParagraphs: true, nestedListsWithoutBlankLine: true)` or the two dedicated factory methods. See [Significant Newlines Mode](/guide/parser-options#significant-newlines-mode).
 
 ```php
 public static function withSignificantNewlines(
@@ -63,7 +63,7 @@ public static function withSignificantNewlines(
 ): self
 ```
 
-Creates a converter with significant newlines mode enabled (equivalent to `blocksInterruptParagraphs: true` + `nestedBlocksInLists: true`). See [Significant Newlines Mode](/guide/parser-options#significant-newlines-mode).
+Creates a converter with significant newlines mode enabled (equivalent to `blocksInterruptParagraphs: true` + `nestedListsWithoutBlankLine: true`). See [Significant Newlines Mode](/guide/parser-options#significant-newlines-mode).
 
 #### withNestedBlocksInLists()
 
@@ -938,7 +938,7 @@ $node->addClass(string $class): void
 ## Significant Newlines Mode
 
 > **Deprecated.** `significantNewlines` is a convenience shorthand for
-> `blocksInterruptParagraphs: true` + `nestedBlocksInLists: true`.
+> `blocksInterruptParagraphs: true` + `nestedListsWithoutBlankLine: true`.
 > Prefer the two granular levers or their factory methods.
 
 An optional parsing mode for chat messages, comments, and quick notes where markdown-like behavior is more intuitive.
@@ -955,7 +955,7 @@ $converter = new DjotConverter(significantNewlines: true);
 // Preferred: use the two granular levers
 $converter = new DjotConverter(
     blocksInterruptParagraphs: true,
-    nestedBlocksInLists: true,
+    nestedListsWithoutBlankLine: true,
 );
 
 // Via parser directly (deprecated)

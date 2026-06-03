@@ -16,7 +16,7 @@ $converter = new DjotConverter();
 $converter = new DjotConverter(
     xhtml: true,
     blocksInterruptParagraphs: true,
-    nestedBlocksInLists: true,
+    nestedListsWithoutBlankLine: true,
 );
 ```
 
@@ -36,7 +36,7 @@ use Djot\Renderer\HtmlRenderer;
 
 // Full control via create()
 $converter = DjotConverter::create(
-    new BlockParser(blocksInterruptParagraphs: true, nestedBlocksInLists: true),
+    new BlockParser(blocksInterruptParagraphs: true, nestedListsWithoutBlankLine: true),
     new HtmlRenderer(xhtml: true),
 );
 ```
@@ -105,7 +105,7 @@ Note: Use `\` at end of line for hard breaks (always renders as `<br>`) regardle
 
 ::: warning Deprecated
 `significantNewlines` is now a convenience shorthand equal to enabling both
-`blocksInterruptParagraphs` and `nestedBlocksInLists` together. It is
+`blocksInterruptParagraphs` and `nestedListsWithoutBlankLine` together. It is
 deprecated in favor of the two granular levers. Migrate as shown below.
 
 ```php
@@ -115,7 +115,7 @@ $converter = DjotConverter::withSignificantNewlines();
 // Equivalent (preferred):
 $converter = new DjotConverter(
     blocksInterruptParagraphs: true,
-    nestedBlocksInLists: true,
+    nestedListsWithoutBlankLine: true,
 );
 ```
 :::
@@ -282,7 +282,7 @@ use Djot\Renderer\SoftBreakMode;
 // Significant newlines with safe mode for user-generated content
 $converter = new DjotConverter(
     safeMode: new SafeMode(),
-    significantNewlines: true, // deprecated: prefer blocksInterruptParagraphs + nestedBlocksInLists
+    significantNewlines: true, // deprecated: prefer blocksInterruptParagraphs + nestedListsWithoutBlankLine
     softBreakMode: SoftBreakMode::Break, // Optional: visible line breaks
 );
 ```
@@ -361,7 +361,7 @@ Output:
 | Nested blocks in list items without a blank line               | No      | **Yes**               | Yes                   |
 | Block elements interrupt top-level paragraphs                  | No      | No                    | Yes                   |
 
-Note: `significantNewlines` is deprecated; it enables both `blocksInterruptParagraphs` and `nestedBlocksInLists`. Prefer setting the two granular levers directly.
+Note: `significantNewlines` is deprecated; it enables both `blocksInterruptParagraphs` and `nestedListsWithoutBlankLine`. Prefer setting the two granular levers directly. (`nestedBlocksInLists` is a separate, also-deprecated broad lever - it is no longer what `significantNewlines` sets.)
 
 ## Block Interrupts Paragraphs Mode
 
@@ -412,7 +412,7 @@ A non-list block also nests inside a list item without a blank line. For example
 
 ```php
 $converter = DjotConverter::withBlocksInterruptParagraphs();
-$result = $converter->convert("- Item\n  > quote");
+$result = $converter->convert("- Item\n  > a\n  > b");
 ```
 
 Output:
@@ -421,13 +421,16 @@ Output:
 <li>
 Item
 <blockquote>
-<p>quote</p>
+<p>a
+b</p>
 </blockquote>
 </li>
 </ul>
 ```
 
-But a sublist does **not** nest with this flag alone (that requires [Nested Lists Without Blank Line](#nested-lists-without-blank-line-mode) mode):
+In-list interruption uses the **same** lone-marker lookahead as the top-level path: an ambiguous single-line marker (`>` comparison, `|`, a lone bullet) stays literal, while unambiguous openers (`#`, fenced code, `:::`, `---`) and real multi-line blocks nest. So `- Item\n  > quote` (a single `>` line) keeps `> quote` as literal text, exactly as `Foo\n> quote` does at the top level.
+
+A sublist does **not** nest with this flag alone (that requires [Nested Lists Without Blank Line](#nested-lists-without-blank-line-mode) mode):
 
 ```php
 $converter = DjotConverter::withBlocksInterruptParagraphs();
