@@ -44,6 +44,13 @@ use Djot\Renderer\HeadingIdTracker;
  */
 class BlockParser
 {
+    /**
+     * Neutral starting point for incremental brace scanning.
+     *
+     * @var array{depth: int, inQuote: bool, quoteChar: string, pendingEscape: bool}
+     */
+    private const INITIAL_BRACE_STATE = ['depth' => 0, 'inQuote' => false, 'quoteChar' => '', 'pendingEscape' => false];
+
     protected InlineParser $inlineParser;
 
     protected ListParser $listParser;
@@ -3091,24 +3098,29 @@ class BlockParser
         $i = $start + 1;
         $count = count($lines);
 
+        // Track brace nesting incrementally. Re-scanning the whole (growing)
+        // $content on every continuation line made paragraph parsing O(n^2) in
+        // the number of lines; carrying the state forward keeps it linear.
+        $braceState = $this->scanBraceState($content, self::INITIAL_BRACE_STATE);
+
         while ($i < $count) {
             $nextLine = $lines[$i];
-
-            // Check for unclosed brace in content - if present, don't break on new block
-            // This handles cases like: text{a=x\n# not-a-heading
-            $hasUnclosedBrace = $this->hasUnclosedBrace($content);
 
             if (IndentationHelper::isBlankLine($nextLine)) {
                 break;
             }
 
-            if (!$hasUnclosedBrace && $this->startsNewBlock($nextLine, $lines, $i)) {
+            // An unclosed brace in the content so far suppresses block
+            // interruption (e.g. `text{a=x` then `# not-a-heading`).
+            if ($braceState['depth'] <= 0 && $this->startsNewBlock($nextLine, $lines, $i)) {
                 break;
             }
 
             // Strip leading whitespace from continuation lines (matching JS reference)
             $nextLine = ltrim($nextLine);
-            $content .= "\n" . $nextLine;
+            $segment = "\n" . $nextLine;
+            $content .= $segment;
+            $braceState = $this->scanBraceState($segment, $braceState);
             $i++;
         }
 
@@ -3466,19 +3478,53 @@ class BlockParser
      */
     protected function hasUnclosedBrace(string $text): bool
     {
-        $depth = 0;
-        $inQuote = false;
-        $quoteChar = '';
-        $len = strlen($text);
+        return $this->scanBraceState($text, self::INITIAL_BRACE_STATE)['depth'] > 0;
+    }
 
-        for ($i = 0; $i < $len; $i++) {
-            $char = $text[$i];
+    /**
+     * Scan a text segment for brace nesting, carrying state across segments.
+     *
+     * Used to detect an unclosed attribute brace in a paragraph (`text{a=x`)
+     * without re-scanning the whole accumulated content on every continuation
+     * line. Quote state, brace depth and a dangling backslash (an escape that
+     * straddles the segment boundary) are threaded through so scanning a string
+     * in one call or split across calls yields the identical result.
+     *
+     * @param string $segment
+     * @param array{depth: int, inQuote: bool, quoteChar: string, pendingEscape: bool} $state
+     *
+     * @return array{depth: int, inQuote: bool, quoteChar: string, pendingEscape: bool}
+     */
+    protected function scanBraceState(string $segment, array $state): array
+    {
+        $depth = $state['depth'];
+        $inQuote = $state['inQuote'];
+        $quoteChar = $state['quoteChar'];
+        $len = strlen($segment);
+        $i = 0;
+
+        // A backslash at the end of the previous segment escapes this segment's
+        // first character.
+        if ($state['pendingEscape'] && $len > 0) {
+            $i = 1;
+        }
+        $pendingEscape = false;
+
+        for (; $i < $len; $i++) {
+            $char = $segment[$i];
 
             // Handle escape sequences
-            if ($char === '\\' && $i + 1 < $len) {
-                $i++;
+            if ($char === '\\') {
+                if ($i + 1 < $len) {
+                    $i++;
 
-                continue;
+                    continue;
+                }
+
+                // Trailing backslash escapes the next segment's first character.
+                $pendingEscape = true;
+
+                break;
             }
 
             // Handle quotes
@@ -3505,7 +3551,7 @@ class BlockParser
             }
         }
 
-        return $depth > 0;
+        return ['depth' => $depth, 'inQuote' => $inQuote, 'quoteChar' => $quoteChar, 'pendingEscape' => $pendingEscape];
     }
 
     /**
