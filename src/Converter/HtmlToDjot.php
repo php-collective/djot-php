@@ -2385,6 +2385,12 @@ class HtmlToDjot
      */
     protected function escapeDjotText(string $text, bool $atLineStart): string
     {
+        // Reverse the parser's deterministic smart-punctuation mapping
+        // (`...` -> `…`, `--` -> `–`, `---` -> `—`) so the regenerated source
+        // keeps the ASCII the author wrote. Runs before the escapers because it
+        // only emits `.` and `-`, neither of which they touch.
+        $text = $this->reverseSmartPunctuation($text, $atLineStart);
+
         // `]` is escaped alongside `[` so that a literal bracket in text never
         // closes an enclosing link/span label early on the next parse. Structural
         // `]` emitted by child-element processors is not text and is unaffected.
@@ -2400,6 +2406,32 @@ class HtmlToDjot
         }
 
         return $escaped;
+    }
+
+    /**
+     * Reverse the parser's smart-punctuation transforms back to ASCII so a
+     * Djot -> HTML -> Djot round-trip preserves the author's original source.
+     *
+     * The parser maps `...` -> `…`, `--` -> en dash and `---` -> em dash
+     * deterministically, so reversing stays HTML-stable: re-rendering the ASCII
+     * reproduces the same typographic characters. Ellipsis is never a block
+     * marker, so it is always reversed. A typographic dash at the start of a
+     * line is kept literal: reversing it to `---`/`--` at column zero would
+     * re-parse as a thematic break or interact with the leading-marker escaper.
+     * Keeping it as the typographic character there is still HTML-stable.
+     */
+    protected function reverseSmartPunctuation(string $text, bool $atLineStart): string
+    {
+        $text = str_replace("\u{2026}", '...', $text);
+
+        if ($atLineStart && preg_match('/^[\x{2013}\x{2014}]/u', $text) === 1) {
+            $first = mb_substr($text, 0, 1);
+            $rest = str_replace(["\u{2014}", "\u{2013}"], ['---', '--'], mb_substr($text, 1));
+
+            return $first . $rest;
+        }
+
+        return str_replace(["\u{2014}", "\u{2013}"], ['---', '--'], $text);
     }
 
     /**
