@@ -575,6 +575,57 @@ With `nestedListsWithoutBlankLine` mode enabled, nested lists can appear immedia
 
 See the [Parser Options guide](/guide/parser-options#nested-lists-without-blank-line-mode) for more on `nestedListsWithoutBlankLine` mode.
 
+#### Compact List Blocks
+
+::: warning djot-php divergence
+By default djot-php keeps a list **tight** when an item carries a sub-block.
+Canonical djot renders such a list **loose**. This changes only the tight/loose
+rendering, never the block structure, so it does not affect the uniformity
+principle — but the HTML differs from djot.js for these inputs.
+:::
+
+In standard djot, a block inside a list item needs a blank line before it, and
+that blank line makes the whole list **loose** (every item gets `<p>` wrappers).
+So any list whose items carry a sub-block is forced loose. djot-php avoids this:
+the blank line still **starts** the block, but no longer **loosens** the list
+when the indented content opens a block (sub-list, block quote, fenced code,
+fenced div, heading, table). The item stays tight, with its lead text inline.
+
+```djot
+- Deploy the service
+
+  > Needs the new env vars set first
+- Run migrations
+```
+
+renders a **tight** list (lead text inline, the quote attached to its item):
+
+```html
+<ul>
+<li>
+Deploy the service
+<blockquote>
+<p>Needs the new env vars set first</p>
+</blockquote>
+</li>
+<li>
+Run migrations
+</li>
+</ul>
+```
+
+::: tip Still loose, correctly
+Only blank-then-*block* is affected. A genuine **second prose paragraph** in an
+item, and a **blank line between items**, still make the list loose:
+
+```djot
+- First point.
+
+  A full second paragraph of explanation.
+- Second point.
+```
+:::
+
 ### Definition Lists
 
 Terms are prefixed with `: ` and definitions are indented below.
