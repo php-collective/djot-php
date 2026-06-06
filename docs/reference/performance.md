@@ -103,6 +103,25 @@ Safe mode has negligible performance impact:
 | Disabled | 24.88 ms    |
 | Enabled  | 25.04 ms    |
 
+## Config Lever Cost: blocksInterruptParagraphs
+
+The `blocksInterruptParagraphs` lever lets a top-level block element interrupt a
+paragraph without a blank line in front of it (markdown-style). Its cost depends
+entirely on whether a document actually triggers that path. Relative A/B on
+equivalent ~50 KB documents:
+
+| Document shape                                   | vs default |
+|--------------------------------------------------|------------|
+| Plain prose (paragraphs separated by blank lines) | no measurable change |
+| Block abutting every paragraph (no blank line)   | ~50% slower |
+
+Enabling the lever is effectively free for normal documents: when no block ever
+abuts a paragraph, the extra check costs nothing measurable. The overhead only
+appears on the markdown-style content the lever exists for, where each
+interruption splits one paragraph into a paragraph plus a separate block and
+therefore parses and builds more nodes. The slowdown is proportional to how
+often blocks abut paragraphs, not a fixed tax.
+
 ## Memory Usage
 
 Memory scales approximately linearly with document size:
