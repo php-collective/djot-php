@@ -126,6 +126,38 @@ Plain code block
 </template>
 </OutputTabs>
 
+::: info Closing fence is optional
+The closing fence may be omitted. An unterminated code block is implicitly
+closed at the end of its enclosing block (a list item, a block quote) or the
+end of the document - the same rule the official djot reference uses:
+
+````djot
+> ```
+> code in a block quote
+````
+
+renders the fenced block closed at the end of the quote. A bare `` ``` `` with
+nothing after it is therefore a valid (empty) code block, not an inline code
+span.
+:::
+
+::: info Language specifier must be a single token
+After the opening fence, only a single-token language specifier (optionally
+surrounded by whitespace) is allowed - "nothing else". A would-be info string
+with internal whitespace is **not** a code block opener: the backtick form
+falls through to an inline verbatim span, and the tilde form to a plain
+paragraph.
+
+| Input | Result |
+|-------|--------|
+| `` ``` `` | empty code block |
+| `` ``` php `` | code block, `language-php` |
+| `` ``` not a code block `` | inline `<code>` span (not a code block) |
+
+The enhanced [code group](/extensions/) syntax (`lang [Label]`) is the one
+exception, and only applies to fences that have content lines.
+:::
+
 ### Block Quotes
 
 Block quotes use `>` at the start of each line.
@@ -991,6 +1023,11 @@ More outer
 </div>
 </template>
 </OutputTabs>
+
+::: info Closing fence is optional
+Like code blocks, the closing `:::` may be omitted - an unterminated div is
+implicitly closed at the end of its enclosing block or the document.
+:::
 
 ### Comments
 
