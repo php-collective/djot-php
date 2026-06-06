@@ -57,10 +57,11 @@ class BlockParser
      * `> ` repeated thousands of times) exhausts the stack or memory. Past this
      * depth, container content is emitted as a literal paragraph instead of
      * recursing. Far above any real document; only adversarial input reaches it.
+     *
+     * @var int
      */
     private const MAX_NESTING_DEPTH = 200;
 
-    /** Current block-container nesting depth, maintained by parseBlocks(). */
     private int $nestingDepth = 0;
 
     protected InlineParser $inlineParser;
