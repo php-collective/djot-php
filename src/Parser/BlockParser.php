@@ -3476,10 +3476,18 @@ class BlockParser
                 // interrupts without a blank line (it would otherwise drop a
                 // genuine single-line or lazily-wrapped list).
                 if (isset($line[1]) && $line[1] === ' ') {
-                    return true; // Unordered list
+                    // An empty list item (marker followed by only whitespace)
+                    // cannot interrupt an OPEN PARAGRAPH (CommonMark/djot rule) -
+                    // it folds into the paragraph instead of opening a stray empty
+                    // <li>. Paragraph interruption is the only caller that passes
+                    // $lines for lookahead; in every other context (heading
+                    // termination, etc.) an empty marker still starts a new block.
+                    if ($lines === null || trim(substr($line, 2)) !== '') {
+                        return true; // Unordered list
+                    }
                 }
 
-                // Thematic breaks: *\s*\*\s*\* or -\s*-\s*-
+                // Thematic breaks still interrupt: *\s*\*\s*\* or -\s*-\s*-
                 return preg_match('/^(\*\s*\*\s*\*|-\s*-\s*-)/', $line) === 1;
             case '|':
                 // Tables: a single "| a | b |" row is already a valid table, but
@@ -3500,9 +3508,15 @@ class BlockParser
                 return isset($line[1], $line[2]) && $line[1] === '%' && $line[2] === '%';
             default:
                 // Only 1. or 1) can interrupt paragraphs (CommonMark rule)
-                // Prevents "1985. That year..." from becoming a list
+                // Prevents "1985. That year..." from becoming a list. When
+                // interrupting an open paragraph (lookahead via $lines), an empty
+                // item ("1. " with no content) cannot interrupt either, so require
+                // a non-space char after the marker; other contexts keep starting
+                // a block on a bare empty marker.
                 if ($first === '1') {
-                    return preg_match('/^1[.)]\s/', $line) === 1;
+                    $pattern = $lines === null ? '/^1[.)]\s/' : '/^1[.)]\s+\S/';
+
+                    return preg_match($pattern, $line) === 1;
                 }
 
                 return false;
