@@ -1898,6 +1898,51 @@ class BlockParser
                 break;
             }
 
+            // List-continuation marker (AsciiDoc-style `+`): a lone `+` at the
+            // marker column attaches the FOLLOWING flush-left block(s) to the
+            // current item, with no blank line, keeping the list tight. A bare
+            // `+` is never a bullet (a bullet needs `+ ` + content), so this does
+            // not collide with `+`-bulleted lists. Lets you attach a code block,
+            // table or quote to an item without indenting its body.
+            if ($currentIndent === $baseIndent && trim($currentLine) === '+') {
+                $lastItem = $this->listParser->getLastListItem($list);
+                if ($lastItem !== null) {
+                    $i++; // consume the `+` marker line
+                    /** @var array<string> $attached */
+                    $attached = [];
+                    while ($i < $count) {
+                        $line = $lines[$i];
+                        if (IndentationHelper::isBlankLine($line)) {
+                            break; // a blank ends the attachment (single-block demo scope)
+                        }
+                        $lineIndent = IndentationHelper::getLeadingSpaces($line);
+                        if ($lineIndent < $baseIndent) {
+                            break;
+                        }
+                        $trimmed = ltrim($line);
+                        if ($lineIndent === $baseIndent) {
+                            // Stop at a sibling item marker or a further `+` marker.
+                            $marker = $this->listParser->parseListItemMarker($trimmed);
+                            if ($marker !== null && $this->listParser->itemMatchesList($listInfo, $marker)) {
+                                break;
+                            }
+                            if ($trimmed === '+') {
+                                break;
+                            }
+                        }
+                        $attached[] = IndentationHelper::stripLeadingIndent($line, $baseIndent);
+                        $i++;
+                    }
+                    if ($attached !== []) {
+                        $this->parseBlocks($lastItem, $attached, 0);
+                    }
+                    // The continuation attaches content but does not loosen the list.
+                    $lastItemHadBlankAfter = false;
+
+                    continue;
+                }
+            }
+
             // Check for indented continuation (after blank line = nested content)
             if ($lastItemHadBlankAfter && $currentIndent > $baseIndent) {
                 // Content after blank line with indentation belongs to previous item
@@ -2074,6 +2119,12 @@ class BlockParser
                 if ($nextIndent === $baseIndent) {
                     $nextInfo = $this->listParser->parseListItemMarker($nextTrimmed);
                     if ($nextInfo !== null) {
+                        break;
+                    }
+                    // List-continuation marker: stop collecting lead text so the
+                    // main loop's `+` handler attaches the following block to this
+                    // item (instead of swallowing `+` as lazy continuation text).
+                    if ($nextTrimmed === '+') {
                         break;
                     }
                     // Non-list content at base indent - check if it starts another block

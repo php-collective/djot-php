@@ -1,0 +1,62 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Djot\Test\TestCase;
+
+use Djot\DjotConverter;
+use Djot\Renderer\SoftBreakMode;
+use PHPUnit\Framework\TestCase;
+
+/**
+ * List continuation marker (AsciiDoc-style `+`).
+ *
+ * A lone `+` at the list marker column attaches the following block to the
+ * current item with no blank line, keeping the list tight, without indenting the
+ * block body. A bare `+` is never a bullet (a bullet needs `+ ` + content), so
+ * it does not collide with `+`-bulleted lists; outside a list it stays literal.
+ *
+ * djot-php addition (not canonical djot).
+ */
+class ListContinuationMarkerTest extends TestCase
+{
+    protected DjotConverter $converter;
+
+    protected function setUp(): void
+    {
+        $this->converter = new DjotConverter();
+        $this->converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
+    }
+
+    public function testAttachesCodeBlockFlushLeftAndTight(): void
+    {
+        $html = $this->converter->convert("- Build\n+\n```sh\ndocker build .\n```\n- Push");
+        $this->assertStringContainsString("<li>\nBuild\n<pre><code class=\"language-sh\">docker build .\n</code></pre>", $html);
+        $this->assertStringNotContainsString('<p>Build</p>', $html);
+        $this->assertStringContainsString("<li>\nPush\n</li>", $html);
+    }
+
+    public function testAttachesBlockquoteTight(): void
+    {
+        $html = $this->converter->convert("- item\n+\n> note\n- next");
+        $this->assertStringContainsString("<li>\nitem\n<blockquote>", $html);
+        $this->assertStringNotContainsString('<p>item</p>', $html);
+    }
+
+    public function testBareMarkerIsNotABulletInsideOrOutsideList(): void
+    {
+        // Outside a list: a lone `+` is ordinary paragraph text.
+        $this->assertStringContainsString('<p>+</p>', $this->converter->convert("para\n\n+\n\nnext"));
+        // Real `+` bullets (marker + space + content) are unaffected.
+        $bullets = $this->converter->convert("+ one\n+ two");
+        $this->assertStringContainsString("<li>\none\n</li>", $bullets);
+        $this->assertStringContainsString("<li>\ntwo\n</li>", $bullets);
+    }
+
+    public function testContinuationDoesNotLoosenList(): void
+    {
+        $html = $this->converter->convert("- a\n+\n> q\n- b");
+        // No item is <p>-wrapped: the list stayed tight.
+        $this->assertStringNotContainsString("<li>\n<p>", $html);
+    }
+}

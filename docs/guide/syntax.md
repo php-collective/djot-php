@@ -575,6 +575,63 @@ With `nestedListsWithoutBlankLine` mode enabled, nested lists can appear immedia
 
 See the [Parser Options guide](/guide/parser-options#nested-lists-without-blank-line-mode) for more on `nestedListsWithoutBlankLine` mode.
 
+#### List Continuation Marker
+
+::: warning djot-php addition
+The `+` continuation marker is a djot-php extension, **not** part of canonical
+djot — djot.js does not recognize it. Documents that rely on it are not portable
+to other djot implementations.
+:::
+
+A lone `+` on its own line, at the list marker's column, attaches the following
+block to the current list item **without a blank line and without making the
+list loose**. It lets you keep a tight item that carries a code block, table,
+admonition or quote, without indenting the block's body — useful for deeply
+nested or wide-marker lists, and for pasting code (no re-indenting every line).
+
+````djot
+- Build the image
++
+```sh
+docker build -t app .
+```
+- Push it
+````
+
+renders a **tight** list whose first item carries the code block flush-left:
+
+```html
+<ul>
+<li>
+Build the image
+<pre><code class="language-sh">docker build -t app .
+</code></pre>
+</li>
+<li>
+Push it
+</li>
+</ul>
+```
+
+A blockquote, table or `:::` admonition attaches the same way:
+
+```djot
+- item
++
+> a note attached to the item
+- next
+```
+
+::: tip Notes
+- A bare `+` is **never** a bullet (a bullet needs `+ ` plus content), so this
+  does not collide with `+`-bulleted lists.
+- The marker attaches one block, up to the next blank line, sibling item, or a
+  further `+`.
+- Outside a list, a lone `+` is ordinary paragraph text.
+- This is sugar, not new structure: the same result is also reachable by
+  indenting the block under the item (which djot already supports).
+:::
+
 ### Definition Lists
 
 Terms are prefixed with `: ` and definitions are indented below.
