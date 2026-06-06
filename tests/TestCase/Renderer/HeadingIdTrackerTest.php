@@ -175,36 +175,47 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('Multiple-Spaces', $this->tracker->normalizeId('Multiple   Spaces'));
         $this->assertSame('this-t-key-params-fallback', $this->tracker->normalizeId("\$this->t(\$key, \$params = [], \$fallback = '')"));
         $this->assertSame('My-title', $this->tracker->normalizeId('My --- title'));
-        // Non-ASCII is transliterated to keep shared anchors link-safe; the
-        // Latin/Cyrillic output is deterministic with or without ext-intl.
-        $this->assertSame('Privet-mir', $this->tracker->normalizeId('Привет мир'));
+        // jgm/djot#393: non-ASCII is preserved (case kept), not transliterated.
+        $this->assertSame('Привет-мир', $this->tracker->normalizeId('Привет мир'));
         $this->assertSame('', $this->tracker->normalizeId('###'));
-        $this->assertSame('h-123-Things', $this->tracker->normalizeId('123 Things'));
-        $this->assertSame('h-1-Introduction', $this->tracker->normalizeId('1. Introduction'));
+        $this->assertSame('s-123-Things', $this->tracker->normalizeId('123 Things'));
+        $this->assertSame('s-1-Introduction', $this->tracker->normalizeId('1. Introduction'));
     }
 
     /**
-     * Pins djot-php's heading-ID behaviour around jgm/djot#391.
-     *
-     * djot-php replaces (not removes) mid-word punctuation, additionally
-     * replaces apostrophes / quotes / `;` / `:` so IDs are valid CSS
-     * identifiers, and transliterates non-ASCII to ASCII so the IDs survive
-     * being shared as URL fragments through auto-linkers. All cases below
-     * are deterministic with or without ext-intl.
+     * Pins djot-php's heading-ID behaviour to jgm/djot#393: each maximal run of
+     * non-alphanumeric ASCII is replaced with `-` and leading/trailing `-` are
+     * trimmed. Case and non-ASCII characters (Cyrillic, accented Latin, smart
+     * quotes) are preserved; `_` is replaced (no longer an exception). A
+     * leading-digit result keeps the `h-` prefix for CSS-selector safety
+     * (orthogonal to #393). ASCII-folding is opt-in via AsciiHeadingIdsExtension.
      */
     public function testNormalizeIdSpecAlignmentEdgeCases(): void
     {
         $this->assertSame('A-B-C', $this->tracker->normalizeId('A+B=C'));
         $this->assertSame('Emphasis-strong', $this->tracker->normalizeId('Emphasis/strong'));
         $this->assertSame('That-s-all', $this->tracker->normalizeId("That's all"));
-        $this->assertSame('That-s-all', $this->tracker->normalizeId('That’s all'));
+        $this->assertSame('That’s-all', $this->tracker->normalizeId('That’s all'));
         $this->assertSame('foo-bar', $this->tracker->normalizeId('foo...bar'));
         $this->assertSame('Uber-uns', $this->tracker->normalizeId('Uber uns'));
-        $this->assertSame('Uber-uns', $this->tracker->normalizeId('Über uns'));
-        $this->assertSame('cafe-resume', $this->tracker->normalizeId('café résumé'));
-        $this->assertSame('Strasse', $this->tracker->normalizeId('Straße'));
-        $this->assertSame('h-2024-recap', $this->tracker->normalizeId('2024 recap'));
+        $this->assertSame('Über-uns', $this->tracker->normalizeId('Über uns'));
+        $this->assertSame('café-résumé', $this->tracker->normalizeId('café résumé'));
+        $this->assertSame('Straße', $this->tracker->normalizeId('Straße'));
+        $this->assertSame('s-2024-recap', $this->tracker->normalizeId('2024 recap'));
         $this->assertSame('', $this->tracker->normalizeId('!!!'));
+    }
+
+    /**
+     * An id transform (e.g. the one set by AsciiHeadingIdsExtension) is applied to
+     * the spec id; here it transliterates non-ASCII to ASCII for portability.
+     */
+    public function testAsciiHeadingIdsOptInTransliterates(): void
+    {
+        $transliterator = new AsciiTransliterator();
+        $ascii = new HeadingIdTracker(static fn (string $id): string => $transliterator->transliterate($id));
+        $this->assertSame('Privet-mir', $ascii->normalizeId('Привет мир'));
+        $this->assertSame('Uber-uns', $ascii->normalizeId('Über uns'));
+        $this->assertSame('cafe-resume', $ascii->normalizeId('café résumé'));
     }
 
     public function testGetPlainText(): void
@@ -370,28 +381,29 @@ class HeadingIdTrackerTest extends TestCase
     }
 
     /**
-     * djot.js keeps `_` (it is not in its punctuation denylist) and it is a
-     * valid CSS identifier character, so djot-php keeps it too. This pins the
-     * deliberate divergence from the looser #393 spec prose.
+     * jgm/djot#393 removes the per-character exceptions: `_` is non-alphanumeric
+     * ASCII, so it is replaced with `-` like any other punctuation.
      */
-    public function testUnderscoreRetainedInId(): void
+    public function testUnderscoreReplacedInId(): void
     {
         $heading = new Heading(2);
         $heading->appendChild(new Text('foo_bar baz'));
 
         $id = $this->tracker->getIdForHeading($heading);
 
-        $this->assertSame('foo_bar-baz', $id);
+        $this->assertSame('foo-bar-baz', $id);
     }
 
     /**
-     * When transliteration removes the entire heading text (a script outside
-     * the baked map, no ext-intl), the heading must fall back to a stable
-     * generated `s-N` id — not the legacy `heading` sentinel.
+     * With an ASCII-folding id transform, when transliteration removes the entire
+     * heading text (a script outside the baked map, no ext-intl), the heading must
+     * fall back to a stable generated `s-N` id. (By default the non-ASCII text is
+     * preserved instead, per #393, so no fallback occurs.)
      */
     public function testHeadingThatTransliteratesToNothingGetsFallbackId(): void
     {
-        $tracker = new HeadingIdTracker(new AsciiTransliterator(useIntl: false));
+        $transliterator = new AsciiTransliterator(useIntl: false);
+        $tracker = new HeadingIdTracker(static fn (string $id): string => $transliterator->transliterate($id));
 
         $cjk = new Heading(2);
         $cjk->appendChild(new Text('日本語の見出し'));
