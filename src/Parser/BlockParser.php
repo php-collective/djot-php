@@ -1571,11 +1571,21 @@ class BlockParser
         $this->pendingAttributeSourceLines = [];
 
         $innerLines = [];
+        $lazyState = [
+            'inFence' => false,
+            'fenceChar' => '',
+            'fenceLength' => 0,
+            'inComment' => false,
+            'commentLength' => 0,
+            'paragraphOpen' => false,
+        ];
 
         if (preg_match('/^> (.*)$/', $line, $matches)) {
             $innerLines[] = $matches[1];
+            $this->trackBlockQuoteLazyState($matches[1], $lazyState);
         } elseif (preg_match('/^>$/', $line)) {
             $innerLines[] = '';
+            $this->trackBlockQuoteLazyState('', $lazyState);
         }
 
         $i = $start + 1;
@@ -1591,15 +1601,20 @@ class BlockParser
             // Continue with "> " prefix (space required per spec)
             if (preg_match('/^> (.*)$/', $currentLine, $matches)) {
                 $innerLines[] = $matches[1];
+                $this->trackBlockQuoteLazyState($matches[1], $lazyState);
                 $i++;
             } elseif (preg_match('/^>$/', $currentLine)) {
                 // Empty block quote line (just >)
                 $innerLines[] = '';
+                $this->trackBlockQuoteLazyState('', $lazyState);
                 $i++;
-            } elseif (!$this->startsNewBlock($currentLine)) {
-                // Lazy continuation - includes lines starting with ">" but no space
-                // These become literal ">text" in the paragraph
+            } elseif ($lazyState['paragraphOpen'] && !$this->startsNewBlock($currentLine)) {
+                // Lazy continuation only extends an OPEN paragraph (djot rule).
+                // A non-">" line inside an open code fence/comment, or after a
+                // block that left no open paragraph (a just-opened div, a closed
+                // fence), terminates the quote instead of being swallowed.
                 $innerLines[] = $currentLine;
+                $this->trackBlockQuoteLazyState($currentLine, $lazyState);
                 $i++;
             } else {
                 break;
@@ -1615,6 +1630,84 @@ class BlockParser
         $parent->appendChild($blockQuote);
 
         return $i - $start;
+    }
+
+    /**
+     * Track verbatim/paragraph state across a blockquote's collected inner lines.
+     *
+     * A non-">" line lazily continues a blockquote only when an open paragraph is
+     * available to extend (the djot/CommonMark lazy-continuation rule). Inside an
+     * open code fence or fenced comment, or after a structural line that leaves no
+     * open paragraph (a just-opened div, a closed fence), such a line must instead
+     * terminate the quote - otherwise it is wrongly swallowed into the fence/div.
+     *
+     * @param string $content Inner content line (after the "> " marker is stripped).
+     * @param array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool} $state
+     *     Running state, mutated in place.
+     */
+    private function trackBlockQuoteLazyState(string $content, array &$state): void
+    {
+        if ($state['inComment']) {
+            if ($this->fencedBlockParser->isFencedCommentCloser($content, $state['commentLength'])) {
+                $state['inComment'] = false;
+            }
+            $state['paragraphOpen'] = false;
+
+            return;
+        }
+
+        if ($state['inFence']) {
+            if ($this->fencedBlockParser->isCodeFenceCloser($content, $state['fenceChar'], $state['fenceLength'])) {
+                $state['inFence'] = false;
+            }
+            $state['paragraphOpen'] = false;
+
+            return;
+        }
+
+        if (IndentationHelper::isBlankLine($content)) {
+            $state['paragraphOpen'] = false;
+
+            return;
+        }
+
+        // A fence/comment/div opener starts a new block only when it is allowed to:
+        // djot paragraphs are not interrupted by block elements without a blank line,
+        // so a fence-looking line mid-paragraph is just paragraph text. With
+        // blocksInterruptParagraphs enabled, openers DO interrupt an open paragraph.
+        if (!$state['paragraphOpen'] || $this->blocksInterruptParagraphs) {
+            $fenceInfo = $this->fencedBlockParser->parseCodeFenceOpener($content);
+            if ($fenceInfo !== null) {
+                $state['inFence'] = true;
+                $state['fenceChar'] = $fenceInfo['char'];
+                $state['fenceLength'] = $fenceInfo['length'];
+                $state['paragraphOpen'] = false;
+
+                return;
+            }
+
+            $commentInfo = $this->fencedBlockParser->parseFencedCommentOpener($content);
+            if ($commentInfo !== null) {
+                $state['inComment'] = true;
+                $state['commentLength'] = $commentInfo['length'];
+                $state['paragraphOpen'] = false;
+
+                return;
+            }
+
+            if ($this->fencedBlockParser->parseDivFenceOpener($content) !== null) {
+                // Div opener/closer line is structural; it opens no paragraph itself.
+                $state['paragraphOpen'] = false;
+
+                return;
+            }
+        }
+
+        // Any other non-blank line is paragraph-ish content (plain text, an open
+        // paragraph's continuation, or a block that opens with text on the same line:
+        // list item, heading, nested quote) - all leave an open paragraph a lazy line
+        // may continue.
+        $state['paragraphOpen'] = true;
     }
 
     /**
