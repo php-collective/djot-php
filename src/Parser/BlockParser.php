@@ -1124,16 +1124,21 @@ class BlockParser
             $i++;
         }
 
-        // If not closed and using backticks, check if this should be inline code
-        if (!$closed && $fenceChar === '`') {
-            if ($i === $start + 1 && $info !== '') {
-                // Single line unclosed fence with content - treat as inline code in a paragraph
-                return null;
-            }
-            if ($content === '' && $info === '') {
-                // Empty unclosed fence (just ``` with nothing) - treat as inline code
-                return null;
-            }
+        // An unterminated single-line backtick fence whose info string carries
+        // internal whitespace is not a code block but an inline verbatim span
+        // (e.g. "``` not a code block" -> <p><code> not a code block</code></p>,
+        // per the djot.js reference and the official conformance suite). A bare
+        // fence ("```") or a single-token language specifier ("``` php") still
+        // opens an (empty) code block. Fences with content lines use the
+        // enhanced lang+label syntax and are left untouched.
+        if (
+            !$closed
+            && $fenceChar === '`'
+            && $i === $start + 1
+            && $info !== ''
+            && preg_match('/\s/', $info) === 1
+        ) {
+            return null;
         }
 
         if (!$closed) {

@@ -3078,6 +3078,24 @@ DJOT;
         $this->assertSame("<p><code> not a code block</code></p>\n", $result);
     }
 
+    public function testUnclosedEmptyBacktickFenceIsCodeBlock(): void
+    {
+        // A bare unterminated ``` with no content and no info string is an
+        // empty code block, not an inline span (matches djot.js + tilde form).
+        $result = $this->converter->convert('```');
+
+        $this->assertSame("<pre><code></code></pre>\n", $result);
+    }
+
+    public function testUnclosedEmptyBacktickFenceWithLanguageIsCodeBlock(): void
+    {
+        // A single-token language specifier on an unterminated empty fence
+        // still opens a code block and keeps the language class.
+        $result = $this->converter->convert('``` php');
+
+        $this->assertSame("<pre><code class=\"language-php\"></code></pre>\n", $result);
+    }
+
     public function testBackticksWithClosingFenceIsCodeBlock(): void
     {
         // Triple backticks with proper closing = code block
