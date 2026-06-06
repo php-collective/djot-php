@@ -200,6 +200,7 @@ class BlockParser
      * resolution) matches the rendered ids. Set by AsciiHeadingIdsExtension.
      *
      * @var \Closure|null
+     * @phpstan-var (\Closure(string): string)|null
      */
     protected ?Closure $headingIdTransformer = null;
 
