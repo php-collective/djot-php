@@ -3,22 +3,28 @@
 Performance benchmarks for djot-php compared to other implementations.
 
 **Test Environment:**
-- PHP 8.4.18 (OPcache enabled)
-- Node.js v18.19.1
+- PHP 8.4.21 (OPcache enabled)
+- Node.js v22.22.2
 - Python 3.12.3
 - Rust (jotdown 0.7)
-- Go (godjot)
-- Linux 6.17.0-19-generic
+- Go (godjot v1.0.6)
+- Linux 6.17.0-35-generic
+
+> [!NOTE]
+> The djot-php tables below (size scaling, content type, safe mode, memory) were
+> re-measured June 2026. The cross-implementation tables (PHP alternatives,
+> cross-language, profiles) are pending a re-measurement on an unloaded machine
+> and still show the previous figures.
 
 ## Quick Reference
 
 | Document Size | PHP Full | Throughput |
 |---------------|----------|------------|
-| 1 KB          | 0.55 ms  | ~2.0 MB/s  |
-| 10 KB         | 4.9 ms   | ~2.2 MB/s  |
-| 56 KB         | 23 ms    | ~2.4 MB/s  |
-| 225 KB        | 115 ms   | ~1.9 MB/s  |
-| 1 MB          | 579 ms   | ~1.9 MB/s  |
+| 1 KB          | 0.51 ms  | ~2.1 MB/s  |
+| 11 KB         | 5.2 ms   | ~2.1 MB/s  |
+| 56 KB         | 26 ms    | ~2.2 MB/s  |
+| 225 KB        | 118 ms   | ~1.9 MB/s  |
+| 1 MB          | 605 ms   | ~1.9 MB/s  |
 
 ## PHP Alternatives Comparison
 
@@ -54,25 +60,25 @@ Benchmarked on medium-sized documents (~56 KB):
 
 PHP djot-php scales linearly with document size:
 
-| Size    | Input     | Mean Time | Throughput |
-|---------|-----------|-----------|------------|
-| tiny    | 1.1 KB    | 0.55 ms   | 2.0 MB/s   |
-| small   | 11.1 KB   | 4.88 ms   | 2.2 MB/s   |
-| medium  | 56.1 KB   | 23.24 ms  | 2.4 MB/s   |
-| large   | 225.5 KB  | 114.52 ms | 1.9 MB/s   |
-| huge    | 1.1 MB    | 579.20 ms | 1.9 MB/s   |
+| Size    | Input     | Median Time | Throughput |
+|---------|-----------|-------------|------------|
+| tiny    | 1.1 KB    | 0.51 ms     | 2.1 MB/s   |
+| small   | 11.1 KB   | 5.24 ms     | 2.1 MB/s   |
+| medium  | 56.1 KB   | 25.92 ms    | 2.2 MB/s   |
+| large   | 225.5 KB  | 118.09 ms   | 1.9 MB/s   |
+| huge    | 1.1 MB    | 605.36 ms   | 1.9 MB/s   |
 
 ## Content Type Performance
 
 Different content types have varying performance characteristics:
 
-| Content Type   | Size    | Mean Time | Throughput | Notes                     |
-|----------------|---------|-----------|------------|---------------------------|
-| code_heavy     | 5.8 KB  | 1.18 ms   | 4.8 MB/s   | Fastest - simple parsing  |
-| nested_lists   | 5.6 KB  | 3.48 ms   | 1.6 MB/s   | Average                   |
-| complex        | 8.9 KB  | 6.18 ms   | 1.4 MB/s   | Many features             |
-| tables         | 9.2 KB  | 6.67 ms   | 1.3 MB/s   | Table parsing overhead    |
-| inline_heavy   | 14.8 KB | 11.25 ms  | 1.3 MB/s   | Many inline elements      |
+| Content Type   | Size    | Median Time | Throughput | Notes                     |
+|----------------|---------|-------------|------------|---------------------------|
+| code_heavy     | 5.8 KB  | 1.74 ms     | 3.4 MB/s   | Fastest - simple parsing  |
+| nested_lists   | 5.6 KB  | 3.14 ms     | 1.8 MB/s   | Average                   |
+| tables         | 9.2 KB  | 5.13 ms     | 1.4 MB/s   | Table parsing overhead    |
+| complex        | 8.9 KB  | 5.28 ms     | 1.7 MB/s   | Many features             |
+| inline_heavy   | 14.8 KB | 9.16 ms     | 1.3 MB/s   | Many inline elements      |
 
 Code-heavy documents are fastest because code blocks require minimal parsing.
 
@@ -92,10 +98,10 @@ Different profiles have similar performance since they filter the same AST:
 
 Safe mode has negligible performance impact:
 
-| Mode     | Mean Time |
-|----------|-----------|
-| Disabled | 20.01 ms  |
-| Enabled  | 20.54 ms  |
+| Mode     | Median Time |
+|----------|-------------|
+| Disabled | 24.88 ms    |
+| Enabled  | 25.04 ms    |
 
 ## Memory Usage
 
@@ -103,9 +109,9 @@ Memory scales approximately linearly with document size:
 
 | Input Size | Peak Memory | Ratio    |
 |------------|-------------|----------|
-| 11 KB      | 72 MB       | ~6500x   |
-| 57 KB      | 72 MB       | ~1260x   |
-| 226 KB     | 72 MB       | ~320x    |
+| 11 KB      | 66 MB       | ~6100x   |
+| 57 KB      | 66 MB       | ~1200x   |
+| 226 KB     | 68 MB       | ~310x    |
 | 1 MB       | ~80 MB      | ~80x     |
 
 Note: PHP has a base memory overhead. The incremental memory per input byte is approximately 30-45x.
@@ -127,7 +133,7 @@ php benchmark.php
 
 ## Key Takeaways
 
-1. **Throughput**: PHP djot-php processes ~2.0-2.4 MB/s of djot content (with OPcache)
+1. **Throughput**: PHP djot-php processes ~1.9-2.2 MB/s of djot content (with OPcache)
 2. **vs CommonMark (Full)**: djot-php is **2x faster** with equivalent features
 3. **vs Parsedown**: Parsedown is 6-7x faster but lacks advanced features
 4. **Scaling**: Performance scales linearly with document size (O(n))
