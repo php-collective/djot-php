@@ -1724,30 +1724,39 @@ class BlockParser
         // so a fence-looking line mid-paragraph is just paragraph text. With
         // blocksInterruptParagraphs enabled, openers DO interrupt an open paragraph.
         if (!$state['paragraphOpen'] || $this->blocksInterruptParagraphs) {
-            $fenceInfo = $this->fencedBlockParser->parseCodeFenceOpener($content);
-            if ($fenceInfo !== null) {
-                $state['inFence'] = true;
-                $state['fenceChar'] = $fenceInfo['char'];
-                $state['fenceLength'] = $fenceInfo['length'];
-                $state['paragraphOpen'] = false;
+            // Each opener below requires a specific first non-space character
+            // (code fence ` or ~, fenced comment %, div :). Dispatch on it so a
+            // plain-text continuation line skips all three probes and their
+            // per-line trim allocations - the common case under
+            // blocksInterruptParagraphs, where this branch runs for every line.
+            $firstChar = $content[strspn($content, " \t\n\r\0\x0B")] ?? '';
 
-                return;
-            }
+            if ($firstChar === '`' || $firstChar === '~') {
+                $fenceInfo = $this->fencedBlockParser->parseCodeFenceOpener($content);
+                if ($fenceInfo !== null) {
+                    $state['inFence'] = true;
+                    $state['fenceChar'] = $fenceInfo['char'];
+                    $state['fenceLength'] = $fenceInfo['length'];
+                    $state['paragraphOpen'] = false;
 
-            $commentInfo = $this->fencedBlockParser->parseFencedCommentOpener($content);
-            if ($commentInfo !== null) {
-                $state['inComment'] = true;
-                $state['commentLength'] = $commentInfo['length'];
-                $state['paragraphOpen'] = false;
+                    return;
+                }
+            } elseif ($firstChar === '%') {
+                $commentInfo = $this->fencedBlockParser->parseFencedCommentOpener($content);
+                if ($commentInfo !== null) {
+                    $state['inComment'] = true;
+                    $state['commentLength'] = $commentInfo['length'];
+                    $state['paragraphOpen'] = false;
 
-                return;
-            }
+                    return;
+                }
+            } elseif ($firstChar === ':') {
+                if ($this->fencedBlockParser->parseDivFenceOpener($content) !== null) {
+                    // Div opener/closer line is structural; it opens no paragraph itself.
+                    $state['paragraphOpen'] = false;
 
-            if ($this->fencedBlockParser->parseDivFenceOpener($content) !== null) {
-                // Div opener/closer line is structural; it opens no paragraph itself.
-                $state['paragraphOpen'] = false;
-
-                return;
+                    return;
+                }
             }
         }
 
