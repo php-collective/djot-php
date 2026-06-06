@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Parser;
 
+use Closure;
 use Djot\Exception\ParseException;
 use Djot\Exception\ParseWarning;
 use Djot\Node\Block\BlockQuote;
@@ -194,11 +195,13 @@ class BlockParser
     protected bool $nestedListsWithoutBlankLine = false;
 
     /**
-     * When true, heading ids are ASCII-folded (opt-in). Mirrors the renderer's
-     * HeadingIdTracker setting so parser-side id computation (heading reference
-     * resolution) matches the rendered ids.
+     * Optional heading-id transform, mirrored from the renderer's
+     * HeadingIdTracker so parser-side id computation (heading reference
+     * resolution) matches the rendered ids. Set by AsciiHeadingIdsExtension.
+     *
+     * @var \Closure(string):|null string|null
      */
-    protected bool $asciiHeadingIds = false;
+    protected ?Closure $headingIdTransformer = null;
 
     public function __construct(
         bool $collectWarnings = false,
@@ -207,11 +210,9 @@ class BlockParser
         bool $nestedBlocksInLists = false,
         bool $blocksInterruptParagraphs = false,
         bool $nestedListsWithoutBlankLine = false,
-        bool $asciiHeadingIds = false,
     ) {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
-        $this->asciiHeadingIds = $asciiHeadingIds;
         // significantNewlines is the deprecated union of blocksInterruptParagraphs
         // and nestedListsWithoutBlankLine (NOT the broad nestedBlocksInLists).
         $this->blocksInterruptParagraphs = $blocksInterruptParagraphs || $significantNewlines;
@@ -221,6 +222,18 @@ class BlockParser
         $this->listParser = new ListParser();
         $this->tableParser = new TableParser();
         $this->fencedBlockParser = new FencedBlockParser();
+    }
+
+    /**
+     * Set the optional heading-id transform used by the heading-reference
+     * resolution pass, so parser-computed ids match the renderer's. Set by
+     * AsciiHeadingIdsExtension to keep ids and `[Heading][]` links in parity.
+     *
+     * @param \Closure(string): string|null $transformer
+     */
+    public function setHeadingIdTransformer(?Closure $transformer): void
+    {
+        $this->headingIdTransformer = $transformer;
     }
 
     /**
@@ -706,7 +719,7 @@ class BlockParser
      */
     protected function extractHeadingReferences(array $lines): void
     {
-        $headingIdTracker = new HeadingIdTracker(null, $this->asciiHeadingIds);
+        $headingIdTracker = new HeadingIdTracker($this->headingIdTransformer);
         $pendingId = null;
         $count = count($lines);
 
@@ -789,7 +802,7 @@ class BlockParser
      */
     protected function rewriteHeadingReferences(Document $document): void
     {
-        $tracker = new HeadingIdTracker(null, $this->asciiHeadingIds);
+        $tracker = new HeadingIdTracker($this->headingIdTransformer);
         $tracker->reserveExplicitIds($document);
 
         /** @var array<string, string> $newUrlByLabel */

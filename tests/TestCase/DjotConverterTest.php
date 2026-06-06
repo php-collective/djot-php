@@ -7,6 +7,7 @@ namespace Djot\Test\TestCase;
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
 use Djot\Exception\ParseException;
+use Djot\Extension\AsciiHeadingIdsExtension;
 use Djot\Extension\HeadingLevelShiftExtension;
 use Djot\Extension\TabsExtension;
 use Djot\Node\Block\Heading;
@@ -1923,9 +1924,10 @@ DJOT;
         $this->assertStringContainsString('<h1>日本語の見出し</h1>', $result);
         $this->assertStringContainsString('id="日本語の見出し"', $result);
 
-        // The opt-in asciiHeadingIds mode folds the id to ASCII for URL/CSS
-        // portability.
-        $ascii = (new DjotConverter(asciiHeadingIds: true))->convert($djot);
+        // AsciiHeadingIdsExtension folds the id to ASCII for URL/CSS portability.
+        $asciiConverter = new DjotConverter();
+        $asciiConverter->addExtension(new AsciiHeadingIdsExtension());
+        $ascii = $asciiConverter->convert($djot);
         $this->assertMatchesRegularExpression('/<section id="[\x21-\x7E]+">/', $ascii);
         if (class_exists(Transliterator::class)) {
             $this->assertStringContainsString('<section id="ri-ben-yuno-jian-chushi">', $ascii);

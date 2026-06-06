@@ -131,7 +131,6 @@ class DjotConverter
      * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines (deprecated; prefer blocksInterruptParagraphs + nestedListsWithoutBlankLine)
      * @param bool $blocksInterruptParagraphs Allow top-level block elements to interrupt paragraphs without a blank line
      * @param bool $nestedListsWithoutBlankLine Allow sublists to nest in list items without a blank line
-     * @param bool $asciiHeadingIds
      */
     public function __construct(
         bool $xhtml = false,
@@ -147,7 +146,6 @@ class DjotConverter
         bool $nestedBlocksInLists = false,
         bool $blocksInterruptParagraphs = false,
         bool $nestedListsWithoutBlankLine = false,
-        bool $asciiHeadingIds = false,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
@@ -156,14 +154,14 @@ class DjotConverter
         if ($parser !== null) {
             $this->parser = $parser;
         } else {
-            $this->parser = new BlockParser($warnings, $strict, $significantNewlines, $nestedBlocksInLists, $blocksInterruptParagraphs, $nestedListsWithoutBlankLine, $asciiHeadingIds);
+            $this->parser = new BlockParser($warnings, $strict, $significantNewlines, $nestedBlocksInLists, $blocksInterruptParagraphs, $nestedListsWithoutBlankLine);
         }
 
         // Use provided renderer or create one from parameters
         if ($renderer !== null) {
             $this->renderer = $renderer;
         } else {
-            $this->renderer = new HtmlRenderer($xhtml, $asciiHeadingIds);
+            $this->renderer = new HtmlRenderer($xhtml);
 
             // Configure safe mode
             $this->setSafeMode($safeMode);

@@ -178,8 +178,8 @@ class HeadingIdTrackerTest extends TestCase
         // jgm/djot#393: non-ASCII is preserved (case kept), not transliterated.
         $this->assertSame('Привет-мир', $this->tracker->normalizeId('Привет мир'));
         $this->assertSame('', $this->tracker->normalizeId('###'));
-        $this->assertSame('h-123-Things', $this->tracker->normalizeId('123 Things'));
-        $this->assertSame('h-1-Introduction', $this->tracker->normalizeId('1. Introduction'));
+        $this->assertSame('s-123-Things', $this->tracker->normalizeId('123 Things'));
+        $this->assertSame('s-1-Introduction', $this->tracker->normalizeId('1. Introduction'));
     }
 
     /**
@@ -188,7 +188,7 @@ class HeadingIdTrackerTest extends TestCase
      * trimmed. Case and non-ASCII characters (Cyrillic, accented Latin, smart
      * quotes) are preserved; `_` is replaced (no longer an exception). A
      * leading-digit result keeps the `h-` prefix for CSS-selector safety
-     * (orthogonal to #393). ASCII-folding is opt-in (asciiHeadingIds).
+     * (orthogonal to #393). ASCII-folding is opt-in via AsciiHeadingIdsExtension.
      */
     public function testNormalizeIdSpecAlignmentEdgeCases(): void
     {
@@ -201,17 +201,18 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('Über-uns', $this->tracker->normalizeId('Über uns'));
         $this->assertSame('café-résumé', $this->tracker->normalizeId('café résumé'));
         $this->assertSame('Straße', $this->tracker->normalizeId('Straße'));
-        $this->assertSame('h-2024-recap', $this->tracker->normalizeId('2024 recap'));
+        $this->assertSame('s-2024-recap', $this->tracker->normalizeId('2024 recap'));
         $this->assertSame('', $this->tracker->normalizeId('!!!'));
     }
 
     /**
-     * The opt-in asciiHeadingIds mode transliterates non-ASCII to ASCII before
-     * slugging, for maximum URL/CSS portability.
+     * An id transform (e.g. the one set by AsciiHeadingIdsExtension) is applied to
+     * the spec id; here it transliterates non-ASCII to ASCII for portability.
      */
     public function testAsciiHeadingIdsOptInTransliterates(): void
     {
-        $ascii = new HeadingIdTracker(null, asciiHeadingIds: true);
+        $transliterator = new AsciiTransliterator();
+        $ascii = new HeadingIdTracker(static fn (string $id): string => $transliterator->transliterate($id));
         $this->assertSame('Privet-mir', $ascii->normalizeId('Привет мир'));
         $this->assertSame('Uber-uns', $ascii->normalizeId('Über uns'));
         $this->assertSame('cafe-resume', $ascii->normalizeId('café résumé'));
@@ -394,14 +395,15 @@ class HeadingIdTrackerTest extends TestCase
     }
 
     /**
-     * In the opt-in asciiHeadingIds mode, when transliteration removes the
-     * entire heading text (a script outside the baked map, no ext-intl), the
-     * heading must fall back to a stable generated `s-N` id. (By default the
-     * non-ASCII text is preserved instead, per #393, so no fallback occurs.)
+     * With an ASCII-folding id transform, when transliteration removes the entire
+     * heading text (a script outside the baked map, no ext-intl), the heading must
+     * fall back to a stable generated `s-N` id. (By default the non-ASCII text is
+     * preserved instead, per #393, so no fallback occurs.)
      */
     public function testHeadingThatTransliteratesToNothingGetsFallbackId(): void
     {
-        $tracker = new HeadingIdTracker(new AsciiTransliterator(useIntl: false), asciiHeadingIds: true);
+        $transliterator = new AsciiTransliterator(useIntl: false);
+        $tracker = new HeadingIdTracker(static fn (string $id): string => $transliterator->transliterate($id));
 
         $cjk = new Heading(2);
         $cjk->appendChild(new Text('日本語の見出し'));

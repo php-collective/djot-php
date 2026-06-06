@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Renderer;
 
+use Closure;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\FootnoteRef;
@@ -55,20 +56,25 @@ class HeadingIdTracker
      */
     protected array $resolvedTexts = [];
 
-    protected AsciiTransliterator $transliterator;
+    /**
+     * @param \Closure(string): string|null $idTransformer Optional transform applied
+     *     to the spec-normalized id (e.g. ASCII transliteration for URL/CSS
+     *     portability). Null (default) leaves the jgm/djot#393 unicode-preserving id
+     *     unchanged. Set via an extension such as AsciiHeadingIdsExtension.
+     */
+    public function __construct(protected ?Closure $idTransformer = null)
+    {
+    }
 
     /**
-     * @param \Djot\Renderer\AsciiTransliterator|null $transliterator
-     * @param bool $asciiHeadingIds When true, transliterate heading text to ASCII
-     *     (Über -> Uber, café -> cafe) before slugging, for maximum URL/CSS
-     *     portability. Off by default: per jgm/djot#393 the identifier preserves
-     *     non-ASCII characters.
+     * Set the optional id transform (see the constructor). Used by extensions to
+     * adjust generated ids without forking the core spec slugger.
+     *
+     * @param \Closure(string): string|null $idTransformer
      */
-    public function __construct(
-        ?AsciiTransliterator $transliterator = null,
-        protected bool $asciiHeadingIds = false,
-    ) {
-        $this->transliterator = $transliterator ?? new AsciiTransliterator();
+    public function setIdTransformer(?Closure $idTransformer): void
+    {
+        $this->idTransformer = $idTransformer;
     }
 
     /**
@@ -126,45 +132,41 @@ class HeadingIdTracker
     /**
      * Normalize heading text into an identifier (jgm/djot#393)
      *
-     * 1. (Opt-in only, when $asciiHeadingIds) transliterate to ASCII
-     *    (Über → Uber, café → cafe, Привет → Privet) for maximum URL/CSS
-     *    portability.
-     * 2. Replace each maximal run of non-alphanumeric ASCII with a single '-'
-     *    (covers whitespace, punctuation, '_', and runs of '-'); non-ASCII
-     *    characters and letter case are preserved.
-     * 3. Trim leading/trailing '-'.
-     * 4. Prefix with 'h-' if the result starts with a digit, so the id is a
-     *    valid bare CSS selector (querySelector('#9-x') would otherwise throw).
-     *    This is orthogonal to #393, which governs punctuation only.
+     * 1. Slug the text: replace each maximal run of non-alphanumeric ASCII with a
+     *    single '-' and trim; non-ASCII characters and letter case are preserved.
+     * 2. If an id transform is set (e.g. ASCII transliteration via
+     *    AsciiHeadingIdsExtension), apply it to the slug and re-slug the result
+     *    (the transform may reintroduce spaces/punctuation, e.g. romanization).
+     * 3. Prefix with 's-' if the result starts with a digit, so the id is a valid
+     *    bare CSS selector (querySelector('#9-x') would otherwise throw). This is
+     *    orthogonal to #393, which governs punctuation only.
      *
-     * Returns '' when nothing usable remains (all-punctuation text, or - in the
-     * opt-in ASCII mode - a script the transliterator cannot reduce to ASCII);
-     * the caller then falls back to a generated `s-N` id.
+     * Returns '' when nothing usable remains (all-punctuation text, or a transform
+     * that reduces the text to nothing); the caller then falls back to a generated
+     * `s-N` id.
      */
     public function normalizeId(string $text): string
     {
-        $id = $text;
+        $id = $this->slug($text);
 
-        // Opt-in: fold to ASCII first (Über -> Uber) for URL/CSS portability.
-        if ($this->asciiHeadingIds) {
-            $id = $this->transliterator->transliterate($id);
+        if ($this->idTransformer !== null) {
+            $id = $this->slug(($this->idTransformer)($id));
         }
 
-        // jgm/djot#393: replace each maximal run of non-alphanumeric ASCII with a
-        // single '-' and trim leading/trailing '-'. Non-ASCII characters (unicode
-        // letters/marks) and case are preserved; this also collapses spaces,
-        // punctuation, '_' and runs of '-'.
-        $id = preg_replace('/[^0-9A-Za-z\x{0080}-\x{10FFFF}]+/u', '-', $id) ?? $id;
-        $id = trim($id, '-');
-
-        // A leading digit is a valid HTML id but an invalid bare CSS selector
-        // (e.g. querySelector('#9-x') throws), so prefix 'h-'. This is orthogonal
-        // to #393, which governs punctuation, not the leading-digit case.
         if ($id !== '' && preg_match('/^\p{N}/u', $id)) {
-            $id = 'h-' . $id;
+            $id = 's-' . $id;
         }
 
         return $id;
+    }
+
+    /**
+     * jgm/djot#393 slug step: replace each maximal run of non-alphanumeric ASCII
+     * with a single '-' and trim. Non-ASCII characters and letter case are kept.
+     */
+    protected function slug(string $text): string
+    {
+        return trim(preg_replace('/[^0-9A-Za-z\x{0080}-\x{10FFFF}]+/u', '-', $text) ?? $text, '-');
     }
 
     /**

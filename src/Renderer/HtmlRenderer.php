@@ -97,9 +97,9 @@ class HtmlRenderer implements RendererInterface
      */
     protected const OL_ONLY_ATTRIBUTES = ['start', 'type', 'reversed'];
 
-    public function __construct(protected bool $xhtml = false, bool $asciiHeadingIds = false)
+    public function __construct(protected bool $xhtml = false)
     {
-        $this->sharedRenderContext = new RenderContext(asciiHeadingIds: $asciiHeadingIds);
+        $this->sharedRenderContext = new RenderContext();
         $this->initNodeRenderers();
     }
 
