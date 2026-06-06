@@ -131,6 +131,7 @@ class DjotConverter
      * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines (deprecated; prefer blocksInterruptParagraphs + nestedListsWithoutBlankLine)
      * @param bool $blocksInterruptParagraphs Allow top-level block elements to interrupt paragraphs without a blank line
      * @param bool $nestedListsWithoutBlankLine Allow sublists to nest in list items without a blank line
+     * @param bool $asciiHeadingIds
      */
     public function __construct(
         bool $xhtml = false,
