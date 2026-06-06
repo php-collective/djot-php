@@ -35,6 +35,19 @@ use Djot\Parser\Utility\AttributeParser;
 class InlineParser
 {
     /**
+     * Characters that can begin a non-plain-text inline construct (escape, code
+     * span, emphasis, link, autolink, math, smart quote/dash, attributes, ...).
+     *
+     * Any run of bytes containing none of these is plain text and is bulk-copied
+     * in a single strcspn() scan instead of going through the per-character
+     * dispatch in parseInlines(). Keep this in sync with the `$char === ...`
+     * branches in that method.
+     *
+     * @var string
+     */
+    private const INLINE_SPECIAL_CHARS = "\\\n\$`:![<_*^~{\"'-.";
+
+    /**
      * @var array<array{type: string, char: string, pos: int, node: \Djot\Node\Node}>
      */
     protected array $delimiterStack = [];
@@ -211,6 +224,20 @@ class InlineParser
         $this->singleQuoteMatchCache = $this->buildSingleQuoteMatchCache($text);
 
         while ($pos < $length) {
+            // Fast path: bulk-copy a run of plain text in a single C-level scan,
+            // bypassing the per-character dispatch below. Skipped when custom
+            // inline patterns are registered, since those may match anywhere.
+            if ($this->customPatterns === []) {
+                $plain = strcspn($text, self::INLINE_SPECIAL_CHARS, $pos);
+                if ($plain > 0) {
+                    $textBuffer .= substr($text, $pos, $plain);
+                    $pos += $plain;
+                    if ($pos >= $length) {
+                        break;
+                    }
+                }
+            }
+
             $char = $text[$pos];
             $nextChar = $text[$pos + 1] ?? '';
 
@@ -1409,6 +1436,11 @@ class InlineParser
      */
     protected function buildSingleQuoteMatchCache(string $text): array
     {
+        // No single quotes means nothing to match; skip the full byte scan.
+        if (!str_contains($text, "'")) {
+            return [];
+        }
+
         $length = strlen($text);
         $openers = [];
         $closers = [];
