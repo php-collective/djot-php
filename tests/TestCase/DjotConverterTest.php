@@ -1919,15 +1919,16 @@ DJOT;
         $djot = '# 日本語の見出し';
         $result = $this->converter->convert($djot);
 
-        // The visible heading text is unchanged; only the ID is made
-        // ASCII-safe so it survives being shared as a URL fragment.
+        // jgm/djot#393: non-ASCII heading text is preserved in the id.
         $this->assertStringContainsString('<h1>日本語の見出し</h1>', $result);
-        $this->assertStringNotContainsString('id="日本語の見出し"', $result);
-        $this->assertMatchesRegularExpression('/<section id="[\x21-\x7E]+">/', $result);
+        $this->assertStringContainsString('id="日本語の見出し"', $result);
 
+        // The opt-in asciiHeadingIds mode folds the id to ASCII for URL/CSS
+        // portability.
+        $ascii = (new DjotConverter(asciiHeadingIds: true))->convert($djot);
+        $this->assertMatchesRegularExpression('/<section id="[\x21-\x7E]+">/', $ascii);
         if (class_exists(Transliterator::class)) {
-            // With ext-intl the CJK heading is romanized rather than dropped.
-            $this->assertStringContainsString('<section id="ri-ben-yuno-jian-chushi">', $result);
+            $this->assertStringContainsString('<section id="ri-ben-yuno-jian-chushi">', $ascii);
         }
     }
 

@@ -146,6 +146,7 @@ class DjotConverter
         bool $nestedBlocksInLists = false,
         bool $blocksInterruptParagraphs = false,
         bool $nestedListsWithoutBlankLine = false,
+        bool $asciiHeadingIds = false,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
@@ -154,14 +155,14 @@ class DjotConverter
         if ($parser !== null) {
             $this->parser = $parser;
         } else {
-            $this->parser = new BlockParser($warnings, $strict, $significantNewlines, $nestedBlocksInLists, $blocksInterruptParagraphs, $nestedListsWithoutBlankLine);
+            $this->parser = new BlockParser($warnings, $strict, $significantNewlines, $nestedBlocksInLists, $blocksInterruptParagraphs, $nestedListsWithoutBlankLine, $asciiHeadingIds);
         }
 
         // Use provided renderer or create one from parameters
         if ($renderer !== null) {
             $this->renderer = $renderer;
         } else {
-            $this->renderer = new HtmlRenderer($xhtml);
+            $this->renderer = new HtmlRenderer($xhtml, $asciiHeadingIds);
 
             // Configure safe mode
             $this->setSafeMode($safeMode);

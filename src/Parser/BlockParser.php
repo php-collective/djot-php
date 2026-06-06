@@ -193,6 +193,13 @@ class BlockParser
      */
     protected bool $nestedListsWithoutBlankLine = false;
 
+    /**
+     * When true, heading ids are ASCII-folded (opt-in). Mirrors the renderer's
+     * HeadingIdTracker setting so parser-side id computation (heading reference
+     * resolution) matches the rendered ids.
+     */
+    protected bool $asciiHeadingIds = false;
+
     public function __construct(
         bool $collectWarnings = false,
         bool $strictMode = false,
@@ -200,9 +207,11 @@ class BlockParser
         bool $nestedBlocksInLists = false,
         bool $blocksInterruptParagraphs = false,
         bool $nestedListsWithoutBlankLine = false,
+        bool $asciiHeadingIds = false,
     ) {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
+        $this->asciiHeadingIds = $asciiHeadingIds;
         // significantNewlines is the deprecated union of blocksInterruptParagraphs
         // and nestedListsWithoutBlankLine (NOT the broad nestedBlocksInLists).
         $this->blocksInterruptParagraphs = $blocksInterruptParagraphs || $significantNewlines;
@@ -697,7 +706,7 @@ class BlockParser
      */
     protected function extractHeadingReferences(array $lines): void
     {
-        $headingIdTracker = new HeadingIdTracker();
+        $headingIdTracker = new HeadingIdTracker(null, $this->asciiHeadingIds);
         $pendingId = null;
         $count = count($lines);
 
@@ -780,7 +789,7 @@ class BlockParser
      */
     protected function rewriteHeadingReferences(Document $document): void
     {
-        $tracker = new HeadingIdTracker();
+        $tracker = new HeadingIdTracker(null, $this->asciiHeadingIds);
         $tracker->reserveExplicitIds($document);
 
         /** @var array<string, string> $newUrlByLabel */

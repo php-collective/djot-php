@@ -57,8 +57,17 @@ class HeadingIdTracker
 
     protected AsciiTransliterator $transliterator;
 
-    public function __construct(?AsciiTransliterator $transliterator = null)
-    {
+    /**
+     * @param \Djot\Renderer\AsciiTransliterator|null $transliterator
+     * @param bool $asciiHeadingIds When true, transliterate heading text to ASCII
+     *     (Über -> Uber, café -> cafe) before slugging, for maximum URL/CSS
+     *     portability. Off by default: per jgm/djot#393 the identifier preserves
+     *     non-ASCII characters.
+     */
+    public function __construct(
+        ?AsciiTransliterator $transliterator = null,
+        protected bool $asciiHeadingIds = false,
+    ) {
         $this->transliterator = $transliterator ?? new AsciiTransliterator();
     }
 
@@ -115,40 +124,42 @@ class HeadingIdTracker
     }
 
     /**
-     * Normalize text into a valid, link-safe CSS identifier string
+     * Normalize heading text into an identifier (jgm/djot#393)
      *
-     * 1. Transliterate to ASCII (Über → Uber, café → cafe, Привет → Privet),
-     *    so the ID survives being shared as a URL fragment through
-     *    auto-linkers that truncate or mangle non-ASCII
-     * 2. Strip # characters entirely
-     * 3. Trim whitespace
-     * 4. Replace whitespace sequences with single dashes
-     * 5. Replace any remaining characters invalid in CSS identifiers
-     *    (anything other than letters, numbers, hyphens, and underscores)
-     *    with dashes
-     * 6. Collapse consecutive dashes and trim leading/trailing dashes
-     * 7. Prefix with 'h-' if the result starts with a digit, ensuring a valid
-     *    CSS ident start (digits are not allowed as the first character)
+     * 1. (Opt-in only, when $asciiHeadingIds) transliterate to ASCII
+     *    (Über → Uber, café → cafe, Привет → Privet) for maximum URL/CSS
+     *    portability.
+     * 2. Replace each maximal run of non-alphanumeric ASCII with a single '-'
+     *    (covers whitespace, punctuation, '_', and runs of '-'); non-ASCII
+     *    characters and letter case are preserved.
+     * 3. Trim leading/trailing '-'.
+     * 4. Prefix with 'h-' if the result starts with a digit, so the id is a
+     *    valid bare CSS selector (querySelector('#9-x') would otherwise throw).
+     *    This is orthogonal to #393, which governs punctuation only.
      *
-     * Returns '' when nothing usable remains (e.g. all-punctuation text, or a
-     * script the transliterator cannot reduce to ASCII); the caller then
-     * falls back to a generated `s-N` id.
-     *
-     * Producing a valid CSS identifier ensures that consumers such as HTMX,
-     * which call `querySelector` with the section ID for scroll-restoration,
-     * do not throw a SyntaxError when headings contain inline code or special
-     * characters (e.g. `$this->t($key, $params = [], $fallback = '')`).
+     * Returns '' when nothing usable remains (all-punctuation text, or - in the
+     * opt-in ASCII mode - a script the transliterator cannot reduce to ASCII);
+     * the caller then falls back to a generated `s-N` id.
      */
     public function normalizeId(string $text): string
     {
-        $id = $this->transliterator->transliterate($text);
-        $id = str_replace('#', '', $id);
-        $id = trim($id);
-        $id = preg_replace('/\s+/u', '-', $id) ?? $id;
-        $id = preg_replace('/[^\p{L}\p{N}_-]+/u', '-', $id) ?? $id;
-        $id = preg_replace('/-{2,}/', '-', $id) ?? $id;
+        $id = $text;
+
+        // Opt-in: fold to ASCII first (Über -> Uber) for URL/CSS portability.
+        if ($this->asciiHeadingIds) {
+            $id = $this->transliterator->transliterate($id);
+        }
+
+        // jgm/djot#393: replace each maximal run of non-alphanumeric ASCII with a
+        // single '-' and trim leading/trailing '-'. Non-ASCII characters (unicode
+        // letters/marks) and case are preserved; this also collapses spaces,
+        // punctuation, '_' and runs of '-'.
+        $id = preg_replace('/[^0-9A-Za-z\x{0080}-\x{10FFFF}]+/u', '-', $id) ?? $id;
         $id = trim($id, '-');
 
+        // A leading digit is a valid HTML id but an invalid bare CSS selector
+        // (e.g. querySelector('#9-x') throws), so prefix 'h-'. This is orthogonal
+        // to #393, which governs punctuation, not the leading-digit case.
         if ($id !== '' && preg_match('/^\p{N}/u', $id)) {
             $id = 'h-' . $id;
         }

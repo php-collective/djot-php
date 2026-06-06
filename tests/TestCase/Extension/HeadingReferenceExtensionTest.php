@@ -174,14 +174,15 @@ DJOT);
 
         // The parser converts straight quotes to smart quotes in heading text,
         // but reference targets keep straight quotes. The extension normalizes
-        // quotes for matching so this should resolve correctly.
+        // quotes for matching so the reference still resolves; the resulting id
+        // keeps the smart quotes (jgm/djot#393 preserves non-ASCII characters).
         $html = $converter->convert(<<<'DJOT'
 See [[Say "Hello"]].
 
 # Say "Hello"
 DJOT);
 
-        $this->assertStringContainsString('href="#Say-Hello"', $html);
+        $this->assertStringContainsString('href="#Say-“Hello”"', $html);
         $this->assertStringNotContainsString('[[Say "Hello"]]', $html);
     }
 
@@ -210,7 +211,7 @@ See [[Bob's Guide]].
 # Bob's Guide
 DJOT);
 
-        $this->assertStringContainsString('href="#Bob-s-Guide"', $html);
+        $this->assertStringContainsString('href="#Bob’s-Guide"', $html);
         $this->assertStringNotContainsString('data-heading-ref=', $html);
         $this->assertStringNotContainsString('[[Bob\'s Guide]]', $html);
     }

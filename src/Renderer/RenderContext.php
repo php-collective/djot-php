@@ -44,9 +44,9 @@ class RenderContext
      */
     public array $inlineFootnoteRenderers = [];
 
-    public function __construct(?HeadingIdTracker $headingIdTracker = null)
+    public function __construct(?HeadingIdTracker $headingIdTracker = null, bool $asciiHeadingIds = false)
     {
-        $this->headingIdTracker = $headingIdTracker ?? new HeadingIdTracker();
+        $this->headingIdTracker = $headingIdTracker ?? new HeadingIdTracker(null, $asciiHeadingIds);
     }
 
     public function reset(): void
