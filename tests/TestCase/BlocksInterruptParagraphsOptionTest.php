@@ -10,6 +10,7 @@ use Djot\Node\Block\Heading;
 use Djot\Node\Block\ListBlock;
 use Djot\Node\Block\Paragraph;
 use Djot\Parser\BlockParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class BlocksInterruptParagraphsOptionTest extends TestCase
@@ -260,5 +261,74 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         }
         $this->assertTrue($hasSublist);
         $this->assertFalse($hasQuote);
+    }
+
+    /**
+     * An empty list item (a marker followed only by whitespace) cannot interrupt
+     * a paragraph; it folds into the paragraph instead of opening a stray empty
+     * <li> (matches the canonical djot.js reference).
+     */
+    #[DataProvider('emptyMarkerProvider')]
+    public function testEmptyMarkerDoesNotInterruptParagraph(string $djot, string $expected): void
+    {
+        $converter = DjotConverter::withBlocksInterruptParagraphs();
+
+        $this->assertSame($expected, $converter->convert($djot));
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function emptyMarkerProvider(): array
+    {
+        return [
+            'dash + space' => ["intro\n- ", "<p>intro\n-</p>\n"],
+            'dash + many spaces' => ["intro\n-   ", "<p>intro\n-</p>\n"],
+            'plus + space' => ["intro\n+ ", "<p>intro\n+</p>\n"],
+            'star + space' => ["intro\n* ", "<p>intro\n*</p>\n"],
+            'ordered dot empty' => ["intro\n1. ", "<p>intro\n1.</p>\n"],
+            'ordered paren empty' => ["intro\n1) ", "<p>intro\n1)</p>\n"],
+        ];
+    }
+
+    public function testMarkerWithContentStillInterrupts(): void
+    {
+        $converter = DjotConverter::withBlocksInterruptParagraphs();
+        $result = $converter->convert("intro\n- x");
+
+        $this->assertStringContainsString('<p>intro</p>', $result);
+        $this->assertStringContainsString('<li>', $result);
+    }
+
+    public function testThematicBreakStillInterrupts(): void
+    {
+        $converter = DjotConverter::withBlocksInterruptParagraphs();
+        $result = $converter->convert("intro\n- - -");
+
+        $this->assertStringContainsString('<p>intro</p>', $result);
+        $this->assertStringContainsString('<hr>', $result);
+    }
+
+    public function testStandaloneEmptyMarkerStillParsesAsList(): void
+    {
+        // Not interrupting a paragraph here, so a bare empty marker is still a
+        // (empty) list, exactly as the reference renders it.
+        $converter = DjotConverter::withBlocksInterruptParagraphs();
+        $result = $converter->convert('- ');
+
+        $this->assertStringContainsString('<ul>', $result);
+        $this->assertStringContainsString('<li>', $result);
+    }
+
+    public function testEmptyMarkerStillEndsHeadingAndStartsList(): void
+    {
+        // The "empty item cannot interrupt" rule is paragraph-only. After a
+        // heading (not a paragraph), an empty marker must still end the heading
+        // and open a list, not fold into the heading text.
+        $converter = DjotConverter::withBlocksInterruptParagraphs();
+        $result = $converter->convert("# h\n- ");
+
+        $this->assertStringContainsString('<h1>h</h1>', $result);
+        $this->assertStringContainsString('<ul>', $result);
     }
 }
