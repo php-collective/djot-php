@@ -45,6 +45,22 @@ use Djot\Renderer\HeadingIdTracker;
 class BlockParser
 {
     /**
+     * Non-letter first (post-indent) characters that can begin a built-in block
+     * construct: headings (#), bullet/ordered lists (-*+, digits, parenthesized),
+     * thematic breaks (-*), block quotes (>), fenced code/div/raw/comment (` ~ %),
+     * tables and line blocks (|), captions (^), footnote/reference defs ([),
+     * abbreviations (*), divs/definition lists (:), and block attributes ({).
+     *
+     * Letters are handled separately in parseBlocksImpl() because they only begin a
+     * block when shaped like an alphabetic/roman ordered-list marker. A line whose
+     * first non-blank character is neither in this set nor such a marker can only be
+     * a paragraph. Keep this in sync with the probes in parseBlocksImpl().
+     *
+     * @var string
+     */
+    private const BLOCK_MARKER_CHARS = '#>-*+~`|^[%:({0123456789';
+
+    /**
      * Neutral starting point for incremental brace scanning.
      *
      * @var array{depth: int, inQuote: bool, quoteChar: string, pendingEscape: bool}
@@ -930,6 +946,23 @@ class BlockParser
             $customConsumed = $this->tryCustomBlockPatterns($parent, $lines, $i);
             if ($customConsumed !== null) {
                 $i += $customConsumed;
+
+                continue;
+            }
+
+            // Fast path: every built-in block construct begins with a fixed marker
+            // character (after optional leading whitespace). If the first non-blank
+            // character is none of them, the line can only be a paragraph, so skip
+            // the probe chain below. Letters can begin alphabetic/roman ordered list
+            // markers (a. / iv) / etc.), so a letter only enters the chain when it
+            // matches that marker shape; plain prose words fall straight through.
+            $marker = $line[strspn($line, " \t")] ?? '';
+            if (
+                $marker !== ''
+                && !str_contains(self::BLOCK_MARKER_CHARS, $marker)
+                && !($marker >= 'A' && preg_match('/^[ \t]*[A-Za-z]+[.)][ \t]/', $line) === 1)
+            ) {
+                $i += $this->tryParseParagraph($parent, $lines, $i);
 
                 continue;
             }
