@@ -7,6 +7,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | Extension | Description |
 |-----------|-------------|
 | [AdmonitionExtension](#admonitionextension) | Transforms divs into semantic admonition markup with accessibility support |
+| [AsciiHeadingIdsExtension](#asciiheadingidsextension) | Folds auto-generated heading ids to ASCII (`Über` → `Uber`) for URL/CSS-fragment portability |
 | [AutolinkExtension](#autolinkextension) | Auto-links bare URLs and email addresses |
 | [CodeGroupExtension](#codegroupextension) | Transforms code-group divs into tabbed code block interfaces |
 | [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
@@ -47,6 +48,7 @@ Extensions are applied in registration order. Generally, order doesn't matter, b
 
 - **AutolinkExtension** should be registered before **ExternalLinksExtension** if you want auto-linked URLs to also get external link attributes
 - **TableOfContentsExtension** should be registered before **HeadingPermalinksExtension** if you want clean heading text in the TOC (without permalink symbols)
+- **AsciiHeadingIdsExtension** has no ordering requirement relative to the heading extensions (TableOfContents, HeadingPermalinks, HeadingReference) — it installs an id transform at registration that is consumed later during parsing/rendering, so the resulting ids are consistent regardless of registration order
 
 Extensions are reset per render, so reusing the same `DjotConverter` across multiple `convert()` calls will not carry per-document extension state such as collected TOC entries into the next output.
 
@@ -225,6 +227,31 @@ $converter->addExtension(new AdmonitionExtension(
     defaultTitle: false,
 ));
 ```
+
+## AsciiHeadingIdsExtension
+
+By default, auto-generated heading ids follow the [jgm/djot#393](https://github.com/jgm/djot/pull/393) rule and **preserve letter case and non-ASCII characters** (`# Über café` → `id="Über-café"`). That is valid HTML5 and resolves in browsers, but the URL fragment is percent-encoded when shared (`#%C3%9Cber-caf%C3%A9`).
+
+`AsciiHeadingIdsExtension` folds heading ids to ASCII for maximum portability — clean fragments, friendlier to legacy anchor tooling, and trivially safe as bare CSS/JS selectors:
+
+```php
+use Djot\DjotConverter;
+use Djot\Extension\AsciiHeadingIdsExtension;
+
+$converter = new DjotConverter();
+$converter->addExtension(new AsciiHeadingIdsExtension());
+
+$converter->convert("# Über café\n");
+// <section id="uber-cafe"> … (default would be id="Über-café")
+```
+
+It applies an ASCII transliteration on top of the spec slug and re-slugs the result, so a transform that reintroduces separators (e.g. CJK romanization) still yields a clean id. The transform is wired to **both** the renderer and the parser's `[Heading][]` reference resolution, so section ids and implicit heading-link targets stay in parity.
+
+`ext-intl` (ICU) is used when available and romanizes scripts the built-in map does not cover (Greek, CJK, Arabic, …); otherwise a baked Unicode→ASCII map is used. Pass `new AsciiHeadingIdsExtension(useIntl: false)` to force the baked map. A heading whose text reduces to nothing under transliteration falls back to a generated `s-N` id.
+
+Registration order relative to other heading extensions (TableOfContents, HeadingPermalinks, HeadingReference) does not matter: the transform is installed at registration and consumed later, during parsing and rendering.
+
+See [Heading ID Generation](/reference/enhancements#heading-id-generation) for the default rule and a full comparison table.
 
 ## ExternalLinksExtension
 

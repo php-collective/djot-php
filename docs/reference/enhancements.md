@@ -155,25 +155,22 @@ content is a symbol falls back to a generated `s-N` ID.
 
 ---
 
-## CSS-Safe Heading IDs
+## Heading ID Generation
 
-**Related:** [php-collective/djot-php#92](https://github.com/php-collective/djot-php/pull/92), [jgm/djot#391](https://github.com/jgm/djot/issues/391)
+**Related:** [php-collective/djot-php#92](https://github.com/php-collective/djot-php/pull/92), [#224](https://github.com/php-collective/djot-php/pull/224), [jgm/djot#391](https://github.com/jgm/djot/issues/391), [jgm/djot#393](https://github.com/jgm/djot/pull/393)
 
 **Status:** Implemented in djot-php
 
-Auto-generated heading IDs are normalized to be valid CSS selectors **and ASCII-only**, so they work with `querySelector()` / HTMX scroll restoration *and* survive being copied around as URL fragments (see [Why ASCII](#why-ascii) below).
+Auto-generated heading IDs follow the settled [jgm/djot#393](https://github.com/jgm/djot/pull/393) rule and **preserve letter case and non-ASCII characters**. For ASCII-only anchors, opt in with [`AsciiHeadingIdsExtension`](#ascii-heading-ids-opt-in).
 
-### Normalization Rules
+### Normalization Rules (default)
 
-1. **Transliterate to ASCII** — `Über`→`Uber`, `café`→`cafe`, `Привет`→`Privet`, smart quotes/dashes→`'"-` (then replaced)
-2. **Strip `#` characters** — Prevents invalid selectors
-3. **Trim whitespace**
-4. **Whitespace to dashes** — Spaces become single `-`
-5. **Invalid characters to dashes** — Anything other than letters, numbers, `-`, `_` becomes `-`
-6. **Collapse consecutive dashes** — `foo--bar` becomes `foo-bar`
-7. **Trim leading/trailing dashes**
-8. **Prefix digits** — IDs starting with a digit get an `h-` prefix (CSS requirement)
-9. **Fallback** — Empty results become `heading` (or a generated `s-N` for empty headings)
+1. **Replace non-alphanumeric ASCII** — each maximal run of non-alphanumeric ASCII (spaces, punctuation, `_`, runs of `-`) becomes a single `-`.
+2. **Trim** leading/trailing `-`. **Letter case and all non-ASCII characters (accented Latin, Cyrillic, CJK, smart quotes, …) are preserved.**
+3. **Prefix `s-` for a leading digit** — a leading digit is a valid HTML id but an invalid *bare* CSS selector (`querySelector('#9-x')` throws), so it is prefixed. Orthogonal to #393, which governs punctuation only.
+4. **Fallback** — an empty result (all-punctuation text) becomes a generated `s-N` id.
+
+Symbols (`:name:`) and footnote references are excluded from the id text (see [Section ID Excludes Footnote Markers and Symbols](#section-id-excludes-footnote-markers-and-symbols)).
 
 ### Examples
 
@@ -181,26 +178,36 @@ Auto-generated heading IDs are normalized to be valid CSS selectors **and ASCII-
 |---------|--------------|
 | `# Hello World` | `Hello-World` |
 | `# Hello World!` | `Hello-World` |
-| `# Über uns` | `Uber-uns` |
-| `# café résumé` | `cafe-resume` |
-| `# Привет мир` | `Privet-mir` |
-| `# Bob's Guide` (smart quotes) | `Bob-s-Guide` |
+| `# Über uns` | `Über-uns` |
+| `# café résumé` | `café-résumé` |
+| `# Привет мир` | `Привет-мир` |
+| `# under_score` | `under-score` |
 | `# E=mc^2` | `E-mc-2` |
-| `# 123 Numbers First` | `h-123-Numbers-First` |
+| `# 123 Numbers First` | `s-123-Numbers-First` |
 | `# $this->method()` | `this-method` |
-| `# ###` | `heading` |
+| `# ###` | `s-1` |
 
-### Why ASCII {#why-ascii}
+### ASCII heading IDs (opt-in) {#ascii-heading-ids-opt-in}
 
-Heading IDs end up as URL fragments (`…/page#Über-uns`) that get copied into chat, email and other documents, where **auto-linkers re-detect the URL heuristically**. Non-ASCII fragments are routinely:
+Add `AsciiHeadingIdsExtension` to fold ids to ASCII (`Über uns` → `uber-uns`) for maximum URL/CSS-fragment portability:
+
+```php
+use Djot\Extension\AsciiHeadingIdsExtension;
+
+$converter->addExtension(new AsciiHeadingIdsExtension());
+```
+
+It applies an ASCII transliteration on top of the #393 slug (and re-slugs the result), wired to **both** the renderer and the parser's `[Heading][]` reference resolution so section ids and link targets stay in parity. Registration order relative to other heading extensions does not matter.
+
+Unicode ids are valid HTML5 and resolve in browsers (the URL fragment is percent-encoded but functional), so ASCII is a portability choice, not a correctness requirement. You may want it because heading IDs end up as URL fragments (`…/page#Über-uns`) copied into chat, email and other documents, where **auto-linkers re-detect the URL heuristically**. Non-ASCII fragments are routinely:
 
 - **truncated** — the link is cut at the first non-ASCII byte (`#Über` → `#`), producing a silent dead link;
 - **percent-encoded inconsistently** — `’`→`%E2%80%99`, bloating and sometimes breaking the link;
 - **re-normalized differently** by the receiving app (NFC/NFD), so the pasted fragment no longer matches the page's `id`.
 
-Transliterating to ASCII keeps shared deep links robust. It's a deliberate deviation from both the djot.js reference and the [jgm/djot#393](https://github.com/jgm/djot/pull/393) spec prose (both preserve non-ASCII) — see [Spec Alignment](#spec-alignment).
+Transliterating to ASCII keeps such shared deep links robust. This is what the extension opts into; the default (no extension) preserves non-ASCII to match the spec — see [Spec Alignment](#spec-alignment).
 
-### Transliteration engine & determinism
+### Transliteration engine & determinism (extension)
 
 Two engines produce the ASCII form:
 
@@ -223,23 +230,23 @@ Explicit IDs are used as-is without normalization or transliteration.
 
 ### Spec Alignment {#spec-alignment}
 
-The remove-vs-replace question raised in [jgm/djot#391](https://github.com/jgm/djot/issues/391) was settled by [jgm/djot#393](https://github.com/jgm/djot/pull/393), which reworded the spec to: *"replacing each maximal run of non-alphanumeric ASCII characters with `-`, removing any leading or trailing `-`"*. #393 changed only the spec **prose**; the djot.js reference implementation is unchanged.
+The remove-vs-replace question raised in [jgm/djot#391](https://github.com/jgm/djot/issues/391) was settled by [jgm/djot#393](https://github.com/jgm/djot/pull/393), which reworded the spec to: *"replacing each maximal run of non-alphanumeric ASCII characters with `-`, removing any leading or trailing `-`"*.
 
-djot-php replaces (does not remove) mid-word punctuation — the direction #393 settled on — additionally replaces `' " ; :` so IDs are valid CSS identifiers, and **transliterates non-ASCII to ASCII** so IDs stay link-safe when shared. The last point is a deliberate deviation from *both* djot.js and the #393 prose, justified by the [Why ASCII](#why-ascii) failure mode.
+djot-php's **default now matches #393**: it replaces every maximal run of non-alphanumeric ASCII (including `_`, `'`, `"`, `;`, `:`) with `-`, and preserves letter case and all non-ASCII characters. The only additions are orthogonal to #393's punctuation rule: a leading-digit `s-` prefix (CSS-selector safety) and an `s-N` fallback for empty results. ASCII transliteration — the previous always-on behavior — is now opt-in via `AsciiHeadingIdsExtension`.
 
-| Aspect | djot.js reference impl | #393 spec prose | djot-php |
-|--------|------------------------|-----------------|----------|
+| Aspect | djot.js / #393 | djot-php default | with AsciiHeadingIdsExtension |
+|--------|----------------|------------------|-------------------------------|
 | Mid-word punctuation (`A+B=C`) | `A-B-C` | `A-B-C` | `A-B-C` |
-| Consecutive punctuation (`foo...bar`) | collapse → `foo-bar` | collapse → `foo-bar` | collapse → `foo-bar` |
-| Underscore (`foo_bar`) | keep → `foo_bar` | strip → `foo-bar` | keep → `foo_bar` (CSS-valid, link-safe) |
-| Apostrophe / `"` / `;` / `:` | preserve | replace | replace → `-` (CSS-safe) |
-| Non-ASCII letters (`Über uns`) | preserve → `Über-uns` | preserve → `Über-uns` | **transliterate → `Uber-uns`** (link-safe) |
-| Non-ASCII / smart quotes (`Bob’s`) | preserve → `Bob’s` | preserve → `Bob’s` | **transliterate → `Bob-s`** (link-safe) |
-| Leading digit (`2024 recap`) | `2024-recap` | `2024-recap` | prefix → `h-2024-recap` (CSS requires non-digit start) |
-| Empty result (`!!!`) | `s-N` family | unspecified | fallback → `heading` |
+| Consecutive punctuation (`foo...bar`) | `foo-bar` | `foo-bar` | `foo-bar` |
+| Underscore (`foo_bar`) | `foo-bar` | `foo-bar` | `foo-bar` |
+| Apostrophe / `"` / `;` / `:` | replace → `-` | replace → `-` | replace → `-` |
+| Non-ASCII letters (`Über uns`) | preserve → `Über-uns` | preserve → `Über-uns` | **fold → `uber-uns`** |
+| Smart quotes (`Bob’s`) | preserve → `Bob’s` | preserve → `Bob’s` | **fold → `Bob-s`** |
+| Leading digit (`2024 recap`) | `2024-recap` | prefix → `s-2024-recap` | `s-2024-recap` |
+| Empty result (`!!!`) | `s-N` family | `s-N` | `s-N` |
 | Symbols / footnote refs | excluded | excluded | excluded |
 
-The deviations are deliberate: `' " ; :` are not valid in unescaped CSS identifiers, and non-ASCII fragments break when shared (see [Why ASCII](#why-ascii)). The leading-digit and empty-result behaviors fill in gaps the spec and reference handle inconsistently. A note proposing the spec clarify the non-ASCII question is tracked against [jgm/djot#391](https://github.com/jgm/djot/issues/391).
+The default is spec-faithful; the leading-digit `s-` prefix and `s-N` fallback fill in cases #393 leaves to the implementation. The ASCII-folding column is only active when the extension is registered.
 
 ---
 
