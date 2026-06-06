@@ -720,6 +720,14 @@ class InlineParser
     {
         $length = strlen($text);
 
+        // A link/image needs a closing `]`. Without this guard, every `[` runs
+        // the char-by-char depth scan below to end-of-text, so an unbalanced run
+        // like `[[[[...` is O(n^2). strpos is a C-level memchr that short-circuits
+        // when no `]` follows.
+        if (strpos($text, ']', $pos + 1) === false) {
+            return null;
+        }
+
         // Find closing ]
         $bracketDepth = 1;
         $textEnd = $pos + 1;
