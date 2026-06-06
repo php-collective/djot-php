@@ -62,6 +62,26 @@ PHP djot-php scales linearly with document size:
 | large   | 225.5 KB  | 114.52 ms | 1.9 MB/s   |
 | huge    | 1.1 MB    | 579.20 ms | 1.9 MB/s   |
 
+The table above uses normal paragraphs separated by blank lines, which always
+scaled linearly.
+
+### Multi-line paragraphs (fixed in 211)
+
+A single paragraph spanning many soft-wrapped lines, with no blank line between
+them, used to be the one exception. Each continuation line re-scanned the whole
+accumulated paragraph for an unclosed attribute brace, so parsing was O(n^2) in
+the line count. PR 211 tracks brace state incrementally (one scan per line),
+restoring linear scaling. A regression test asserts a 3000-line paragraph parses
+well under a second.
+
+Representative before/after for one N-line paragraph (relative magnitude is the
+point; absolute times vary by machine):
+
+| Paragraph lines | Before 211 | After 211 |
+|-----------------|------------|-----------|
+| 1000            | ~2 s       | ~25 ms    |
+| 3000            | ~17 s      | ~75 ms    |
+
 ## Content Type Performance
 
 Different content types have varying performance characteristics:
@@ -130,7 +150,7 @@ php benchmark.php
 1. **Throughput**: PHP djot-php processes ~2.0-2.4 MB/s of djot content (with OPcache)
 2. **vs CommonMark (Full)**: djot-php is **2x faster** with equivalent features
 3. **vs Parsedown**: Parsedown is 6-7x faster but lacks advanced features
-4. **Scaling**: Performance scales linearly with document size (O(n))
+4. **Scaling**: Performance scales linearly with document size (O(n)), including multi-line paragraphs since PR 211
 5. **vs Rust/Go**: Native implementations are 6-12x faster (as expected)
 6. **vs JavaScript**: Reference JS implementation is ~3x faster
 7. **Safe mode**: No significant performance penalty
