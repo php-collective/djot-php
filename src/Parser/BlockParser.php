@@ -199,7 +199,7 @@ class BlockParser
      * HeadingIdTracker so parser-side id computation (heading reference
      * resolution) matches the rendered ids. Set by AsciiHeadingIdsExtension.
      *
-     * @var \Closure(string):|null string|null
+     * @var \Closure|null
      */
     protected ?Closure $headingIdTransformer = null;
 
