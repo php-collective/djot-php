@@ -2424,11 +2424,10 @@ class HtmlToDjot
     {
         $text = str_replace("\u{2026}", '...', $text);
 
-        if ($atLineStart && preg_match('/^[\x{2013}\x{2014}]/u', $text) === 1) {
-            $first = mb_substr($text, 0, 1);
-            $rest = str_replace(["\u{2014}", "\u{2013}"], ['---', '--'], mb_substr($text, 1));
+        if ($atLineStart && preg_match('/^([\x{2013}\x{2014}])(.*)$/su', $text, $matches) === 1) {
+            $rest = str_replace(["\u{2014}", "\u{2013}"], ['---', '--'], $matches[2]);
 
-            return $first . $rest;
+            return $matches[1] . $rest;
         }
 
         return str_replace(["\u{2014}", "\u{2013}"], ['---', '--'], $text);
