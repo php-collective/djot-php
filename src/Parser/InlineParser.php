@@ -1043,14 +1043,18 @@ class InlineParser
         }
 
         // Find closing delimiter, skipping over attribute blocks and code spans
-        // First, check if there are consecutive delimiters (opening run)
-        $searchPos = $pos + 1;
-        $openingRunEnd = $pos + 1;
-        while ($openingRunEnd < $length && $text[$openingRunEnd] === $delimiter) {
-            $openingRunEnd++;
-        }
+        // First, measure the consecutive opening run. strspn is a C-level scan;
+        // a PHP char-by-char loop here made a long delimiter run (`****...`)
+        // O(n^2), since every opener re-counts the run from its position.
+        $openingRunEnd = $pos + strspn($text, $delimiter, $pos);
         // If the opening run extends to end of string (all delimiters), no valid emphasis
         if ($openingRunEnd >= $length) {
+            return null;
+        }
+        // A closer needs the delimiter to appear again after the opening run.
+        // Without this, every opener scans the whole tail looking for a close
+        // that is not there (the other half of the O(n^2)).
+        if (strpos($text, $delimiter, $openingRunEnd) === false) {
             return null;
         }
         // Skip the opening run to look for content and closing run
