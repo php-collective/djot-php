@@ -137,10 +137,12 @@ func generateContent(targetBytes int) string {
 }
 
 func benchmarkGodjot(content string, iterations, warmup int) []float64 {
+	context := djot_parser.NewConversionContext("html", djot_parser.DefaultConversionRegistry)
+
 	// Warmup
 	for i := 0; i < warmup; i++ {
 		ast := djot_parser.BuildDjotAst([]byte(content))
-		html_writer.NewHtmlWriter().BuildHtml(&ast)
+		context.ConvertDjotToHtml(&html_writer.HtmlWriter{}, ast...)
 	}
 
 	// Benchmark
@@ -148,7 +150,7 @@ func benchmarkGodjot(content string, iterations, warmup int) []float64 {
 	for i := 0; i < iterations; i++ {
 		start := time.Now()
 		ast := djot_parser.BuildDjotAst([]byte(content))
-		html_writer.NewHtmlWriter().BuildHtml(&ast)
+		context.ConvertDjotToHtml(&html_writer.HtmlWriter{}, ast...)
 		times[i] = float64(time.Since(start).Nanoseconds()) / 1e6
 	}
 	return times
