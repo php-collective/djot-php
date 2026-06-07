@@ -683,8 +683,8 @@ $html = $renderer->render($document);
 **Configuration:**
 
 ```php
-// Tabs in code blocks default to 4 spaces; use null to preserve tabs
-$renderer->setCodeBlockTabWidth(null);
+// Convert tabs in code to 4 spaces (default preserves them)
+$renderer->setCodeBlockTabWidth(4);
 
 // Customize soft break rendering
 $renderer->setSoftBreakMode(SoftBreakMode::Space);
@@ -695,15 +695,20 @@ $renderer->setSafeMode(SafeMode::defaults());
 
 #### Tab Width in Code Blocks
 
-By default, tabs in code blocks are converted to 4 spaces. This ensures consistent display across all contexts, since browsers default to 8-space tabs and CSS `tab-size` isn't supported everywhere (email clients, RSS readers, etc.).
+By default, tabs in code blocks and inline code are **preserved literally**, which is spec-conformant (djot keeps tabs). A literal tab in `<pre>` renders at the browser's default tab width (usually 8), so if you want a fixed width, convert tabs to spaces:
 
 ```php
-// Preserve tabs instead of converting
-$renderer->setCodeBlockTabWidth(null);
+// Convert tabs to 4 spaces
+$renderer->setCodeBlockTabWidth(4);
 
-// Use different width (e.g., 2 spaces)
+// Use a different width (e.g., 2 spaces)
 $renderer->setCodeBlockTabWidth(2);
+
+// Preserve tabs (default)
+$renderer->setCodeBlockTabWidth(null);
 ```
+
+The opt-in [`TabNormalizationExtension`](/extensions/#tabnormalizationextension) wraps this for the common case (`new TabNormalizationExtension()` converts tabs to 4 spaces).
 
 This affects both fenced code blocks (`<pre><code>`) and inline code (`<code>`).
 

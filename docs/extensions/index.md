@@ -20,6 +20,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [MermaidExtension](#mermaidextension) | Transforms mermaid code blocks into diagrams |
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
 | [SmartQuotesExtension](#smartquotesextension) | Configures locale-specific smart quote characters |
+| [TabNormalizationExtension](#tabnormalizationextension) | Converts tabs in code blocks and inline code to spaces (default 4) for consistent display |
 | [TableOfContentsExtension](#tableofcontentsextension) | Generates a table of contents from headings |
 | [TabsExtension](#tabsextension) | Transforms divs into accessible tabbed content interfaces |
 | [WikilinksExtension](#wikilinksextension) | Converts `[[Page Name]]` patterns to wiki-style links |
@@ -1268,6 +1269,24 @@ $converter->addExtension(new DefaultAttributesExtension([
     'block_quote' => ['class' => 'border-l-4 pl-4 italic'],
 ]));
 ```
+
+## TabNormalizationExtension
+
+Converts tabs in code blocks and inline code to a fixed number of spaces (default 4). djot preserves literal tabs by default (spec-conformant), but a literal tab in `<pre>` renders at the browser's default tab width (usually 8). Enable this extension for consistent display without relying on CSS `tab-size`.
+
+```php
+use Djot\Extension\TabNormalizationExtension;
+
+$converter = new DjotConverter();
+
+// Tabs in code -> 4 spaces
+$converter->addExtension(new TabNormalizationExtension());
+
+// Tabs in code -> 2 spaces
+$converter->addExtension(new TabNormalizationExtension(2));
+```
+
+Only HTML output is affected; with other renderers the extension is a no-op. A width below 1 throws `InvalidArgumentException`.
 
 ## TabsExtension
 
