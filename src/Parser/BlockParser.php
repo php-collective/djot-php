@@ -983,7 +983,7 @@ class BlockParser
             if (
                 $marker !== ''
                 && !str_contains(self::BLOCK_MARKER_CHARS, $marker)
-                && !($marker >= 'A' && preg_match('/^[ \t]*[A-Za-z]+[.)][ \t]/', $line) === 1)
+                && !($marker >= 'A' && preg_match('/^[ \t]*[A-Za-z]+[.)]([ \t]|$)/', $line) === 1)
             ) {
                 $i += $this->tryParseParagraph($parent, $lines, $i);
 
@@ -2080,6 +2080,12 @@ class BlockParser
                     if ($this->startsNewBlock($nextTrimmed)) {
                         break;
                     }
+                    // An empty item (bare marker, no content yet) has no open
+                    // paragraph, so a following base-indent line cannot be lazy
+                    // continuation - it starts a new block outside the list.
+                    if ($itemContent === '' && $itemLines === ['']) {
+                        break;
+                    }
                 }
 
                 // Check for list item attributes (must be at content indent, be a standalone attribute block)
@@ -2233,6 +2239,15 @@ class BlockParser
                 }
             }
 
+            // A bare marker (no same-line content) that is followed by indented
+            // continuation lines owns that content directly: the empty lead line
+            // is just the absent marker text, so drop it. This keeps the item from
+            // rendering a stray blank line and lets a following indented block
+            // (blockquote, code fence, ...) be recognized instead of escaped.
+            if ($itemContent === '' && count($itemLines) > 1 && $itemLines[0] === '') {
+                array_shift($itemLines);
+            }
+
             // For tight lists with continuation lines, check if content starts with
             // a block element. If so, parse as blocks; otherwise parse as plain text.
             // This prevents "-like" lines from being parsed as nested lists while
@@ -2249,7 +2264,9 @@ class BlockParser
                     $this->inlineParser->parse($paragraph, implode("\n", $itemLines), $start);
                     $listItem->appendChild($paragraph);
                 }
-            } else {
+            } elseif ($itemLines !== ['']) {
+                // A bare marker with no content is an empty item: leave it childless
+                // so it renders as `<li>\n</li>` rather than wrapping a blank line.
                 $this->parseBlocks($listItem, $itemLines, 0);
             }
 

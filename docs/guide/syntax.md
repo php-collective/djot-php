@@ -349,6 +349,40 @@ Lists can start at any number:
 </template>
 </OutputTabs>
 
+#### Empty List Items
+
+A list marker may be followed by a space *or by the end of the line*, so a bare
+marker on its own line is a valid empty item. This works for every marker type
+(`-`, `*`, `+`, `1.`, `(1)`, `a.`, `i.`).
+
+**Input:**
+```djot
+- One
+-
+- Three
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<ul>
+<li>One</li>
+<li></li>
+<li>Three</li>
+</ul>
+```
+
+</template>
+<template #result>
+<ul>
+<li>One</li>
+<li></li>
+<li>Three</li>
+</ul>
+</template>
+</OutputTabs>
+
 #### Nested Lists
 
 Indent with 2+ spaces for nested lists.
