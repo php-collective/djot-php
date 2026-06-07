@@ -2112,8 +2112,11 @@ class BlockParser
                     if ($this->allowsImmediateNestedBlock($nextTrimmed, $lines, $i)) {
                         break;
                     }
-                    // Properly indented continuation - include with original indentation relative to content
-                    $itemLines[] = IndentationHelper::stripLeadingIndent($nextLine, $contentIndent);
+                    // Text continuation of the item (not a nested block, which
+                    // breaks out above): strip all leading whitespace. Indentation
+                    // beyond the content column is not significant for plain text,
+                    // matching the reference implementation.
+                    $itemLines[] = $nextTrimmed;
                 } else {
                     // Lazy continuation (not properly indented but not at base level either)
                     $itemLines[] = $nextTrimmed;
