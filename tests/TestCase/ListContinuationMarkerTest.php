@@ -112,4 +112,24 @@ class ListContinuationMarkerTest extends TestCase
         $this->assertStringContainsString("item\n+\n", $html);
         $this->assertStringNotContainsString('<blockquote>', $html);
     }
+
+    /**
+     * The marker is list-item-scoped, not quote-scoped: it works for a list
+     * nested inside a blockquote (attaching to the list item, inside the quote),
+     * but a `+` in a quote with no list stays literal text.
+     */
+    public function testWorksForListNestedInsideBlockquote(): void
+    {
+        $attached = $this->converter->convert("> - item\n> +\n> > note\n> - next");
+        // The quote-in-item is attached to the first list item, inside the outer quote.
+        $this->assertStringContainsString(
+            "<blockquote>\n<ul>\n<li>\nitem\n<blockquote>\n<p>note</p>",
+            $attached,
+        );
+        $this->assertStringContainsString("<li>\nnext\n</li>", $attached);
+
+        // No list to attach to: the `+` is ordinary text.
+        $noList = $this->converter->convert("> para\n> +\n> > note");
+        $this->assertStringContainsString("para\n+\n", $noList);
+    }
 }
