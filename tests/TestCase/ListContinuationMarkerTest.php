@@ -103,4 +103,13 @@ class ListContinuationMarkerTest extends TestCase
         $this->assertStringNotContainsString('<blockquote>', $html);
         $this->assertStringContainsString('+', $html);
     }
+
+    public function testIndentedBlockAfterMarkerIsNotFlushAttachment(): void
+    {
+        // The attached block must sit flush at the marker column; an indented
+        // block after `+` is not a tight continuation, so the `+` stays literal.
+        $html = $this->converter->convert("- item\n+\n  > note\n- next");
+        $this->assertStringContainsString("item\n+\n", $html);
+        $this->assertStringNotContainsString('<blockquote>', $html);
+    }
 }
