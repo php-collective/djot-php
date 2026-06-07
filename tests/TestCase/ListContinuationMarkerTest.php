@@ -95,4 +95,12 @@ class ListContinuationMarkerTest extends TestCase
         $blankBefore = $this->converter->convert("- item\n\n+\n> note");
         $this->assertStringNotContainsString("<li>\nitem\n<blockquote>", $blankBefore);
     }
+
+    public function testTrailingMarkerWithNoFollowingBlockIsLiteral(): void
+    {
+        // A `+` with nothing after it is not a continuation marker.
+        $html = $this->converter->convert("- item\n+");
+        $this->assertStringNotContainsString('<blockquote>', $html);
+        $this->assertStringContainsString('+', $html);
+    }
 }

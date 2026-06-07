@@ -3578,12 +3578,10 @@ class BlockParser
      */
     private function opensAttachableContinuationBlock(string $trimmed): bool
     {
-        if ($trimmed === '') {
-            return false;
-        }
+        $first = $trimmed[0] ?? '';
 
-        return $trimmed[0] === '>'
-            || $trimmed[0] === '|'
+        return $first === '>'
+            || $first === '|'
             || preg_match('/^(`{3,}|~{3,}|:{3,})/', $trimmed) === 1;
     }
 
