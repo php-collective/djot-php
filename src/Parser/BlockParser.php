@@ -1832,8 +1832,13 @@ class BlockParser
     {
         $line = $lines[$start];
 
-        // Try to match list item marker
-        $listInfo = $this->listParser->parseListItemMarker($line);
+        // Try to match the list item marker. The marker may carry leading
+        // indentation: at the top level (or any block boundary) djot treats a
+        // leading-indented marker as a list, since indentation is only
+        // significant for nesting. The leading indent becomes the list's base
+        // indentation below. Lazy-continuation lines never reach here (they are
+        // collected by the open paragraph or the enclosing list item first).
+        $listInfo = $this->listParser->parseListItemMarker(ltrim($line, " \t"));
         if ($listInfo === null) {
             return null;
         }
