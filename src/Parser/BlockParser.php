@@ -1899,12 +1899,15 @@ class BlockParser
             }
 
             // List-continuation marker (AsciiDoc-style `+`): a lone `+` at the
-            // marker column attaches the FOLLOWING flush-left block(s) to the
-            // current item, with no blank line, keeping the list tight. A bare
-            // `+` is never a bullet (a bullet needs `+ ` + content), so this does
-            // not collide with `+`-bulleted lists. Lets you attach a code block,
-            // table or quote to an item without indenting its body.
-            if ($currentIndent === $baseIndent && trim($currentLine) === '+') {
+            // marker column, in the tight form `x` / `+` / `y` (no blank line
+            // before or after it), attaches the FOLLOWING flush-left block to the
+            // current item and keeps the list tight. Only container/verbatim
+            // blocks attach (see isTightListContinuation()); any other shape
+            // leaves the `+` as ordinary text. A bare `+` is never a bullet
+            // (a bullet needs `+ ` + content), so it does not collide with
+            // `+`-bulleted lists. Lets you attach a code block, table or quote to
+            // an item without indenting its body.
+            if ($this->isTightListContinuation($lines, $i, $baseIndent)) {
                 $lastItem = $this->listParser->getLastListItem($list);
                 if ($lastItem !== null) {
                     $i++; // consume the `+` marker line
@@ -2123,8 +2126,9 @@ class BlockParser
                     }
                     // List-continuation marker: stop collecting lead text so the
                     // main loop's `+` handler attaches the following block to this
-                    // item (instead of swallowing `+` as lazy continuation text).
-                    if ($nextTrimmed === '+') {
+                    // item. Only the tight `x` / `+` / `y` form qualifies; an
+                    // otherwise-shaped `+` stays lazy continuation text.
+                    if ($nextTrimmed === '+' && $this->isTightListContinuation($lines, $i, $baseIndent)) {
                         break;
                     }
                     // Non-list content at base indent - check if it starts another block
@@ -3521,6 +3525,66 @@ class BlockParser
         if ($lastChild instanceof Paragraph) {
             $this->inlineParser->parse($lastChild, ' ' . $content, $line);
         }
+    }
+
+    /**
+     * Whether the line at $i is a list-continuation marker in the only valid form:
+     *
+     *     x
+     *     +
+     *     y
+     *
+     * A lone `+` at the marker column with content (no blank line) immediately
+     * before and after it, where `y` opens a container or verbatim block. Any
+     * other shape (blank line around the `+`, a leaf block such as a paragraph,
+     * heading or thematic break, or a sibling list item) leaves the `+` as
+     * ordinary text.
+     *
+     * @param array<string> $lines
+     * @param int $baseIndent
+     * @param int $i
+     */
+    private function isTightListContinuation(array $lines, int $i, int $baseIndent): bool
+    {
+        $line = $lines[$i] ?? '';
+        if (trim($line) !== '+' || IndentationHelper::getLeadingSpaces($line) !== $baseIndent) {
+            return false;
+        }
+
+        // No blank line (and not the very first line) immediately before the marker.
+        if (!isset($lines[$i - 1]) || IndentationHelper::isBlankLine($lines[$i - 1])) {
+            return false;
+        }
+
+        // A non-blank block must follow immediately at the marker column.
+        $next = $lines[$i + 1] ?? null;
+        if ($next === null || IndentationHelper::isBlankLine($next)) {
+            return false;
+        }
+        if (IndentationHelper::getLeadingSpaces($next) !== $baseIndent) {
+            return false;
+        }
+
+        return $this->opensAttachableContinuationBlock(ltrim($next));
+    }
+
+    /**
+     * Whether a line opens a block that a `+` continuation may attach to a list
+     * item: a container block (blockquote `>`, div/admonition `:::`, table `|`)
+     * or a verbatim block (fenced code/raw ``` or ~~~).
+     *
+     * Leaf blocks (paragraph, heading, thematic break) and lists (a `-`/`1.` at
+     * the marker column is a sibling item, not nested content) are excluded.
+     */
+    private function opensAttachableContinuationBlock(string $trimmed): bool
+    {
+        if ($trimmed === '') {
+            return false;
+        }
+
+        return $trimmed[0] === '>'
+            || $trimmed[0] === '|'
+            || preg_match('/^(`{3,}|~{3,}|:{3,})/', $trimmed) === 1;
     }
 
     /**

@@ -59,4 +59,40 @@ class ListContinuationMarkerTest extends TestCase
         // No item is <p>-wrapped: the list stayed tight.
         $this->assertStringNotContainsString("<li>\n<p>", $html);
     }
+
+    public function testAttachesTableAndDiv(): void
+    {
+        $table = $this->converter->convert("- item\n+\n| a | b |\n- next");
+        $this->assertStringContainsString("<li>\nitem\n<table>", $table);
+
+        $div = $this->converter->convert("- item\n+\n::: note\nhi\n:::\n- next");
+        $this->assertStringContainsString("<li>\nitem\n<div class=\"note\">", $div);
+    }
+
+    /**
+     * Strict scope: a `+` only attaches container/verbatim blocks. A leaf block
+     * (heading, thematic break, plain paragraph) is not attached; the `+` stays
+     * literal continuation text on the item.
+     */
+    public function testDoesNotAttachLeafBlocks(): void
+    {
+        foreach (['## Heading', '---', 'plain paragraph'] as $leaf) {
+            $html = $this->converter->convert("- item\n+\n{$leaf}\n- next");
+            $this->assertStringContainsString("item\n+\n", $html, "+ should stay literal before: {$leaf}");
+            $this->assertStringNotContainsString('<blockquote>', $html);
+        }
+    }
+
+    /**
+     * Only the tight `x` / `+` / `y` form is a continuation marker; a blank line
+     * before or after the `+` leaves it as ordinary text.
+     */
+    public function testBlankLineAroundMarkerIsNotContinuation(): void
+    {
+        $blankAfter = $this->converter->convert("- item\n+\n\n> note");
+        $this->assertStringNotContainsString("<li>\nitem\n<blockquote>", $blankAfter);
+
+        $blankBefore = $this->converter->convert("- item\n\n+\n> note");
+        $this->assertStringNotContainsString("<li>\nitem\n<blockquote>", $blankBefore);
+    }
 }

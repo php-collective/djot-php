@@ -586,8 +586,11 @@ to other djot implementations.
 A lone `+` on its own line, at the list marker's column, attaches the following
 block to the current list item **without a blank line and without making the
 list loose**. It lets you keep a tight item that carries a code block, table,
-admonition or quote, without indenting the block's body — useful for deeply
+div/admonition or quote, without indenting the block's body. Useful for deeply
 nested or wide-marker lists, and for pasting code (no re-indenting every line).
+
+The marker is recognized **only** in the tight form `x` / `+` / `y`: content,
+then a lone `+`, then the block, with **no blank line before or after** the `+`.
 
 ````djot
 - Build the image
@@ -613,6 +616,13 @@ Push it
 </ul>
 ```
 
+Only **container and verbatim** blocks attach. A leaf block, or a `+` with a
+blank line around it, is left as ordinary text:
+
+| `+` attaches | `+` stays literal text |
+|---|---|
+| blockquote `>`, fenced code / raw ` ``` ` or `~~~`, table `\|`, div / admonition `:::` | paragraph, heading `##`, thematic break `---`, a sibling list item, or any blank line around the `+` |
+
 A blockquote, table or `:::` admonition attaches the same way:
 
 ```djot
@@ -630,6 +640,22 @@ A blockquote, table or `:::` admonition attaches the same way:
 - Outside a list, a lone `+` is ordinary paragraph text.
 - This is sugar, not new structure: the same result is also reachable by
   indenting the block under the item (which djot already supports).
+:::
+
+::: info Portable alternative
+`+` is a djot-php extension and is not portable. The canonical djot way to attach
+a block to a list item is to **indent it under the item** after a blank line,
+which every djot implementation accepts. For callouts specifically, use a
+canonical [`:::` div](#divs) inside the indented item rather than relying on `+`:
+
+```djot
+- item
+
+  ::: note
+  a note attached to the item
+  :::
+- next
+```
 :::
 
 ### Definition Lists
