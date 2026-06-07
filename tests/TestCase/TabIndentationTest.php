@@ -71,20 +71,16 @@ class TabIndentationTest extends TestCase
     }
 
     /**
-     * Block quote requires space after > (not tab) per djot spec.
-     *
-     * The space after > is a syntax delimiter, not indentation.
-     * Tab indentation rules apply to nested structures, not syntax delimiters.
+     * A tab after > is a valid block quote marker delimiter (matches the
+     * reference djot implementation), just like a space.
      */
-    public function testBlockQuoteWithTabNotBlockquote(): void
+    public function testBlockQuoteWithTabIsBlockquote(): void
     {
         $input = ">\tQuoted with tab";
         $result = $this->converter->convert($input);
 
-        // Per spec, > must be followed by space, not tab
-        // So this becomes a paragraph with > as text
-        $this->assertStringNotContainsString('<blockquote>', $result);
-        $this->assertStringContainsString('<p>', $result);
+        $this->assertStringContainsString('<blockquote>', $result);
+        $this->assertStringContainsString('Quoted with tab', $result);
     }
 
     /**
@@ -192,18 +188,16 @@ class TabIndentationTest extends TestCase
     }
 
     /**
-     * Block quote continuation requires space after > (not tab).
-     *
-     * Since >\t is not a blockquote marker, both lines become paragraphs.
+     * Block quote continuation lines also accept a tab after > as the delimiter.
      */
-    public function testBlockQuoteContinuationWithTabNotBlockquote(): void
+    public function testBlockQuoteContinuationWithTab(): void
     {
         $input = ">\tLine 1\n>\tLine 2";
         $result = $this->converter->convert($input);
 
-        // Per spec, > must be followed by space
-        $this->assertStringNotContainsString('<blockquote>', $result);
-        $this->assertStringContainsString('<p>', $result);
+        $this->assertStringContainsString('<blockquote>', $result);
+        $this->assertStringContainsString('Line 1', $result);
+        $this->assertStringContainsString('Line 2', $result);
     }
 
     /**

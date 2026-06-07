@@ -1661,9 +1661,9 @@ class BlockParser
             return null;
         }
 
-        // Match block quote: > followed by space or end of line (NOT >text or >>)
-        // The > must be followed by a space or be at end of line
-        if (!preg_match('/^> (.*)$/', $line, $matches) && !preg_match('/^>$/', $line)) {
+        // Match block quote: > followed by a space or tab, or end of line
+        // (NOT >text or >>). The space/tab is the marker delimiter.
+        if (!preg_match('/^>[ \t](.*)$/', $line, $matches) && !preg_match('/^>$/', $line)) {
             return null;
         }
 
@@ -1684,7 +1684,7 @@ class BlockParser
             'paragraphOpen' => false,
         ];
 
-        if (preg_match('/^> (.*)$/', $line, $matches)) {
+        if (preg_match('/^>[ \t](.*)$/', $line, $matches)) {
             $innerLines[] = $matches[1];
             $this->trackBlockQuoteLazyState($matches[1], $lazyState);
         } elseif (preg_match('/^>$/', $line)) {
@@ -1702,8 +1702,8 @@ class BlockParser
                 break;
             }
 
-            // Continue with "> " prefix (space required per spec)
-            if (preg_match('/^> (.*)$/', $currentLine, $matches)) {
+            // Continue with a "> " or ">\t" prefix (space or tab delimiter)
+            if (preg_match('/^>[ \t](.*)$/', $currentLine, $matches)) {
                 $innerLines[] = $matches[1];
                 $this->trackBlockQuoteLazyState($matches[1], $lazyState);
                 $i++;
