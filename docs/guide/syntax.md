@@ -586,8 +586,21 @@ to other djot implementations.
 A lone `+` on its own line, at the list marker's column, attaches the following
 block to the current list item **without a blank line and without making the
 list loose**. It lets you keep a tight item that carries a code block, table,
-div/admonition or quote, without indenting the block's body. Useful for deeply
-nested or wide-marker lists, and for pasting code (no re-indenting every line).
+div/admonition or quote, without indenting the block's body.
+
+::: tip Why, where it beats plain indentation
+The canonical way to attach a block is to indent its body under the item. `+`
+adds the **flush-left** case, which matters when that indentation is painful:
+
+- **Pasting code** keeps its own indentation; you do not have to re-indent every
+  line by the marker width.
+- **Deep or wide markers** make the required indent large: under `10. ` or three
+  levels deep the body would need 4 to 8 leading spaces on every line. `+` keeps
+  the block flush at column 0.
+
+It adds no new structure (the same tree is reachable by indenting); it is
+authoring sugar for the flush-left case.
+:::
 
 The marker is recognized **only** in the tight form `x` / `+` / `y`: content,
 then a lone `+`, then the block, with **no blank line before or after** the `+`.
