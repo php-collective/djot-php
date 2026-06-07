@@ -1910,35 +1910,8 @@ class BlockParser
             if ($this->isTightListContinuation($lines, $i, $baseIndent)) {
                 $lastItem = $this->listParser->getLastListItem($list);
                 if ($lastItem !== null) {
-                    $i++; // consume the `+` marker line
-                    /** @var array<string> $attached */
-                    $attached = [];
-                    while ($i < $count) {
-                        $line = $lines[$i];
-                        if (IndentationHelper::isBlankLine($line)) {
-                            break; // a blank ends the attachment (single-block demo scope)
-                        }
-                        $lineIndent = IndentationHelper::getLeadingSpaces($line);
-                        if ($lineIndent < $baseIndent) {
-                            break;
-                        }
-                        $trimmed = ltrim($line);
-                        if ($lineIndent === $baseIndent) {
-                            // Stop at a sibling item marker or a further `+` marker.
-                            $marker = $this->listParser->parseListItemMarker($trimmed);
-                            if ($marker !== null && $this->listParser->itemMatchesList($listInfo, $marker)) {
-                                break;
-                            }
-                            if ($trimmed === '+') {
-                                break;
-                            }
-                        }
-                        $attached[] = IndentationHelper::stripLeadingIndent($line, $baseIndent);
-                        $i++;
-                    }
-                    if ($attached !== []) {
-                        $this->parseBlocks($lastItem, $attached, 0);
-                    }
+                    // Attach the following block to the current item; skip the `+`.
+                    $i = $this->attachContinuationBlock($lastItem, $lines, $i + 1, $count, $baseIndent, $listInfo);
                     // The continuation attaches content but does not loosen the list.
                     $lastItemHadBlankAfter = false;
 
@@ -2086,6 +2059,19 @@ class BlockParser
             $listItem = new ListItem($taskMarker);
             /** @var string $itemContent */
             $itemContent = $itemInfo['content'];
+
+            // Empty-item continuation: a marker whose only content is a bare `+`
+            // (e.g. `- +`) with an attachable container/verbatim block on the next
+            // flush-left line attaches that block as the item's sole content. This
+            // is the trailing-whitespace-free form of `x` / `+` / `y` for the case
+            // where the block is the first thing in the item.
+            if ($itemContent === '+' && $this->nextLineOpensAttachableBlock($lines, $i, $baseIndent)) {
+                $list->appendChild($listItem);
+                $i = $this->attachContinuationBlock($listItem, $lines, $i + 1, $count, $baseIndent, $listInfo);
+                $lastItemHadBlankAfter = false;
+
+                continue;
+            }
 
             // Collect item content lines (without blank line = tight continuation)
             /** @var array<string> $itemLines */
@@ -3556,7 +3542,20 @@ class BlockParser
             return false;
         }
 
-        // A non-blank block must follow immediately at the marker column.
+        return $this->nextLineOpensAttachableBlock($lines, $i, $baseIndent);
+    }
+
+    /**
+     * Whether the line after index $i is a non-blank attachable block, flush at
+     * the marker column. Shared by the lone-`+` marker (`x` / `+` / `y`) and the
+     * empty-item marker (`- +` / `y`).
+     *
+     * @param array<string> $lines
+     * @param int $baseIndent
+     * @param int $i
+     */
+    private function nextLineOpensAttachableBlock(array $lines, int $i, int $baseIndent): bool
+    {
         $next = $lines[$i + 1] ?? null;
         if ($next === null || IndentationHelper::isBlankLine($next)) {
             return false;
@@ -3566,6 +3565,50 @@ class BlockParser
         }
 
         return $this->opensAttachableContinuationBlock(ltrim($next));
+    }
+
+    /**
+     * Collect and attach a single flush-left block to $item, starting at line
+     * index $i (the first line of the block). The block runs to the next blank
+     * line, sibling item marker, or further `+`. Returns the index just past the
+     * attached block.
+     *
+     * @param \Djot\Node\Block\ListItem $item
+     * @param array<string> $lines
+     * @param int $baseIndent
+     * @param int $count
+     * @param int $i
+     * @param array<string, mixed> $listInfo
+     */
+    private function attachContinuationBlock(ListItem $item, array $lines, int $i, int $count, int $baseIndent, array $listInfo): int
+    {
+        /** @var array<string> $attached */
+        $attached = [];
+        while ($i < $count) {
+            $line = $lines[$i];
+            if (IndentationHelper::isBlankLine($line)) {
+                break; // a blank ends the attachment (single block)
+            }
+            $lineIndent = IndentationHelper::getLeadingSpaces($line);
+            $trimmed = ltrim($line);
+            if ($lineIndent === $baseIndent) {
+                // Stop at a sibling item marker or a further `+` marker.
+                $marker = $this->listParser->parseListItemMarker($trimmed);
+                if ($marker !== null && $this->listParser->itemMatchesList($listInfo, $marker)) {
+                    break;
+                }
+                if ($trimmed === '+') {
+                    break;
+                }
+            }
+            $attached[] = IndentationHelper::stripLeadingIndent($line, $baseIndent);
+            $i++;
+        }
+        if ($attached !== []) {
+            $this->parseBlocks($item, $attached, 0);
+        }
+
+        return $i;
     }
 
     /**

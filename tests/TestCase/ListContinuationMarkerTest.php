@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase;
 
 use Djot\DjotConverter;
+use Djot\Parser\BlockParser;
 use Djot\Renderer\SoftBreakMode;
 use PHPUnit\Framework\TestCase;
 
@@ -131,5 +132,65 @@ class ListContinuationMarkerTest extends TestCase
         // No list to attach to: the `+` is ordinary text.
         $noList = $this->converter->convert("> para\n> +\n> > note");
         $this->assertStringContainsString("para\n+\n", $noList);
+    }
+
+    /**
+     * `- +` (marker + bare `+`, no trailing whitespace) attaches the following
+     * block as the item's first and only content.
+     */
+    public function testEmptyItemMarkerAttachesFirstBlock(): void
+    {
+        $table = $this->converter->convert("- +\n| a | b |\n- next");
+        $this->assertStringContainsString("<li>\n<table>", $table);
+        $this->assertStringContainsString("<li>\nnext\n</li>", $table);
+
+        $ordered = $this->converter->convert("1. +\n> note\n2. next");
+        $this->assertStringContainsString("<li>\n<blockquote>", $ordered);
+    }
+
+    public function testEmptyItemMarkerRejectsLeafBlocks(): void
+    {
+        // `- +` only attaches container/verbatim blocks; a leaf block leaves the
+        // `+` as literal item text.
+        $html = $this->converter->convert("- +\n## H\n- next");
+        $this->assertStringContainsString("+\n## H", $html);
+        $this->assertStringNotContainsString('<table>', $html);
+    }
+
+    public function testChainedMarkersAttachMultipleBlocks(): void
+    {
+        $html = $this->converter->convert("- item\n+\n> a\n+\n> b\n- next");
+        // Two blockquotes attached to the first item, then the sibling.
+        $this->assertSame(2, substr_count($html, '<blockquote>'));
+        $this->assertStringContainsString("<li>\nnext\n</li>", $html);
+    }
+
+    public function testBlankLineEndsAttachedBlock(): void
+    {
+        // The attachment is a single block: a blank line after it ends it, and
+        // following content is a normal top-level block.
+        $html = $this->converter->convert("- item\n+\n> note\n\nafter");
+        $this->assertStringContainsString('<blockquote>', $html);
+        $this->assertStringContainsString('<p>after</p>', $html);
+    }
+
+    public function testContinuationInsideNestedListDedents(): void
+    {
+        // Inside a nested list, the attached block ends when a line dedents below
+        // the nested list's marker column.
+        $html = $this->converter->convert("- outer\n\n  - inner\n  +\n  > note\n- after");
+        $this->assertStringContainsString("inner\n<blockquote>", $html);
+        $this->assertStringContainsString("<li>\nafter\n</li>", $html);
+    }
+
+    public function testContinuationInInlineNestedListDedents(): void
+    {
+        // With inline nesting, the nested list and the dedent to the parent share
+        // one line array, so the attachment must stop at the dedented line.
+        $converter = new DjotConverter(parser: new BlockParser(nestedListsWithoutBlankLine: true));
+        $converter->getHtmlRenderer()->setSoftBreakMode(SoftBreakMode::Newline);
+        $html = $converter->convert("- outer\n  - inner\n  +\n  > note\n- after");
+        $this->assertStringContainsString("inner\n<blockquote>", $html);
+        $this->assertStringContainsString("<li>\nafter\n</li>", $html);
     }
 }

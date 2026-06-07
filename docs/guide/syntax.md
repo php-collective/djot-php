@@ -645,6 +645,34 @@ A blockquote, table or `:::` admonition attaches the same way:
 - next
 ```
 
+When the block is the **first content** of the item (no text before it), put the
+`+` right after the marker as `- +` (a space between marker and `+`, never a
+trailing space). This is the lint-safe way to start an item with a block:
+
+```djot
+- +
+| a | b |
+- next
+```
+
+renders the table as the first item's only content:
+
+```html
+<ul>
+<li>
+<table>
+<tr>
+<td>a</td>
+<td>b</td>
+</tr>
+</table>
+</li>
+<li>
+next
+</li>
+</ul>
+```
+
 ::: tip Notes
 - A bare `+` is **never** a bullet (a bullet needs `+ ` plus content), so this
   does not collide with `+`-bulleted lists.
