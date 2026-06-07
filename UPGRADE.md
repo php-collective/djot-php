@@ -1,6 +1,6 @@
 # Upgrade Guide
 
-## Upgrading to 0.1.30
+## Upgrading to 0.1.29
 
 ### Behavior change: tabs in code are preserved by default
 
