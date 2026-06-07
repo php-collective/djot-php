@@ -67,9 +67,14 @@ class HtmlRenderer implements RendererInterface
     protected ?SafeMode $safeMode = null;
 
     /**
-     * Tab width for code blocks (null = preserve tabs, integer = convert to spaces)
+     * Tab width for code blocks and inline code (null = preserve tabs literally,
+     * integer = convert each tab to that many spaces).
+     *
+     * Defaults to null to stay spec-conformant: djot preserves literal tabs. Use
+     * TabNormalizationExtension or setCodeBlockTabWidth() to convert them for
+     * display (a literal tab in <pre> renders at the browser default tab width).
      */
-    protected ?int $codeBlockTabWidth = 4;
+    protected ?int $codeBlockTabWidth = null;
 
     /**
      * Round-trip mode adds data attributes to preserve Djot-specific information
@@ -213,11 +218,12 @@ class HtmlRenderer implements RendererInterface
     }
 
     /**
-     * Set tab width for code blocks
+     * Set tab width for code blocks and inline code.
      *
-     * When set, tabs in code blocks and inline code are converted to spaces.
-     * This ensures consistent display across all browsers and contexts
-     * (email clients, RSS readers, etc.) without relying on CSS tab-size.
+     * When set to an integer, tabs are converted to that many spaces, for
+     * consistent display across browsers and contexts (email clients, RSS
+     * readers, etc.) without relying on CSS tab-size. The default is null
+     * (preserve literal tabs), which is spec-conformant.
      *
      * @param int|null $width Number of spaces per tab (null to preserve tabs)
      */

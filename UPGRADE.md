@@ -1,5 +1,24 @@
 # Upgrade Guide
 
+## Upgrading to 0.1.30
+
+### Behavior change: tabs in code are preserved by default
+
+Tabs in code blocks and inline code are now **preserved literally** instead of being converted to 4 spaces. This is spec-conformant (djot keeps tabs).
+
+If you relied on the previous 4-space conversion, restore it explicitly:
+
+```php
+// Per renderer
+$converter->getHtmlRenderer()->setCodeBlockTabWidth(4);
+
+// Or via the opt-in extension
+use Djot\Extension\TabNormalizationExtension;
+$converter->addExtension(new TabNormalizationExtension()); // 4 spaces (configurable)
+```
+
+Note: a literal tab in `<pre>` renders at the browser's default tab width (usually 8), so enabling one of the above is recommended if you want a fixed width.
+
 ## Upgrading to 0.1.23
 
 ### Breaking Change: `significantNewlines` No Longer Sets `SoftBreakMode::Break`
