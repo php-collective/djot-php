@@ -66,9 +66,11 @@ class ListParser
         }
 
         // Bullet list: -, +, or *
-        if (preg_match('/^([-*+]) +(.*)$/', $line, $matches)) {
+        // A marker followed by a space (or end of line) is a valid item; a bare
+        // marker alone on its line is an empty item (djot allows marker + newline).
+        if (preg_match('/^([-*+])(?: +(.*))?$/', $line, $matches)) {
             $marker = $matches[1];
-            $content = $matches[2];
+            $content = $matches[2] ?? '';
 
             // Don't treat as list if content ends with same marker (likely emphasis)
             if ($marker === '*' || $marker === '-') {
@@ -88,27 +90,27 @@ class ListParser
             ];
         }
 
-        // Ordered list: 1. or 1) or (1)
-        if (preg_match('/^(\d+)([.)]) +(.*)$/', $line, $matches)) {
+        // Ordered list: 1. or 1) or (1) - bare marker (no content) is an empty item.
+        if (preg_match('/^(\d+)([.)])(?: +(.*))?$/', $line, $matches)) {
             return [
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => $matches[2],
-                'content' => $matches[3],
+                'content' => $matches[3] ?? '',
                 'start' => (int)$matches[1],
             ];
         }
 
-        if (preg_match('/^\((\d+)\) +(.*)$/', $line, $matches)) {
+        if (preg_match('/^\((\d+)\)(?: +(.*))?$/', $line, $matches)) {
             return [
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => '()',
-                'content' => $matches[2],
+                'content' => $matches[2] ?? '',
                 'start' => (int)$matches[1],
             ];
         }
 
         // Roman numeral ordered list
-        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)]) +(.*)$/', $line, $matches)) {
+        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)])(?: +(.*))?$/', $line, $matches)) {
             $roman = $matches[1];
             $isLower = ctype_lower($roman[0]);
             $start = $this->romanToInt(strtoupper($roman));
@@ -116,7 +118,7 @@ class ListParser
                 $result = [
                     'type' => ListBlock::TYPE_ORDERED,
                     'marker' => $matches[2],
-                    'content' => $matches[3],
+                    'content' => $matches[3] ?? '',
                     'start' => $start,
                     'style' => $isLower ? 'i' : 'I',
                 ];
@@ -131,7 +133,7 @@ class ListParser
             }
         }
 
-        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\) +(.*)$/', $line, $matches)) {
+        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\)(?: +(.*))?$/', $line, $matches)) {
             $roman = $matches[1];
             $isLower = ctype_lower($roman[0]);
             $start = $this->romanToInt(strtoupper($roman));
@@ -139,7 +141,7 @@ class ListParser
                 $result = [
                     'type' => ListBlock::TYPE_ORDERED,
                     'marker' => '()',
-                    'content' => $matches[2],
+                    'content' => $matches[2] ?? '',
                     'start' => $start,
                     'style' => $isLower ? 'i' : 'I',
                 ];
@@ -155,7 +157,7 @@ class ListParser
         }
 
         // Alpha ordered list: a. or A. or a) or A) or (a) or (A)
-        if (preg_match('/^([a-zA-Z])([.)]) +(.*)$/', $line, $matches)) {
+        if (preg_match('/^([a-zA-Z])([.)])(?: +(.*))?$/', $line, $matches)) {
             $letter = $matches[1];
             $isLower = ctype_lower($letter);
             $start = ord(strtolower($letter)) - ord('a') + 1;
@@ -163,13 +165,13 @@ class ListParser
             return [
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => $matches[2],
-                'content' => $matches[3],
+                'content' => $matches[3] ?? '',
                 'start' => $start,
                 'style' => $isLower ? 'a' : 'A',
             ];
         }
 
-        if (preg_match('/^\(([a-zA-Z])\) +(.*)$/', $line, $matches)) {
+        if (preg_match('/^\(([a-zA-Z])\)(?: +(.*))?$/', $line, $matches)) {
             $letter = $matches[1];
             $isLower = ctype_lower($letter);
             $start = ord(strtolower($letter)) - ord('a') + 1;
@@ -177,7 +179,7 @@ class ListParser
             return [
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => '()',
-                'content' => $matches[2],
+                'content' => $matches[2] ?? '',
                 'start' => $start,
                 'style' => $isLower ? 'a' : 'A',
             ];

@@ -771,6 +771,11 @@ class HtmlRenderer implements RendererInterface
             $content = rtrim($content);
         }
 
+        // An empty item (bare marker, no content) renders without a blank line.
+        if ($content === '') {
+            return '<li' . $attrs . ">\n</li>\n";
+        }
+
         // In djot, list item content is always on its own line
         return '<li' . $attrs . ">\n" . $content . "\n</li>\n";
     }
