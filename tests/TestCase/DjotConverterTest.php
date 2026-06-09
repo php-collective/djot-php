@@ -303,6 +303,26 @@ class DjotConverterTest extends TestCase
         $this->assertSame($expected, $this->converter->convert($djot));
     }
 
+    public function testInvalidAttrBlockKeepsBracketsLiteral(): void
+    {
+        // A bracketed run abutting an invalid attribute block ({???}) is not a
+        // span: the brackets and block render literally, but the bracket text
+        // is still inline-parsed.
+        $this->assertSame("<p>[x]{???}</p>\n", $this->converter->convert('[x]{???}'));
+        $this->assertSame(
+            "<p>[<strong>x</strong>]{???}</p>\n",
+            $this->converter->convert('[*x*]{???}'),
+        );
+    }
+
+    public function testEmptyAttrBlockStillFormsSpan(): void
+    {
+        // An empty or whitespace-only block is a valid empty attribute block,
+        // kept as a bare <span> so a default-attribute extension can target it.
+        $this->assertSame("<p><span>x</span></p>\n", $this->converter->convert('[x]{}'));
+        $this->assertSame("<p><span>x</span></p>\n", $this->converter->convert('[x]{ }'));
+    }
+
     public function testTable(): void
     {
         $djot = "| A | B |\n|---|---|\n| 1 | 2 |";
