@@ -307,10 +307,10 @@ class HtmlRenderer implements RendererInterface
 
                 $html = $this->renderDocumentWithSections($document);
 
-                if (
-                    $this->sharedRenderContext->collectedFootnotes !== []
-                    || $this->sharedRenderContext->footnoteNumbers !== []
-                ) {
+                // Only emit the endnotes section when at least one footnote was
+                // actually referenced. A footnote defined but never referenced
+                // produces no section; an empty <ol> would otherwise leak.
+                if ($this->sharedRenderContext->footnoteNumbers !== []) {
                     $html .= $this->renderFootnotesSection();
                 }
 
