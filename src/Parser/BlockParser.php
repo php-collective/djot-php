@@ -2871,7 +2871,11 @@ class BlockParser
             }
 
             // Process rowspan markers - find cells above that should span down
-            // We need to track column positions considering rowspan markers in previous rows
+            // We need to track column positions considering rowspan markers in previous rows.
+            // getChildren() hands back a copy-on-write alias of the table's internal child
+            // array. Holding it alive across the appendChild() below would force PHP to copy
+            // the entire array on every row (turning a plain table into O(rows^2)), so it is
+            // released with unset() right before the append - see the note there.
             $tableChildren = $table->getChildren();
             $currentRowIndex = count($tableChildren); // Index where current row will be added
 
@@ -2922,6 +2926,9 @@ class BlockParser
                 $this->removeOverlappingCells($table, $row, $rowCellData, $currentRowIndex);
             }
 
+            // Release the copy-on-write alias taken above so appendChild() mutates the
+            // child array in place instead of duplicating it; keeps table parsing linear.
+            unset($tableChildren);
             $table->appendChild($row);
         }
 
