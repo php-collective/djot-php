@@ -912,19 +912,30 @@ class InlineParser
             }
         }
 
-        // Check for attribute span: [text]{.class} or [text]{.foo}{.bar}
+        // Inline span [text]{attrs}. A bracketed run forms a <span> only when
+        // the directly-abutting block is a valid attribute block: one that
+        // yields an attribute, or an empty/whitespace/comment-only block (kept
+        // so a default-attribute extension can target [x]{} / [x]{ }). A block
+        // carrying unrecognized content ({???}, {=y=}) is not an attribute
+        // block, so the brackets and block render literally - the bracket text
+        // is still inline-parsed, e.g. [*x*]{???} -> [<strong>x</strong>]{???}.
         if ($afterBracket < $length && $text[$afterBracket] === '{') {
             $attrEnd = $this->findAttributeEnd($text, $afterBracket);
             if ($attrEnd !== null) {
-                $span = new Span();
-                // Apply all consecutive attribute blocks
-                $endPos = $this->applyConsecutiveAttributes($span, $text, $afterBracket);
-                $this->parseInlines($span, $linkText);
+                $attrStr = substr($text, $afterBracket + 1, $attrEnd - $afterBracket - 1);
+                if ($this->isValidAttrPayload($attrStr)) {
+                    $span = new Span();
+                    // Apply the gating block, then absorb any further
+                    // consecutive attribute blocks.
+                    $this->applyAttributesToNode($span, $attrStr);
+                    $endPos = $this->applyConsecutiveAttributes($span, $text, $attrEnd + 1);
+                    $this->parseInlines($span, $linkText);
 
-                return [
-                    'node' => $span,
-                    'pos' => $endPos,
-                ];
+                    return [
+                        'node' => $span,
+                        'pos' => $endPos,
+                    ];
+                }
             }
         }
 
@@ -1888,6 +1899,25 @@ class InlineParser
      *
      * @return int The final position after all attribute blocks
      */
+
+    /**
+     * Whether a `{...}` payload is a valid attribute block.
+     *
+     * Valid means it yields at least one attribute under the attribute grammar,
+     * or it is empty/whitespace/comment-only - a valid empty block kept as a
+     * bare <span> so a default-attribute extension can target it. A block
+     * carrying unrecognized content (`{???}`, `{=y=}`) is not an attribute
+     * block, so the surrounding bracketed run stays literal text.
+     */
+    protected function isValidAttrPayload(string $attrStr): bool
+    {
+        if (AttributeParser::parse($attrStr) !== []) {
+            return true;
+        }
+
+        return trim($this->removeAttributeComments($attrStr)) === '';
+    }
+
     protected function applyConsecutiveAttributes(Node $node, string $text, int $startPos): int
     {
         $length = strlen($text);
@@ -1900,6 +1930,13 @@ class InlineParser
             }
 
             $attrStr = substr($text, $pos + 1, $attrEnd - $pos - 1);
+            // Stop at the first block that is not a valid attribute block; it
+            // (and anything after it) stays literal instead of being silently
+            // consumed, e.g. the {???} in [x]{.a}{???}.
+            if (!$this->isValidAttrPayload($attrStr)) {
+                break;
+            }
+
             $this->applyAttributesToNode($node, $attrStr);
             $pos = $attrEnd + 1;
         }
