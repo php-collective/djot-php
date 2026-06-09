@@ -9,6 +9,7 @@ use Djot\LinkPolicy;
 use Djot\Node\Block\BlockNode;
 use Djot\Node\Block\BlockQuote;
 use Djot\Node\Block\CodeBlock;
+use Djot\Node\Block\Comment;
 use Djot\Node\Block\DefinitionDescription;
 use Djot\Node\Block\DefinitionList;
 use Djot\Node\Block\DefinitionTerm;
@@ -194,6 +195,15 @@ class ProfileFilter
 
     protected function convertToText(Node $node, Node $parent): void
     {
+        // A comment is never visible content. Converting it to text would leak
+        // its body into the output (and, being a block node, wrap it in a stray
+        // paragraph), so always drop it instead.
+        if ($node instanceof Comment) {
+            $parent->removeChild($node);
+
+            return;
+        }
+
         $textContent = $this->extractTextContent($node);
 
         if ($textContent === '') {
