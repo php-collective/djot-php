@@ -97,6 +97,26 @@ class ProfileTest extends TestCase
         $this->assertStringContainsString('Paragraph text', $html);
     }
 
+    public function testCommentProfileDropsBraceCommentWithoutLeakingContent(): void
+    {
+        $converter = new DjotConverter(profile: Profile::comment());
+        $html = $converter->convert("hello\n\n{% secret note %}\n\nworld");
+
+        $this->assertStringNotContainsString('secret', $html);
+        $this->assertStringContainsString('<p>hello</p>', $html);
+        $this->assertStringContainsString('<p>world</p>', $html);
+    }
+
+    public function testCommentProfileDropsFencedCommentWithoutLeakingContent(): void
+    {
+        $converter = new DjotConverter(profile: Profile::comment());
+        $html = $converter->convert("a\n\n%%%\nsecret\n%%%\n\nb");
+
+        $this->assertStringNotContainsString('secret', $html);
+        $this->assertStringContainsString('<p>a</p>', $html);
+        $this->assertStringContainsString('<p>b</p>', $html);
+    }
+
     public function testParseEnforcesProfileMaxLength(): void
     {
         $converter = new DjotConverter(profile: (new Profile())->setMaxLength(5));
