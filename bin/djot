@@ -4,18 +4,23 @@
 declare(strict_types=1);
 
 /**
- * Djot CLI - Convert djot files to HTML
+ * Djot CLI - Convert djot markup to other formats
  *
  * Usage:
- *   djot [options] [input-file]
- *   cat file.djot | djot [options]
+ *   djot convert [options] <file> Convert a file (use - for stdin)
+ *   djot version Show version information
+ *   djot --help Show help
  *
- * Options:
- *   -o, --output FILE Write output to FILE instead of stdout
- *   -x, --xhtml Use XHTML-compatible output
- *   -s, --safe Enable safe mode (sanitize HTML)
+ * The legacy flat form (djot [options] <file>) is still accepted and behaves
+ * like `djot convert`.
+ *
+ * Convert options:
+ *   -o, --output=FILE Write output to FILE instead of stdout
+ *   -f, --format=FORMAT Output format: html (default), text, markdown, ansi
+ *   --safe[=MODE] Enable safe mode (MODE: default or strict), HTML only
+ *   -x, --xhtml Use XHTML-compatible output (HTML only)
  *   -w, --warnings Show parse warnings on stderr
- *   --strict Exit with error if warnings are generated
+ *   --strict Exit with code 1 if warnings are generated
  *   -h, --help Show this help message
  *   -v, --version Show version information
  */
@@ -43,19 +48,53 @@ if (!$autoloaderFound) {
 }
 
 use Djot\DjotConverter;
+use Djot\Renderer\AnsiRenderer;
+use Djot\Renderer\MarkdownRenderer;
+use Djot\Renderer\PlainTextRenderer;
+use Djot\Renderer\RendererInterface;
+use Djot\SafeMode;
 
 /**
- * Parse command line arguments
+ * Exit codes.
  *
- * @param array<int, string> $argv
- * @return array{options: array<string, bool|string>, input: ?string}
+ * @var int
  */
-function parseArgs(array $argv): array
+const EXIT_SUCCESS = 0;
+/**
+ * @var int
+ */
+const EXIT_ERROR = 1;
+/**
+ * @var int
+ */
+const EXIT_FILE_NOT_FOUND = 2;
+/**
+ * @var int
+ */
+const EXIT_INVALID_FORMAT = 3;
+
+/**
+ * Supported output formats.
+ *
+ * @var array<int, string>
+ */
+const FORMATS = ['html', 'text', 'markdown', 'ansi'];
+
+/**
+ * Parse convert command line arguments.
+ *
+ * @param array<int, string> $argv Arguments after the subcommand.
+ *
+ * @return array{options: array<string, bool|string|null>, input: ?string}
+ */
+function parseConvertArgs(array $argv): array
 {
     $options = [
         'output' => null,
+        'format' => 'html',
         'xhtml' => false,
         'safe' => false,
+        'safeStrict' => false,
         'warnings' => false,
         'strict' => false,
         'help' => false,
@@ -64,7 +103,7 @@ function parseArgs(array $argv): array
     $input = null;
 
     $argc = count($argv);
-    for ($i = 1; $i < $argc; $i++) {
+    for ($i = 0; $i < $argc; $i++) {
         $arg = $argv[$i];
 
         if ($arg === '-h' || $arg === '--help') {
@@ -73,27 +112,56 @@ function parseArgs(array $argv): array
             $options['version'] = true;
         } elseif ($arg === '-x' || $arg === '--xhtml') {
             $options['xhtml'] = true;
-        } elseif ($arg === '-s' || $arg === '--safe') {
+        } elseif ($arg === '-s' || $arg === '--safe' || $arg === '--safe=default') {
             $options['safe'] = true;
+        } elseif ($arg === '--safe=strict') {
+            $options['safe'] = true;
+            $options['safeStrict'] = true;
+        } elseif (str_starts_with($arg, '--safe=')) {
+            $mode = substr($arg, strlen('--safe='));
+            fwrite(STDERR, "Error: Unknown safe mode: $mode (expected default or strict)\n");
+            exit(EXIT_ERROR);
         } elseif ($arg === '-w' || $arg === '--warnings') {
             $options['warnings'] = true;
         } elseif ($arg === '--strict') {
             $options['strict'] = true;
             $options['warnings'] = true;
-        } elseif ($arg === '-o' || $arg === '--output') {
+        } elseif ($arg === '-f' || $arg === '--format') {
             if (!isset($argv[$i + 1])) {
+                fwrite(STDERR, "Error: --format requires a value\n");
+                exit(EXIT_ERROR);
+            }
+            $options['format'] = strtolower($argv[++$i]);
+        } elseif (str_starts_with($arg, '--format=')) {
+            $options['format'] = strtolower(substr($arg, strlen('--format=')));
+        } elseif ($arg === '-o' || $arg === '--output') {
+            if (!isset($argv[$i + 1]) || $argv[$i + 1] === '') {
                 fwrite(STDERR, "Error: --output requires a filename\n");
-                exit(1);
+                exit(EXIT_ERROR);
             }
             $options['output'] = $argv[++$i];
+        } elseif (str_starts_with($arg, '--output=')) {
+            $value = substr($arg, strlen('--output='));
+            if ($value === '') {
+                fwrite(STDERR, "Error: --output requires a filename\n");
+                exit(EXIT_ERROR);
+            }
+            $options['output'] = $value;
+        } elseif ($arg === '-') {
+            // Explicit stdin marker; counts as the single input.
+            if ($input !== null) {
+                fwrite(STDERR, "Error: Multiple input files specified\n");
+                exit(EXIT_ERROR);
+            }
+            $input = '-';
         } elseif (str_starts_with($arg, '-')) {
             fwrite(STDERR, "Error: Unknown option: $arg\n");
             fwrite(STDERR, "Try 'djot --help' for more information.\n");
-            exit(1);
+            exit(EXIT_ERROR);
         } else {
             if ($input !== null) {
                 fwrite(STDERR, "Error: Multiple input files specified\n");
-                exit(1);
+                exit(EXIT_ERROR);
             }
             $input = $arg;
         }
@@ -105,30 +173,41 @@ function parseArgs(array $argv): array
 function showHelp(): void
 {
     echo <<<'HELP'
-Djot - Convert djot markup to HTML
+Djot - Convert djot markup to other formats
 
 Usage:
-  djot [options] [input-file]
-  cat file.djot | djot [options]
+  djot convert [options] <file>   Convert a file (use - for stdin)
+  djot version                    Show version information
+  djot --help                     Show this help message
+
+The legacy flat form (djot [options] <file>) is still accepted and behaves
+like `djot convert`.
 
 Arguments:
-  input-file          Input djot file (reads from stdin if not specified)
+  file                  Input file (use - for stdin)
 
 Options:
-  -o, --output FILE   Write output to FILE instead of stdout
-  -x, --xhtml         Use XHTML-compatible output (self-closing tags)
-  -s, --safe          Enable safe mode (sanitize dangerous HTML)
-  -w, --warnings      Show parse warnings on stderr
-  --strict            Exit with error code 1 if warnings are generated
-  -h, --help          Show this help message
-  -v, --version       Show version information
+  -o, --output=FILE     Write output to FILE instead of stdout
+  -f, --format=FORMAT   Output format: html (default), text, markdown, ansi
+  --safe[=MODE]         Enable safe mode (MODE: default or strict), HTML only
+  -x, --xhtml           Use XHTML-compatible output (HTML only)
+  -w, --warnings        Show parse warnings on stderr
+  --strict              Exit with code 1 if warnings are generated
+  -h, --help            Show this help message
+  -v, --version         Show version information
 
 Examples:
-  djot document.djot                    Convert file to stdout
-  djot document.djot -o document.html   Convert file to output file
-  djot -s untrusted.djot                Convert with safe mode enabled
-  echo '*hello*' | djot                 Convert from stdin
-  djot --warnings doc.djot 2>warn.txt   Save warnings to file
+  djot convert document.djot                  Convert file to stdout (HTML)
+  djot convert document.djot --format=text    Convert to plain text
+  djot convert document.djot -o document.html Convert file to output file
+  djot convert untrusted.djot --safe          Convert with safe mode enabled
+  echo '*hello*' | djot convert -             Convert from stdin
+
+Exit codes:
+  0  Success
+  1  General error
+  2  File not found
+  3  Invalid format
 
 HELP;
 }
@@ -139,86 +218,162 @@ function showVersion(): void
     $version = 'unknown';
 
     if (file_exists($composerJson)) {
-        $data = json_decode(file_get_contents($composerJson), true);
-        $version = $data['version'] ?? 'dev';
+        $data = json_decode((string)file_get_contents($composerJson), true);
+        if (is_array($data) && isset($data['version']) && is_string($data['version'])) {
+            $version = $data['version'];
+        } else {
+            $version = 'dev';
+        }
     }
 
     echo "djot-php version $version\n";
 }
 
-// Main
-$parsed = parseArgs($argv);
-$options = $parsed['options'];
-$inputFile = $parsed['input'];
+/**
+ * Resolve the renderer for a given output format, or null for HTML (default).
+ */
+function rendererForFormat(string $format): ?RendererInterface
+{
+    return match ($format) {
+        'text' => new PlainTextRenderer(),
+        'markdown' => new MarkdownRenderer(),
+        'ansi' => new AnsiRenderer(),
+        default => null,
+    };
+}
 
-if ($options['help']) {
+/**
+ * Run the `convert` command.
+ *
+ * @param array<int, string> $argv Arguments after the subcommand.
+ */
+function runConvert(array $argv): int
+{
+    $parsed = parseConvertArgs($argv);
+    $options = $parsed['options'];
+    $inputArg = $parsed['input'];
+
+    if ($options['help']) {
+        showHelp();
+
+        return EXIT_SUCCESS;
+    }
+
+    if ($options['version']) {
+        showVersion();
+
+        return EXIT_SUCCESS;
+    }
+
+    $format = (string)$options['format'];
+    if (!in_array($format, FORMATS, true)) {
+        fwrite(STDERR, "Error: Invalid format: $format (expected: " . implode(', ', FORMATS) . ")\n");
+
+        return EXIT_INVALID_FORMAT;
+    }
+
+    // Read input.
+    if ($inputArg !== null && $inputArg !== '-') {
+        if (!file_exists($inputArg)) {
+            fwrite(STDERR, "Error: File not found: $inputArg\n");
+
+            return EXIT_FILE_NOT_FOUND;
+        }
+        if (!is_readable($inputArg)) {
+            fwrite(STDERR, "Error: Cannot read file: $inputArg\n");
+
+            return EXIT_ERROR;
+        }
+        $input = file_get_contents($inputArg);
+        if ($input === false) {
+            fwrite(STDERR, "Error: Failed to read file: $inputArg\n");
+
+            return EXIT_ERROR;
+        }
+    } else {
+        // Read from stdin.
+        if (posix_isatty(STDIN)) {
+            fwrite(STDERR, "Reading from stdin... (Ctrl+D to end, Ctrl+C to cancel)\n");
+        }
+        $input = stream_get_contents(STDIN);
+        if ($input === false) {
+            fwrite(STDERR, "Error: Failed to read from stdin\n");
+
+            return EXIT_ERROR;
+        }
+    }
+
+    $warnings = (bool)$options['warnings'] || (bool)$options['strict'];
+    $renderer = rendererForFormat($format);
+
+    // Safe mode only applies to the HTML renderer.
+    $safeMode = null;
+    if ($format === 'html') {
+        $safeMode = $options['safeStrict'] ? SafeMode::strict() : ($options['safe'] ? true : null);
+    }
+
+    $converter = new DjotConverter(
+        xhtml: (bool)$options['xhtml'],
+        warnings: $warnings,
+        safeMode: $safeMode,
+        renderer: $renderer,
+    );
+
+    $output = $converter->convert($input);
+
+    // Handle warnings.
+    $exitCode = EXIT_SUCCESS;
+    if ($warnings) {
+        $collected = $converter->getWarnings();
+        foreach ($collected as $warning) {
+            fwrite(STDERR, "Warning: $warning\n");
+        }
+        if ($options['strict'] && $collected !== []) {
+            $exitCode = EXIT_ERROR;
+        }
+    }
+
+    // Write output.
+    if ($options['output'] !== null) {
+        $result = file_put_contents((string)$options['output'], $output);
+        if ($result === false) {
+            fwrite(STDERR, "Error: Failed to write to: {$options['output']}\n");
+
+            return EXIT_ERROR;
+        }
+    } else {
+        echo $output;
+    }
+
+    return $exitCode;
+}
+
+// Main: dispatch subcommands.
+$args = $argv ?? [];
+$command = $args[1] ?? null;
+
+// No arguments: convert piped stdin (legacy `cat file | djot`), else show help.
+if ($command === null) {
+    if (!posix_isatty(STDIN)) {
+        exit(runConvert([]));
+    }
     showHelp();
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
-if ($options['version']) {
+if ($command === 'help' || $command === '-h' || $command === '--help') {
+    showHelp();
+    exit(EXIT_SUCCESS);
+}
+
+if ($command === 'version' || $command === '-v' || $command === '--version') {
     showVersion();
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
-// Read input
-if ($inputFile !== null) {
-    if (!file_exists($inputFile)) {
-        fwrite(STDERR, "Error: File not found: $inputFile\n");
-        exit(1);
-    }
-    if (!is_readable($inputFile)) {
-        fwrite(STDERR, "Error: Cannot read file: $inputFile\n");
-        exit(1);
-    }
-    $input = file_get_contents($inputFile);
-    if ($input === false) {
-        fwrite(STDERR, "Error: Failed to read file: $inputFile\n");
-        exit(1);
-    }
-} else {
-    // Read from stdin
-    if (posix_isatty(STDIN)) {
-        fwrite(STDERR, "Reading from stdin... (Ctrl+D to end, Ctrl+C to cancel)\n");
-    }
-    $input = stream_get_contents(STDIN);
-    if ($input === false) {
-        fwrite(STDERR, "Error: Failed to read from stdin\n");
-        exit(1);
-    }
+if ($command === 'convert') {
+    exit(runConvert(array_slice($args, 2)));
 }
 
-// Create converter
-$converter = new DjotConverter(
-    xhtml: $options['xhtml'],
-    warnings: $options['warnings'] || $options['strict'],
-    safeMode: $options['safe'] ? true : null,
-);
-
-// Convert
-$output = $converter->convert($input);
-
-// Handle warnings
-$exitCode = 0;
-if ($options['warnings'] || $options['strict']) {
-    $warnings = $converter->getWarnings();
-    foreach ($warnings as $warning) {
-        fwrite(STDERR, "Warning: $warning\n");
-    }
-    if ($options['strict'] && count($warnings) > 0) {
-        $exitCode = 1;
-    }
-}
-
-// Write output
-if ($options['output'] !== null) {
-    $result = file_put_contents($options['output'], $output);
-    if ($result === false) {
-        fwrite(STDERR, "Error: Failed to write to: {$options['output']}\n");
-        exit(1);
-    }
-} else {
-    echo $output;
-}
-
-exit($exitCode);
+// Legacy flat form: treat all remaining args as convert arguments.
+exit(runConvert(array_slice($args, 1)));
