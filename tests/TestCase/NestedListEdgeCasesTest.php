@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase;
 
 use Djot\DjotConverter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -731,5 +732,44 @@ DJOT;
         $headingPos = strpos($result, '<h2>');
         $this->assertNotFalse($headingPos);
         $this->assertGreaterThan($lastUlPos, $headingPos);
+    }
+
+    // ============ Over-indented paragraph continuation in a list item ============
+
+    /**
+     * A tight list-item paragraph continuation line indented MORE than the item
+     * content indent must strip all leading whitespace (djot soft-break rule),
+     * not just the item indent. Matches canonical djot.js, which renders every
+     * variant below identically.
+     *
+     * @return array<string, array{0: string}>
+     */
+    public static function overIndentedContinuationProvider(): array
+    {
+        return [
+            'flush continuation' => ["- a\n  - b\nc\n"],
+            'one-space continuation' => ["- a\n  - b\n c\n"],
+            'content-indent continuation' => ["- a\n  - b\n  c\n"],
+            'over-indented continuation' => ["- a\n  - b\n    c\n"],
+        ];
+    }
+
+    #[DataProvider('overIndentedContinuationProvider')]
+    public function testOverIndentedParagraphContinuationStripsSurplusIndent(string $djot): void
+    {
+        $result = $this->converter->convert($djot);
+
+        // The "- b" line and "c" line are plain paragraph continuation text of
+        // item "a"; surplus indentation must not leak into the inline output.
+        $this->assertStringContainsString("a\n- b\nc", $result);
+        $this->assertStringNotContainsString('  c', $result);
+    }
+
+    public function testListItemOverIndentedContinuationWithoutNestedMarker(): void
+    {
+        $result = $this->converter->convert("- a\n    c\n");
+
+        $this->assertStringContainsString("a\nc", $result);
+        $this->assertStringNotContainsString('  c', $result);
     }
 }
