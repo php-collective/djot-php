@@ -292,7 +292,7 @@ function runConvert(array $argv): int
         }
     } else {
         // Read from stdin.
-        if (posix_isatty(STDIN)) {
+        if (stream_isatty(STDIN)) {
             fwrite(STDERR, "Reading from stdin... (Ctrl+D to end, Ctrl+C to cancel)\n");
         }
         $input = stream_get_contents(STDIN);
@@ -354,7 +354,7 @@ $command = $args[1] ?? null;
 
 // No arguments: convert piped stdin (legacy `cat file | djot`), else show help.
 if ($command === null) {
-    if (!posix_isatty(STDIN)) {
+    if (!stream_isatty(STDIN)) {
         exit(runConvert([]));
     }
     showHelp();

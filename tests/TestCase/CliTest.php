@@ -20,13 +20,14 @@ class CliTest extends TestCase
      *
      * @param array<int, string> $args
      * @param string $stdin
+     * @param array<int, string> $phpFlags Extra flags passed to the PHP binary itself.
      *
      * @return array{stdout: string, stderr: string, exit: int}
      */
-    protected function runCli(array $args, string $stdin = ''): array
+    protected function runCli(array $args, string $stdin = '', array $phpFlags = []): array
     {
         $bin = dirname(__DIR__, 2) . '/bin/djot';
-        $command = array_merge([PHP_BINARY, $bin], $args);
+        $command = array_merge([PHP_BINARY], $phpFlags, [$bin], $args);
 
         $descriptors = [
             0 => ['pipe', 'r'],
@@ -153,6 +154,28 @@ class CliTest extends TestCase
     {
         $result = $this->runCli([], '*hi*');
         $this->assertSame(0, $result['exit']);
+        $this->assertStringContainsString('<strong>hi</strong>', $result['stdout']);
+    }
+
+    public function testConvertWorksWithoutPosixExtension(): void
+    {
+        // ext-posix is not a hard dependency; stdin detection must not fatal on
+        // PHP builds without posix_isatty(). Simulate by disabling the function.
+        $noPosix = ['-d', 'disable_functions=posix_isatty'];
+
+        $result = $this->runCli(['convert', '-'], '*hi*', $noPosix);
+        $this->assertSame(0, $result['exit']);
+        $this->assertStringNotContainsString('posix_isatty', $result['stderr']);
+        $this->assertStringContainsString('<strong>hi</strong>', $result['stdout']);
+    }
+
+    public function testLegacyStdinWorksWithoutPosixExtension(): void
+    {
+        $noPosix = ['-d', 'disable_functions=posix_isatty'];
+
+        $result = $this->runCli([], '*hi*', $noPosix);
+        $this->assertSame(0, $result['exit']);
+        $this->assertStringNotContainsString('posix_isatty', $result['stderr']);
         $this->assertStringContainsString('<strong>hi</strong>', $result['stdout']);
     }
 
