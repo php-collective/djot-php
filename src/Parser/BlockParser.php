@@ -2269,7 +2269,13 @@ class BlockParser
                     $this->parseBlocks($listItem, $itemLines, 0);
                 } else {
                     $paragraph = new Paragraph();
-                    $this->inlineParser->parse($paragraph, implode("\n", $itemLines), $start);
+                    // Plain-paragraph item: continuation lines strip ALL leading
+                    // whitespace (djot soft-break rule), matching tryParseParagraph().
+                    // itemLines keep indent relative to the item for the block-parse
+                    // branch above; here that surplus indent would leak into the
+                    // inline text (e.g. an over-indented continuation rendering as
+                    // "  c" instead of "c").
+                    $this->inlineParser->parse($paragraph, implode("\n", array_map('ltrim', $itemLines)), $start);
                     $listItem->appendChild($paragraph);
                 }
             } elseif ($itemLines !== ['']) {
