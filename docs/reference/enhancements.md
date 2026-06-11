@@ -17,6 +17,7 @@ They are either on the way to get incorporated upstream - or may be incorporated
   - [Block Interrupts Paragraphs Mode](#block-interrupts-paragraphs-mode)
   - [Nested Lists Without Blank Line Mode](#nested-lists-without-blank-line-mode)
 - [Language Features Beyond Spec](#language-features-beyond-spec)
+  - [Line Blocks](#line-blocks)
   - [Task List Underscore Notation](#task-list-underscore-notation)
   - [List Item Attributes](#list-item-attributes)
   - [Table Row and Cell Attributes](#table-row-and-cell-attributes)
@@ -392,6 +393,48 @@ container.
 attributes valid only on `<ol>`. djot-php silently drops them from
 `<li>` / `<dd>` output to keep the HTML valid; use a preceding
 block-attribute line on the list itself to set them on `<ol>`.
+
+---
+
+### Line Blocks
+
+**Related:** [Pandoc line blocks](https://pandoc.org/MANUAL.html#line-blocks)
+
+**Status:** djot-php extension
+
+Lines prefixed with `| ` (pipe + space) form a *line block*: a single paragraph
+whose original line breaks are preserved as hard breaks. Useful for poetry,
+addresses, and other content where line layout is significant. This mirrors
+Pandoc's line-block syntax and is **not** part of the djot core spec.
+
+```djot
+| Roses are red,
+| Violets are blue,
+| Sugar is sweet,
+| And so are you.
+```
+
+**Output:**
+```html
+<div class="line-block">
+<p>Roses are red,<br>
+Violets are blue,<br>
+Sugar is sweet,<br>
+And so are you.</p>
+</div>
+```
+
+**Rules:**
+- Each line starts with `| ` (pipe followed by a space); the marker is stripped.
+- A bare `|` on its own line produces an empty line within the block.
+- At least **two** consecutive `|` lines are required: a single `| ...` line
+  stays a normal paragraph, and a `| a | b |` row is parsed as a table, not a
+  line block.
+- Inline markup is parsed per line; the line breaks render as `<br>` hard breaks.
+- A preceding `{...}` attribute block attaches to the wrapping `<div class="line-block">`.
+
+Round-trips through the Markdown, plain-text, and ANSI renderers (the
+`div.line-block` class is detected on the way back in HtmlToDjot).
 
 ---
 
@@ -1003,6 +1046,7 @@ vendor/bin/phpunit
 
 | Feature                           | Upstream PR/Issue                                                   | Status     |
 |-----------------------------------|---------------------------------------------------------------------|------------|
+| Line blocks (`\|` poetry/address) | [Pandoc line blocks](https://pandoc.org/MANUAL.html#line-blocks)    | djot-php   |
 | Task list underscore notation     | [djot:305](https://github.com/jgm/djot/issues/305)                  | Open       |
 | List item attributes              | [djot:262](https://github.com/jgm/djot/pull/262)                    | Open PR    |
 | Table row/cell attributes         | [djot:250](https://github.com/jgm/djot/issues/250)                  | Open       |
