@@ -46,31 +46,38 @@ class ListParser
      *
      * @param string $line The line to parse
      *
-     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, taskMarker?: string, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string}|null
+     * Attributes in curly braces that immediately follow the marker (no space
+     * before the brace) attach to the list item itself, per the djot proposal
+     * jgm/djot#262, e.g. `+{.blue} text` or `(a){.bar} text`. They are returned
+     * raw (without the braces) in the `attrs` key; a space before the brace
+     * instead makes it ordinary item content (a block attribute), so it is not
+     * captured here.
+     *
+     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, taskMarker?: string, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string, attrs?: string}|null
      */
     public function parseListItemMarker(string $line): ?array
     {
         // Task list: - [.] where . is any single character
         // Standard markers: ' ' (unchecked), 'x'/'X' (checked)
         // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred), etc.
-        if (preg_match('/^([-*+]) +\[(.)\] +(.*)$/', $line, $matches)) {
-            $taskMarker = $matches[2];
+        if (preg_match('/^(?<marker>[-*+]) +\[(?<task>.)\](?:\{(?<attrs>[^{}]+)\})? +(?<content>.*)$/', $line, $matches)) {
+            $taskMarker = $matches['task'];
 
-            return [
+            return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_TASK,
-                'marker' => $matches[1],
-                'content' => $matches[3],
+                'marker' => $matches['marker'],
+                'content' => $matches['content'],
                 'checked' => strtolower($taskMarker) === 'x',
                 'taskMarker' => $taskMarker,
-            ];
+            ], $matches['attrs']);
         }
 
         // Bullet list: -, +, or *
         // A marker followed by a space (or end of line) is a valid item; a bare
         // marker alone on its line is an empty item (djot allows marker + newline).
-        if (preg_match('/^([-*+])(?: +(.*))?$/', $line, $matches)) {
+        if (preg_match('/^([-*+])(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
             $marker = $matches[1];
-            $content = $matches[2] ?? '';
+            $content = $matches[3] ?? '';
 
             // Don't treat as list if content ends with same marker (likely emphasis)
             if ($marker === '*' || $marker === '-') {
@@ -83,34 +90,34 @@ class ListParser
                 }
             }
 
-            return [
+            return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_BULLET,
                 'marker' => $marker,
                 'content' => $content,
-            ];
+            ], $matches[2] ?? '');
         }
 
         // Ordered list: 1. or 1) or (1) - bare marker (no content) is an empty item.
-        if (preg_match('/^(\d+)([.)])(?: +(.*))?$/', $line, $matches)) {
-            return [
+        if (preg_match('/^(\d+)([.)])(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+            return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => $matches[2],
-                'content' => $matches[3] ?? '',
+                'content' => $matches[4] ?? '',
                 'start' => (int)$matches[1],
-            ];
+            ], $matches[3] ?? '');
         }
 
-        if (preg_match('/^\((\d+)\)(?: +(.*))?$/', $line, $matches)) {
-            return [
+        if (preg_match('/^\((\d+)\)(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+            return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => '()',
-                'content' => $matches[2] ?? '',
+                'content' => $matches[3] ?? '',
                 'start' => (int)$matches[1],
-            ];
+            ], $matches[2] ?? '');
         }
 
         // Roman numeral ordered list
-        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)])(?: +(.*))?$/', $line, $matches)) {
+        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)])(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
             $roman = $matches[1];
             $isLower = ctype_lower($roman[0]);
             $start = $this->romanToInt(strtoupper($roman));
@@ -118,6 +125,29 @@ class ListParser
                 $result = [
                     'type' => ListBlock::TYPE_ORDERED,
                     'marker' => $matches[2],
+                    'content' => $matches[4] ?? '',
+                    'start' => $start,
+                    'style' => $isLower ? 'i' : 'I',
+                ];
+                if (strlen($roman) === 1) {
+                    $alphaStart = ord(strtolower($roman)) - ord('a') + 1;
+                    $result['ambiguous'] = true;
+                    $result['alpha_start'] = $alphaStart;
+                    $result['alpha_style'] = $isLower ? 'a' : 'A';
+                }
+
+                return $this->withMarkerAttrs($result, $matches[3] ?? '');
+            }
+        }
+
+        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\)(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+            $roman = $matches[1];
+            $isLower = ctype_lower($roman[0]);
+            $start = $this->romanToInt(strtoupper($roman));
+            if ($start > 0) {
+                $result = [
+                    'type' => ListBlock::TYPE_ORDERED,
+                    'marker' => '()',
                     'content' => $matches[3] ?? '',
                     'start' => $start,
                     'style' => $isLower ? 'i' : 'I',
@@ -129,60 +159,37 @@ class ListParser
                     $result['alpha_style'] = $isLower ? 'a' : 'A';
                 }
 
-                return $result;
-            }
-        }
-
-        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\)(?: +(.*))?$/', $line, $matches)) {
-            $roman = $matches[1];
-            $isLower = ctype_lower($roman[0]);
-            $start = $this->romanToInt(strtoupper($roman));
-            if ($start > 0) {
-                $result = [
-                    'type' => ListBlock::TYPE_ORDERED,
-                    'marker' => '()',
-                    'content' => $matches[2] ?? '',
-                    'start' => $start,
-                    'style' => $isLower ? 'i' : 'I',
-                ];
-                if (strlen($roman) === 1) {
-                    $alphaStart = ord(strtolower($roman)) - ord('a') + 1;
-                    $result['ambiguous'] = true;
-                    $result['alpha_start'] = $alphaStart;
-                    $result['alpha_style'] = $isLower ? 'a' : 'A';
-                }
-
-                return $result;
+                return $this->withMarkerAttrs($result, $matches[2] ?? '');
             }
         }
 
         // Alpha ordered list: a. or A. or a) or A) or (a) or (A)
-        if (preg_match('/^([a-zA-Z])([.)])(?: +(.*))?$/', $line, $matches)) {
+        if (preg_match('/^([a-zA-Z])([.)])(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
             $letter = $matches[1];
             $isLower = ctype_lower($letter);
             $start = ord(strtolower($letter)) - ord('a') + 1;
 
-            return [
+            return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => $matches[2],
+                'content' => $matches[4] ?? '',
+                'start' => $start,
+                'style' => $isLower ? 'a' : 'A',
+            ], $matches[3] ?? '');
+        }
+
+        if (preg_match('/^\(([a-zA-Z])\)(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+            $letter = $matches[1];
+            $isLower = ctype_lower($letter);
+            $start = ord(strtolower($letter)) - ord('a') + 1;
+
+            return $this->withMarkerAttrs([
+                'type' => ListBlock::TYPE_ORDERED,
+                'marker' => '()',
                 'content' => $matches[3] ?? '',
                 'start' => $start,
                 'style' => $isLower ? 'a' : 'A',
-            ];
-        }
-
-        if (preg_match('/^\(([a-zA-Z])\)(?: +(.*))?$/', $line, $matches)) {
-            $letter = $matches[1];
-            $isLower = ctype_lower($letter);
-            $start = ord(strtolower($letter)) - ord('a') + 1;
-
-            return [
-                'type' => ListBlock::TYPE_ORDERED,
-                'marker' => '()',
-                'content' => $matches[2] ?? '',
-                'start' => $start,
-                'style' => $isLower ? 'a' : 'A',
-            ];
+            ], $matches[2] ?? '');
         }
 
         // Definition list: :
@@ -195,6 +202,26 @@ class ListParser
         }
 
         return null;
+    }
+
+    /**
+     * Attach the raw marker-adjacent attribute string to a parsed marker result.
+     *
+     * Empty strings (no `{...}` after the marker) are dropped so the `attrs` key
+     * is only present when the item actually carries marker attributes.
+     *
+     * @param array{type: string, marker: string, content: string, start?: int, checked?: bool, taskMarker?: string, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string, attrs?: string} $result The parsed marker result
+     * @param string $attrs Raw attribute string captured after the marker (no braces)
+     *
+     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, taskMarker?: string, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string, attrs?: string}
+     */
+    protected function withMarkerAttrs(array $result, string $attrs): array
+    {
+        if ($attrs !== '') {
+            $result['attrs'] = $attrs;
+        }
+
+        return $result;
     }
 
     /**

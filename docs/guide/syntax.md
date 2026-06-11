@@ -460,7 +460,52 @@ The underscore notation `[_]` is useful on mobile devices or in editors without 
 
 #### List Item Attributes (Extension)
 
-Attributes can be added to list items on the following indented line:
+Attributes can be attached to a list item by placing them in curly braces
+**immediately after the marker**, with no space before the brace (per the djot
+proposal [jgm/djot#262](https://github.com/jgm/djot/pull/262)):
+
+**Input:**
+```djot
++{.blue} A blue list item.
++{#id1 .highlight} Item with id and class.
+1.{data-value="test"} Numbered item with a data attribute.
+```
+
+<OutputTabs>
+<template #output>
+
+```html
+<ul>
+<li class="blue">A blue list item.</li>
+<li id="id1" class="highlight">Item with id and class.</li>
+</ul>
+<ol>
+<li data-value="test">Numbered item with a data attribute.</li>
+</ol>
+```
+
+</template>
+<template #result>
+<ul>
+<li class="blue">A blue list item.</li>
+<li id="id1" class="highlight">Item with id and class.</li>
+</ul>
+<ol>
+<li data-value="test">Numbered item with a data attribute.</li>
+</ol>
+</template>
+</OutputTabs>
+
+Works with every marker type (bullet, ordered, parenthesized, roman, alpha, and
+task lists). A **space** between the marker and the brace changes the meaning:
+`+ {.blue}` makes the `{.blue}` ordinary item content (a block attribute for the
+following block inside the item), not an attribute on the `<li>`.
+
+::: tip Soft-deprecated alternative
+Attributes can also be added on the following indented line. This older form
+still attaches to the `<li>`, but the marker-adjacent form above is now the
+preferred syntax.
+:::
 
 **Input:**
 ```djot
