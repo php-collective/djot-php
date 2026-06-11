@@ -1240,9 +1240,10 @@ dolor sit amet
 This produces two separate paragraphs. For comments that should not interrupt
 paragraph flow (keeping text in the same paragraph), use inline comments (`{% ... %}`).
 
-### Line Blocks
+### Line Blocks (Extension)
 
 Preserve line breaks using `|` at the start of each line. Useful for poetry or addresses.
+This is a djot-php addition beyond the core spec; see [Enhancements](/reference/enhancements#line-blocks).
 
 **Input:**
 ```djot
