@@ -983,7 +983,7 @@ class BlockParser
             if (
                 $marker !== ''
                 && !str_contains(self::BLOCK_MARKER_CHARS, $marker)
-                && !($marker >= 'A' && preg_match('/^[ \t]*[A-Za-z]+[.)]([ \t]|$)/', $line) === 1)
+                && !($marker >= 'A' && preg_match('/^[ \t]*[A-Za-z]+[.)](?:\{[^{}]+\})?([ \t]|$)/', $line) === 1)
             ) {
                 $i += $this->tryParseParagraph($parent, $lines, $i);
 
@@ -2059,6 +2059,14 @@ class BlockParser
                 // Ordered list marker width = length of trimmed line - length of content
                 // Examples: "1. " = 3, "10. " = 4, "(1) " = 4, "(10) " = 5
                 $markerWidth = strlen($trimmedLine) - strlen($itemContent);
+                // Marker-adjacent attributes (`1.{.x} item`) sit between the marker
+                // and the content but are not part of the content-indent column, so
+                // exclude them from the marker width.
+                if (isset($itemInfo['attrs'])) {
+                    /** @var string $markerAttrsRaw */
+                    $markerAttrsRaw = $itemInfo['attrs'];
+                    $markerWidth -= strlen('{' . $markerAttrsRaw . '}');
+                }
             } else {
                 // Bullet and task lists use 2-char base marker ("- " or "* " or "+ ")
                 $markerWidth = 2;
@@ -2133,7 +2141,15 @@ class BlockParser
             // is parsed as a standard djot block attribute for the following
             // block inside the item. This keeps the list / item intact instead
             // of terminating it on a mid-item {...} line.
+            // Marker-adjacent attributes (`+{.blue} item`, jgm/djot#262) attach to
+            // the <li>. They seed the item attributes; the soft-deprecated
+            // separate-line form below merges on top of them.
             $itemAttributes = [];
+            if (isset($itemInfo['attrs'])) {
+                /** @var string $markerAttrsRaw */
+                $markerAttrsRaw = $itemInfo['attrs'];
+                $itemAttributes = AttributeParser::parseOrdered($markerAttrsRaw);
+            }
             $parseItemLinesAsBlocks = false;
             if ($i < $count) {
                 $potentialAttrLine = $lines[$i];
@@ -2241,7 +2257,7 @@ class BlockParser
                             }
                         }
                     } else {
-                        $itemAttributes = AttributeParser::parseOrdered($attrMatch[1]);
+                        $itemAttributes = AttributeParser::parseAndMerge($itemAttributes, $attrMatch[1]);
                         $i++;
                     }
                 }
@@ -3578,14 +3594,21 @@ class BlockParser
                 // is an opt-in markdown/chat-like mode, so a line-leading marker
                 // interrupts without a blank line (it would otherwise drop a
                 // genuine single-line or lazily-wrapped list).
-                if (isset($line[1]) && $line[1] === ' ') {
+                // Marker-adjacent attributes (`-{.x} item`) sit between the marker
+                // and the separating space, so skip an optional `{...}` block before
+                // looking for the content.
+                $afterMarker = substr($line, 1);
+                if (preg_match('/^\{[^{}]+\}/', $afterMarker, $attrMatch) === 1) {
+                    $afterMarker = substr($afterMarker, strlen($attrMatch[0]));
+                }
+                if (isset($afterMarker[0]) && $afterMarker[0] === ' ') {
                     // An empty list item (marker followed by only whitespace)
                     // cannot interrupt an OPEN PARAGRAPH (CommonMark/djot rule) -
                     // it folds into the paragraph instead of opening a stray empty
                     // <li>. Paragraph interruption is the only caller that passes
                     // $lines for lookahead; in every other context (heading
                     // termination, etc.) an empty marker still starts a new block.
-                    if ($lines === null || trim(substr($line, 2)) !== '') {
+                    if ($lines === null || trim(substr($afterMarker, 1)) !== '') {
                         return true; // Unordered list
                     }
                 }
@@ -3617,7 +3640,10 @@ class BlockParser
                 // a non-space char after the marker; other contexts keep starting
                 // a block on a bare empty marker.
                 if ($first === '1') {
-                    $pattern = $lines === null ? '/^1[.)]\s/' : '/^1[.)]\s+\S/';
+                    // Allow optional marker-adjacent attributes: `1.{.x} item`.
+                    $pattern = $lines === null
+                        ? '/^1[.)](?:\{[^{}]+\})?\s/'
+                        : '/^1[.)](?:\{[^{}]+\})?\s+\S/';
 
                     return preg_match($pattern, $line) === 1;
                 }
