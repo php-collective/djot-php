@@ -92,7 +92,12 @@ class PlainTextRenderer implements RendererInterface
         // Normalize multiple blank lines to single
         $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
 
-        return trim($text) . "\n";
+        $text = trim($text) . "\n";
+
+        // The internal non-breaking-space placeholder (U+E000) collapses to an
+        // ordinary space in plain text. Done as the final step, after trimming, so
+        // placeholder-derived leading indentation (e.g. in a line block) survives.
+        return str_replace("\u{E000}", ' ', $text);
     }
 
     protected function renderNode(Node $node): string

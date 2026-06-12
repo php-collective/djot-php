@@ -8,6 +8,7 @@ use Djot\DjotConverter;
 use Djot\Node\Block\LineBlock;
 use Djot\Node\Block\Paragraph;
 use Djot\Node\Inline\HardBreak;
+use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Parser\Block\FencedBlockParser;
 use Djot\Parser\BlockParser;
@@ -56,6 +57,21 @@ class LineBlockDivExtension implements ExtensionInterface
      * @var string
      */
     protected const OPENER = '/^(:{3,})[ \t]*\|[ \t]*$/';
+
+    /**
+     * @param bool $cssIndent By default leading whitespace on each line is
+     *   emitted as non-breaking spaces (`&nbsp;` in HTML, ordinary spaces in the
+     *   other formats), so the indentation survives the browser's whitespace
+     *   collapsing without any CSS, and renders faithfully in every format. Set
+     *   this to true to keep raw spaces instead and rely on a
+     *   `white-space: pre-wrap` rule on the `.line-block` div. This mode targets
+     *   HTML + CSS: the Markdown / plain-text / ANSI renderers trim leading
+     *   whitespace, so a first line's indentation is not preserved there - prefer
+     *   the default if you render to those formats.
+     */
+    public function __construct(protected bool $cssIndent = false)
+    {
+    }
 
     public function register(DjotConverter $converter): void
     {
@@ -211,7 +227,22 @@ class LineBlockDivExtension implements ExtensionInterface
         $last = count($stanza) - 1;
         $index = 0;
         foreach ($stanza as $line) {
-            $inlineParser->parse($paragraph, $line, $baseLine + $index);
+            $content = $line;
+            if (!$this->cssIndent) {
+                // Emit leading whitespace via the internal non-breaking-space
+                // placeholder (U+E000, the same sentinel the parser uses for an
+                // escaped space). The HTML renderer turns it into a &nbsp; entity
+                // so the indent survives whitespace collapsing; the other
+                // renderers turn it back into a normal space. A private-use
+                // character is used so it never collides with a literal U+00A0 in
+                // the author's own text. Tabs expand to four-column tab stops.
+                [$columns, $content] = $this->splitLeadingWhitespace($line);
+                if ($columns > 0) {
+                    $paragraph->appendChild(new Text(str_repeat("\u{E000}", $columns)));
+                }
+            }
+
+            $inlineParser->parse($paragraph, $content, $baseLine + $index);
             if ($index < $last) {
                 $paragraph->appendChild(new HardBreak());
             }
@@ -219,5 +250,30 @@ class LineBlockDivExtension implements ExtensionInterface
         }
 
         return $paragraph;
+    }
+
+    /**
+     * Split a line into its leading-whitespace width (in columns, tabs expanded
+     * to four-column stops) and the remaining content.
+     *
+     * @return array{0: int, 1: string}
+     */
+    protected function splitLeadingWhitespace(string $line): array
+    {
+        $column = 0;
+        $offset = 0;
+        $length = strlen($line);
+        while ($offset < $length) {
+            if ($line[$offset] === ' ') {
+                $column++;
+            } elseif ($line[$offset] === "\t") {
+                $column += 4 - ($column % 4);
+            } else {
+                break;
+            }
+            $offset++;
+        }
+
+        return [$column, substr($line, $offset)];
     }
 }

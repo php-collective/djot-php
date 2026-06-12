@@ -617,6 +617,14 @@ use Djot\Extension\LineBlockDivExtension;
 $converter->addExtension(new LineBlockDivExtension());
 ```
 
+By default, leading whitespace on each line is emitted as non-breaking spaces - `&nbsp;` in HTML (so the indentation survives the browser's whitespace collapsing without any CSS) and ordinary spaces in the Markdown / plain-text / ANSI renderers. Tabs expand to four-column stops. Pass `cssIndent: true` to keep raw spaces instead and style `.line-block` with `white-space: pre-wrap` yourself:
+
+```php
+$converter->addExtension(new LineBlockDivExtension(cssIndent: true));
+```
+
+`cssIndent` targets HTML + CSS: the Markdown, plain-text, and ANSI renderers trim leading whitespace, so a first line's indentation is not preserved there. Use the default if you render to those formats.
+
 **Input:**
 
 ```djot
@@ -632,9 +640,9 @@ But the good ones I've seen
 ```html
 <div class="line-block">
 <p>The limerick packs laughs anatomical<br>
-  Into space that is quite economical.</p>
+&nbsp;&nbsp;Into space that is quite economical.</p>
 <p>But the good ones I've seen<br>
-  So seldom are clean</p>
+&nbsp;&nbsp;So seldom are clean</p>
 </div>
 ```
 

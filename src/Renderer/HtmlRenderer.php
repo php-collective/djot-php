@@ -809,6 +809,8 @@ class HtmlRenderer implements RendererInterface
         $attrs = $this->getRenderableAttributes($node);
         $attrs = $this->mergeAttribute($attrs, 'class', 'line-block');
 
+        // Leading-indent placeholders (U+E000) are turned into &nbsp; entities by
+        // the shared text escaper, so no extra handling is needed here.
         return '<div' . $this->renderAttributeArray($attrs) . ">\n" . $this->renderChildren($node) . "</div>\n";
     }
 

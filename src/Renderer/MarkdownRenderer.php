@@ -97,7 +97,12 @@ class MarkdownRenderer implements RendererInterface
         // Normalize multiple blank lines
         $markdown = preg_replace("/\n{3,}/", "\n\n", $markdown) ?? $markdown;
 
-        return trim($markdown) . "\n";
+        $markdown = trim($markdown) . "\n";
+
+        // The internal non-breaking-space placeholder (U+E000) collapses to an
+        // ordinary space in Markdown. Done as the final step, after trimming, so
+        // placeholder-derived leading indentation (e.g. in a line block) survives.
+        return str_replace("\u{E000}", ' ', $markdown);
     }
 
     protected function renderNode(Node $node): string
