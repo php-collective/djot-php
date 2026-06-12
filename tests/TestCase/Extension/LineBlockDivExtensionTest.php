@@ -221,6 +221,71 @@ class LineBlockDivExtensionTest extends TestCase
         $this->assertStringContainsString("alpha<br>\n&nbsp;&nbsp;beta", $html);
     }
 
+    public function testMedialGapIsPreservedAsNonBreakingSpaces(): void
+    {
+        // A line block keeps medial alignment, not only the leading indent: the
+        // caesura of Old English verse is a run of spaces in the middle of a line.
+        $djot = "::: |\nHwaet! We Gardena    in geardagum\n:::";
+
+        $html = $this->converter()->convert($djot);
+
+        $this->assertStringContainsString('Hwaet! We Gardena' . str_repeat('&nbsp;', 4) . 'in geardagum', $html);
+    }
+
+    public function testSingleInnerSpaceStaysOrdinary(): void
+    {
+        // Ordinary word spacing must stay a real, collapsible space so the line
+        // can still wrap; only runs of two or more columns are treated as a gap.
+        $djot = "::: |\nThe limerick packs laughs\n:::";
+
+        $html = $this->converter()->convert($djot);
+
+        $this->assertStringContainsString('The limerick packs laughs', $html);
+        $this->assertStringNotContainsString('&nbsp;', $html);
+    }
+
+    public function testMedialGapNonHtmlUsesRegularSpaces(): void
+    {
+        // Plain text keeps the gap visible as ordinary spaces, with no placeholder
+        // leaking through.
+        $document = $this->converter()->parse("::: |\nleft    right\n:::");
+        $text = (new PlainTextRenderer())->render($document);
+
+        $this->assertStringContainsString('left    right', $text);
+        $this->assertStringNotContainsString(self::NBSP_PLACEHOLDER, $text);
+    }
+
+    public function testMedialGapMarkdownUsesNonBreakingSpaces(): void
+    {
+        // Markdown round-trips the gap as real U+00A0 so re-rendering keeps it.
+        $document = $this->converter()->parse("::: |\nleft  right\n:::");
+        $markdown = (new MarkdownRenderer())->render($document);
+
+        $this->assertStringContainsString('left' . self::NBSP . self::NBSP . 'right', $markdown);
+        $this->assertStringNotContainsString(self::NBSP_PLACEHOLDER, $markdown);
+    }
+
+    public function testMedialTabExpandsToColumnStop(): void
+    {
+        // A tab used as a medial gap expands to the next four-column stop.
+        $djot = "::: |\nab\tcd\n:::";
+
+        $html = $this->converter()->convert($djot);
+
+        // "ab" sits at columns 0-1; the tab fills columns 2-3 -> two nbsp.
+        $this->assertStringContainsString('ab' . str_repeat('&nbsp;', 2) . 'cd', $html);
+    }
+
+    public function testMedialGapKeepsInlineMarkup(): void
+    {
+        // Inline markup on either side of a gap still parses.
+        $djot = "::: |\n_em_    [link](https://example.com)\n:::";
+
+        $html = $this->converter()->convert($djot);
+
+        $this->assertStringContainsString('<em>em</em>' . str_repeat('&nbsp;', 4) . '<a href="https://example.com">link</a>', $html);
+    }
+
     public function testPlainDivWithRealClassIsUntouched(): void
     {
         $djot = "::: warning\nHello\n:::";

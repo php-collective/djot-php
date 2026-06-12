@@ -12,6 +12,7 @@ use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Parser\Block\FencedBlockParser;
 use Djot\Parser\BlockParser;
+use Djot\Parser\InlineParser;
 
 /**
  * Adds a fenced line-block div: `::: |`.
@@ -198,8 +199,8 @@ class LineBlockDivExtension implements ExtensionInterface
     }
 
     /**
-     * Build one stanza paragraph: each line is inline-parsed and joined by a
-     * hard break, so single newlines render as `<br>`.
+     * Build one stanza paragraph: each line keeps its significant whitespace and
+     * is joined to the next by a hard break, so single newlines render as `<br>`.
      *
      * @param \Djot\Parser\BlockParser $blockParser
      * @param array<int, string> $stanza
@@ -212,19 +213,7 @@ class LineBlockDivExtension implements ExtensionInterface
         $last = count($stanza) - 1;
         $index = 0;
         foreach ($stanza as $line) {
-            // Emit leading whitespace via the internal non-breaking-space
-            // placeholder (U+E000, the same sentinel the parser uses for an
-            // escaped space). The HTML renderer turns it into a &nbsp; entity so
-            // the indent survives whitespace collapsing; Markdown keeps a real
-            // non-breaking space (U+00A0); plain text and ANSI use a normal space.
-            // A private-use character is used so it never collides with a literal
-            // U+00A0 in the author's own text. Tabs expand to four-column stops.
-            [$columns, $content] = $this->splitLeadingWhitespace($line);
-            if ($columns > 0) {
-                $paragraph->appendChild(new Text(str_repeat("\u{E000}", $columns)));
-            }
-
-            $inlineParser->parse($paragraph, $content, $baseLine + $index);
+            $this->appendLine($paragraph, $inlineParser, $line, $baseLine + $index);
             if ($index < $last) {
                 $paragraph->appendChild(new HardBreak());
             }
@@ -235,27 +224,80 @@ class LineBlockDivExtension implements ExtensionInterface
     }
 
     /**
-     * Split a line into its leading-whitespace width (in columns, tabs expanded
-     * to four-column stops) and the remaining content.
+     * Append one verse line, preserving its significant whitespace.
      *
-     * @return array{0: int, 1: string}
+     * In a line block every space the author typed is meaningful (Pandoc's
+     * definition), so a verse keeps not only its leading indent but also the
+     * medial gaps used for alignment - the caesura of Old English verse, columns
+     * in an address, chords aligned above lyrics. The rule:
+     *
+     * - **Leading** whitespace (indentation): always preserved, even one space.
+     * - **Inner / trailing** runs of **two or more** columns (medial gaps,
+     *   inline alignment): preserved.
+     * - A **single** inner space stays an ordinary, collapsible space, so a long
+     *   line can still wrap between words.
+     *
+     * Each preserved column is emitted via the internal non-breaking-space
+     * placeholder (U+E000, the same sentinel the parser uses for an escaped
+     * space): the HTML renderer turns it into `&nbsp;`, Markdown keeps a real
+     * U+00A0 (so the gap survives a round-trip and is never read as indented
+     * code), and plain text / ANSI use an ordinary space. A private-use character
+     * is used so it never collides with a literal U+00A0 in the author's text.
+     * Tabs expand to four-column stops. Text segments between gaps are
+     * inline-parsed, so emphasis, links, and the rest still work.
+     *
+     * @param \Djot\Node\Block\Paragraph $paragraph
+     * @param \Djot\Parser\InlineParser $inlineParser
+     * @param string $line
+     * @param int $lineNo
      */
-    protected function splitLeadingWhitespace(string $line): array
+    protected function appendLine(Paragraph $paragraph, InlineParser $inlineParser, string $line, int $lineNo): void
     {
-        $column = 0;
-        $offset = 0;
         $length = strlen($line);
+        $offset = 0;
+        $column = 0;
+        $text = '';
+        $seenContent = false;
+
         while ($offset < $length) {
-            if ($line[$offset] === ' ') {
+            $char = $line[$offset];
+            if ($char !== ' ' && $char !== "\t") {
+                $text .= $char;
+                $seenContent = true;
                 $column++;
-            } elseif ($line[$offset] === "\t") {
-                $column += 4 - ($column % 4);
-            } else {
-                break;
+                $offset++;
+
+                continue;
             }
-            $offset++;
+
+            $width = 0;
+            while ($offset < $length && ($line[$offset] === ' ' || $line[$offset] === "\t")) {
+                if ($line[$offset] === "\t") {
+                    $width += 4 - (($column + $width) % 4);
+                } else {
+                    $width++;
+                }
+                $offset++;
+            }
+            $column += $width;
+
+            // Leading indent is always significant; an inner or trailing gap only
+            // from two columns up. A lone inner space stays a normal, wrappable space.
+            if (!$seenContent || $width >= 2) {
+                if ($text !== '') {
+                    $inlineParser->parse($paragraph, $text, $lineNo);
+                    $text = '';
+                }
+                $paragraph->appendChild(new Text(str_repeat("\u{E000}", $width)));
+
+                continue;
+            }
+
+            $text .= ' ';
         }
 
-        return [$column, substr($line, $offset)];
+        if ($text !== '') {
+            $inlineParser->parse($paragraph, $text, $lineNo);
+        }
     }
 }
