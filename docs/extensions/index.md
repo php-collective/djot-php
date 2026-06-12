@@ -16,6 +16,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [HeadingReferenceExtension](#headingreferenceextension) | Resolves `[[Heading Text]]` links to headings in the current document |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [InlineFootnotesExtension](#inlinefootnotesextension) | Converts `[content]{.fn}` spans to inline footnotes |
+| [LineBlockDivExtension](#lineblockdivextension) | Adds a fenced `::: |` line block (verse/addresses) without prefixing every line |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
 | [MermaidExtension](#mermaidextension) | Transforms mermaid code blocks into diagrams |
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
@@ -603,6 +604,45 @@ fallback such as parenthetical inline content.
 ### Why This Syntax?
 
 This follows the approach discussed in [djot issue #286](https://github.com/jgm/djot/issues/286). The `^[...]` syntax used by Pandoc conflicts with djot's superscript syntax (`^text^`), so the span-with-class approach provides inline footnotes without parser changes.
+
+## LineBlockDivExtension
+
+Adds a fenced line block written as a `:::` div whose only class token is a pipe: `::: |`. It produces the same `line-block` div as the [`|`-prefixed form](/guide/syntax#line-blocks), but without prefixing every line - convenient for verse, addresses, lyrics, and signature blocks where each line would otherwise need a leading `|`.
+
+Inside the fence, each soft line break becomes a hard break (`<br>`), leading whitespace is preserved, and a blank line separates stanzas (each becomes its own paragraph). Inline djot (emphasis, links, ...) still parses normally.
+
+```php
+use Djot\Extension\LineBlockDivExtension;
+
+$converter->addExtension(new LineBlockDivExtension());
+```
+
+**Input:**
+
+```djot
+::: |
+The limerick packs laughs anatomical
+  Into space that is quite economical.
+
+But the good ones I've seen
+  So seldom are clean
+:::
+```
+
+```html
+<div class="line-block">
+<p>The limerick packs laughs anatomical<br>
+  Into space that is quite economical.</p>
+<p>But the good ones I've seen<br>
+  So seldom are clean</p>
+</div>
+```
+
+The pipe is consumed as the marker, so the output is a `line-block` div, never a literal `class="|"`. Because `|` is not a meaningful class, intercepting it cannot collide with real usage - which is why this needs no core parser change. It composes with nesting: a `::: |` block works inside blockquotes and list items.
+
+### Why This Syntax?
+
+This follows the approach discussed in [djot issue #29](https://github.com/jgm/djot/issues/29). A leading `|` on every line (Pandoc-style line blocks) can be confused with pipe tables and is awkward to edit; an English keyword div class (`::: verse`) was undesirable. A language-neutral `|` marker on the div opener sidesteps both concerns.
 
 ## MentionsExtension
 
