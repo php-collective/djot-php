@@ -1277,7 +1277,7 @@ And so are you.</p>
 </OutputTabs>
 
 ::: tip Fenced alternative
-Prefer not to prefix every line? The [`LineBlockDivExtension`](/extensions/#lineblockdivextension) adds a fenced form, `::: |`, that produces the same `line-block` div without the per-line `|`. Leading whitespace is preserved and a blank line separates stanzas.
+Prefer not to prefix every line? The [`LineBlockDivExtension`](/extensions/#lineblockdivextension) adds a fenced form, `::: |`, that produces the same `line-block` div without the per-line `|`. Leading indentation and medial alignment gaps are preserved, and a blank line separates stanzas.
 :::
 
 ### Block Attributes

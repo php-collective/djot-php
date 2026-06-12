@@ -609,7 +609,7 @@ This follows the approach discussed in [djot issue #286](https://github.com/jgm/
 
 Adds a fenced line block written as a `:::` div whose only class token is a pipe: `::: |`. It produces the same `line-block` div as the [`|`-prefixed form](/guide/syntax#line-blocks), but without prefixing every line - convenient for verse, addresses, lyrics, and signature blocks where each line would otherwise need a leading `|`.
 
-Inside the fence, each soft line break becomes a hard break (`<br>`), leading whitespace is preserved, and a blank line separates stanzas (each becomes its own paragraph). Inline djot (emphasis, links, ...) still parses normally.
+Inside the fence, each soft line break becomes a hard break (`<br>`), significant whitespace is preserved, and a blank line separates stanzas (each becomes its own paragraph). Inline djot (emphasis, links, ...) still parses normally.
 
 ```php
 use Djot\Extension\LineBlockDivExtension;
@@ -617,7 +617,25 @@ use Djot\Extension\LineBlockDivExtension;
 $converter->addExtension(new LineBlockDivExtension());
 ```
 
-Leading whitespace on each line is preserved as a non-breaking space, so the indentation survives without any CSS: `&nbsp;` in HTML, a real non-breaking space (`U+00A0`) in Markdown - which keeps it through a round-trip re-render and never trips Markdown's indented-code-block rule - and an ordinary space in the plain-text and ANSI renderers. Tabs expand to four-column stops.
+Significant whitespace on each line is preserved as a non-breaking space, so the shape survives without any CSS: `&nbsp;` in HTML, a real non-breaking space (`U+00A0`) in Markdown - which keeps it through a round-trip re-render and never trips Markdown's indented-code-block rule - and an ordinary space in the plain-text and ANSI renderers. Tabs expand to four-column stops.
+
+Significant means: all **leading** indentation, plus any **medial or trailing** run of two or more columns - the gaps used for inline alignment, such as the caesura in Old English verse or the columns of an address. A lone space between words stays an ordinary, collapsible space, so a long line can still wrap. This follows Pandoc's line-block rule that every space the author writes is meaningful, and addresses the [medial-gap point raised on djot#29](https://github.com/jgm/djot/issues/29).
+
+**Input:**
+
+```djot
+::: |
+Hwaet! We Gardena    in geardagum
+theodcyninga       thrym gefrunon
+:::
+```
+
+```html
+<div class="line-block">
+<p>Hwaet! We Gardena&nbsp;&nbsp;&nbsp;&nbsp;in geardagum<br>
+theodcyninga&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;thrym gefrunon</p>
+</div>
+```
 
 **Input:**
 
