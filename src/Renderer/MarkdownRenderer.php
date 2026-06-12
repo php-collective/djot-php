@@ -99,10 +99,14 @@ class MarkdownRenderer implements RendererInterface
 
         $markdown = trim($markdown) . "\n";
 
-        // The internal non-breaking-space placeholder (U+E000) collapses to an
-        // ordinary space in Markdown. Done as the final step, after trimming, so
-        // placeholder-derived leading indentation (e.g. in a line block) survives.
-        return str_replace("\u{E000}", ' ', $markdown);
+        // The internal non-breaking-space placeholder (U+E000) becomes a literal
+        // non-breaking space (U+00A0). Markdown is a re-parseable round-trip
+        // format, so unlike the display renderers it keeps the real nbsp: that
+        // survives a re-render as `&nbsp;` and is never mistaken for a Markdown
+        // indented-code-block prefix the way ordinary leading spaces would be.
+        // Done as the final step, after trimming, so placeholder-derived leading
+        // indentation (e.g. in a line block) survives.
+        return str_replace("\u{E000}", "\u{00A0}", $markdown);
     }
 
     protected function renderNode(Node $node): string

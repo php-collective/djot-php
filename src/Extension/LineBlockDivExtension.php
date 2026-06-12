@@ -58,21 +58,6 @@ class LineBlockDivExtension implements ExtensionInterface
      */
     protected const OPENER = '/^(:{3,})[ \t]*\|[ \t]*$/';
 
-    /**
-     * @param bool $cssIndent By default leading whitespace on each line is
-     *   emitted as non-breaking spaces (`&nbsp;` in HTML, ordinary spaces in the
-     *   other formats), so the indentation survives the browser's whitespace
-     *   collapsing without any CSS, and renders faithfully in every format. Set
-     *   this to true to keep raw spaces instead and rely on a
-     *   `white-space: pre-wrap` rule on the `.line-block` div. This mode targets
-     *   HTML + CSS: the Markdown / plain-text / ANSI renderers trim leading
-     *   whitespace, so a first line's indentation is not preserved there - prefer
-     *   the default if you render to those formats.
-     */
-    public function __construct(protected bool $cssIndent = false)
-    {
-    }
-
     public function register(DjotConverter $converter): void
     {
         $converter->getParser()->addBlockPattern(self::OPENER, $this->parseLineBlockDiv(...));
@@ -227,19 +212,16 @@ class LineBlockDivExtension implements ExtensionInterface
         $last = count($stanza) - 1;
         $index = 0;
         foreach ($stanza as $line) {
-            $content = $line;
-            if (!$this->cssIndent) {
-                // Emit leading whitespace via the internal non-breaking-space
-                // placeholder (U+E000, the same sentinel the parser uses for an
-                // escaped space). The HTML renderer turns it into a &nbsp; entity
-                // so the indent survives whitespace collapsing; the other
-                // renderers turn it back into a normal space. A private-use
-                // character is used so it never collides with a literal U+00A0 in
-                // the author's own text. Tabs expand to four-column tab stops.
-                [$columns, $content] = $this->splitLeadingWhitespace($line);
-                if ($columns > 0) {
-                    $paragraph->appendChild(new Text(str_repeat("\u{E000}", $columns)));
-                }
+            // Emit leading whitespace via the internal non-breaking-space
+            // placeholder (U+E000, the same sentinel the parser uses for an
+            // escaped space). The HTML renderer turns it into a &nbsp; entity so
+            // the indent survives whitespace collapsing; Markdown keeps a real
+            // non-breaking space (U+00A0); plain text and ANSI use a normal space.
+            // A private-use character is used so it never collides with a literal
+            // U+00A0 in the author's own text. Tabs expand to four-column stops.
+            [$columns, $content] = $this->splitLeadingWhitespace($line);
+            if ($columns > 0) {
+                $paragraph->appendChild(new Text(str_repeat("\u{E000}", $columns)));
             }
 
             $inlineParser->parse($paragraph, $content, $baseLine + $index);

@@ -24,10 +24,10 @@ class LineBlockDivExtensionTest extends TestCase
      */
     private const NBSP_PLACEHOLDER = "\u{E000}";
 
-    private function converter(bool $cssIndent = false): DjotConverter
+    private function converter(): DjotConverter
     {
         $converter = new DjotConverter();
-        $converter->addExtension(new LineBlockDivExtension($cssIndent));
+        $converter->addExtension(new LineBlockDivExtension());
 
         return $converter;
     }
@@ -63,17 +63,6 @@ class LineBlockDivExtensionTest extends TestCase
         $this->assertStringContainsString("Flush left<br>\n&nbsp;&nbsp;Indented two", $html);
     }
 
-    public function testCssIndentOptionKeepsRawSpaces(): void
-    {
-        $djot = "::: |\nFlush left\n  Indented two\n:::";
-
-        $html = $this->converter(cssIndent: true)->convert($djot);
-
-        $this->assertStringContainsString("Flush left<br>\n  Indented two", $html);
-        $this->assertStringNotContainsString('&nbsp;', $html);
-        $this->assertStringNotContainsString(self::NBSP_PLACEHOLDER, $html);
-    }
-
     public function testNonHtmlOutputUsesRegularSpaces(): void
     {
         // The nbsp placeholder is an HTML-only concern; plain text gets ordinary
@@ -86,15 +75,17 @@ class LineBlockDivExtensionTest extends TestCase
         $this->assertStringNotContainsString(self::NBSP_PLACEHOLDER, $text);
     }
 
-    public function testMarkdownPreservesIndentedFirstLine(): void
+    public function testMarkdownPreservesIndentedFirstLineAsNonBreakingSpaces(): void
     {
-        // The placeholder must survive the renderer's trimming so an indented
-        // first line keeps its indentation in Markdown too.
+        // Markdown is a re-parseable round-trip format, so the indent is kept as
+        // real non-breaking spaces (U+00A0): they survive trimming, survive a
+        // re-render as &nbsp;, and are never mistaken for an indented code block.
         $document = $this->converter()->parse("::: |\n  first\n  second\n:::");
         $markdown = (new MarkdownRenderer())->render($document);
         $firstLine = explode("\n", $markdown)[0];
 
-        $this->assertSame('  first', rtrim($firstLine));
+        $this->assertSame(self::NBSP . self::NBSP . 'first', rtrim($firstLine));
+        $this->assertStringNotContainsString(self::NBSP_PLACEHOLDER, $markdown);
     }
 
     public function testLiteralNonBreakingSpaceInContentIsPreserved(): void
