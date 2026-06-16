@@ -34,6 +34,10 @@ class TableParser
             return false;
         }
 
+        // Trailing whitespace after the closing pipe is insignificant (parity
+        // with carve-js / carve-rs); strip it before the structural checks.
+        $line = rtrim($line, " \t");
+
         // Strip row attributes if present (|...|{.class})
         $lineWithoutRowAttrs = $this->stripRowAttributes($line);
 
@@ -88,7 +92,29 @@ class TableParser
      */
     public function isSeparatorRow(string $line): bool
     {
-        return preg_match('/^\|[\s:|-]+\|$/', $line) === 1 && str_contains($line, '-');
+        // Trailing whitespace after the closing pipe is insignificant.
+        $line = rtrim($line, " \t");
+
+        $len = strlen($line);
+        if ($len < 2 || $line[0] !== '|' || $line[$len - 1] !== '|') {
+            return false;
+        }
+
+        // Every cell must be a delimiter cell: optional whitespace, an optional
+        // leading ':', one or more '-', an optional trailing ':', optional
+        // whitespace. An EMPTY cell (`|---||`) or any other content disqualifies
+        // the row -- it is then an ordinary data row (matches carve-js/carve-rs).
+        $cells = $this->parseTableCells($line);
+        if ($cells === []) {
+            return false;
+        }
+        foreach ($cells as $cell) {
+            if (preg_match('/^\s*:?-+:?\s*$/', $cell) !== 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -151,6 +177,9 @@ class TableParser
     {
         // Strip row attributes first
         $line = $this->stripRowAttributes($line);
+
+        // Trailing whitespace after the closing pipe is insignificant.
+        $line = rtrim($line, " \t");
 
         // Remove leading and trailing |
         $line = substr($line, 1, -1);
@@ -356,6 +385,9 @@ class TableParser
     {
         // Strip row attributes first
         $line = $this->stripRowAttributes($line);
+
+        // Trailing whitespace after the closing pipe is insignificant.
+        $line = rtrim($line, " \t");
 
         // Must start with | to be a potential table row
         if (!str_starts_with($line, '|')) {
