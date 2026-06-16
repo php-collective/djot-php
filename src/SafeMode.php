@@ -228,8 +228,11 @@ class SafeMode
             $scheme = substr($url, 0, $colonPos);
 
             // Normalize scheme: strip ASCII whitespace and control characters (0x00-0x20)
-            // This prevents bypass attempts like "java\tscript:", "java\x0bscript:", etc.
-            $scheme = preg_replace('/[\x00-\x20]+/', '', $scheme) ?? $scheme;
+            // plus the U+FFFD replacement character (a NUL becomes U+FFFD at the
+            // parse entry, so a `java\x00script:` evasion arrives as
+            // `java\u{FFFD}script:`). This prevents bypass attempts like
+            // "java\tscript:", "java\x0bscript:", "java\x00script:", etc.
+            $scheme = preg_replace('/[\x00-\x20]+|\x{FFFD}+/u', '', $scheme) ?? $scheme;
             $scheme = strtolower($scheme);
 
             // Check against dangerous schemes

@@ -496,6 +496,14 @@ class BlockParser
         $this->headingReferenceLabels = [];
         $this->lineOffset = 0;
         $document = new Document();
+
+        // Replace any NUL (U+0000) with the U+FFFD replacement character so a
+        // control byte never reaches output (decided cross-impl behavior;
+        // WHATWG-style). A raw NUL must never reach rendered output.
+        if (str_contains($input, "\0")) {
+            $input = str_replace("\0", "\u{FFFD}", $input);
+        }
+
         $lines = $this->splitLines($input);
 
         // First pass: extract reference definitions, footnotes, abbreviations, and heading references
@@ -561,7 +569,7 @@ class BlockParser
             //   `"Title"` makes the line not a reference definition (matches djot.js)
             if (preg_match('/^\[([^\]]+)\]:(?:[ \t]+(\S*))?[ \t]*$/', $line, $matches)) {
                 // Normalize label: collapse whitespace, trim
-                $label = preg_replace('/\s+/', ' ', trim($matches[1]));
+                $label = preg_replace('/\s+/', ' ', trim($matches[1])) ?? '';
                 $url = trim($matches[2] ?? '');
 
                 // Collect continuation lines (URL can start on continuation line)

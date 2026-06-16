@@ -703,4 +703,31 @@ DJOT;
         $this->assertCount(1, $children);
         $this->assertSame('<b>bold</b>', $children[0]->getContent());
     }
+
+    public function testNulByteIsReplacedWithReplacementCharacter(): void
+    {
+        // A raw NUL (U+0000) must never reach rendered output: it is normalized
+        // to the U+FFFD replacement character at the parse entry (WHATWG-style,
+        // decided cross-impl behavior).
+        $converter = new DjotConverter();
+        $html = $converter->convert("a\0b");
+
+        $this->assertStringNotContainsString("\0", $html, 'A raw NUL byte must not reach output');
+        $this->assertStringContainsString("\u{FFFD}", $html, 'NUL must be normalized to U+FFFD');
+        $this->assertStringContainsString("a\u{FFFD}b", $html);
+    }
+
+    public function testNulByteInLinkSchemeDoesNotProduceExecutableHref(): void
+    {
+        // A `java\x00script:` evasion arrives as `java\u{FFFD}script:` after NUL
+        // normalization. SafeMode also strips U+FFFD from a scheme, so the
+        // evasion is still detected and blocked (empty href), and no raw NUL or
+        // executable javascript: scheme may reach output.
+        $converter = new DjotConverter(safeMode: true);
+        $html = $converter->convert("[x](java\0script:alert(1))");
+
+        $this->assertStringNotContainsString("\0", $html, 'A raw NUL byte must not reach output');
+        $this->assertStringNotContainsString('javascript:', $html, 'No executable javascript: scheme');
+        $this->assertStringContainsString('href=""', $html, 'NUL-evasion javascript: scheme is blocked');
+    }
 }
