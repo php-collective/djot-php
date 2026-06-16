@@ -11,6 +11,7 @@ use Djot\Node\Block\Comment;
 use Djot\Node\Block\DefinitionDescription;
 use Djot\Node\Block\DefinitionList;
 use Djot\Node\Block\DefinitionTerm;
+use Djot\Node\Block\Div;
 use Djot\Node\Block\Footnote;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\LineBlock;
@@ -25,6 +26,7 @@ use Djot\Node\Block\ThematicBreak;
 use Djot\Node\Document;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
+use Djot\Node\Inline\EscapedText;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
@@ -114,6 +116,7 @@ class PlainTextRenderer implements RendererInterface
 
         return match (true) {
             $node instanceof Document => $this->renderChildren($node),
+            $node instanceof Div => $this->renderDiv($node),
             $node instanceof Paragraph => $this->renderParagraph($node),
             $node instanceof Heading => $this->renderHeading($node),
             $node instanceof CodeBlock => $this->renderCodeBlock($node),
@@ -132,6 +135,7 @@ class PlainTextRenderer implements RendererInterface
             $node instanceof LineBlock => $this->renderLineBlock($node),
             $node instanceof Footnote => $this->renderFootnote($node),
             $node instanceof Text => $node->getContent(),
+            $node instanceof EscapedText => $node->getContent(),
             $node instanceof Code => $node->getContent(),
             $node instanceof Math => $node->getContent(),
             $node instanceof Image => $node->getAlt(),
@@ -159,6 +163,19 @@ class PlainTextRenderer implements RendererInterface
     protected function renderParagraph(Paragraph $node): string
     {
         return $this->renderChildren($node) . "\n\n";
+    }
+
+    protected function renderDiv(Div $node): string
+    {
+        $body = $this->renderChildren($node);
+        // A Div's quoted title (e.g. an admonition title carried as the `title`
+        // attribute) is preserved as a leading line instead of being dropped.
+        $title = $node->getAttribute('title');
+        if (is_string($title) && $title !== '') {
+            return $title . "\n\n" . $body;
+        }
+
+        return $body;
     }
 
     protected function renderHeading(Heading $node): string
