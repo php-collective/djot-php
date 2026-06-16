@@ -701,4 +701,64 @@ DJOT;
         $cells = $dataRow2->getChildren();
         $this->assertCount(1, $cells); // Only "L2" cell
     }
+
+    public function testLeadingColspanMarkerInFirstColumnIsEmptyCell(): void
+    {
+        // A colspan marker `<` in the first column has no cell to its left to
+        // merge into: it must render as an empty cell, not be dropped.
+        $djot = <<<'DJOT'
+| < | a |
+|---|---|
+| b | c |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+
+        /** @var \Djot\Node\Block\Table $table */
+        $table = $doc->getChildren()[0];
+        $this->assertInstanceOf(Table::class, $table);
+
+        $rows = $table->getChildren();
+
+        /** @var \Djot\Node\Block\TableRow $headerRow */
+        $headerRow = $rows[0];
+        $headerCells = $headerRow->getChildren();
+        $this->assertCount(2, $headerCells);
+
+        /** @var \Djot\Node\Block\TableCell $leadingCell */
+        $leadingCell = $headerCells[0];
+        $this->assertSame(1, $leadingCell->getColspan());
+        $this->assertSame(1, $leadingCell->getRowspan());
+        $this->assertCount(0, $leadingCell->getChildren());
+    }
+
+    public function testLeadingRowspanMarkerInFirstRowIsEmptyCell(): void
+    {
+        // A rowspan marker `^` in the first row has no cell above to merge
+        // into: it must render as an empty cell, not be dropped.
+        $djot = <<<'DJOT'
+| ^ | a |
+|---|---|
+| b | c |
+DJOT;
+
+        $doc = $this->converter->parse($djot);
+
+        /** @var \Djot\Node\Block\Table $table */
+        $table = $doc->getChildren()[0];
+        $this->assertInstanceOf(Table::class, $table);
+
+        $rows = $table->getChildren();
+
+        /** @var \Djot\Node\Block\TableRow $headerRow */
+        $headerRow = $rows[0];
+        $headerCells = $headerRow->getChildren();
+        $this->assertCount(2, $headerCells);
+
+        /** @var \Djot\Node\Block\TableCell $leadingCell */
+        $leadingCell = $headerCells[0];
+        $this->assertSame(1, $leadingCell->getColspan());
+        $this->assertSame(1, $leadingCell->getRowspan());
+        $this->assertCount(0, $leadingCell->getChildren());
+    }
 }
