@@ -1370,74 +1370,6 @@ class InlineParser
     }
 
     /**
-     * Find a matching single quote closer for a potential opener at $pos
-     *
-     * Returns the position of the closer if found, null otherwise.
-     * Uses a matching algorithm similar to emphasis - potential openers and closers
-     * are matched from innermost pairs outward.
-     */
-    protected function findMatchingSingleQuoteCloser(string $text, int $openerPos): ?int
-    {
-        $length = strlen($text);
-
-        // Collect all potential openers and closers after this position
-        $openers = [$openerPos];
-        $closers = [];
-
-        for ($i = $openerPos + 1; $i < $length; $i++) {
-            if ($text[$i] !== "'") {
-                continue;
-            }
-
-            $prevChar = $text[$i - 1] ?? ' ';
-            $nextChar = $text[$i + 1] ?? ' ';
-            $prevIsSpace = ctype_space($prevChar);
-            // Closer can be followed by space, punctuation, or end of string
-            $nextIsSpaceOrPunct = ctype_space($nextChar) || $i === $length - 1
-                || preg_match('/^[\p{P}\p{S}]/u', $nextChar);
-
-            // Skip quotes before digits (always apostrophe)
-            if (ctype_digit($nextChar)) {
-                continue;
-            }
-
-            // Skip quotes after ] or )
-            if ($prevChar === ']' || $prevChar === ')') {
-                continue;
-            }
-
-            $nextIsSpace = ctype_space($nextChar);
-            if ($prevIsSpace && !$nextIsSpace) {
-                // Could be opener (after space, before non-space)
-                $openers[] = $i;
-            } elseif (!$prevIsSpace && $nextIsSpaceOrPunct) {
-                // Could be closer (after non-space, before space/punct)
-                $closers[] = $i;
-            } elseif (!$prevIsSpace) {
-                // Mid-word quote (like Jane's) - typically apostrophe
-                continue;
-            }
-        }
-
-        // Now match openers with closers, innermost first
-        // For each closer, find the nearest preceding unmatched opener
-        $matched = [];
-        foreach ($closers as $closer) {
-            for ($j = count($openers) - 1; $j >= 0; $j--) {
-                $opener = $openers[$j];
-                if ($opener < $closer && !isset($matched[$opener])) {
-                    $matched[$opener] = $closer;
-
-                    break;
-                }
-            }
-        }
-
-        // Return the closer for our position, if any
-        return $matched[$openerPos] ?? null;
-    }
-
-    /**
      * Build a cache of all single quote opener→closer matches for the text.
      *
      * This is called once per parseInlines() to avoid O(n²) complexity
@@ -1453,10 +1385,14 @@ class InlineParser
         }
 
         $length = strlen($text);
-        $openers = [];
-        $closers = [];
+        $matched = [];
+        $openerStack = [];
 
-        // Single pass: collect all potential openers and closers
+        // Single forward pass: classify each quote and pair a closer with the
+        // innermost still-open opener via a stack. The stack top is always the
+        // largest-index unmatched opener seen so far, so popping it reproduces
+        // the former "nearest preceding unmatched opener" pairing in O(n)
+        // instead of the previous O(n²) closer-by-opener scan.
         for ($i = 0; $i < $length; $i++) {
             if ($text[$i] !== "'") {
                 continue;
@@ -1493,26 +1429,13 @@ class InlineParser
             }
 
             if ($prevIsSpace && !$nextIsSpace) {
-                // Potential opener
-                $openers[] = $i;
-            } elseif (!$prevIsSpace && $nextIsSpaceOrPunct) {
-                // Potential closer
-                $closers[] = $i;
+                // Potential opener - push onto the stack of open quotes
+                $openerStack[] = $i;
+            } elseif (!$prevIsSpace && $nextIsSpaceOrPunct && $openerStack) {
+                // Potential closer - pair with the innermost unmatched opener
+                $matched[array_pop($openerStack)] = $i;
             }
             // Mid-word quotes are skipped (apostrophes)
-        }
-
-        // Match openers with closers, innermost first
-        $matched = [];
-        foreach ($closers as $closer) {
-            for ($j = count($openers) - 1; $j >= 0; $j--) {
-                $opener = $openers[$j];
-                if ($opener < $closer && !isset($matched[$opener])) {
-                    $matched[$opener] = $closer;
-
-                    break;
-                }
-            }
         }
 
         return $matched;
