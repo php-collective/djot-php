@@ -2750,7 +2750,9 @@ class BlockParser
             // Strip row attributes for validation (|...|{.class} → |...|)
             $lineWithoutRowAttrs = $this->tableParser->stripRowAttributes($currentLine);
 
-            if (!preg_match('/^\|.*\|$/', $lineWithoutRowAttrs)) {
+            // Trailing whitespace after the closing pipe is insignificant
+            // (parity with carve-js / carve-rs).
+            if (!preg_match('/^\|.*\|[ \t]*$/', $lineWithoutRowAttrs)) {
                 break;
             }
 
