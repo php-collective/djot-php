@@ -30,6 +30,7 @@ use Djot\Node\Inline\Abbreviation;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
 use Djot\Node\Inline\Emphasis;
+use Djot\Node\Inline\EscapedText;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Highlight;
@@ -403,6 +404,7 @@ class AnsiRenderer implements RendererInterface
             $node instanceof LineBlock => $this->renderLineBlock($node),
             $node instanceof Footnote => $this->renderFootnote($node),
             $node instanceof Text => $node->getContent(),
+            $node instanceof EscapedText => $node->getContent(),
             $node instanceof Abbreviation => $this->renderAbbreviation($node),
             $node instanceof Emphasis => $this->renderEmphasis($node),
             $node instanceof Strong => $this->renderStrong($node),
@@ -608,7 +610,16 @@ class AnsiRenderer implements RendererInterface
 
     protected function renderDiv(Div $node): string
     {
-        return $this->renderChildren($node);
+        $body = $this->renderChildren($node);
+        // A Div's quoted title (e.g. an admonition title carried as the `title`
+        // attribute) is preserved as a leading bold line instead of being
+        // dropped.
+        $title = $node->getAttribute('title');
+        if (is_string($title) && $title !== '') {
+            return $this->style($title, self::BOLD) . "\n\n" . $body;
+        }
+
+        return $body;
     }
 
     protected function renderTable(Table $node): string
