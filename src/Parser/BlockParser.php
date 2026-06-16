@@ -2848,6 +2848,14 @@ class BlockParser
                 }
             }
 
+            // Leading colspan markers (`<` with no cell to their left) cannot
+            // merge: each becomes an empty cell rather than being dropped
+            // (djot-js / carve parity).
+            while ($colspanAccumulator > 1) {
+                array_unshift($processedCells, ['content' => '', 'attributes' => [], 'colspan' => 1]);
+                $colspanAccumulator--;
+            }
+
             // Parse regular row
             $row = new TableRow(false);
             if ($rowAttributes) {
@@ -2859,11 +2867,51 @@ class BlockParser
             $rowCellData = [];
             $colPosition = 0;
 
+            // getChildren() hands back a copy-on-write alias of the table's internal child
+            // array. Holding it alive across the appendChild() below would force PHP to copy
+            // the entire array on every row (turning a plain table into O(rows^2)), so it is
+            // released with unset() right before the append - see the note there.
+            $tableChildren = $table->getChildren();
+            $currentRowIndex = count($tableChildren); // Index where current row will be added
+
             foreach ($processedCells as $index => $cellData) {
                 $colspan = $cellData['colspan'];
 
                 // Check for rowspan marker
                 if ($this->tableParser->isRowspanMarker($cellData['content'])) {
+                    // A rowspan marker with no cell above to extend (first row, or
+                    // a column with no origin) cannot merge: it becomes an empty
+                    // cell rather than being dropped (djot-js / carve parity).
+                    $cellAbove = null;
+                    for ($prevRowIdx = $currentRowIndex - 1; $prevRowIdx >= 0; $prevRowIdx--) {
+                        if (!($tableChildren[$prevRowIdx] instanceof TableRow)) {
+                            continue;
+                        }
+                        $cellAbove = $this->findCellAtColumnForRowspan(
+                            $tableChildren,
+                            $prevRowIdx,
+                            $colPosition,
+                            $currentRowIndex,
+                        );
+                        if ($cellAbove !== null) {
+                            break;
+                        }
+                    }
+
+                    if ($cellAbove === null) {
+                        $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
+                        $cell = new TableCell(false, $alignment, 1, $colspan);
+                        $row->appendChild($cell);
+                        $rowCellData[] = [
+                            'type' => 'cell',
+                            'cell' => $cell,
+                            'colPosition' => $colPosition,
+                        ];
+                        $colPosition += $colspan;
+
+                        continue;
+                    }
+
                     // Mark this position for rowspan processing
                     $rowCellData[] = [
                         'type' => 'rowspan_marker',
@@ -2894,12 +2942,8 @@ class BlockParser
 
             // Process rowspan markers - find cells above that should span down
             // We need to track column positions considering rowspan markers in previous rows.
-            // getChildren() hands back a copy-on-write alias of the table's internal child
-            // array. Holding it alive across the appendChild() below would force PHP to copy
-            // the entire array on every row (turning a plain table into O(rows^2)), so it is
-            // released with unset() right before the append - see the note there.
-            $tableChildren = $table->getChildren();
-            $currentRowIndex = count($tableChildren); // Index where current row will be added
+            // $tableChildren / $currentRowIndex were captured before the cell loop above
+            // (the table's child array is unchanged until the appendChild() below).
 
             // Track which cells have already been extended in this row
             // (multiple ^ markers under a colspan should only extend once)
