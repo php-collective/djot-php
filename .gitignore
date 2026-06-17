@@ -24,3 +24,7 @@
 /docs/.vitepress/cache/
 /docs/.vitepress/dist/
 /docs/.vitepress/grammars/
+
+# Superpowers working docs (never tracked)
+docs/superpowers/
+_*.md

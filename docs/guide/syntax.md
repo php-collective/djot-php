@@ -256,6 +256,8 @@ Use `^` after a block quote to add an attribution/caption. The block quote will 
 </template>
 </OutputTabs>
 
+Prefer not to prefix every line? The [`BlockQuoteDivExtension`](/extensions/#blockquotedivextension) adds a fenced form, `::: >`, that produces the same `<blockquote>` without the per-line `>` - useful when the quote contains lists, fences, or tables.
+
 ### Lists
 
 #### Bullet Lists

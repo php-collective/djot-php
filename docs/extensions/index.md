@@ -17,6 +17,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [InlineFootnotesExtension](#inlinefootnotesextension) | Converts `[content]{.fn}` spans to inline footnotes |
 | [LineBlockDivExtension](#lineblockdivextension) | Adds a fenced `::: |` line block (verse/addresses) without prefixing every line |
+| [BlockQuoteDivExtension](#blockquotedivextension) | Adds a fenced `::: >` blockquote so a quote can own lists/fences/tables without a per-line `>` |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
 | [MermaidExtension](#mermaidextension) | Transforms mermaid code blocks into diagrams |
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
@@ -663,6 +664,62 @@ The pipe is consumed as the marker, so the output is a `line-block` div, never a
 ### Why This Syntax?
 
 This follows the approach discussed in [djot issue #29](https://github.com/jgm/djot/issues/29). A leading `|` on every line (Pandoc-style line blocks) can be confused with pipe tables and is awkward to edit; an English keyword div class (`::: verse`) was undesirable. A language-neutral `|` marker on the div opener sidesteps both concerns.
+
+## BlockQuoteDivExtension
+
+Adds a fenced blockquote written as a `:::` div whose only token is a greater-than sign: `::: >`. It produces the same semantic `<blockquote>` as the [`>`-prefixed form](/guide/syntax#block-quotes), but without prefixing every line - which matters when the quote contains **block** content, because the `>`-prefix form needs the marker on every line of a list, nested fence, or table (lazy continuation only folds plain paragraph text into a quote, never new block structure).
+
+```php
+use Djot\Extension\BlockQuoteDivExtension;
+
+$converter->addExtension(new BlockQuoteDivExtension());
+```
+
+A list inside a quote, with no per-line marker:
+
+```djot
+::: >
+- item one
+- item two
+:::
+```
+
+```html
+<blockquote>
+<ul>
+<li>
+item one
+</li>
+<li>
+item two
+</li>
+</ul>
+</blockquote>
+```
+
+A `^ attribution` line right after the closing `:::` wraps the quote in a figure, exactly as the `>`-prefix form does:
+
+```djot
+::: >
+Stay hungry, stay foolish.
+:::
+^ Steve Jobs
+```
+
+```html
+<figure>
+<blockquote>
+<p>Stay hungry, stay foolish.</p>
+</blockquote>
+<figcaption>Steve Jobs</figcaption>
+</figure>
+```
+
+The gt is consumed as the marker, so the output is a `<blockquote>`, never a literal `class=">"`. Because `>` is not a meaningful class, intercepting it cannot collide with real usage - which is why this needs no core parser change, the same design as the `::: |` line block. Attributes on the preceding line (`{#id .class}`) attach to the blockquote, and longer colon runs nest (`:::: >` outside, `::: >` inside).
+
+### Why This Syntax?
+
+The `>`-prefix blockquote is fine for prose, but every list item or nested block inside it needs its own `>`. The fenced form mirrors the language-neutral `::: |` line block: a single sigil on the opener, no English keyword, no per-line marker. `::: quote` is deliberately different - it stays an `<aside class="admonition quote">`, not a semantic `<blockquote>`.
 
 ## MentionsExtension
 

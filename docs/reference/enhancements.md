@@ -438,6 +438,52 @@ Round-trips through the Markdown, plain-text, and ANSI renderers (the
 
 ---
 
+### Fenced Block Quote (`::: >`)
+
+**Related:** [`BlockQuoteDivExtension`](/extensions/#blockquotedivextension)
+
+**Status:** djot-php extension (opt-in)
+
+A `:::` div whose only token is `>` produces a semantic `<blockquote>` - the same
+node as the `>`-prefixed form, but without a marker on every line. This matters
+for **block** content inside a quote: the `>`-prefix form needs the marker on
+every line of a list, nested fence, or table, because lazy continuation only
+folds plain paragraph text into a quote, never new block structure.
+
+```djot
+::: >
+- item one
+- item two
+:::
+```
+
+**Output:**
+```html
+<blockquote>
+<ul>
+<li>
+item one
+</li>
+<li>
+item two
+</li>
+</ul>
+</blockquote>
+```
+
+**Rules:**
+- The opener is `:::` (3+ colons) followed by only `>` (optional surrounding spaces); the gt is the marker, so the output is `<blockquote>`, never `class=">"`.
+- The body is parsed as ordinary block content, so any block (lists, fences, tables, nested quotes) is allowed without a per-line `>`.
+- A `^ attribution` line right after the closing `:::` wraps the quote in a `<figure>`/`<figcaption>`, the same as the `>`-prefix caption form.
+- A preceding `{...}` attribute block attaches to the `<blockquote>`.
+- Longer colon runs nest (`:::: >` outside, `::: >` inside), per djot div semantics.
+
+Mirrors the language-neutral design of the `::: |` line block. Distinct from
+`::: quote`, which stays an `<aside class="admonition quote">` rather than a
+semantic blockquote.
+
+---
+
 ### Task List Underscore Notation
 
 **Related:** [jgm/djot#305](https://github.com/jgm/djot/issues/305)
@@ -1047,6 +1093,7 @@ vendor/bin/phpunit
 | Feature                           | Upstream PR/Issue                                                   | Status     |
 |-----------------------------------|---------------------------------------------------------------------|------------|
 | Line blocks (`\|` poetry/address) | [Pandoc line blocks](https://pandoc.org/MANUAL.html#line-blocks)    | djot-php   |
+| Fenced block quote (`::: >`)      | [`BlockQuoteDivExtension`](/extensions/#blockquotedivextension)      | djot-php   |
 | Task list underscore notation     | [djot:305](https://github.com/jgm/djot/issues/305)                  | Open       |
 | List item attributes              | [djot:262](https://github.com/jgm/djot/pull/262)                    | Open PR    |
 | Table row/cell attributes         | [djot:250](https://github.com/jgm/djot/issues/250)                  | Open       |
