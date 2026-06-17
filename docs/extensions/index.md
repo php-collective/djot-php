@@ -675,10 +675,12 @@ use Djot\Extension\BlockQuoteDivExtension;
 $converter->addExtension(new BlockQuoteDivExtension());
 ```
 
-A list inside a quote, with no per-line marker:
+A quote with a lead paragraph and a list, with no per-line marker:
 
 ```djot
 ::: >
+Notes from the meeting:
+
 - item one
 - item two
 :::
@@ -686,6 +688,7 @@ A list inside a quote, with no per-line marker:
 
 ```html
 <blockquote>
+<p>Notes from the meeting:</p>
 <ul>
 <li>
 item one
@@ -697,9 +700,11 @@ item two
 </blockquote>
 ```
 
-The verbose `>`-prefix form below produces the **identical** output, but needs the marker on every line:
+The verbose `>`-prefix form below produces the **identical** output, but needs the marker on every line - the prose line, the blank separator, and each list item:
 
 ```djot
+> Notes from the meeting:
+>
 > - item one
 > - item two
 ```
