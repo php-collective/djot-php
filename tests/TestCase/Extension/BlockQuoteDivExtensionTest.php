@@ -97,6 +97,20 @@ class BlockQuoteDivExtensionTest extends TestCase
         $this->assertStringContainsString('Inner.', $html);
     }
 
+    public function testInnerCodeFenceIsNotMistakenForTheCloser(): void
+    {
+        // The ::: inside the code block must not close the quote; only the
+        // bare ::: after the code fence does.
+        $djot = "::: >\n```\n:::\n```\nAfter.\n:::";
+
+        $html = $this->converter()->convert($djot);
+
+        $this->assertStringContainsString('<blockquote>', $html);
+        // The code block keeps the literal ::: as its content.
+        $this->assertMatchesRegularExpression('/<code[^>]*>[\s\S]*:::[\s\S]*<\/code>/', $html);
+        $this->assertStringContainsString('After.', $html);
+    }
+
     public function testUnclosedFenceDoesNotProduceBlockquote(): void
     {
         $djot = "::: >\nNo closer here.";
