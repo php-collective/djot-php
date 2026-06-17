@@ -697,6 +697,15 @@ item two
 </blockquote>
 ```
 
+The verbose `>`-prefix form below produces the **identical** output, but needs the marker on every line:
+
+```djot
+> - item one
+> - item two
+```
+
+The two are interchangeable; the fenced form simply drops the per-line `>`, which is what makes longer or more deeply nested quoted content practical to edit. The gap grows with the content - a quote wrapping a fenced code block or a table needs a `>` on every one of those lines too.
+
 A `^ attribution` line right after the closing `:::` wraps the quote in a figure, exactly as the `>`-prefix form does:
 
 ```djot
