@@ -743,6 +743,59 @@ tag in source order (safe-mode filtering still applies); the structural
 `caption`, `header-rows`, `header-cols`, and the auto `list-table` class are
 consumed by the extension and not emitted.
 
+### Spanning rows and columns
+
+Cells can span rows and columns using the **same `^` / `<` markers djot-php's
+native pipe tables use**, with the same continuation semantics. A cell (list
+item) whose sole inline content is:
+
+- a lone `^` merges into the cell **above** it (rowspan);
+- a lone `<` merges into the cell to its **left** (colspan).
+
+Spans are written as continuations: a `colspan=3` is the origin cell followed by
+two `<` cells; a `rowspan=N` is the origin cell followed by `N - 1` `^` cells in
+the rows below it. To keep a literal `^` or `<` as cell text, escape it (`\^`,
+`\<`) or attach an attribute - an attributed cell is never treated as a span
+marker. A `^` with no cell above it, or a leading `<` with no cell to its left,
+degrades to an empty cell rather than being dropped.
+
+**Input:**
+```djot
+{caption="Sales" header-rows=1}
+::: list-table
+- - Region
+  - Q1
+  - Q2
+- - EMEA
+  - 10
+  - 12
+- - ^
+  - 14
+  - 16
+- - Total
+  - <
+  - <
+:::
+```
+
+**Output:**
+```html
+<table>
+  <caption>Sales</caption>
+  <thead><tr><th>Region</th><th>Q1</th><th>Q2</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="2">EMEA</td><td>10</td><td>12</td></tr>
+    <tr><td>14</td><td>16</td></tr>
+    <tr><td colspan="3">Total</td></tr>
+  </tbody>
+</table>
+```
+
+The `^` under `EMEA` gives its column `rowspan="2"`; the two `<` cells under
+`Total` give it `colspan="3"`. The resulting span markup matches what the
+equivalent pipe table produces - the extension reuses djot-php's pipe-table span
+resolution semantics.
+
 This builds on the marker-line nested-list block-absorption fix
 ([#251](https://github.com/php-collective/djot-php/pull/251)) that lets a cell
 hold full block content. HTML output only.

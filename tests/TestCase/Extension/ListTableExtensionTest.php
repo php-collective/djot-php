@@ -294,6 +294,320 @@ class ListTableExtensionTest extends TestCase
         $this->assertStringNotContainsString('<table', $html);
     }
 
+    public function testRowspanWithCaret(): void
+    {
+        // EMEA spans down two rows: the second row's first cell is a lone `^`.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - EMEA',
+            '  - 10',
+            '- - ^',
+            '  - 14',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td rowspan="2">EMEA</td><td>10</td></tr>',
+            '    <tr><td>14</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testColspanWithSingleLessThan(): void
+    {
+        // X spans two columns: the cell to its right is a lone `<`.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - B',
+            '  - C',
+            '- - X',
+            '  - <',
+            '  - Z',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td>A</td><td>B</td><td>C</td></tr>',
+            '    <tr><td colspan="2">X</td><td>Z</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testColspanWithTwoLessThan(): void
+    {
+        // Total spans all three columns: two trailing `<` cells.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - B',
+            '  - C',
+            '- - Total',
+            '  - <',
+            '  - <',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td>A</td><td>B</td><td>C</td></tr>',
+            '    <tr><td colspan="3">Total</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testSalesExampleWithRowspanAndColspan(): void
+    {
+        $djot = implode("\n", [
+            '{caption="Sales" header-rows=1}',
+            '::: list-table',
+            '- - Region',
+            '  - Q1',
+            '  - Q2',
+            '- - EMEA',
+            '  - 10',
+            '  - 12',
+            '- - ^',
+            '  - 14',
+            '  - 16',
+            '- - Total',
+            '  - <',
+            '  - <',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <caption>Sales</caption>',
+            '  <thead><tr><th>Region</th><th>Q1</th><th>Q2</th></tr></thead>',
+            '  <tbody>',
+            '    <tr><td rowspan="2">EMEA</td><td>10</td><td>12</td></tr>',
+            '    <tr><td>14</td><td>16</td></tr>',
+            '    <tr><td colspan="3">Total</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testCombinedRowspanAndColspan(): void
+    {
+        // C spans two rows; X spans two columns in the row that also rowspans C.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - B',
+            '  - C',
+            '- - X',
+            '  - <',
+            '  - ^',
+            '- - P',
+            '  - Q',
+            '  - R',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td>A</td><td>B</td><td rowspan="2">C</td></tr>',
+            '    <tr><td colspan="2">X</td></tr>',
+            '    <tr><td>P</td><td>Q</td><td>R</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testEscapedMarkersAreKeptLiteralNotSpans(): void
+    {
+        // An escaped `\^` / `\<` (and an attributed marker) is literal content,
+        // never a span marker.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - B',
+            '- - \\^',
+            '  - \\<',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td>A</td><td>B</td></tr>',
+            '    <tr><td>^</td><td>&lt;</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testListTableSpanHtmlMatchesEquivalentPipeTable(): void
+    {
+        // The span resolution must produce the same rowspan/colspan markup the
+        // native pipe table emits for the equivalent input.
+        $listTable = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - B',
+            '  - C',
+            '- - X',
+            '  - <',
+            '  - ^',
+            '- - P',
+            '  - Q',
+            '  - R',
+            ':::',
+        ]);
+
+        $pipeTable = implode("\n", [
+            '| A | B | C |',
+            '|---|---|---|',
+            '| X | < | ^ |',
+            '| P | Q | R |',
+        ]);
+
+        $converter = new DjotConverter();
+        $converter->addExtension(new ListTableExtension());
+        $listHtml = trim($converter->convert($listTable));
+
+        $pipeConverter = new DjotConverter();
+        $pipeHtml = trim($pipeConverter->convert($pipeTable));
+
+        // Normalize both to the bare cell markup (tag + span attributes + text),
+        // dropping whitespace, thead/tbody grouping and the th/td distinction
+        // that the list-table header conventions add on top.
+        $normalize = static function (string $html): string {
+            $html = preg_replace('/<\/?(table|thead|tbody|caption)[^>]*>/', '', $html) ?? $html;
+            $html = preg_replace('/\s+/', '', $html) ?? $html;
+            $html = str_replace(['<th', '</th>'], ['<td', '</td>'], $html);
+
+            return $html;
+        };
+
+        $this->assertSame($normalize($pipeHtml), $normalize($listHtml));
+    }
+
+    public function testRowspanOverColspanReservesTheWholeRectangle(): void
+    {
+        // A colspan=2 cell that also spans two rows needs a `^` under each of
+        // its columns; the result matches the equivalent pipe table.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - <',
+            '  - C',
+            '- - ^',
+            '  - ^',
+            '  - D',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td rowspan="2" colspan="2">A</td><td>C</td></tr>',
+            '    <tr><td>D</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+
+        // Same span markup as the equivalent pipe table.
+        $pipe = implode("\n", [
+            '| A | < | C |',
+            '|---|---|---|',
+            '| ^ | ^ | D |',
+        ]);
+        $pipeHtml = trim((new DjotConverter())->convert($pipe));
+        $this->assertStringContainsString('<th rowspan="2" colspan="2">A</th>', $pipeHtml);
+    }
+
+    public function testRowspanAttachesToCellDirectlyAboveNotAcrossRaggedGaps(): void
+    {
+        // The middle row is short; its second column is padded with an empty
+        // cell. A `^` in the next row must extend THAT padded cell, never jump
+        // up to `B` two rows above - matching the equivalent pipe table.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - B',
+            '- - C',
+            '- - X',
+            '  - ^',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td>A</td><td>B</td></tr>',
+            '    <tr><td>C</td><td rowspan="2"></td></tr>',
+            '    <tr><td>X</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testConsecutiveLeadingColspanMarkersEachBecomeEmptyCell(): void
+    {
+        // A run of leading `<` with no cell to the left yields one empty cell
+        // per marker (they never merge into each other), matching the pipe
+        // table's leading-marker fallback.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - <',
+            '  - <',
+            '  - A',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td></td><td></td><td>A</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testNoSpanMarkersIsUnchanged(): void
+    {
+        // A table with no span markers must render exactly as before.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - B',
+            '- - C',
+            '  - D',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td>A</td><td>B</td></tr>',
+            '    <tr><td>C</td><td>D</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
     public function testSiblingClassIsPreservedOnTable(): void
     {
         $djot = implode("\n", [
