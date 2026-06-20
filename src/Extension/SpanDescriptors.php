@@ -10,26 +10,28 @@ use Djot\Node\Block\ListItem;
  * A flat, mutable list of placed table cells used while the
  * {@see \Djot\Extension\ListTableExtension} resolves `^` / `<` span markers.
  *
- * Each descriptor records the origin cell (a list item), the effective column
- * it starts at, and its resolved rowspan / colspan. Keeping them in one typed
- * list - referenced from the grid by integer index - lets span markers grow an
- * earlier cell's span without losing the descriptor's array shape.
+ * Each descriptor records the origin cell (a list item), the row and effective
+ * column it starts at, and its resolved rowspan / colspan. Keeping them in one
+ * typed list - referenced from the grid by integer index - lets span markers
+ * grow an earlier cell's span without losing the descriptor's array shape. The
+ * origin row lets the renderer clamp a rowspan at the header/body boundary.
  */
 class SpanDescriptors
 {
     /**
-     * @var array<int, array{cell: \Djot\Node\Block\ListItem, col: int, rowspan: int, colspan: int}>
+     * @var array<int, array{cell: \Djot\Node\Block\ListItem, row: int, col: int, rowspan: int, colspan: int}>
      */
     protected array $descriptors = [];
 
     /**
-     * Add an origin cell at the given effective column and return its index.
+     * Add an origin cell at the given row and effective column; return its index.
      */
-    public function add(ListItem $cell, int $col): int
+    public function add(ListItem $cell, int $row, int $col): int
     {
         $index = count($this->descriptors);
         $this->descriptors[$index] = [
             'cell' => $cell,
+            'row' => $row,
             'col' => $col,
             'rowspan' => 1,
             'colspan' => 1,
@@ -57,7 +59,7 @@ class SpanDescriptors
     /**
      * Get the descriptor at the given index.
      *
-     * @return array{cell: \Djot\Node\Block\ListItem, col: int, rowspan: int, colspan: int}
+     * @return array{cell: \Djot\Node\Block\ListItem, row: int, col: int, rowspan: int, colspan: int}
      */
     public function get(int $index): array
     {

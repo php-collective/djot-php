@@ -608,6 +608,144 @@ class ListTableExtensionTest extends TestCase
         $this->assertSame($expected, $this->render($djot));
     }
 
+    public function testAttributedCellIsNeverASpanMarkerAndKeepsItsAttribute(): void
+    {
+        // A cell authored `-{.x} ^` carries an attribute on its list item; that
+        // makes it literal content, never a rowspan marker. The neighbor above
+        // must NOT gain a rowspan, the literal `^` must stay, and the `.x`
+        // attribute must be preserved on the cell.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - B',
+            '- -{.x} ^',
+            '  - C',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <tbody>',
+            '    <tr><td>A</td><td>B</td></tr>',
+            '    <tr><td class="x">^</td><td>C</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testMalformedDeferDoesNotDuplicateStrayContent(): void
+    {
+        // A row whose last cell has a stray block appended, followed by a later
+        // row that forces a defer (no inner cell list). The extension must NOT
+        // have mutated the AST before deferring; otherwise the default div
+        // renderer renders the stray block twice. The claimed-extension output
+        // must be byte-identical to the plain div the converter produces with
+        // no extension registered.
+        $djot = implode("\n", [
+            '::: list-table',
+            '- - A',
+            '  - B',
+            '',
+            '  Stray.',
+            '- Row label only',
+            ':::',
+        ]);
+
+        $withExtension = $this->render($djot);
+
+        $plain = trim((new DjotConverter())->convert($djot));
+
+        $this->assertSame($plain, $withExtension);
+        // Sanity: the stray block appears exactly once, not duplicated.
+        $this->assertSame(1, substr_count($withExtension, '<p>Stray.</p>'));
+    }
+
+    public function testHeaderRowRowspanDoesNotCrossIntoBody(): void
+    {
+        // A header-row cell with a `^` below it would span from <thead> into
+        // <tbody>; HTML cannot reliably span a cell across row groups. The
+        // rowspan is clamped: the header cell stays a plain <th> and the body
+        // row gets a fresh empty cell in that column.
+        $djot = implode("\n", [
+            '{header-rows=1}',
+            '::: list-table',
+            '- - H',
+            '  - X',
+            '- - ^',
+            '  - Y',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <thead><tr><th>H</th><th>X</th></tr></thead>',
+            '  <tbody>',
+            '    <tr><td></td><td>Y</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+
+        // The header cell must not carry a rowspan reaching into the body.
+        $this->assertStringNotContainsString('rowspan', $this->render($djot));
+    }
+
+    public function testRowspanWithinHeaderRowsIsKept(): void
+    {
+        // A rowspan that lives entirely inside the header rows is valid and
+        // must be preserved (it never crosses into <tbody>).
+        $djot = implode("\n", [
+            '{header-rows=2}',
+            '::: list-table',
+            '- - H',
+            '  - X',
+            '- - ^',
+            '  - Y',
+            '- - B1',
+            '  - B2',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <thead><tr><th rowspan="2">H</th><th>X</th></tr><tr><th>Y</th></tr></thead>',
+            '  <tbody>',
+            '    <tr><td>B1</td><td>B2</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
+    public function testRowspanWithinBodyIsKeptWithHeaderRows(): void
+    {
+        // A rowspan that lives entirely inside the body is unaffected by the
+        // header/body clamp.
+        $djot = implode("\n", [
+            '{header-rows=1}',
+            '::: list-table',
+            '- - H1',
+            '  - H2',
+            '- - A',
+            '  - B',
+            '- - ^',
+            '  - C',
+            ':::',
+        ]);
+
+        $expected = implode("\n", [
+            '<table>',
+            '  <thead><tr><th>H1</th><th>H2</th></tr></thead>',
+            '  <tbody>',
+            '    <tr><td rowspan="2">A</td><td>B</td></tr>',
+            '    <tr><td>C</td></tr>',
+            '  </tbody>',
+            '</table>',
+        ]);
+        $this->assertSame($expected, $this->render($djot));
+    }
+
     public function testSiblingClassIsPreservedOnTable(): void
     {
         $djot = implode("\n", [

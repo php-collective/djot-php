@@ -754,10 +754,26 @@ item) whose sole inline content is:
 
 Spans are written as continuations: a `colspan=3` is the origin cell followed by
 two `<` cells; a `rowspan=N` is the origin cell followed by `N - 1` `^` cells in
-the rows below it. To keep a literal `^` or `<` as cell text, escape it (`\^`,
-`\<`) or attach an attribute - an attributed cell is never treated as a span
-marker. A `^` with no cell above it, or a leading `<` with no cell to its left,
-degrades to an empty cell rather than being dropped.
+the rows below it.
+
+To keep a literal `^` or `<` as cell text, **escape it** (`\^`, `\<`) or **give
+the cell its own attribute** - an attributed cell is never treated as a span
+marker. The attribute can sit on the cell's list item, e.g. `-{.note} ^` renders
+as a literal `<td class="note">^</td>` (the `class` is preserved, the `^` is kept
+verbatim), not a rowspan.
+
+A span marker with no cell to merge into renders as an **empty cell** rather than
+being dropped: a `^` in the first row (no cell above), a `<` in the first column
+(no cell to the left), or a `<` adjacent to a cell already pulled in by a rowspan
+all become an empty `<td>`. A row whose every cell is a span marker emits an empty
+`<tr></tr>` - valid, if cosmetically odd.
+
+A `rowspan` is **clamped at the `<thead>`/`<tbody>` boundary**: a `^` in the first
+body row whose origin lives in the header rows does not extend that header cell
+down into the body (HTML cells cannot reliably span across row groups - browsers
+misrender). The `^` degrades to a fresh empty body cell instead, and the header
+cell keeps its rowspan within the header rows. A rowspan that lives entirely
+inside the header rows, or entirely inside the body, is unaffected.
 
 **Input:**
 ```djot
