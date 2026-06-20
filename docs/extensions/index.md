@@ -17,6 +17,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [InlineFootnotesExtension](#inlinefootnotesextension) | Converts `[content]{.fn}` spans to inline footnotes |
 | [LineBlockDivExtension](#lineblockdivextension) | Adds a fenced `::: |` line block (verse/addresses) without prefixing every line |
+| [ListTableExtension](#listtableextension) | Renders `::: list-table` divs as real HTML tables whose cells can hold block content |
 | [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
 | [MermaidExtension](#mermaidextension) | Transforms mermaid code blocks into diagrams |
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
@@ -663,6 +664,92 @@ The pipe is consumed as the marker, so the output is a `line-block` div, never a
 ### Why This Syntax?
 
 This follows the approach discussed in [djot issue #29](https://github.com/jgm/djot/issues/29). A leading `|` on every line (Pandoc-style line blocks) can be confused with pipe tables and is awkward to edit; an English keyword div class (`::: verse`) was undesirable. A language-neutral `|` marker on the div opener sidesteps both concerns.
+
+## ListTableExtension
+
+Renders `::: list-table` blocks as real HTML `<table>` markup, with the table
+authored as a nested list. Because each cell is a list item, cells can hold full
+block content (paragraphs, lists, code blocks) that the native pipe-table syntax
+cannot express.
+
+```php
+use Djot\Extension\ListTableExtension;
+
+$converter->addExtension(new ListTableExtension());
+```
+
+Each outer list item is a row; each inner list item is a cell.
+
+::: info Attributes go on a preceding line
+djot has no `::: type "title"` parse, so the caption and header controls are
+read from the div's attribute block, which sits on the line **above** the
+`:::` opener: `{caption="Quarterly results" header-rows=1}`.
+:::
+
+**Input:**
+
+```djot
+{caption="Quarterly results" header-rows=1}
+::: list-table
+- - Region
+  - Notes
+- - EMEA
+  - Strong quarter.
+
+    Drivers:
+
+    - new logos
+    - renewals
+:::
+```
+
+**Output:**
+
+```html
+<table>
+  <caption>Quarterly results</caption>
+  <thead><tr><th>Region</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>EMEA</td><td><p>Strong quarter.</p>
+<p>Drivers:</p>
+<ul>
+<li>
+new logos
+</li>
+<li>
+renewals
+</li>
+</ul></td></tr>
+  </tbody>
+</table>
+```
+
+The `caption` attribute becomes the `<caption>` (omitted when absent). Two
+attributes control header promotion (both default `0`):
+
+- `header-rows=N` promotes the first `N` rows to `<thead>` with `<th>` cells.
+- `header-cols=N` promotes the first `N` cells of **every** row to row-header
+  `<th>`.
+
+A cell whose only content is a single plain paragraph collapses to inline
+content (`<td>text</td>`), exactly like a tight list item; a cell with multiple
+blocks keeps its `<p>`/`<ul>` wrappers (as in the `Strong quarter.` cell above).
+This is the core benefit over pipe tables: rich, multi-block cells.
+
+Ragged rows (rows with differing cell counts) are padded with empty `<td>` to
+the widest row, so no content is ever silently dropped. Inline markup inside a
+cell renders normally. Block attributes on the opener carry onto the `<table>`
+tag in source order (safe-mode filtering still applies); the structural
+`caption`, `header-rows`, `header-cols`, and the auto `list-table` class are
+consumed by the extension and not emitted.
+
+This builds on the marker-line nested-list block-absorption fix
+([#251](https://github.com/php-collective/djot-php/pull/251)) that lets a cell
+hold full block content. HTML output only.
+
+Without the extension the same block degrades gracefully to the default
+`<div class="list-table">` holding the literal nested list, so source is never
+lost.
 
 ## MentionsExtension
 
