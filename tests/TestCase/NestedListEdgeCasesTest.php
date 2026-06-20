@@ -772,4 +772,89 @@ DJOT;
         $this->assertStringContainsString("a\nc", $result);
         $this->assertStringNotContainsString('  c', $result);
     }
+
+    // ============ Sublist opened on the parent item's marker line ============
+    //
+    // `- - A` opens a nested list on the OUTER item's marker line. That inner
+    // list must behave like any other nested container: its item stays open,
+    // absorbs a block indented to the inner content column, and a following
+    // same-indent marker continues it. Output is pinned to the reference
+    // djot.js 0.3.2. (carve-php inherits this parser, so it was affected too.)
+
+    public function testMarkerLineSublistItemAbsorbsBlockAndKeepsFollowingMarker(): void
+    {
+        // Case 1: the inner item A keeps the block indented to its content
+        // column, and a following same-indent marker stays in the same list.
+        $result = $this->converter->convert("- - A\n\n    block for A\n  - B");
+
+        $expected = <<<'HTML'
+            <ul>
+            <li>
+            <ul>
+            <li>
+            <p>A</p>
+            <p>block for A</p>
+            </li>
+            <li>
+            <p>B</p>
+            </li>
+            </ul>
+            </li>
+            </ul>
+
+            HTML;
+
+        $this->assertSame($expected, $result);
+    }
+
+    public function testMarkerLineSublistItemAbsorbsBlockWithoutLeak(): void
+    {
+        // Case 2: the block stays inside inner item A; it must not leak out to
+        // the outer item.
+        $result = $this->converter->convert("- - A\n\n    block under A");
+
+        $expected = <<<'HTML'
+            <ul>
+            <li>
+            <ul>
+            <li>
+            <p>A</p>
+            <p>block under A</p>
+            </li>
+            </ul>
+            </li>
+            </ul>
+
+            HTML;
+
+        $this->assertSame($expected, $result);
+    }
+
+    public function testMarkerLineSublistTightItemsStayOneList(): void
+    {
+        // Case 3 (regression guard): without an interleaved block, the markers
+        // form a single tight inner list [A, B, C].
+        $result = $this->converter->convert("- - A\n  - B\n  - C");
+
+        $expected = <<<'HTML'
+            <ul>
+            <li>
+            <ul>
+            <li>
+            A
+            </li>
+            <li>
+            B
+            </li>
+            <li>
+            C
+            </li>
+            </ul>
+            </li>
+            </ul>
+
+            HTML;
+
+        $this->assertSame($expected, $result);
+    }
 }

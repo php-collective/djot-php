@@ -2052,6 +2052,18 @@ class BlockParser
             /** @var string $itemContent */
             $itemContent = $itemInfo['content'];
 
+            // A sublist opened on this item's marker line (`- - A`): the content
+            // itself begins with a list marker. Such an inner list must behave like
+            // any other nested container - its item stays open and absorbs blocks
+            // indented to the inner content column, and a following same-indent
+            // marker continues it. We achieve that by collecting the whole nested
+            // region into the item's lines below and parsing it as blocks, so the
+            // recursive list parser builds a persistent inner list (matching the
+            // reference djot.js). Definition lists keep their dedicated handling.
+            $markerLineSublist = $itemContent !== ''
+                && ($subMarker = $this->listParser->parseListItemMarker($itemContent)) !== null
+                && $subMarker['type'] !== ListBlock::TYPE_DEFINITION;
+
             // Collect item content lines (without blank line = tight continuation)
             /** @var array<string> $itemLines */
             $itemLines = [$itemContent];
@@ -2141,6 +2153,73 @@ class BlockParser
                 $i++;
             }
 
+            // Marker-line sublist (`- - A`): pull the whole nested region into
+            // this item's lines so the recursive parse builds a persistent inner
+            // list. A line that belongs to the inner list is either indented past
+            // the inner marker column (`> $contentIndent` - inner item content or
+            // a deeper sublist), or a list marker sitting exactly at the inner
+            // marker column (`== $contentIndent` - a following/sibling item). A
+            // non-marker line at the inner marker column, or anything less
+            // indented, is outer-item (or higher-level) content and ends the
+            // region, left for the outer loop to attach correctly. Without this
+            // the outer "indented continuation" path would steal the inner item's
+            // blocks and attach them beside the inner list, on the outer item.
+            $markerLineSublistParsed = false;
+            if ($markerLineSublist) {
+                $j = $i;
+                $gathered = [];
+                $consumedThrough = $i;
+                while ($j < $count) {
+                    $subLine = $lines[$j];
+                    if (IndentationHelper::isBlankLine($subLine)) {
+                        $gathered[] = '';
+                        $j++;
+
+                        continue;
+                    }
+                    $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
+                    if ($lineIndent < $contentIndent) {
+                        break;
+                    }
+                    if (
+                        $lineIndent === $contentIndent
+                        && $this->listParser->parseListItemMarker(ltrim($subLine)) === null
+                    ) {
+                        // A non-marker line sitting exactly at the inner marker
+                        // column is the inner item's content only when it lazily
+                        // continues an open paragraph (the previously gathered line
+                        // is non-blank). After a blank line, or with nothing open
+                        // before it, it is outer-item content and ends the region.
+                        $previousIsOpenParagraph = $gathered !== []
+                            && $gathered[array_key_last($gathered)] !== '';
+                        if (!$previousIsOpenParagraph) {
+                            break;
+                        }
+                    }
+                    $gathered[] = IndentationHelper::stripLeadingIndent($subLine, $contentIndent);
+                    $j++;
+                    $consumedThrough = $j;
+                }
+                // Drop trailing blank lines collected past the last real content.
+                while ($gathered !== [] && $gathered[array_key_last($gathered)] === '') {
+                    array_pop($gathered);
+                }
+                if ($gathered !== []) {
+                    if ($itemLines !== [] && $itemLines[array_key_last($itemLines)] !== '') {
+                        $itemLines[] = '';
+                    }
+                    foreach ($gathered as $gatheredLine) {
+                        $itemLines[] = $gatheredLine;
+                    }
+                    // Resume after the last consumed content line, not past blank
+                    // lines that precede outer content (the outer loop needs them
+                    // to detect the loose-list boundary).
+                    $i = $consumedThrough;
+                    $hasNonMarkerContinuation = true;
+                    $markerLineSublistParsed = true;
+                }
+            }
+
             // Check for list item attributes on the next line.
             //
             // Rule: a standalone {...} line attaches to the <li> ONLY when it
@@ -2158,8 +2237,8 @@ class BlockParser
                 $markerAttrsRaw = $itemInfo['attrs'];
                 $itemAttributes = AttributeParser::parseOrdered($markerAttrsRaw);
             }
-            $parseItemLinesAsBlocks = false;
-            if ($i < $count) {
+            $parseItemLinesAsBlocks = $markerLineSublistParsed;
+            if (!$markerLineSublistParsed && $i < $count) {
                 $potentialAttrLine = $lines[$i];
                 $trimmedAttrLine = ltrim($potentialAttrLine);
                 if (
