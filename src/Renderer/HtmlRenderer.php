@@ -927,9 +927,13 @@ class HtmlRenderer implements RendererInterface
         $href = $node->getDestination();
         $title = $node->getTitle();
 
-        // Sanitize URL in safe mode
-        if ($this->safeMode !== null && $href !== null) {
-            $href = $this->safeMode->sanitizeUrl($href);
+        // Always-on URL hardening (dangerous scheme denylist), then safe mode
+        // may apply a stricter allowlist on top.
+        if ($href !== null) {
+            $href = $this->sanitizeUrlBaseline($href);
+            if ($this->safeMode !== null) {
+                $href = $this->safeMode->sanitizeUrl($href);
+            }
         }
 
         $html = '<a';
@@ -963,7 +967,9 @@ class HtmlRenderer implements RendererInterface
         $src = $node->getSource();
         $title = $node->getTitle();
 
-        // Sanitize URL in safe mode
+        // Always-on URL hardening (dangerous scheme denylist), then safe mode
+        // may apply a stricter allowlist on top.
+        $src = $this->sanitizeUrlBaseline($src);
         if ($this->safeMode !== null) {
             $src = $this->safeMode->sanitizeUrl($src);
         }
@@ -1083,12 +1089,128 @@ class HtmlRenderer implements RendererInterface
             $attrs = array_diff_key($attrs, array_flip($exclude));
         }
 
-        // Filter dangerous attributes in safe mode
+        // Always-on hardening: strip event handlers / injection sinks and
+        // neutralize dangerous attribute values regardless of safe mode.
+        $attrs = $this->sanitizeAttributes($attrs);
+
+        // Safe mode may strip additional names (e.g. style under strict) on top.
         if ($this->safeMode !== null) {
             $attrs = $this->safeMode->filterAttributes($attrs);
         }
 
         return $attrs;
+    }
+
+    /**
+     * URL schemes that are always neutralized in attribute values and in
+     * `href` / `src`, regardless of safe mode.
+     *
+     * @var array<string>
+     */
+    private const DANGEROUS_VALUE_SCHEMES = ['javascript', 'vbscript', 'data', 'file'];
+
+    /**
+     * Always-on attribute hardening, applied regardless of safe mode.
+     *
+     * Drops event-handler names (`on*`) and the injection sinks `srcdoc` /
+     * `formaction`, and blanks a value carrying a dangerous URL scheme or a CSS
+     * `expression(...)`. Safe mode (when set) filters further on top. Attribute
+     * names are otherwise left as-is (their well-formedness is the parser's job).
+     *
+     * @param array<string, string> $attrs
+     *
+     * @return array<string, string>
+     */
+    protected function sanitizeAttributes(array $attrs): array
+    {
+        $out = [];
+        foreach ($attrs as $key => $value) {
+            $name = strtolower((string)$key);
+            if (str_starts_with($name, 'on') || $name === 'srcdoc' || $name === 'formaction') {
+                continue;
+            }
+            $out[$key] = $this->sanitizeAttributeValue($name, (string)$value);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Blank an attribute value that carries a dangerous URL scheme or a CSS
+     * `expression(...)`. The scheme is normalized (C0 controls + spaces removed)
+     * before comparison to defeat `java\tscript:` style evasion.
+     */
+    protected function sanitizeAttributeValue(string $name, string $value): string
+    {
+        $colon = strpos($value, ':');
+        if ($colon !== false) {
+            $scheme = strtolower((string)preg_replace('/[\x00-\x20]+/', '', substr($value, 0, $colon)));
+            if (in_array($scheme, self::DANGEROUS_VALUE_SCHEMES, true)) {
+                return '';
+            }
+        }
+        if ($name === 'style' && $this->hasDangerousCss($value)) {
+            return '';
+        }
+
+        return $value;
+    }
+
+    /**
+     * Detect script-bearing / fetching constructs in a CSS `style` value:
+     * `expression()` (legacy IE script), `url(...)` (can fetch or carry
+     * `javascript:`), `@import`, and the legacy `behavior` / `-moz-binding`
+     * script bindings. CSS escapes are decoded and whitespace collapsed first so
+     * `expr\65 ssion(` / `expr ession (` cannot evade.
+     */
+    protected function hasDangerousCss(string $value): bool
+    {
+        $withoutComments = preg_replace('/\/\*.*?\*\//s', '', $value) ?? $value;
+        $decoded = preg_replace_callback(
+            '/\\\\([0-9A-Fa-f]{1,6}\s?|.)/s',
+            static function (array $m): string {
+                $escape = $m[1];
+                if (preg_match('/^([0-9A-Fa-f]{1,6})\s?$/', $escape, $hex) === 1) {
+                    $codepoint = (int)hexdec($hex[1]);
+                    if ($codepoint <= 0 || $codepoint > 0x10FFFF) {
+                        return '';
+                    }
+
+                    return mb_chr($codepoint, 'UTF-8');
+                }
+
+                return $escape;
+            },
+            $withoutComments,
+        ) ?? $withoutComments;
+        $compact = strtolower((string)preg_replace('/\s+/', '', $decoded));
+
+        return str_contains($compact, 'expression(')
+            || str_contains($compact, 'url(')
+            || str_contains($compact, '@import')
+            || str_contains($compact, 'behavior:')
+            || str_contains($compact, '-moz-binding');
+    }
+
+    /**
+     * Always-on URL hardening for `href` / `src`, independent of safe mode.
+     *
+     * Blanks a URL whose (normalized) scheme is one of the dangerous denylist
+     * schemes (`javascript`, `vbscript`, `data`, `file`); every other scheme and
+     * any scheme-less URL passes. Safe mode may apply a stricter allowlist on
+     * top. Scheme detection strips C0 controls + spaces to defeat `java\tscript:`
+     * evasion.
+     */
+    protected function sanitizeUrlBaseline(string $url): string
+    {
+        $probe = (string)preg_replace('/[\x00-\x20]+/', '', $url);
+        if (preg_match('/^([a-zA-Z][a-zA-Z0-9+.\-]*):/', $probe, $m) === 1) {
+            if (in_array(strtolower($m[1]), self::DANGEROUS_VALUE_SCHEMES, true)) {
+                return '';
+            }
+        }
+
+        return $url;
     }
 
     /**
