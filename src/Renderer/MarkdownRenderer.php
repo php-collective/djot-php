@@ -47,6 +47,7 @@ use Djot\Node\Inline\Superscript;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Renderer\Utility\AbbreviationBudgetTrait;
 use Djot\Renderer\Utility\EventDispatcherTrait;
 use Djot\Util\StringUtil;
 
@@ -66,6 +67,7 @@ use Djot\Util\StringUtil;
  */
 class MarkdownRenderer implements RendererInterface
 {
+    use AbbreviationBudgetTrait;
     use EventDispatcherTrait;
 
     protected int $listDepth = 0;
@@ -96,6 +98,8 @@ class MarkdownRenderer implements RendererInterface
 
     public function render(Document $document): string
     {
+        $this->resetAbbreviationBudget($document->getSourceLength());
+
         $markdown = $this->renderChildren($document);
 
         // Normalize multiple blank lines
@@ -528,12 +532,21 @@ class MarkdownRenderer implements RendererInterface
      */
     protected function renderAbbreviation(Abbreviation $node): string
     {
+        // DoS guard: once the cumulative expansion bytes would exceed the
+        // budget, degrade to plain key text (no <abbr> wrapper, no title).
+        // Return the children as ordinary Markdown text - NOT the HTML-escaped
+        // form below, which is only correct inside the raw <abbr> element (a
+        // bare `&`/`<` in the key must stay literal in Markdown output).
+        if (!$this->chargeAbbreviationExpansion($node->getTitle())) {
+            return $this->renderChildren($node);
+        }
+
         // The whole element is raw inline HTML, so both the title (attribute)
         // and the text (element content) need HTML escaping, NOT Markdown text
         // escaping: a `"` in the title or a `<` in the text would otherwise
         // break the tag / be misparsed as markup downstream.
-        $title = htmlspecialchars($node->getTitle(), ENT_QUOTES, 'UTF-8');
         $text = htmlspecialchars($this->renderChildren($node), ENT_QUOTES, 'UTF-8');
+        $title = htmlspecialchars($node->getTitle(), ENT_QUOTES, 'UTF-8');
 
         return '<abbr title="' . $title . '">' . $text . '</abbr>';
     }

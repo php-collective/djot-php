@@ -16,9 +16,33 @@ class Document extends Node
      */
     protected array $abbreviations = [];
 
+    /**
+     * Byte length of the original source the document was parsed from.
+     *
+     * Used to scale render-time DoS budgets (e.g. abbreviation expansion).
+     * Defaults to 0 for documents built directly rather than parsed.
+     */
+    protected int $sourceLength = 0;
+
     public function getType(): string
     {
         return 'document';
+    }
+
+    /**
+     * Get the byte length of the original parsed source.
+     */
+    public function getSourceLength(): int
+    {
+        return $this->sourceLength;
+    }
+
+    /**
+     * Set the byte length of the original parsed source.
+     */
+    public function setSourceLength(int $sourceLength): void
+    {
+        $this->sourceLength = $sourceLength;
     }
 
     /**

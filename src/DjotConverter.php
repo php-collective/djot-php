@@ -417,6 +417,10 @@ class DjotConverter
 
         $document = $this->parser->parse($djot);
 
+        // Record the source size so render-time DoS budgets (abbreviation
+        // expansion) can scale with the input rather than a fixed cap.
+        $document->setSourceLength(strlen($djot));
+
         foreach ($this->extensions as $extension) {
             if ($extension instanceof ParsedDocumentExtensionInterface) {
                 $extension->afterParse($document);

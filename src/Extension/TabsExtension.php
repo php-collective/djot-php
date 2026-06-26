@@ -582,7 +582,7 @@ class TabsExtension implements ResettableExtensionInterface
             $child instanceof DefinitionList => $this->renderDefinitionListToDjot($child, $renderer),
             $child instanceof Div => $this->renderDivToDjot($child, $renderer),
             $child instanceof Table => $this->renderTableToDjot($child, $renderer),
-            default => rtrim((new HtmlToDjot())->convert($renderer->renderNodeFragment($child)), "\n"),
+            default => rtrim((new HtmlToDjot(trustedRoundTrip: true))->convert($renderer->renderNodeFragment($child)), "\n"),
         };
     }
 
@@ -592,9 +592,9 @@ class TabsExtension implements ResettableExtensionInterface
 
         foreach ($list->getChildren() as $child) {
             if ($child instanceof DefinitionTerm) {
-                $lines[] = rtrim((new HtmlToDjot())->convert($renderer->renderNodeFragment($child)), "\n");
+                $lines[] = rtrim((new HtmlToDjot(trustedRoundTrip: true))->convert($renderer->renderNodeFragment($child)), "\n");
             } elseif ($child instanceof DefinitionDescription) {
-                $content = rtrim((new HtmlToDjot())->convert($renderer->renderNodeFragment($child)), "\n");
+                $content = rtrim((new HtmlToDjot(trustedRoundTrip: true))->convert($renderer->renderNodeFragment($child)), "\n");
                 $lines[] = ': ' . $content;
             }
         }
@@ -655,7 +655,7 @@ class TabsExtension implements ResettableExtensionInterface
                     continue;
                 }
 
-                $cells[] = rtrim((new HtmlToDjot())->convert($renderer->renderNodeFragment($cell)), "\n");
+                $cells[] = rtrim((new HtmlToDjot(trustedRoundTrip: true))->convert($renderer->renderNodeFragment($cell)), "\n");
                 if ($row->isHeader() || !isset($alignments[$cellIndex])) {
                     $alignments[$cellIndex] = $cell->getAlignment();
                 }
