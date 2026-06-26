@@ -19,9 +19,18 @@ class HtmlToDjotTest extends TestCase
 {
     protected HtmlToDjot $converter;
 
+    /**
+     * Trusted converter for round-trip-fidelity assertions, which consume
+     * djot-produced HTML and must honor the `data-djot-src` / `data-djot-raw`
+     * round-trip attributes. The default {@see self::$converter} stays untrusted
+     * to reflect real conversion of external HTML.
+     */
+    protected HtmlToDjot $trustedConverter;
+
     protected function setUp(): void
     {
         $this->converter = new HtmlToDjot();
+        $this->trustedConverter = new HtmlToDjot(trustedRoundTrip: true);
     }
 
     // ==================== Basic Formatting ====================
@@ -1059,14 +1068,14 @@ HTML;
         // Test dash (default)
         $djot = '---';
         $html = $djotConverter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
         $this->assertSame('---', $back, 'Dash thematic break should round-trip');
 
         // Test asterisk (preserved via data-char)
         $djot = '***';
         $html = $djotConverter->convert($djot);
         $this->assertStringContainsString('data-char="*"', $html);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
         $this->assertSame('***', $back, 'Asterisk thematic break should round-trip');
     }
 
@@ -1078,7 +1087,7 @@ HTML;
         $html = $djotConverter->convert('# Title');
 
         $this->assertStringContainsString('data-djot-source-level="1"', $html);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame('# Title', $back);
     }
@@ -1093,7 +1102,7 @@ HTML;
 
         $this->assertStringContainsString('data-djot-heading-ref="Getting Started"', $html);
         $this->assertStringNotContainsString('data-heading-ref=', $html);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame($djot, $back);
     }
@@ -1107,7 +1116,7 @@ HTML;
         $html = $djotConverter->convert($djot);
 
         $this->assertStringContainsString('data-djot-inline-footnote-html=', $html);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame($djot, $back);
     }
@@ -1121,7 +1130,7 @@ HTML;
         $html = $djotConverter->convert($djot);
 
         $this->assertStringContainsString('data-djot-inline-footnote-class="footnote"', $html);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame($djot, $back);
     }
@@ -1133,7 +1142,7 @@ HTML;
 
         $djot = 'Text[  Footnote  ]{.fn} after.';
         $html = $djotConverter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame($djot, $back);
     }
@@ -1145,7 +1154,7 @@ HTML;
 
         $djot = 'Text[  Foo   Bar  ]{.fn} after.';
         $html = $djotConverter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame($djot, $back);
     }
@@ -1305,7 +1314,7 @@ DJOT;
         $this->assertStringContainsString('data-djot-col-widths="11,9,19"', $html);
 
         // Convert back to Djot
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         // Separator widths should be preserved (compact format without spaces around dashes)
         $this->assertStringContainsString('|-----------|---------|-------------------|', $back);
@@ -1331,7 +1340,7 @@ DJOT;
         $djot = "{#snippet .demo selected}\n``` php [Example]\necho 123;\n```\n";
 
         $html = (new DjotConverter(roundTripMode: true))->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1344,7 +1353,7 @@ DJOT;
         $djot = "{#flow data-theme=dark}\n``` mermaid\ngraph TD;\n    A-->B;\n```\n";
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1370,7 +1379,7 @@ echo 2;
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1397,7 +1406,7 @@ Text with *bold*, _em_, `code`, ![alt](img.png), and [link](https://example.com)
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1427,7 +1436,7 @@ echo 2;
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1450,7 +1459,7 @@ DJOT;
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1474,7 +1483,7 @@ $x = 1;
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1496,7 +1505,7 @@ DJOT;
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1518,7 +1527,7 @@ DJOT;
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1541,7 +1550,7 @@ DJOT;
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1564,7 +1573,7 @@ DJOT;
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $expected = <<<'DJOT'
 :::: tabs
@@ -1599,7 +1608,7 @@ Nested content
 DJOT;
 
         $html = $converter->convert($djot);
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $this->assertSame(trim($djot), $back);
     }
@@ -1607,7 +1616,7 @@ DJOT;
     public function testGenericDivRoundTripUsesDjotSrc(): void
     {
         $html = '<div class="box note" id="callout" data-x="1"><p>Inside</p></div>';
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $expected = <<<'DJOT'
 {#callout .note data-x=1}
@@ -1622,7 +1631,7 @@ DJOT;
     public function testTableAlignmentRoundTripWithoutDjotSrcUsesCellAlignment(): void
     {
         $html = '<table data-djot-col-widths="5,6"><tr><th style="text-align: left;">Left</th><th style="text-align: right;">Right</th></tr><tr><td style="text-align: left;">a</td><td style="text-align: right;">b</td></tr></table>';
-        $back = trim($this->converter->convert($html));
+        $back = trim($this->trustedConverter->convert($html));
 
         $expected = <<<'DJOT'
 | Left | Right |

@@ -31,7 +31,9 @@ class RoundTripTest extends TestCase
         $this->converter->addExtension(new TabsExtension());
         $this->converter->addExtension(new MermaidExtension());
         $this->converter->addExtension(new AdmonitionExtension());
-        $this->htmlToDjot = new HtmlToDjot();
+        // The round-trip harness consumes djot-produced (trusted) HTML, so it
+        // must honor the data-djot-src / data-djot-raw round-trip attributes.
+        $this->htmlToDjot = new HtmlToDjot(trustedRoundTrip: true);
     }
 
     /**

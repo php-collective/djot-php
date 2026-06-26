@@ -48,6 +48,7 @@ use Djot\Node\Inline\Superscript;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Renderer\Utility\AbbreviationBudgetTrait;
 use Djot\Renderer\Utility\EventDispatcherTrait;
 use Djot\SafeMode;
 use Djot\Util\StringUtil;
@@ -57,6 +58,7 @@ use Djot\Util\StringUtil;
  */
 class HtmlRenderer implements RendererInterface
 {
+    use AbbreviationBudgetTrait;
     use EventDispatcherTrait;
 
     protected SoftBreakMode $softBreakMode = SoftBreakMode::Newline;
@@ -304,6 +306,7 @@ class HtmlRenderer implements RendererInterface
             $this->sharedRenderContext,
             function () use ($document): string {
                 $this->sharedRenderContext->reset();
+                $this->resetAbbreviationBudget($document->getSourceLength());
 
                 $html = $this->renderDocumentWithSections($document);
 
@@ -1060,8 +1063,15 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderAbbreviation(Abbreviation $node): string
     {
-        $attrs = $this->renderAttributes($node);
         $title = $node->getTitle();
+
+        // DoS guard: once the cumulative expansion bytes would exceed the
+        // budget, degrade to plain key text (no <abbr> wrapper, no title).
+        if (!$this->chargeAbbreviationExpansion($title)) {
+            return $this->renderChildren($node);
+        }
+
+        $attrs = $this->renderAttributes($node);
 
         return '<abbr title="' . $this->escapeAttribute($title) . '"' . $attrs . '>'
             . $this->renderChildren($node) . '</abbr>';

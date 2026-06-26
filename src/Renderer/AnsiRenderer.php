@@ -47,6 +47,7 @@ use Djot\Node\Inline\Superscript;
 use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
+use Djot\Renderer\Utility\AbbreviationBudgetTrait;
 
 /**
  * Renders AST to ANSI-formatted terminal output
@@ -56,6 +57,8 @@ use Djot\Node\Node;
  */
 class AnsiRenderer implements RendererInterface
 {
+    use AbbreviationBudgetTrait;
+
     // ANSI escape codes
     /**
      * @var string
@@ -367,6 +370,8 @@ class AnsiRenderer implements RendererInterface
 
     public function render(Document $document): string
     {
+        $this->resetAbbreviationBudget($document->getSourceLength());
+
         $output = $this->renderChildren($document);
 
         // Normalize multiple blank lines
@@ -921,6 +926,13 @@ class AnsiRenderer implements RendererInterface
     protected function renderAbbreviation(Abbreviation $node): string
     {
         $text = $this->renderChildren($node);
+
+        // DoS guard: once the cumulative expansion bytes would exceed the
+        // budget, degrade to plain key text (no parenthesized definition).
+        if (!$this->chargeAbbreviationExpansion($node->getTitle())) {
+            return $text;
+        }
+
         $title = $node->getTitle();
 
         // Show abbreviation with definition in parentheses

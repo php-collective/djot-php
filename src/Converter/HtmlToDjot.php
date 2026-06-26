@@ -23,9 +23,30 @@ use RuntimeException;
  * Key Djot requirements handled:
  * - Blank lines required around block elements (headings, code blocks, lists)
  * - Nested lists require blank line before the nested portion
+ *
+ * SECURITY: this converter is NOT a sanitizer. Its output is Djot markup that
+ * may still contain content derived from the input; render untrusted input with
+ * safe mode enabled on the downstream renderer. By default the converter IGNORES
+ * the `data-djot-src` / `data-djot-raw` round-trip attributes on the input (they
+ * would otherwise be re-emitted verbatim as raw Djot, letting a crafted attribute
+ * smuggle a raw-HTML block -> live <script> into the output). Only enable
+ * round-trip extraction via the constructor flag when the HTML is TRUSTED (e.g.
+ * produced by djot itself for a faithful round-trip).
  */
 class HtmlToDjot
 {
+    /**
+     * When true, trust and re-emit the `data-djot-src` / `data-djot-raw`
+     * round-trip attributes on the input. Default false: untrusted HTML must not
+     * be able to smuggle raw Djot (incl. a raw-HTML block) through them.
+     */
+    protected bool $trustedRoundTrip = false;
+
+    public function __construct(bool $trustedRoundTrip = false)
+    {
+        $this->trustedRoundTrip = $trustedRoundTrip;
+    }
+
     protected int $listDepth = 0;
 
     protected bool $inPre = false;
@@ -948,6 +969,14 @@ class HtmlToDjot
 
     protected function extractRoundTripSource(DOMElement $node, string $tagName): ?string
     {
+        // Untrusted HTML must not be able to smuggle raw Djot through a
+        // `data-djot-src` attribute (it is emitted verbatim, so a crafted value
+        // could inject a raw-HTML block -> live <script>). Only honor it when the
+        // caller explicitly trusts the source.
+        if (!$this->trustedRoundTrip) {
+            return null;
+        }
+
         if (!$node->hasAttribute('data-djot-src')) {
             return null;
         }
@@ -1852,8 +1881,12 @@ class HtmlToDjot
             return '\\' . $node->textContent;
         }
 
-        // Check for raw inline content (round-trip support)
-        if ($node->hasAttribute('data-djot-raw')) {
+        // Check for raw inline content (round-trip support). Only honor it for
+        // trusted input: `data-djot-raw` is re-emitted verbatim as a raw inline
+        // span (`` `...`{=html} ``), so a crafted attribute on untrusted HTML
+        // could smuggle live markup. Untrusted input falls through to ordinary
+        // span processing (getElementAttributes drops the data-djot-* attribute).
+        if ($this->trustedRoundTrip && $node->hasAttribute('data-djot-raw')) {
             return $this->processRawInline($node);
         }
 
@@ -2224,7 +2257,10 @@ class HtmlToDjot
 
     protected function convertInlineFragmentToDjot(string $html): string
     {
-        $converter = new self();
+        // Propagate the trust setting so a trusted round-trip parent keeps
+        // honoring inner round-trip attributes in the recursive sub-conversion
+        // (and an untrusted parent keeps ignoring them).
+        $converter = new self($this->trustedRoundTrip);
         $converter->preserveTextWhitespace = true;
 
         $doc = new DOMDocument();
