@@ -48,6 +48,19 @@ class InlineParser
     private const INLINE_SPECIAL_CHARS = "\\\n\$`:![<_*^~{\"'-.";
 
     /**
+     * Maximum inline-recursion depth before remaining text is emitted literally
+     * (DoS guard, see parseInlines()). Far deeper than any real document.
+     *
+     * @var int
+     */
+    protected const MAX_INLINE_DEPTH = 100;
+
+    /**
+     * Current inline-recursion depth (see self::MAX_INLINE_DEPTH).
+     */
+    protected int $inlineDepth = 0;
+
+    /**
      * @var array<array{type: string, char: string, pos: int, node: \Djot\Node\Node}>
      */
     protected array $delimiterStack = [];
@@ -215,6 +228,29 @@ class InlineParser
     }
 
     protected function parseInlines(Node $parent, string $text): void
+    {
+        // Inline-nesting DoS guard: deeply nested inline constructs (e.g. a bomb
+        // of nested links `[[[...](#)](#)...`) recurse through parseInlines and
+        // rescan balanced brackets at each level, which is ~O(n^2). Beyond this
+        // depth the remaining text is emitted literally instead of recursing
+        // further. Far deeper than any real document.
+        if ($this->inlineDepth >= self::MAX_INLINE_DEPTH) {
+            if ($text !== '') {
+                $parent->appendChild(new Text($text));
+            }
+
+            return;
+        }
+
+        $this->inlineDepth++;
+        try {
+            $this->parseInlinesImpl($parent, $text);
+        } finally {
+            $this->inlineDepth--;
+        }
+    }
+
+    protected function parseInlinesImpl(Node $parent, string $text): void
     {
         $length = strlen($text);
         $pos = 0;

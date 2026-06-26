@@ -243,11 +243,14 @@ class SafeModeTest extends TestCase
     public function testSafeModeDisabledByDefault(): void
     {
         $converter = new DjotConverter();
-        $djot = '[click](javascript:alert(1))';
-        $result = $converter->convert($djot);
 
-        // Without safe mode, dangerous URLs are allowed
-        $this->assertStringContainsString('javascript:alert(1)', $result);
+        // Safe-mode-only filtering is not applied by default: raw HTML passes
+        // through instead of being escaped.
+        $this->assertStringContainsString('<b>bold</b>', $converter->convert('`<b>bold</b>`{=html}'));
+
+        // Always-on hardening still neutralizes dangerous URL schemes even with
+        // safe mode off (there is no legitimate reason to emit javascript:).
+        $this->assertStringNotContainsString('javascript:', $converter->convert('[click](javascript:alert(1))'));
     }
 
     public function testSafeModeCanBeEnabledAfterConstruction(): void
@@ -266,10 +269,12 @@ class SafeModeTest extends TestCase
         $converter = new DjotConverter(safeMode: true);
         $converter->setSafeMode(false);
 
-        $djot = '[click](javascript:alert(1))';
-        $result = $converter->convert($djot);
+        // Disabling safe mode restores the safe-mode-gated behavior (raw HTML
+        // passes through again)...
+        $this->assertStringContainsString('<b>bold</b>', $converter->convert('`<b>bold</b>`{=html}'));
 
-        $this->assertStringContainsString('javascript:alert(1)', $result);
+        // ...but the always-on URL hardening still applies regardless.
+        $this->assertStringNotContainsString('javascript:', $converter->convert('[click](javascript:alert(1))'));
     }
 
     public function testCustomSafeModeConfiguration(): void
