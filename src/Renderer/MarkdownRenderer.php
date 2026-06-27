@@ -50,6 +50,7 @@ use Djot\Node\Node;
 use Djot\Renderer\Utility\AbbreviationBudgetTrait;
 use Djot\Renderer\Utility\EventDispatcherTrait;
 use Djot\Util\StringUtil;
+use Djot\Util\UrlSafety;
 
 /**
  * Renders AST to Markdown (CommonMark compatible where possible)
@@ -411,7 +412,7 @@ class MarkdownRenderer implements RendererInterface
     protected function renderLink(Link $node): string
     {
         $text = $this->renderChildren($node);
-        $url = $node->getDestination();
+        $url = UrlSafety::sanitize($node->getDestination() ?? '');
         $title = $node->getTitle();
 
         if ($title !== null) {
@@ -424,7 +425,7 @@ class MarkdownRenderer implements RendererInterface
     protected function renderImage(Image $node): string
     {
         $alt = $node->getAlt();
-        $src = $node->getSource();
+        $src = UrlSafety::sanitize($node->getSource());
         $title = $node->getTitle();
 
         if ($title !== null) {

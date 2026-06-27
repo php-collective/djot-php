@@ -38,6 +38,7 @@ use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\Utility\EventDispatcherTrait;
+use Djot\Util\UrlSafety;
 
 /**
  * Renders AST to plain text
@@ -294,7 +295,12 @@ class PlainTextRenderer implements RendererInterface
 
     protected function renderLink(Link $node): string
     {
-        return $node->getDestination() ?? $this->renderChildren($node);
+        $url = $node->getDestination();
+        if ($url === null || UrlSafety::hasDangerousScheme($url)) {
+            return $this->renderChildren($node);
+        }
+
+        return $url;
     }
 
     /**

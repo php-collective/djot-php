@@ -48,6 +48,7 @@ use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\Utility\AbbreviationBudgetTrait;
+use Djot\Util\UrlSafety;
 
 /**
  * Renders AST to ANSI-formatted terminal output
@@ -790,13 +791,13 @@ class AnsiRenderer implements RendererInterface
     protected function renderLink(Link $node): string
     {
         $text = $this->renderChildren($node);
-        $url = $node->getDestination();
+        $url = UrlSafety::sanitize($node->getDestination() ?? '');
 
         // OSC 8 hyperlink support (for terminals that support it)
         // Format: \033]8;;URL\033\\TEXT\033]8;;\033\\
         $styled = $this->style($text, self::UNDERLINE . self::FG_BLUE);
 
-        if ($url !== null && $url !== '' && $url !== $text) {
+        if ($url !== '' && $url !== $text) {
             $styled .= $this->style(' (' . $url . ')', self::DIM);
         }
 
