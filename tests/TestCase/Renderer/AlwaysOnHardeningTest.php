@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Renderer;
 
 use Djot\DjotConverter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -74,6 +75,61 @@ class AlwaysOnHardeningTest extends TestCase
     {
         $result = $this->converter->convert('text{style="x:expression(alert(1))"}');
         $this->assertStringNotContainsString('expression(', $result);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function dangerousCssProvider(): array
+    {
+        return [
+            'expression' => ['width:expression(alert(1))'],
+            'url' => ['background:url(javascript:alert(1))'],
+            'import' => ['x:y;@import "evil.css"'],
+            'behavior' => ['behavior:url(x.htc)'],
+            'moz-binding' => ['-moz-binding:url(x.xml)'],
+            'escaped-expression' => ['width:expr\\65 ssion(alert(1))'],
+        ];
+    }
+
+    #[DataProvider('dangerousCssProvider')]
+    public function testDangerousCssStyleBlanked(string $css): void
+    {
+        $result = $this->converter->convert('text{style="' . $css . '"}');
+        $this->assertStringContainsString('style=""', $result, "did not blank: $css");
+    }
+
+    public function testSafeCssStylePreserved(): void
+    {
+        $result = $this->converter->convert('text{style="color:red"}');
+        $this->assertStringContainsString('style="color:red"', $result);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function dangerousSchemeProvider(): array
+    {
+        return [
+            'javascript' => ['javascript:alert(1)'],
+            'vbscript' => ['vbscript:msgbox(1)'],
+            'data' => ['data:text/html,<script>alert(1)</script>'],
+            'file' => ['file:///etc/passwd'],
+        ];
+    }
+
+    #[DataProvider('dangerousSchemeProvider')]
+    public function testDangerousLinkSchemesBlanked(string $url): void
+    {
+        $result = $this->converter->convert('[x](' . $url . ')');
+        $this->assertStringContainsString('href=""', $result, "did not blank: $url");
+    }
+
+    public function testColonBearingNonSchemeValuePreserved(): void
+    {
+        // A value with a colon that is not a dangerous scheme must pass through.
+        $result = $this->converter->convert('text{data-when="10:30"}');
+        $this->assertStringContainsString('data-when="10:30"', $result);
     }
 
     public function testDangerousAttributeValueSchemeBlanked(): void
