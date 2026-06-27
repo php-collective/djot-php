@@ -52,6 +52,7 @@ use Djot\Renderer\Utility\AbbreviationBudgetTrait;
 use Djot\Renderer\Utility\EventDispatcherTrait;
 use Djot\SafeMode;
 use Djot\Util\StringUtil;
+use Djot\Util\UrlSafety;
 
 /**
  * Renders AST to HTML
@@ -1112,14 +1113,6 @@ class HtmlRenderer implements RendererInterface
     }
 
     /**
-     * URL schemes that are always neutralized in attribute values and in
-     * `href` / `src`, regardless of safe mode.
-     *
-     * @var array<string>
-     */
-    private const DANGEROUS_VALUE_SCHEMES = ['javascript', 'vbscript', 'data', 'file'];
-
-    /**
      * Always-on attribute hardening, applied regardless of safe mode.
      *
      * Drops event-handler names (`on*`) and the injection sinks `srcdoc` /
@@ -1152,12 +1145,8 @@ class HtmlRenderer implements RendererInterface
      */
     protected function sanitizeAttributeValue(string $name, string $value): string
     {
-        $colon = strpos($value, ':');
-        if ($colon !== false) {
-            $scheme = strtolower((string)preg_replace('/[\x00-\x20]+/', '', substr($value, 0, $colon)));
-            if (in_array($scheme, self::DANGEROUS_VALUE_SCHEMES, true)) {
-                return '';
-            }
+        if (UrlSafety::hasDangerousScheme($value)) {
+            return '';
         }
         if ($name === 'style' && $this->hasDangerousCss($value)) {
             return '';
@@ -1213,14 +1202,7 @@ class HtmlRenderer implements RendererInterface
      */
     protected function sanitizeUrlBaseline(string $url): string
     {
-        $probe = (string)preg_replace('/[\x00-\x20]+/', '', $url);
-        if (preg_match('/^([a-zA-Z][a-zA-Z0-9+.\-]*):/', $probe, $m) === 1) {
-            if (in_array(strtolower($m[1]), self::DANGEROUS_VALUE_SCHEMES, true)) {
-                return '';
-            }
-        }
-
-        return $url;
+        return UrlSafety::sanitize($url);
     }
 
     /**
