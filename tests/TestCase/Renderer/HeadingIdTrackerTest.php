@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Test\TestCase\Renderer;
 
+use Djot\DjotConverter;
 use Djot\Node\Block\Heading;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
@@ -185,17 +186,22 @@ class HeadingIdTrackerTest extends TestCase
     /**
      * Pins djot-php's heading-ID behaviour to jgm/djot#393: each maximal run of
      * non-alphanumeric ASCII is replaced with `-` and leading/trailing `-` are
-     * trimmed. Case and non-ASCII characters (Cyrillic, accented Latin, smart
-     * quotes) are preserved; `_` is replaced (no longer an exception). A
-     * leading-digit result keeps the `h-` prefix for CSS-selector safety
-     * (orthogonal to #393). ASCII-folding is opt-in via AsciiHeadingIdsExtension.
+     * trimmed. Case and genuine non-ASCII characters (Cyrillic, accented Latin)
+     * are preserved; `_` is replaced (no longer an exception). The parser's smart
+     * punctuation is reversed to its ASCII source first, so a smart apostrophe/
+     * quote becomes a separator (matching the djot.js reference, which slugs the
+     * source text) rather than a preserved U+2019 glyph. A leading-digit result
+     * keeps the `s-` prefix for CSS-selector safety (orthogonal to #393).
+     * ASCII-folding is opt-in via AsciiHeadingIdsExtension.
      */
     public function testNormalizeIdSpecAlignmentEdgeCases(): void
     {
         $this->assertSame('A-B-C', $this->tracker->normalizeId('A+B=C'));
         $this->assertSame('Emphasis-strong', $this->tracker->normalizeId('Emphasis/strong'));
         $this->assertSame('That-s-all', $this->tracker->normalizeId("That's all"));
-        $this->assertSame('That’s-all', $this->tracker->normalizeId('That’s all'));
+        // Smart apostrophe (U+2019) is reversed to its ASCII source, so it slugs
+        // like a straight apostrophe instead of leaking the glyph into the id.
+        $this->assertSame('That-s-all', $this->tracker->normalizeId('That’s all'));
         $this->assertSame('foo-bar', $this->tracker->normalizeId('foo...bar'));
         $this->assertSame('Uber-uns', $this->tracker->normalizeId('Uber uns'));
         $this->assertSame('Über-uns', $this->tracker->normalizeId('Über uns'));
@@ -203,6 +209,42 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('Straße', $this->tracker->normalizeId('Straße'));
         $this->assertSame('s-2024-recap', $this->tracker->normalizeId('2024 recap'));
         $this->assertSame('', $this->tracker->normalizeId('!!!'));
+    }
+
+    /**
+     * The parser renders smart punctuation into the heading text (apostrophe as
+     * U+2019, quotes/dashes/ellipsis as their typographic glyphs). Those glyphs
+     * are reversed to their ASCII source before slugging so the id is derived
+     * from the source text (as djot.js does), rather than leaking non-ASCII
+     * typography into the id.
+     */
+    public function testNormalizeIdReversesSmartPunctuation(): void
+    {
+        $this->assertSame('Bob-s-Guide', $this->tracker->normalizeId("Bob\u{2019}s Guide"));
+        $this->assertSame('left-single', $this->tracker->normalizeId("\u{2018}left single\u{2019}"));
+        $this->assertSame('Say-Hello', $this->tracker->normalizeId("Say \u{201C}Hello\u{201D}"));
+        $this->assertSame('a-b', $this->tracker->normalizeId("a \u{2013} b"));
+        $this->assertSame('a-b', $this->tracker->normalizeId("a \u{2014} b"));
+        $this->assertSame('foo-bar', $this->tracker->normalizeId("foo\u{2026}bar"));
+    }
+
+    /**
+     * End-to-end: a heading run through the full converter (which applies smart
+     * punctuation) must still produce a source-derived id, free of typographic
+     * glyphs.
+     */
+    public function testSmartPunctuationIdEndToEnd(): void
+    {
+        $converter = new DjotConverter();
+
+        $html = $converter->convert("# That's all");
+        $this->assertStringContainsString('id="That-s-all"', $html);
+
+        $html = $converter->convert('# a -- b');
+        $this->assertStringContainsString('id="a-b"', $html);
+
+        $html = $converter->convert('# Say "Hello"');
+        $this->assertStringContainsString('id="Say-Hello"', $html);
     }
 
     /**

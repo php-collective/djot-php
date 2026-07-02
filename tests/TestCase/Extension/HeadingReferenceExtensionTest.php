@@ -173,16 +173,16 @@ DJOT);
         $converter->addExtension(new HeadingReferenceExtension());
 
         // The parser converts straight quotes to smart quotes in heading text,
-        // but reference targets keep straight quotes. The extension normalizes
-        // quotes for matching so the reference still resolves; the resulting id
-        // keeps the smart quotes (jgm/djot#393 preserves non-ASCII characters).
+        // but reference targets keep straight quotes. The id is derived from the
+        // ASCII source (smart punctuation is reversed before slugging, matching
+        // the djot.js reference), so both sides resolve to the same glyph-free id.
         $html = $converter->convert(<<<'DJOT'
 See [[Say "Hello"]].
 
 # Say "Hello"
 DJOT);
 
-        $this->assertStringContainsString('href="#Say-“Hello”"', $html);
+        $this->assertStringContainsString('href="#Say-Hello"', $html);
         $this->assertStringNotContainsString('[[Say "Hello"]]', $html);
     }
 
@@ -211,7 +211,7 @@ See [[Bob's Guide]].
 # Bob's Guide
 DJOT);
 
-        $this->assertStringContainsString('href="#Bob’s-Guide"', $html);
+        $this->assertStringContainsString('href="#Bob-s-Guide"', $html);
         $this->assertStringNotContainsString('data-heading-ref=', $html);
         $this->assertStringNotContainsString('[[Bob\'s Guide]]', $html);
     }

@@ -166,10 +166,13 @@ Auto-generated heading IDs follow the settled [jgm/djot#393](https://github.com/
 
 ### Normalization Rules (default)
 
-1. **Replace non-alphanumeric ASCII** — each maximal run of non-alphanumeric ASCII (spaces, punctuation, `_`, runs of `-`) becomes a single `-`.
-2. **Trim** leading/trailing `-`. **Letter case and all non-ASCII characters (accented Latin, Cyrillic, CJK, smart quotes, …) are preserved.**
-3. **Prefix `s-` for a leading digit** — a leading digit is a valid HTML id but an invalid *bare* CSS selector (`querySelector('#9-x')` throws), so it is prefixed. Orthogonal to #393, which governs punctuation only.
-4. **Fallback** — an empty result (all-punctuation text) becomes a generated `s-N` id.
+1. **Reverse smart punctuation to its ASCII source** — the parser renders apostrophes/quotes/dashes/ellipsis as typographic glyphs (`'` → U+2019, `--` → en dash, `...` → ellipsis, …). These are mapped back to their ASCII source *before* slugging, so the id is derived from the source text and never carries a curly quote or dash glyph. This matches the djot.js reference, which builds ids from the source text.
+2. **Replace non-alphanumeric ASCII** — each maximal run of non-alphanumeric ASCII (spaces, punctuation, `_`, runs of `-`) becomes a single `-`.
+3. **Trim** leading/trailing `-`. **Letter case and genuine non-ASCII characters (accented Latin, Cyrillic, CJK, …) are preserved.**
+4. **Prefix `s-` for a leading digit** — a leading digit is a valid HTML id but an invalid *bare* CSS selector (`querySelector('#9-x')` throws), so it is prefixed. Orthogonal to #393, which governs punctuation only.
+5. **Fallback** — an empty result (all-punctuation text) becomes a generated `s-N` id.
+
+> Only the core, locale-independent glyphs (apostrophe, straight-quote pair, en/em dash, ellipsis) are reversed. Locale quote glyphs from the opt-in `SmartQuotesExtension` (guillemets, low-9 quotes) are left as-is, and a literal author-typed typographic glyph in the source is treated the same as a parser-generated one.
 
 Symbols (`:name:`) and footnote references are excluded from the id text (see [Section ID Excludes Footnote Markers and Symbols](#section-id-excludes-footnote-markers-and-symbols)).
 
@@ -183,6 +186,9 @@ Symbols (`:name:`) and footnote references are excluded from the id text (see [S
 | `# café résumé` | `café-résumé` |
 | `# Привет мир` | `Привет-мир` |
 | `# under_score` | `under-score` |
+| `# Bob's Guide` | `Bob-s-Guide` |
+| `# Say "Hello"` | `Say-Hello` |
+| `# Pros -- and cons` | `Pros-and-cons` |
 | `# E=mc^2` | `E-mc-2` |
 | `# 123 Numbers First` | `s-123-Numbers-First` |
 | `# $this->method()` | `this-method` |
