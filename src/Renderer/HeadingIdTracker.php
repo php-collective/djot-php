@@ -132,12 +132,18 @@ class HeadingIdTracker
     /**
      * Normalize heading text into an identifier (jgm/djot#393)
      *
-     * 1. Slug the text: replace each maximal run of non-alphanumeric ASCII with a
+     * 1. Reverse the parser's smart-punctuation back to its ASCII source
+     *    (`'`, `"`, `--`, `...`), so the id is derived from the source text
+     *    rather than the presentational glyphs. The djot.js reference builds
+     *    ids from the source (its smart_punctuation nodes carry the ASCII
+     *    text), so `# Bob's Guide` yields an id from `Bob's Guide`, not from
+     *    the rendered `Bob<U+2019>s Guide`.
+     * 2. Slug the text: replace each maximal run of non-alphanumeric ASCII with a
      *    single '-' and trim; non-ASCII characters and letter case are preserved.
-     * 2. If an id transform is set (e.g. ASCII transliteration via
+     * 3. If an id transform is set (e.g. ASCII transliteration via
      *    AsciiHeadingIdsExtension), apply it to the slug and re-slug the result
      *    (the transform may reintroduce spaces/punctuation, e.g. romanization).
-     * 3. Prefix with 's-' if the result starts with a digit, so the id is a valid
+     * 4. Prefix with 's-' if the result starts with a digit, so the id is a valid
      *    bare CSS selector (querySelector('#9-x') would otherwise throw). This is
      *    orthogonal to #393, which governs punctuation only.
      *
@@ -147,7 +153,7 @@ class HeadingIdTracker
      */
     public function normalizeId(string $text): string
     {
-        $id = $this->slug($text);
+        $id = $this->slug($this->deTypography($text));
 
         if ($this->idTransformer !== null) {
             $id = $this->slug(($this->idTransformer)($id));
@@ -167,6 +173,39 @@ class HeadingIdTracker
     protected function slug(string $text): string
     {
         return trim(preg_replace('/[^0-9A-Za-z\x{0080}-\x{10FFFF}]+/u', '-', $text) ?? $text, '-');
+    }
+
+    /**
+     * Reverse the parser's default smart-punctuation substitutions to their ASCII
+     * source before an id is slugged, so an id never depends on presentational
+     * typography. The InlineParser always renders apostrophes as U+2019 and
+     * converts `"`, `--`, `---` and `...` to their typographic forms; without this
+     * step those non-ASCII glyphs survive slug() (>= U+0080 is preserved) and leak
+     * into the id (e.g. `Bob<U+2019>s-Guide` instead of `Bob-s-Guide`).
+     *
+     * Only the core, locale-independent glyphs are mapped here. Locale quote glyphs
+     * from the opt-in SmartQuotesExtension (guillemets, low-9 quotes) are not
+     * reversed, since those code points can also be legitimate heading content.
+     *
+     * Limitation: the parser bakes smart punctuation into plain text nodes, so a
+     * literal author-typed glyph (e.g. a real U+2013 in the source) is
+     * indistinguishable from a parser-generated one and is reversed the same way.
+     * The djot.js reference avoids this by carrying the source on dedicated
+     * smart-punctuation nodes; matching that would need node-level source tracking.
+     * In practice the collapse only affects rare literal-typographic headings and is
+     * consistent with the sibling carve-php implementation.
+     */
+    protected function deTypography(string $text): string
+    {
+        return strtr($text, [
+            "\u{2018}" => "'", // left single quotation mark
+            "\u{2019}" => "'", // right single quotation mark / apostrophe
+            "\u{201C}" => '"', // left double quotation mark
+            "\u{201D}" => '"', // right double quotation mark
+            "\u{2013}" => '--', // en dash (source: --)
+            "\u{2014}" => '---', // em dash (source: ---)
+            "\u{2026}" => '...', // horizontal ellipsis (source: ...)
+        ]);
     }
 
     /**
