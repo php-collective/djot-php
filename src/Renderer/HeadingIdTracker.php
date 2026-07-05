@@ -325,6 +325,28 @@ class HeadingIdTracker
         }
 
         // Track and deduplicate
+        return $this->dedupe($baseId);
+    }
+
+    /**
+     * Reserve a unique id in the document id namespace.
+     *
+     * Returns $baseId when free, otherwise the next free numeric suffix
+     * ($baseId-1, -2, ...), skipping candidates already reserved by explicit
+     * attributes or previously generated ids. Used by extensions (tabs,
+     * code groups) so their generated DOM ids never duplicate an explicit
+     * `{#id}` attribute or a generated heading id.
+     */
+    public function uniqueId(string $baseId): string
+    {
+        return $this->dedupe($baseId);
+    }
+
+    /**
+     * Reserve $baseId when free, otherwise take the next free suffix.
+     */
+    protected function dedupe(string $baseId): string
+    {
         if (!isset($this->usedIds[$baseId])) {
             $this->usedIds[$baseId] = 0;
 

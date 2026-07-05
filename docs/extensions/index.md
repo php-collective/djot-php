@@ -1418,6 +1418,12 @@ Note: Use 4 colons (`::::`) for the outer `tabs` wrapper and 3 colons (`:::`) fo
 | `radioClass` | `string` | `'tabs-radio'` | CSS class for radio inputs (CSS mode only) |
 | `idPrefix` | `string` | `'tabset'` | Prefix for generated IDs |
 
+Generated ids (`tabset-1`, `tabset-1-tab-1`, ...) are deduplicated against the
+document id namespace: when an explicit `{#id}` attribute or a generated
+heading id already uses a name, the tab set takes the next free suffix
+(`tabset-1-1`) instead of emitting a duplicate DOM id. The same applies to
+`CodeGroupExtension` group ids.
+
 ### CSS-Only Mode
 
 Uses radio inputs and CSS sibling selectors. No JavaScript required.

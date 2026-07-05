@@ -55,6 +55,31 @@ class HeadingIdTrackerTest extends TestCase
         $this->assertSame('Final-Thoughts-2', $id3);
     }
 
+    public function testUniqueIdReservesGeneratedIds(): void
+    {
+        $this->assertSame('x', $this->tracker->uniqueId('x'));
+        $this->assertSame('x-1', $this->tracker->uniqueId('x'));
+        $this->assertSame('x-2', $this->tracker->uniqueId('x'));
+    }
+
+    public function testUniqueIdSkipsReservedSuffixCandidate(): void
+    {
+        $this->tracker->trackId('x-1');
+
+        $this->assertSame('x', $this->tracker->uniqueId('x'));
+        $this->assertSame('x-2', $this->tracker->uniqueId('x'));
+    }
+
+    public function testUniqueIdBlocksLaterHeadingAutoId(): void
+    {
+        $this->assertSame('My-Heading', $this->tracker->uniqueId('My-Heading'));
+
+        $heading = new Heading(2);
+        $heading->appendChild(new Text('My Heading'));
+
+        $this->assertSame('My-Heading-1', $this->tracker->getIdForHeading($heading));
+    }
+
     public function testCachingReturnsSameId(): void
     {
         $heading = new Heading(2);
