@@ -216,7 +216,8 @@ class CodeGroupExtension implements ResettableExtensionInterface
     protected function renderCodeGroup(Div $wrapper, array $codeBlocks, HtmlRenderer $renderer): string
     {
         $this->groupCounter++;
-        $groupId = $this->idPrefix . '-' . $this->groupCounter;
+        $tracker = $renderer->getHeadingIdTracker();
+        $groupId = $tracker->uniqueId($this->idPrefix . '-' . $this->groupCounter);
 
         // Build wrapper attributes
         $attrs = $this->buildWrapperAttributes($wrapper);
@@ -232,7 +233,7 @@ class CodeGroupExtension implements ResettableExtensionInterface
         // Render all radio inputs and labels first
         foreach ($codeBlocks as $index => $item) {
             $tabNum = $index + 1;
-            $inputId = $groupId . '-tab-' . $tabNum;
+            $inputId = $tracker->uniqueId($groupId . '-tab-' . $tabNum);
             $checked = $item['selected'] ? ' checked' : '';
 
             $html .= '<input type="radio" name="' . StringUtil::escapeHtml($groupId) . '" ';

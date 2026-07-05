@@ -95,6 +95,29 @@ DJOT;
         $this->assertStringNotContainsString('id="codegroup-1-tab-2" class="code-group-radio" checked', $html);
     }
 
+    public function testGeneratedIdsAvoidExplicitIds(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new CodeGroupExtension());
+
+        $djot = <<<'DJOT'
+{#codegroup-1}
+Reserved.
+
+::: code-group
+``` php
+echo "Hello";
+```
+:::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('name="codegroup-1-1"', $html);
+        $this->assertStringContainsString('id="codegroup-1-1-tab-1"', $html);
+        $this->assertStringContainsString('for="codegroup-1-1-tab-1"', $html);
+    }
+
     public function testLabelOnlyNoLanguage(): void
     {
         $converter = new DjotConverter();

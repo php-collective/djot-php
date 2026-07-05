@@ -75,6 +75,31 @@ DJOT;
         $this->assertStringNotContainsString('id="tabset-1-tab-2" class="tabs-radio" checked', $html);
     }
 
+    public function testGeneratedCssIdsAvoidExplicitIds(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TabsExtension());
+
+        $djot = <<<'DJOT'
+{#tabset-1}
+Reserved.
+
+:::: tabs
+::: tab
+### First
+
+Content.
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString('name="tabset-1-1"', $html);
+        $this->assertStringContainsString('id="tabset-1-1-tab-1"', $html);
+        $this->assertStringContainsString('for="tabset-1-1-tab-1"', $html);
+    }
+
     public function testExplicitSelectedTab(): void
     {
         $converter = new DjotConverter();
@@ -251,6 +276,36 @@ DJOT;
         $this->assertStringContainsString('aria-labelledby=', $html);
         $this->assertStringContainsString('<button', $html);
         $this->assertStringNotContainsString('type="radio"', $html);
+    }
+
+    public function testGeneratedAriaIdsAvoidExplicitIdsAndKeepPairsAligned(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new TabsExtension(mode: 'aria'));
+
+        $djot = <<<'DJOT'
+{#tabset-1}
+Reserved.
+
+:::: tabs
+::: tab
+### First
+
+Content.
+:::
+::::
+DJOT;
+
+        $html = $converter->convert($djot);
+
+        $this->assertStringContainsString(
+            'id="tabset-1-1-tab-1" aria-selected="true" aria-controls="tabset-1-1-panel-1"',
+            $html,
+        );
+        $this->assertStringContainsString(
+            'id="tabset-1-1-panel-1" aria-labelledby="tabset-1-1-tab-1"',
+            $html,
+        );
     }
 
     public function testAriaHiddenAttribute(): void
