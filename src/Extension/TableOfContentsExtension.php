@@ -39,6 +39,9 @@ use Djot\Util\StringUtil;
  *     listType: 'ol', // Use ordered list
  *     position: 'top', // Auto-insert at 'top', 'bottom', or null for manual
  *     separator: "<hr>\n", // Optional separator between TOC and content
+ *     collapsible: true, // Wrap in a <details>/<summary> disclosure
+ *     summary: 'Contents', // Disclosure label (default 'Table of Contents')
+ *     open: false, // Start expanded when true (default collapsed)
  * );
  * ```
  */
@@ -58,6 +61,10 @@ class TableOfContentsExtension implements ResettableExtensionInterface
      * @param string $cssClass CSS class for the TOC container
      * @param string|null $position Auto-insert position: 'top', 'bottom', or null for manual placement
      * @param string $separator HTML separator between TOC and content (when position is set)
+     * @param bool $collapsible Wrap the TOC in a `<details>`/`<summary>` disclosure so it can be
+     *   collapsed. Off by default; when off the output is the unchanged `<nav class="toc">`.
+     * @param string $summary Summary label for the disclosure (only used when $collapsible is true).
+     * @param bool $open Render the disclosure expanded by default (only used when $collapsible is true).
      */
     public function __construct(
         protected int $minLevel = 1,
@@ -66,6 +73,9 @@ class TableOfContentsExtension implements ResettableExtensionInterface
         protected string $cssClass = 'toc',
         protected ?string $position = null,
         protected string $separator = '',
+        protected bool $collapsible = false,
+        protected string $summary = 'Table of Contents',
+        protected bool $open = false,
     ) {
     }
 
@@ -169,9 +179,19 @@ class TableOfContentsExtension implements ResettableExtensionInterface
             return '';
         }
 
-        $html = '<nav class="' . StringUtil::escapeHtml($this->cssClass) . '">' . "\n";
+        if (!$this->collapsible) {
+            return '<nav class="' . StringUtil::escapeHtml($this->cssClass) . '">' . "\n"
+                . $this->renderTocList($headings)
+                . '</nav>' . "\n";
+        }
+
+        // Collapsible: the heading list sits directly inside a <details>
+        // disclosure so it can be toggled, closed by default unless $open.
+        $open = $this->open ? ' open' : '';
+        $html = '<details class="' . StringUtil::escapeHtml($this->cssClass) . '"' . $open . '>' . "\n";
+        $html .= '<summary>' . StringUtil::escapeHtml($this->summary) . '</summary>' . "\n";
         $html .= $this->renderTocList($headings);
-        $html .= '</nav>' . "\n";
+        $html .= '</details>' . "\n";
 
         return $html;
     }
