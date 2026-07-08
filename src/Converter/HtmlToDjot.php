@@ -2540,6 +2540,14 @@ class HtmlToDjot
 
     protected function requiresRawImageFallback(string $alt): bool
     {
+        // The raw-HTML fallback re-emits the original element verbatim (a
+        // `{=html}` block), so untrusted HTML could smuggle live script /
+        // event handlers (`<img onerror=...>`) through it. Only trusted input
+        // may use it; otherwise fall through to safe `![alt](src)` processing.
+        if (!$this->trustedRoundTrip) {
+            return false;
+        }
+
         return strpbrk($alt, '[]\\') !== false;
     }
 
