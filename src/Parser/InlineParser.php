@@ -92,6 +92,15 @@ class InlineParser
     protected ?string $abbreviationPattern = null;
 
     /**
+     * Memoized per-text check: does the text contain any link/span trigger
+     * (`](`, `][`, `]{`)? Lets parseLink skip the O(n) bracket-depth scan for
+     * trigger-free text, so a deeply nested `[[[[x]]]]` run stays linear.
+     */
+    protected ?string $linkTriggerText = null;
+
+    protected bool $linkTriggerPresent = false;
+
+    /**
      * Cached abbreviation keys for the current pattern
      *
      * @var array<string, string>|null
@@ -788,6 +797,21 @@ class InlineParser
         // like `[[[[...` is O(n^2). strpos is a C-level memchr that short-circuits
         // when no `]` follows.
         if (strpos($text, ']', $pos + 1) === false) {
+            return null;
+        }
+
+        // A link, reference, or inline span can only form when the matched `]`
+        // is directly followed by `(`, `[`, or `{`. If the text contains none of
+        // `](`, `][`, `]{`, nothing can start here, so skip the bracket-depth
+        // scan below -- otherwise a deeply nested run like `[[[[x]]]]` is
+        // O(n^2). The presence check is memoized per text.
+        if ($text !== $this->linkTriggerText) {
+            $this->linkTriggerText = $text;
+            $this->linkTriggerPresent = strpos($text, '](') !== false
+                || strpos($text, '][') !== false
+                || strpos($text, ']{') !== false;
+        }
+        if (!$this->linkTriggerPresent) {
             return null;
         }
 

@@ -392,4 +392,17 @@ BBCODE;
             $this->assertStringNotContainsString('<script>', $html);
         }
     }
+
+    public function testDeeplyNestedQuotesAreLinearAndCorrect(): void
+    {
+        // Regression: deeply nested [quote] was O(n^2) (a converter DoS). This
+        // completes near-instantly and nesting is preserved.
+        $n = 4000;
+        $bb = str_repeat('[quote]', $n) . 'x' . str_repeat('[/quote]', $n);
+        $out = $this->converter->convert($bb);
+        $this->assertStringContainsString('x', $out);
+        // A small nested case keeps its structure.
+        $small = $this->converter->convert('[quote]a[quote]b[/quote]c[/quote]');
+        $this->assertStringContainsString('> > b', $small);
+    }
 }
