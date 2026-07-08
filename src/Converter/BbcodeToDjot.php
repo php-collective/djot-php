@@ -123,7 +123,10 @@ class BbcodeToDjot
         // [code=lang]...[/code] -> ```lang\n...\n```
         $text = preg_replace_callback(
             '/\[code=([^\]]+)\](.*?)\[\/code\]/is',
-            fn ($m) => "\n\n```" . strtolower($m[1]) . "\n" . trim($m[2]) . "\n```\n\n",
+            // Neutralize a leading `=` in the [code=..] language so untrusted
+            // Bbcode cannot mint a Djot `=html` raw-HTML block (live HTML under
+            // the default renderer). `[code= =html]` -> inert ```html block.
+            fn ($m) => "\n\n```" . ltrim(ltrim(strtolower(trim($m[1])), '=')) . "\n" . trim($m[2]) . "\n```\n\n",
             $text,
         ) ?? $text;
 

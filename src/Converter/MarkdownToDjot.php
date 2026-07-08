@@ -44,7 +44,18 @@ class MarkdownToDjot
                 }
                 $inCodeBlock = true;
                 $codeFence = $matches[1][0]; // First char of fence
-                $result[] = $line;
+                // A foreign code-fence info string is a LANGUAGE, never a raw
+                // block directive. Neutralize a leading `=` so untrusted
+                // Markdown cannot mint a Djot ` ```=html ` raw-HTML block (which
+                // the default renderer emits as live HTML); `=html` -> an inert,
+                // escaped ` ``` html ` code block.
+                $rest = (string)substr($line, strlen($matches[1]));
+                if (str_starts_with(ltrim($rest), '=')) {
+                    $lang = ltrim(ltrim(ltrim($rest), '='));
+                    $result[] = $matches[1] . ($lang !== '' ? ' ' . $lang : '');
+                } else {
+                    $result[] = $line;
+                }
                 $prevLineType = 'code_fence';
 
                 continue;
