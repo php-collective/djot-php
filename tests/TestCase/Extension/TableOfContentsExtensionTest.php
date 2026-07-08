@@ -430,4 +430,64 @@ DJOT;
         $this->assertStringNotContainsString("</ul>\n\n<ul>", $html);
         $this->assertStringContainsString('<li><a href="#Three">Three</a></li>' . "\n<li><a href=\"#Two\">Two</a></li>", $html);
     }
+
+    public function testNonCollapsibleTocKeepsPlainNav(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension();
+        $converter->addExtension($tocExtension);
+
+        $converter->convert("# One\n\n## Two\n");
+        $html = $tocExtension->getTocHtml();
+
+        $this->assertStringStartsWith('<nav class="toc">', $html);
+        $this->assertStringNotContainsString('<details', $html);
+    }
+
+    public function testCollapsibleWrapsTocInClosedDisclosure(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension(collapsible: true);
+        $converter->addExtension($tocExtension);
+
+        $converter->convert("# One\n\n## Two\n");
+        $html = $tocExtension->getTocHtml();
+
+        // Closed by default (no `open`), list sits directly inside <details>.
+        $this->assertStringStartsWith(
+            '<details class="toc">' . "\n" . '<summary>Table of Contents</summary>' . "\n" . '<ul>',
+            $html,
+        );
+        $this->assertStringEndsWith('</ul>' . "\n" . '</details>' . "\n", $html);
+        $this->assertStringNotContainsString('<nav', $html);
+        $this->assertStringNotContainsString('<details class="toc" open', $html);
+    }
+
+    public function testCollapsibleHonorsOpenAndCustomSummary(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension(collapsible: true, summary: 'Contents', open: true);
+        $converter->addExtension($tocExtension);
+
+        $converter->convert("# One\n");
+        $html = $tocExtension->getTocHtml();
+
+        $this->assertStringStartsWith(
+            '<details class="toc" open>' . "\n" . '<summary>Contents</summary>',
+            $html,
+        );
+    }
+
+    public function testCollapsibleSummaryIsHtmlEscaped(): void
+    {
+        $converter = new DjotConverter();
+        $tocExtension = new TableOfContentsExtension(collapsible: true, summary: 'A & <b>B</b>');
+        $converter->addExtension($tocExtension);
+
+        $converter->convert("# One\n");
+        $html = $tocExtension->getTocHtml();
+
+        $this->assertStringContainsString('<summary>A &amp; &lt;b&gt;B&lt;/b&gt;</summary>', $html);
+        $this->assertStringNotContainsString('<b>B</b>', $html);
+    }
 }

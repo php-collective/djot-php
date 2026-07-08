@@ -1021,8 +1021,25 @@ $tocExtension = new TableOfContentsExtension(
     cssClass: 'toc',   // CSS class for nav element
     position: 'top',   // 'top', 'bottom', or null for manual placement
     separator: '<hr>', // Optional HTML between TOC and content
+    collapsible: true, // Wrap in a <details>/<summary> disclosure
+    summary: 'Contents', // Disclosure label (default 'Table of Contents')
+    open: false,       // Start expanded when true (default collapsed)
 );
 ```
+
+**Collapsible:** with `collapsible: true` the TOC is wrapped in a
+`<details>`/`<summary>` disclosure (closed unless `open: true`), with the heading
+list directly inside it:
+
+```html
+<details class="toc">
+<summary>Table of Contents</summary>
+<ul> ... </ul>
+</details>
+```
+
+When `collapsible` is off (the default) the output is the unchanged
+`<nav class="toc">`.
 
 **Auto-insertion:**
 
