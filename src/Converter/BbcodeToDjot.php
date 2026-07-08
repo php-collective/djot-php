@@ -158,67 +158,61 @@ class BbcodeToDjot
      */
     protected function parseQuotesWithDepth(string $text): string
     {
-        $result = '';
         $length = strlen($text);
         $i = 0;
+        // Single left-to-right pass with a stack of open-quote content buffers
+        // (O(n)). The previous version recursed on each closed quote's inner
+        // content and re-scanned it, which is O(n^2) on deeply nested
+        // `[quote]` (a converter DoS). Index 0 accumulates the top-level output;
+        // each `[quote]` pushes a level, each `[/quote]` pops one, formats it as
+        // a blockquote, and folds it into its parent -- producing the same
+        // output the recursion did for well-formed input.
+        /** @var array<int, string> $contents */
+        $contents = [''];
+        /** @var array<int, string|null> $authors */
+        $authors = [null];
+        $top = 0;
 
         while ($i < $length) {
-            // Check for opening quote tag - matches [quote], [quote=...], or [quote ...]
-            if (preg_match('/\[quote(?:[= ]([^\]]*))?\]/i', $text, $matches, 0, $i) && strpos($text, $matches[0], $i) === $i) {
-                $author = $matches[1] ?? null;
-                $tagLength = strlen($matches[0]);
-                $i += $tagLength;
-
-                // Find the matching closing tag by tracking depth
-                $depth = 1;
-                $contentStart = $i;
-
-                while ($i < $length) {
-                    // Check for nested opening quote
-                    if (preg_match('/\[quote(?:[= ][^\]]*)?\]/i', $text, $m, 0, $i) && strpos($text, $m[0], $i) === $i) {
-                        $depth++;
-                        $i += strlen($m[0]);
-
-                        continue;
-                    }
-
-                    // Check for closing quote
-                    if (preg_match('/\[\/quote\]/i', $text, $m, 0, $i) && strpos($text, $m[0], $i) === $i) {
-                        $depth--;
-                        if ($depth === 0) {
-                            // Extract content and convert to Djot blockquote
-                            $content = substr($text, $contentStart, $i - $contentStart);
-                            $i += strlen($m[0]);
-
-                            // Recursively process nested quotes in content
-                            $content = $this->parseQuotesWithDepth($content);
-
-                            // Convert to Djot blockquote format
-                            $result .= $this->formatAsBlockquote($content, $author);
-
-                            continue 2; // Continue outer loop
-                        }
-                        $i += strlen($m[0]);
-
-                        continue;
-                    }
-
-                    $i++;
-                }
-
-                // If we exit without finding closing tag, treat remaining as content
-                $content = substr($text, $contentStart);
-                $result .= $this->formatAsBlockquote($content, $author);
+            if (preg_match('/\G\[quote(?:[= ]([^\]]*))?\]/i', $text, $m, 0, $i)) {
+                $contents[] = '';
+                $authors[] = $m[1] ?? null;
+                $top++;
+                $i += strlen($m[0]);
 
                 continue;
             }
 
-            // Regular character, add to result
-            $result .= $text[$i];
+            if (preg_match('/\G\[\/quote\]/i', $text, $m, 0, $i)) {
+                $i += strlen($m[0]);
+                if ($top > 0) {
+                    $blockquote = $this->formatAsBlockquote($contents[$top], $authors[$top]);
+                    array_pop($contents);
+                    array_pop($authors);
+                    $top--;
+                    $contents[$top] .= $blockquote;
+                }
+                // A stray `[/quote]` with no open quote is dropped.
+
+                continue;
+            }
+
+            $contents[$top] .= $text[$i];
             $i++;
         }
 
-        return $result;
+        // Unclosed quotes: format each remaining open level as a blockquote,
+        // innermost first, folding into its parent (matches the previous
+        // "content runs to end of input" behavior).
+        while ($top > 0) {
+            $blockquote = $this->formatAsBlockquote($contents[$top], $authors[$top]);
+            array_pop($contents);
+            array_pop($authors);
+            $top--;
+            $contents[$top] .= $blockquote;
+        }
+
+        return $contents[0];
     }
 
     /**
