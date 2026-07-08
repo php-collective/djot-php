@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase;
 
 use Djot\Converter\MarkdownToDjot;
+use Djot\DjotConverter;
 use PHPUnit\Framework\TestCase;
 
 class MarkdownToDjotTest extends TestCase
@@ -773,5 +774,16 @@ DJOT;
         $expected = '[API]{abbr="Bob\'s API"}';
 
         $this->assertSame($expected, $this->converter->convert($markdown));
+    }
+
+    public function testForeignCodeFenceCannotMintRawHtmlBlock(): void
+    {
+        // An untrusted code fence whose info string is `=html` must NOT
+        // become a raw-HTML block; it stays an inert, escaped code block.
+        foreach (["```=html\n<script>alert(1)</script>\n```\n", "``` =html\n<script>x</script>\n```\n"] as $md) {
+            $out = $this->converter->convert($md);
+            $html = (new DjotConverter())->convert($out);
+            $this->assertStringNotContainsString('<script>', $html);
+        }
     }
 }

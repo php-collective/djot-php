@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Converter;
 
 use Djot\Converter\BbcodeToDjot;
+use Djot\DjotConverter;
 use PHPUnit\Framework\TestCase;
 
 class BbcodeToDjotTest extends TestCase
@@ -379,5 +380,16 @@ BBCODE;
     {
         $result = $this->converter->convert('Some text[table][tr][td]Cell[/td][/tr][/table]More text');
         $this->assertStringContainsString("Some text\n\n| Cell |", $result);
+    }
+
+    public function testCodeLangCannotMintRawHtmlBlock(): void
+    {
+        // An untrusted [code=..] language of `=html` must NOT become a
+        // raw-HTML block; it stays an inert, escaped code block.
+        foreach (['[code= =html]<script>alert(1)</script>[/code]', '[code==html]<script>x</script>[/code]'] as $bb) {
+            $out = $this->converter->convert($bb);
+            $html = (new DjotConverter())->convert($out);
+            $this->assertStringNotContainsString('<script>', $html);
+        }
     }
 }
