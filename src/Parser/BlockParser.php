@@ -1156,6 +1156,12 @@ class BlockParser
                 return null;
             }
 
+            // An invalid character anywhere in the spec invalidates it entirely;
+            // the line then renders as literal paragraph text
+            if (!AttributeParser::isValid($attrStr)) {
+                return null;
+            }
+
             // Check if attributes precede a reference definition - if so, skip storing them
             // (they were already applied during extractReferences)
             $count = count($lines);
@@ -1193,6 +1199,9 @@ class BlockParser
                 // Exclude _ * = + - ~ ^ which are braced inline markers (not block attributes)
                 // Exclude % which starts comments (handled by tryParseComment)
                 if (!preg_match('/^[.#a-zA-Z]/', $attrStr) || str_starts_with($attrStr, '%')) {
+                    return null;
+                }
+                if (!AttributeParser::isValid($attrStr)) {
                     return null;
                 }
                 $this->parseAttributeString($attrStr);
@@ -1676,12 +1685,16 @@ class BlockParser
             }
 
             // Check for continuation with # prefix (same level or less) - these continue the heading
-            // e.g., "# Heading\n# more" becomes "Heading\nmore" for a level-1 heading
-            if (preg_match('/^[ ]{0,3}#{1,' . $level . '} +(.+)$/', $nextLine, $contMatch)) {
-                if ($content !== '') {
-                    $content .= "\n";
+            // e.g., "# Heading\n# more" becomes "Heading\nmore" for a level-1 heading.
+            // A bare marker line ("#") continues the heading but contributes no content.
+            if (preg_match('/^[ ]{0,3}#{1,' . $level . '}(?: +(.*))?[ ]*$/', $nextLine, $contMatch)) {
+                $contContent = trim($contMatch[1] ?? '');
+                if ($contContent !== '') {
+                    if ($content !== '') {
+                        $content .= "\n";
+                    }
+                    $content .= $contContent;
                 }
-                $content .= $contMatch[1];
                 $i++;
             } elseif (preg_match('/^[ ]{0,3}#{1,6}(?: |$)/', $nextLine)) {
                 // Different level heading marker (or empty heading) starts a new heading
@@ -2608,8 +2621,9 @@ class BlockParser
                 continue;
             }
 
-            // Must start with ": " (space is syntax delimiter, not tab)
-            if (!preg_match('/^: +(.*)$/', $line, $matches)) {
+            // Must start with ": " (space is syntax delimiter, not tab),
+            // or be a bare ":" (empty term and definition)
+            if (!preg_match('/^:(?: +(.*))?$/', $line, $matches)) {
                 break;
             }
 
@@ -2628,12 +2642,12 @@ class BlockParser
                     continue;
                 }
 
-                // Check if this is a term line
-                if (!preg_match('/^: +(.*)$/', $termLine, $termMatch)) {
+                // Check if this is a term line (bare ":" means empty term)
+                if (!preg_match('/^:(?: +(.*))?$/', $termLine, $termMatch)) {
                     break;
                 }
 
-                $termContent = $termMatch[1];
+                $termContent = $termMatch[1] ?? '';
 
                 // Check for continuation marker `: +` - not a new term, breaks term collection
                 if ($termContent === '+') {
@@ -2757,7 +2771,7 @@ class BlockParser
                 }
 
                 // Check for next term (space is syntax delimiter, not tab)
-                if (preg_match('/^: +/', $defLine)) {
+                if (preg_match('/^:(?: |$)/', $defLine)) {
                     break;
                 }
 
@@ -4024,8 +4038,8 @@ class BlockParser
             return true;
         }
 
-        // Definition list terms (: followed by space or content)
-        if (preg_match('/^: /', $line)) {
+        // Definition list terms (: followed by space, or bare :)
+        if (preg_match('/^:(?: |$)/', $line)) {
             return true;
         }
 

@@ -192,12 +192,12 @@ class ListParser
             ], $matches[2] ?? '');
         }
 
-        // Definition list: :
-        if (preg_match('/^: +(.*)$/', $line, $matches)) {
+        // Definition list: `: term`, or a bare `:` (empty term and definition)
+        if (preg_match('/^:(?: +(.*))?$/', $line, $matches)) {
             return [
                 'type' => ListBlock::TYPE_DEFINITION,
                 'marker' => ':',
-                'content' => $matches[1],
+                'content' => $matches[1] ?? '',
             ];
         }
 

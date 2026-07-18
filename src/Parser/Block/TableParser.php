@@ -100,16 +100,17 @@ class TableParser
             return false;
         }
 
-        // Every cell must be a delimiter cell: optional whitespace, an optional
-        // leading ':', one or more '-', an optional trailing ':', optional
-        // whitespace. An EMPTY cell (`|---||`) or any other content disqualifies
-        // the row -- it is then an ordinary data row (matches carve-js/carve-rs).
+        // Every cell must be a delimiter cell starting immediately after the
+        // `|`: an optional leading ':', one or more '-', an optional trailing
+        // ':', then optional whitespace. A leading space (`| --- |`), an EMPTY
+        // cell (`|---||`), or any other content disqualifies the row -- it is
+        // then an ordinary data row (matches djot.js pattRowSep).
         $cells = $this->parseTableCells($line);
         if ($cells === []) {
             return false;
         }
         foreach ($cells as $cell) {
-            if (preg_match('/^\s*:?-+:?\s*$/', $cell) !== 1) {
+            if (preg_match('/^:?-+:?[ \t]*$/', $cell) !== 1) {
                 return false;
             }
         }

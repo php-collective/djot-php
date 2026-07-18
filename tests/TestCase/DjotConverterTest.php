@@ -315,6 +315,19 @@ class DjotConverterTest extends TestCase
         );
     }
 
+    public function testInvalidCharInAttrSpecKeepsBracesLiteral(): void
+    {
+        // An invalid character (like `<`) anywhere in an attribute spec
+        // invalidates the entire spec; the braces stay literal instead of
+        // attaching attributes to the preceding element.
+        $this->assertSame("<p><em>x</em>{#a&lt;b}</p>\n", $this->converter->convert('_x_{#a<b}'));
+        $this->assertSame("<p><a href=\"u\">x</a>{#a&lt;b}</p>\n", $this->converter->convert('[x](u){#a<b}'));
+        $this->assertSame("<p><code>c</code>{#a&lt;b}</p>\n", $this->converter->convert('`c`{#a<b}'));
+        // Bracketed run abutting an invalid block: no span, everything literal
+        // (same convention as {???} above)
+        $this->assertSame("<p>[x]{#a&lt;b}</p>\n", $this->converter->convert('[x]{#a<b}'));
+    }
+
     public function testEmptyAttrBlockStillFormsSpan(): void
     {
         // An empty or whitespace-only block is a valid empty attribute block,
