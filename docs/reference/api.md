@@ -438,6 +438,16 @@ the block at the top of the source pane, find the element whose
 `data-source-line` matches in the rendered pane, and scroll it into view. The
 1-based value matches editor gutters (Monaco / CodeMirror).
 
+::: info Stability and future extensions
+`data-source-line` is the stable, lean tier of source mapping: a 1-based start
+line on block-level elements, intended for scroll-sync anchors. Its name, value
+format, and block-level scope will not change. Richer mappings (start/end
+ranges with column and offset, inline elements - what djot.js emits as
+`data-startpos` / `data-endpos` under its `sourcePositions` option) are
+deliberately **not** folded into this attribute; if added later, they will
+arrive as a separate opt-in option alongside it.
+:::
+
 When you construct the parser yourself, enable it there instead — the converter
 `sourceLines` flag is ignored once a pre-configured `$parser` is passed:
 
