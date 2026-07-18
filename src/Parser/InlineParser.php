@@ -286,6 +286,17 @@ class InlineParser
             $char = $text[$pos];
             $nextChar = $text[$pos + 1] ?? '';
 
+            // A backslash at the very end of the content (no following
+            // character) still produces a hard break
+            if ($char === '\\' && $pos + 1 >= $length) {
+                $this->flushText($parent, $textBuffer);
+                $textBuffer = '';
+                $parent->appendChild(new HardBreak());
+                $pos++;
+
+                continue;
+            }
+
             // Check for escape sequences
             if ($char === '\\' && $pos + 1 < $length) {
                 $escaped = $text[$pos + 1];
@@ -1588,6 +1599,12 @@ class InlineParser
             return null;
         }
 
+        // An invalid character anywhere in the spec invalidates it entirely;
+        // the braces then stay literal text
+        if (!AttributeParser::isValid($attrStr)) {
+            return null;
+        }
+
         // Remove comments from attributes: % ... % or % to end
         $attrStr = $this->removeAttributeComments($attrStr);
 
@@ -1894,6 +1911,12 @@ class InlineParser
      */
     protected function isValidAttrPayload(string $attrStr): bool
     {
+        // An invalid character anywhere in the spec invalidates it entirely
+        // (e.g. {#a<b}); the block then stays literal text.
+        if (!AttributeParser::isValid($attrStr)) {
+            return false;
+        }
+
         if (AttributeParser::parse($attrStr) !== []) {
             return true;
         }

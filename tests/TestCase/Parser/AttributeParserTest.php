@@ -270,19 +270,13 @@ class AttributeParserTest extends TestCase
         $this->assertLessThan($titlePos, $classPos, 'class should appear before title');
     }
 
-    public function testInvalidUnquotedValueDoesNotAffectOrder(): void
+    public function testInvalidUnquotedValueInvalidatesWholeSpec(): void
     {
-        // Invalid unquoted value should be skipped, not affect ordering of valid attrs
+        // An invalid unquoted value (dot in foo.bar) invalidates the entire
+        // attribute spec, which then renders as literal text (matches djot.js)
         $result = $this->converter->convert('[text]{.myclass invalid=foo.bar data-x=valid}');
 
-        $classPos = strpos($result, 'class="myclass"');
-        $dataPos = strpos($result, 'data-x="valid"');
-
-        $this->assertNotFalse($classPos);
-        $this->assertNotFalse($dataPos);
-        // invalid=foo.bar should be skipped entirely
-        $this->assertStringNotContainsString('invalid=', $result);
-        $this->assertLessThan($dataPos, $classPos, 'class should appear before data-x');
+        $this->assertSame("<p>[text]{.myclass invalid=foo.bar data-x=valid}</p>\n", $result);
     }
 
     /**

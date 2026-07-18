@@ -96,6 +96,33 @@ class AttributeParser
     }
 
     /**
+     * Check whether an attribute string is a fully valid attribute spec
+     *
+     * Per djot spec, identifiers, class names, keys, and unquoted values may
+     * only contain ASCII alphanumerics, `_`, `:`, and `-`. Any other character
+     * outside a quoted value invalidates the entire spec, which then renders
+     * as literal text.
+     *
+     * @param string $attrStr The attribute string (contents inside {})
+     */
+    public static function isValid(string $attrStr): bool
+    {
+        $stripped = self::removeComments($attrStr);
+
+        $name = '[a-zA-Z0-9_:-]+';
+        $token = '(?:'
+            . '\.' . $name
+            . '|#' . $name
+            . '|' . $name . '="(?:[^"\\\\]|\\\\.)*"'
+            . '|' . $name . "='(?:[^'\\\\]|\\\\.)*'"
+            . '|' . $name . '=' . $name
+            . '|[a-zA-Z][a-zA-Z0-9_-]*'
+            . ')';
+
+        return preg_match('/^\s*(?:' . $token . '(?:\s+' . $token . ')*)?\s*$/', $stripped) === 1;
+    }
+
+    /**
      * Parse attribute string preserving source order
      *
      * @param string $attrStr The attribute string to parse
