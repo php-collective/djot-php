@@ -45,7 +45,7 @@ public function __construct(
 - `$nestedBlocksInLists`: **Deprecated.** When `true`, indentation alone introduces nested blocks of **any** type inside list items without a blank line (broad, eager - no lone-marker lookahead), while top-level paragraph interruption stays spec-compliant (see [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode)). Prefer `$blocksInterruptParagraphs` + `$nestedListsWithoutBlankLine`. No longer implied by `$significantNewlines`.
 - `$blocksInterruptParagraphs`: When `true`, top-level block elements (lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences) can interrupt a paragraph without a preceding blank line. It **also** interrupts a list item's lead paragraph, so an indented non-list block nests inside the item without a blank line, using the **same** lone-marker lookahead as the top level: unambiguous openers (`#`, fenced code, `:::`, `---`) and real multi-line blocks nest, while a single ambiguous marker line (`>`, `|`) stays literal. It does not nest sublists (see [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode)). Implied by `$significantNewlines`.
 - `$nestedListsWithoutBlankLine`: When `true`, a sublist nests inside a list item without a blank line. Only sublists nest; non-list blocks under the item stay literal and top-level paragraph interruption is unaffected (see [Nested Lists Without Blank Line Mode](/guide/parser-options#nested-lists-without-blank-line-mode)). Implied by `$significantNewlines`.
-- `$sourceLines`: When `true`, each top-level block element is stamped with a `data-source-line` attribute holding the **1-based** source line where the block started. Off by default, so normal output is unchanged. Intended for editor live-preview scroll-sync (map a rendered block back to the source textarea). Ignored when a pre-configured `$parser` is supplied (pass `new BlockParser(trackSourceLines: true)` instead). See [Source-line tracking](#source-line-tracking).
+- `$sourceLines`: When `true`, block elements, nested blocks, list items, and definition terms/descriptions are stamped with a `data-source-line` attribute holding the **1-based** source line where the block started. Off by default, so normal output is unchanged. Intended for editor live-preview scroll-sync (map a rendered block back to the source textarea). Ignored when a pre-configured `$parser` is supplied (pass `new BlockParser(trackSourceLines: true)` instead). See [Source-line tracking](#source-line-tracking).
 
 ### Factory Methods
 
@@ -411,11 +411,27 @@ echo $converter->convert("# Heading\n\nA paragraph.\n");
 </section>
 ```
 
-- Only **top-level** blocks are stamped (a paragraph nested inside a blockquote
-  is not). The value is the **1-based** source line where the block starts.
+- Top-level and nested blocks are stamped. List items (`<li>`) and definition
+  list terms/descriptions (`<dt>` / `<dd>`) are stamped too. The value is the
+  **1-based** source line where the block starts in the original document.
 - The attribute renders **after** any author attributes, e.g.
   `<p class="note" data-source-line="2">`.
 - Raw HTML blocks and comments are not stamped (no reliable element tag).
+
+For example:
+
+```php
+echo $converter->convert("- first\n\n  second\n");
+```
+
+```html
+<ul data-source-line="1">
+<li data-source-line="1">
+<p data-source-line="1">first</p>
+<p data-source-line="3">second</p>
+</li>
+</ul>
+```
 
 The typical use is editor live-preview scroll synchronization: read the line of
 the block at the top of the source pane, find the element whose

@@ -131,7 +131,7 @@ class DjotConverter
      * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines (deprecated; prefer blocksInterruptParagraphs + nestedListsWithoutBlankLine)
      * @param bool $blocksInterruptParagraphs Allow top-level block elements to interrupt paragraphs without a blank line
      * @param bool $nestedListsWithoutBlankLine Allow sublists to nest in list items without a blank line
-     * @param bool $sourceLines Stamp top-level block elements with a `data-source-line` attribute (1-based source line). Opt-in, for editor scroll-sync; ignored when a pre-configured $parser is supplied.
+     * @param bool $sourceLines Stamp block elements, nested blocks, list items, and definition list entries with a `data-source-line` attribute (1-based source line). Opt-in, for editor scroll-sync; ignored when a pre-configured $parser is supplied.
      */
     public function __construct(
         bool $xhtml = false,
