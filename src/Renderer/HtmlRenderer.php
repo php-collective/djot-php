@@ -768,7 +768,9 @@ class HtmlRenderer implements RendererInterface
             // This handles both:
             // 1. Single paragraph: <p>text</p> -> text
             // 2. Paragraph followed by nested list: <p>text</p>\n<ul>... -> text\n<ul>...
-            $content = preg_replace('/^<p>(.+?)<\/p>(\n)?/s', '$1$2', $content) ?? $content;
+            // A data-source-line-only wrapper is stripped too (the source-line
+            // option must never change structure; the <li> keeps the anchor).
+            $content = preg_replace('/^<p(?: data-source-line="\d+")?>(.+?)<\/p>(\n)?/s', '$1$2', $content) ?? $content;
         }
 
         // Handle task list items
