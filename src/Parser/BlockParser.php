@@ -220,6 +220,16 @@ class BlockParser
      */
     protected ?Closure $headingIdTransformer = null;
 
+    /**
+     * When true, top-level block nodes are stamped with a `data-source-line`
+     * attribute holding the 1-based source line where the block started.
+     * Opt-in (default off): used by editor live-preview to sync scroll to the
+     * source textarea. Off by default so normal rendering output is unchanged.
+     *
+     * @var bool
+     */
+    protected bool $trackSourceLines = false;
+
     public function __construct(
         bool $collectWarnings = false,
         bool $strictMode = false,
@@ -227,6 +237,7 @@ class BlockParser
         bool $nestedBlocksInLists = false,
         bool $blocksInterruptParagraphs = false,
         bool $nestedListsWithoutBlankLine = false,
+        bool $trackSourceLines = false,
     ) {
         $this->collectWarnings = $collectWarnings;
         $this->strictMode = $strictMode;
@@ -235,6 +246,7 @@ class BlockParser
         $this->blocksInterruptParagraphs = $blocksInterruptParagraphs || $significantNewlines;
         $this->nestedBlocksInLists = $nestedBlocksInLists;
         $this->nestedListsWithoutBlankLine = $nestedListsWithoutBlankLine || $significantNewlines;
+        $this->trackSourceLines = $trackSourceLines;
         $this->inlineParser = new InlineParser($this);
         $this->listParser = new ListParser();
         $this->tableParser = new TableParser();
@@ -973,9 +985,18 @@ class BlockParser
                 continue;
             }
 
+            // Source-line tracking (opt-in): remember where this block starts and
+            // how many children the parent had, so newly appended top-level blocks
+            // can be stamped with `data-source-line` after the dispatch below.
+            // Only the document's direct children are stamped (nested blocks are
+            // skipped via the -1 sentinel).
+            $blockStart = $i;
+            $childrenBefore = ($this->trackSourceLines && $parent instanceof Document) ? count($parent->getChildren()) : -1;
+
             // Try custom block patterns first (before built-in syntax)
             $customConsumed = $this->tryCustomBlockPatterns($parent, $lines, $i);
             if ($customConsumed !== null) {
+                $this->stampSourceLine($parent, $childrenBefore, $blockStart);
                 $i += $customConsumed;
 
                 continue;
@@ -993,7 +1014,9 @@ class BlockParser
                 && !str_contains(self::BLOCK_MARKER_CHARS, $marker)
                 && !($marker >= 'A' && preg_match('/^[ \t]*[A-Za-z]+[.)](?:\{[^{}]+\})?([ \t]|$)/', $line) === 1)
             ) {
-                $i += $this->tryParseParagraph($parent, $lines, $i);
+                $consumedFast = $this->tryParseParagraph($parent, $lines, $i);
+                $this->stampSourceLine($parent, $childrenBefore, $blockStart);
+                $i += $consumedFast;
 
                 continue;
             }
@@ -1019,7 +1042,34 @@ class BlockParser
                 ?? $this->tryParseCaption($parent, $lines, $i)
                 ?? $this->tryParseParagraph($parent, $lines, $i);
 
+            $this->stampSourceLine($parent, $childrenBefore, $blockStart);
             $i += $consumed;
+        }
+    }
+
+    /**
+     * Stamp `data-source-line` on any children appended to $parent since
+     * $childrenBefore, using the 1-based source line the block started on.
+     * No-op unless source-line tracking is enabled (childrenBefore === -1).
+     *
+     * @param \Djot\Node\Node $parent
+     * @param int $childrenBefore Child count before the block was parsed, or -1 when disabled.
+     * @param int $start 0-indexed source line index; emitted as 1-based (+1).
+     *
+     * @return void
+     */
+    private function stampSourceLine(Node $parent, int $childrenBefore, int $start): void
+    {
+        if ($childrenBefore < 0) {
+            return;
+        }
+
+        $children = $parent->getChildren();
+        $total = count($children);
+        for ($k = $childrenBefore; $k < $total; $k++) {
+            if ($children[$k]->getAttribute('data-source-line') === null) {
+                $children[$k]->setAttribute('data-source-line', (string)($start + 1));
+            }
         }
     }
 
