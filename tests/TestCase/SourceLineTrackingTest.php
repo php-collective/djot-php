@@ -88,7 +88,9 @@ class SourceLineTrackingTest extends TestCase
         $converter = new DjotConverter(sourceLines: true);
         $html = $converter->convert("- first\n  {.note}\n  second\n");
 
-        $this->assertStringContainsString('<p data-source-line="1">first</p>', $html);
+        // The tight item's lead stays unwrapped (anchor-only <p> wrappers are
+        // stripped like plain ones); the li carries the anchor.
+        $this->assertMatchesRegularExpression('/<li data-source-line="1">\nfirst\n/', $html);
         $this->assertStringContainsString('<p class="note" data-source-line="3">second</p>', $html);
         $this->assertStringNotContainsString('data-source-line="0"', $html);
     }
@@ -99,11 +101,9 @@ class SourceLineTrackingTest extends TestCase
         $html = $converter->convert("> - quoted item\n>   - nested item\n");
 
         $this->assertMatchesRegularExpression('/<ul data-source-line="1">/', $html);
-        $this->assertMatchesRegularExpression('/<li data-source-line="1">/', $html);
-        $this->assertStringContainsString('<p data-source-line="1">quoted item</p>', $html);
+        $this->assertMatchesRegularExpression('/<li data-source-line="1">\nquoted item\n/', $html);
         $this->assertMatchesRegularExpression('/<ul data-source-line="2">/', $html);
-        $this->assertMatchesRegularExpression('/<li data-source-line="2">/', $html);
-        $this->assertStringContainsString('<p data-source-line="2">nested item</p>', $html);
+        $this->assertMatchesRegularExpression('/<li data-source-line="2">\nnested item\n/', $html);
     }
 
     public function testFootnoteContentBlocksAreStamped(): void
@@ -188,5 +188,18 @@ class SourceLineTrackingTest extends TestCase
         $this->assertStringContainsString('<p data-source-line="1">Intro</p>', $html);
         $this->assertStringContainsString('<div data-source-line="3">', $html);
         $this->assertStringContainsString('<p>nested</p>', $html);
+    }
+
+    public function testEnabledOutputIsStructureIdenticalToDisabled(): void
+    {
+        // The option is attribute-only: stripping the stamped attributes must
+        // reproduce the default output byte for byte. Regression: tight list
+        // items used to grow <p> wrappers because the stamped paragraph no
+        // longer matched the renderer's tight-strip pattern.
+        $doc = "> - quoted item\n\n- a\n- b\n\n1. loose\n\n  para\n\n:: nope\n";
+        $off = (new DjotConverter())->convert($doc);
+        $on = (new DjotConverter(sourceLines: true))->convert($doc);
+
+        $this->assertSame($off, preg_replace('/ data-source-line="\d+"/', '', $on));
     }
 }
