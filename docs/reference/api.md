@@ -29,6 +29,7 @@ public function __construct(
     bool $blocksInterruptParagraphs = false,
     bool $nestedListsWithoutBlankLine = false,
     bool $sourceLines = false,
+    bool $sections = true,
 )
 ```
 
@@ -41,11 +42,12 @@ public function __construct(
 - `$softBreakMode`: Override how soft breaks are rendered. When `null`, uses the renderer's default (newline for HTML).
 - `$roundTripMode`: When `true`, adds round-trip metadata for Djot→HTML→Djot workflows (HTML renderer only).
 - `$parser`: Optional pre-configured parser. When provided, inline parser constructor flags such as `warnings`, `strict`, `significantNewlines` (deprecated), `nestedBlocksInLists`, `blocksInterruptParagraphs`, and `nestedListsWithoutBlankLine` are ignored.
-- `$renderer`: Optional pre-configured renderer. When provided, inline renderer constructor flags such as `xhtml`, `safeMode`, `softBreakMode`, and `roundTripMode` are ignored.
+- `$renderer`: Optional pre-configured renderer. When provided, inline renderer constructor flags such as `xhtml`, `safeMode`, `softBreakMode`, `roundTripMode`, and `sections` are ignored.
 - `$nestedBlocksInLists`: **Deprecated.** When `true`, indentation alone introduces nested blocks of **any** type inside list items without a blank line (broad, eager - no lone-marker lookahead), while top-level paragraph interruption stays spec-compliant (see [Nested Blocks in Lists Mode](/guide/parser-options#nested-blocks-in-lists-mode)). Prefer `$blocksInterruptParagraphs` + `$nestedListsWithoutBlankLine`. No longer implied by `$significantNewlines`.
 - `$blocksInterruptParagraphs`: When `true`, top-level block elements (lists, blockquotes, headings, tables, thematic breaks, and code/div/comment fences) can interrupt a paragraph without a preceding blank line. It **also** interrupts a list item's lead paragraph, so an indented non-list block nests inside the item without a blank line, using the **same** lone-marker lookahead as the top level: unambiguous openers (`#`, fenced code, `:::`, `---`) and real multi-line blocks nest, while a single ambiguous marker line (`>`, `|`) stays literal. It does not nest sublists (see [Block Interrupts Paragraphs Mode](/guide/parser-options#block-interrupts-paragraphs-mode)). Implied by `$significantNewlines`.
 - `$nestedListsWithoutBlankLine`: When `true`, a sublist nests inside a list item without a blank line. Only sublists nest; non-list blocks under the item stay literal and top-level paragraph interruption is unaffected (see [Nested Lists Without Blank Line Mode](/guide/parser-options#nested-lists-without-blank-line-mode)). Implied by `$significantNewlines`.
 - `$sourceLines`: When `true`, block elements, nested blocks, list items, and definition terms/descriptions are stamped with a `data-source-line` attribute holding the **1-based** source line where the block started. Off by default, so normal output is unchanged. Intended for editor live-preview scroll-sync (map a rendered block back to the source textarea). Ignored when a pre-configured `$parser` is supplied (pass `new BlockParser(trackSourceLines: true)` instead). See [Source-line tracking](#source-line-tracking).
+- `$sections`: When `true` (default), document-level headings are wrapped in `<section>` elements and the heading id is placed on the section. When `false`, no heading section wrapper is emitted and the heading keeps its id inline. HTML renderer only; the footnote endnotes section is unaffected. CLI: `--no-sections`.
 
 ### Factory Methods
 
@@ -758,7 +760,36 @@ $renderer->setSoftBreakMode(SoftBreakMode::Space);
 
 // Enable safe mode for user-generated content
 $renderer->setSafeMode(SafeMode::defaults());
+
+// Disable document heading section wrappers
+$renderer->setSections(false);
 ```
+
+#### Section Wrapping
+
+By default, the HTML renderer wraps document-level headings in `<section>` elements and places each heading id on the section:
+
+```html
+<section id="intro">
+<h1>Intro</h1>
+</section>
+```
+
+Disable this when you need flat heading output, for example to keep existing Markdown-oriented stylesheet sibling selectors working:
+
+```php
+$converter = new DjotConverter(sections: false);
+// Or:
+$renderer->setSections(false);
+```
+
+With section wrapping disabled, the heading keeps its id inline:
+
+```html
+<h1 id="intro">Intro</h1>
+```
+
+This option is HTML-only. It does not affect the footnote endnotes section. In the CLI, use `--no-sections`.
 
 #### Tab Width in Code Blocks
 

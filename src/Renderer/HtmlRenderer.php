@@ -85,6 +85,11 @@ class HtmlRenderer implements RendererInterface
      */
     protected bool $roundTripMode = false;
 
+    /**
+     * Whether document-level headings are wrapped in section elements.
+     */
+    protected bool $sections = true;
+
     protected RenderContext $sharedRenderContext;
 
     protected ?RenderContext $activeRenderContext = null;
@@ -270,6 +275,20 @@ class HtmlRenderer implements RendererInterface
     }
 
     /**
+     * Set whether document-level headings are wrapped in section elements.
+     *
+     * When disabled, headings keep their id attribute inline and no section
+     * wrapper is emitted around document-level heading content. This does not
+     * affect the endnotes section emitted for footnotes.
+     */
+    public function setSections(bool $enabled): self
+    {
+        $this->sections = $enabled;
+
+        return $this;
+    }
+
+    /**
      * Register an inline footnote and return its number
      *
      * Used by extensions like InlineFootnotesExtension to add footnotes
@@ -360,6 +379,15 @@ class HtmlRenderer implements RendererInterface
         // same heading ids.
         $this->getRenderContext()->headingIdTracker->reserveExplicitIds($document);
 
+        if (!$this->sections) {
+            $html = '';
+            foreach ($document->getChildren() as $child) {
+                $html .= $this->renderNode($child);
+            }
+
+            return $html . $this->renderRoundTripAbbreviations($document);
+        }
+
         $children = $document->getChildren();
         $html = '';
         /** @var array<int, int> $openSections Level => count of open sections at that level */
@@ -434,15 +462,30 @@ class HtmlRenderer implements RendererInterface
             }
         }
 
-        // Add abbreviation definitions for round-trip support
-        if ($this->roundTripMode) {
-            $abbreviations = $document->getAbbreviations();
-            if ($abbreviations !== []) {
-                $html .= $this->renderAbbreviationDefinitions($abbreviations);
-            }
-        }
+        $html .= $this->renderRoundTripAbbreviations($document);
 
         return $html;
+    }
+
+    /**
+     * Render the round-trip abbreviation metadata for a document, if any.
+     *
+     * Returns an empty string when round-trip mode is off or the document
+     * defines no abbreviations. Shared by both the section-wrapped and the
+     * unwrapped document render paths.
+     */
+    protected function renderRoundTripAbbreviations(Document $document): string
+    {
+        if (!$this->roundTripMode) {
+            return '';
+        }
+
+        $abbreviations = $document->getAbbreviations();
+        if ($abbreviations === []) {
+            return '';
+        }
+
+        return $this->renderAbbreviationDefinitions($abbreviations);
     }
 
     /**

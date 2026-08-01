@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Djot\Test\TestCase\Renderer;
 
+use Djot\DjotConverter;
+use Djot\Event\RenderEvent;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Div;
 use Djot\Node\Block\Footnote;
@@ -59,6 +61,107 @@ class HtmlRendererTest extends TestCase
 
         // Headings are wrapped in <section> tags per djot spec
         $this->assertSame("<section id=\"Title\">\n<h2>Title</h2>\n</section>\n", $result);
+    }
+
+    public function testSectionsCanBeDisabled(): void
+    {
+        $cases = [
+            "{#install .featured}\n## Setup\n" => "<h2 id=\"install\" class=\"featured\">Setup</h2>\n",
+            "{a=b .c}\n# abc\n" => "<h1 id=\"abc\" a=\"b\" class=\"c\">abc</h1>\n",
+            "# abc\n" => "<h1 id=\"abc\">abc</h1>\n",
+            "{.c}\n# abc\n\npara\n\n{#y .d}\n## deeper\n" => "<h1 id=\"abc\" class=\"c\">abc</h1>\n<p>para</p>\n<h2 id=\"y\" class=\"d\">deeper</h2>\n",
+        ];
+
+        foreach ($cases as $input => $expected) {
+            $converter = new DjotConverter();
+            $converter->getHtmlRenderer()->setSections(false);
+
+            $this->assertSame($expected, $converter->convert($input));
+        }
+    }
+
+    public function testSectionsAreEnabledByDefault(): void
+    {
+        $cases = [
+            "{#install .featured}\n## Setup\n" => "<section id=\"install\">\n<h2 class=\"featured\">Setup</h2>\n</section>\n",
+            "{a=b .c}\n# abc\n" => "<section id=\"abc\">\n<h1 a=\"b\" class=\"c\">abc</h1>\n</section>\n",
+            "# abc\n" => "<section id=\"abc\">\n<h1>abc</h1>\n</section>\n",
+            "{.c}\n# abc\n\npara\n\n{#y .d}\n## deeper\n" => "<section id=\"abc\">\n<h1 class=\"c\">abc</h1>\n<p>para</p>\n<section id=\"y\">\n<h2 class=\"d\">deeper</h2>\n</section>\n</section>\n",
+        ];
+
+        foreach ($cases as $input => $expected) {
+            $this->assertSame($expected, (new DjotConverter())->convert($input));
+        }
+    }
+
+    public function testDuplicateHeadingIdsAreDeduplicatedWhenSectionsAreDisabled(): void
+    {
+        $converter = new DjotConverter();
+        $converter->getHtmlRenderer()->setSections(false);
+
+        $this->assertSame(
+            "<p id=\"abc\">intro</p>\n<h1 id=\"abc-1\">abc</h1>\n<h1 id=\"abc-2\">abc</h1>\n",
+            $converter->convert("{#abc}\nintro\n\n# abc\n\n# abc\n"),
+        );
+    }
+
+    public function testFootnotesSectionIsStillEmittedWhenSectionsAreDisabled(): void
+    {
+        $converter = new DjotConverter();
+        $converter->getHtmlRenderer()->setSections(false);
+
+        $html = $converter->convert("note[^a]\n\n[^a]: foot\n");
+
+        $this->assertStringContainsString('<section role="doc-endnotes">', $html);
+    }
+
+    public function testRoundTripAbbreviationsAreStillEmittedWhenSectionsAreDisabled(): void
+    {
+        $input = "*[HTML]: HyperText Markup Language\n\nHTML is fine.\n";
+        $withSections = new DjotConverter(roundTripMode: true);
+        $withoutSections = new DjotConverter(roundTripMode: true, sections: false);
+
+        $this->assertStringContainsString(
+            '<template data-djot-abbreviations>',
+            $withSections->convert($input),
+        );
+        $this->assertStringContainsString(
+            '<template data-djot-abbreviations>',
+            $withoutSections->convert($input),
+        );
+    }
+
+    public function testHeadingInsideDivRendersIdenticallyWithSectionsEnabledAndDisabled(): void
+    {
+        $input = "::: {.box}\n# abc\n:::\n";
+        $withSections = (new DjotConverter())->convert($input);
+
+        $withoutSections = new DjotConverter();
+        $withoutSections->getHtmlRenderer()->setSections(false);
+
+        $this->assertSame($withSections, $withoutSections->convert($input));
+        $this->assertSame("<div class=\"box\">\n<h1 id=\"abc\">abc</h1>\n</div>\n", $withSections);
+    }
+
+    public function testConverterConstructorCanDisableSections(): void
+    {
+        $converter = new DjotConverter(sections: false);
+
+        $this->assertSame("<h1 id=\"abc\">abc</h1>\n", $converter->convert("# abc\n"));
+    }
+
+    public function testRenderHeadingEventFiresWhenSectionsAreDisabled(): void
+    {
+        $converter = new DjotConverter(sections: false);
+        $fired = false;
+
+        $converter->on('render.heading', function (RenderEvent $event) use (&$fired): void {
+            $fired = true;
+            $this->assertInstanceOf(Heading::class, $event->getNode());
+        });
+
+        $this->assertSame("<h1 id=\"abc\">abc</h1>\n", $converter->convert("# abc\n"));
+        $this->assertTrue($fired);
     }
 
     public function testRenderEmphasis(): void

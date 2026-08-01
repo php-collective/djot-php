@@ -127,11 +127,12 @@ class DjotConverter
      * @param \Djot\Renderer\SoftBreakMode|null $softBreakMode How to render soft breaks (HTML renderer only)
      * @param bool $roundTripMode Add data attributes for Djot→HTML→Djot round-trips (HTML renderer only)
      * @param \Djot\Parser\BlockParser|null $parser Pre-configured parser (ignores warnings/strict/significantNewlines/nestedBlocksInLists/blocksInterruptParagraphs/nestedListsWithoutBlankLine if set)
-     * @param \Djot\Renderer\RendererInterface|null $renderer Pre-configured renderer (ignores xhtml/safeMode/softBreakMode/roundTripMode if set)
+     * @param \Djot\Renderer\RendererInterface|null $renderer Pre-configured renderer (ignores xhtml/safeMode/softBreakMode/roundTripMode/sections if set)
      * @param bool $nestedBlocksInLists Allow nested blocks in list items without blank lines (deprecated; prefer blocksInterruptParagraphs + nestedListsWithoutBlankLine)
      * @param bool $blocksInterruptParagraphs Allow top-level block elements to interrupt paragraphs without a blank line
      * @param bool $nestedListsWithoutBlankLine Allow sublists to nest in list items without a blank line
      * @param bool $sourceLines Stamp block elements, nested blocks, list items, and definition list entries with a `data-source-line` attribute (1-based source line). Opt-in, for editor scroll-sync; ignored when a pre-configured $parser is supplied.
+     * @param bool $sections Wrap document-level headings in section elements (HTML renderer only)
      */
     public function __construct(
         bool $xhtml = false,
@@ -148,6 +149,7 @@ class DjotConverter
         bool $blocksInterruptParagraphs = false,
         bool $nestedListsWithoutBlankLine = false,
         bool $sourceLines = false,
+        bool $sections = true,
     ) {
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
@@ -176,6 +178,11 @@ class DjotConverter
             // Configure round-trip mode
             if ($roundTripMode) {
                 $this->renderer->setRoundTripMode(true);
+            }
+
+            // Configure section wrapping
+            if (!$sections) {
+                $this->renderer->setSections(false);
             }
         }
 

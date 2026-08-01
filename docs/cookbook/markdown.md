@@ -107,6 +107,14 @@ Note: Features like highlight, superscript, and subscript don't have native Mark
 
 Migrate content from Djot to a Markdown-based CMS:
 
+When migrating Markdown stylesheets to Djot HTML output, note that document-level headings are wrapped in `<section>` elements by default. If your existing CSS expects a flat heading structure, disable section wrapping:
+
+```php
+$converter = new DjotConverter(sections: false);
+```
+
+The CLI equivalent is `--no-sections`. With this option off, headings keep their ids inline, and the footnote endnotes section is unchanged.
+
 ```php
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
