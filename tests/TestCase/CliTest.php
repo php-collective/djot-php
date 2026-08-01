@@ -65,6 +65,13 @@ class CliTest extends TestCase
         $this->assertStringContainsString('<strong>hi</strong>', $result['stdout']);
     }
 
+    public function testNoSectionsDisablesHtmlSectionWrapping(): void
+    {
+        $result = $this->runCli(['convert', '-', '--no-sections'], "# hi\n");
+        $this->assertSame(0, $result['exit']);
+        $this->assertSame("<h1 id=\"hi\">hi</h1>\n", $result['stdout']);
+    }
+
     public function testFormatText(): void
     {
         $result = $this->runCli(['convert', '-', '--format=text'], '*hi*');

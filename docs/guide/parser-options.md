@@ -15,6 +15,7 @@ $converter = new DjotConverter();
 // With options
 $converter = new DjotConverter(
     xhtml: true,
+    sections: false,
     blocksInterruptParagraphs: true,
     nestedListsWithoutBlankLine: true,
 );
@@ -42,6 +43,32 @@ $converter = DjotConverter::create(
 ```
 
 :::
+
+## Section Wrapping
+
+By default, HTML output wraps document-level headings in `<section>` elements and puts the heading id on the section:
+
+```html
+<section id="setup">
+<h2>Setup</h2>
+</section>
+```
+
+Disable section wrapping for flat heading markup:
+
+```php
+use Djot\DjotConverter;
+
+$converter = new DjotConverter(sections: false);
+```
+
+Output keeps the id on the heading itself:
+
+```html
+<h2 id="setup">Setup</h2>
+```
+
+This option is HTML-only, defaults to on, and does not affect the footnote endnotes section. In the CLI, use `--no-sections`.
 
 ## Soft Break Modes
 

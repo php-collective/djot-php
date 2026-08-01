@@ -317,6 +317,24 @@ Some Djot features cannot survive round-trip conversion due to semantic equivale
 
 These behaviors are correct and intentional - smart quotes enhance typography while preserving meaning.
 
+### Section Wrapping
+
+By default, Djot HTML wraps document-level headings in `<section>` elements and places the heading id on the section. Disable this HTML-only option when you need flat heading markup:
+
+```php
+use Djot\DjotConverter;
+
+$converter = new DjotConverter(sections: false);
+```
+
+With section wrapping off, the heading keeps its id inline:
+
+```html
+<h2 id="setup">Setup</h2>
+```
+
+The default is on, and the footnote endnotes section is unaffected. In the CLI, use `--no-sections`.
+
 **Use Cases:**
 - Converting WYSIWYG editor output
 - Migrating HTML documentation to Djot

@@ -19,6 +19,7 @@ declare(strict_types=1);
  *   -f, --format=FORMAT Output format: html (default), text, markdown, ansi
  *   --safe[=MODE] Enable safe mode (MODE: default or strict), HTML only
  *   -x, --xhtml Use XHTML-compatible output (HTML only)
+ *   --no-sections Do not wrap document headings in sections (HTML only)
  *   -w, --warnings Show parse warnings on stderr
  *   --strict Exit with code 1 if warnings are generated
  *   -h, --help Show this help message
@@ -93,6 +94,7 @@ function parseConvertArgs(array $argv): array
         'output' => null,
         'format' => 'html',
         'xhtml' => false,
+        'sections' => true,
         'safe' => false,
         'safeStrict' => false,
         'warnings' => false,
@@ -112,6 +114,8 @@ function parseConvertArgs(array $argv): array
             $options['version'] = true;
         } elseif ($arg === '-x' || $arg === '--xhtml') {
             $options['xhtml'] = true;
+        } elseif ($arg === '--no-sections') {
+            $options['sections'] = false;
         } elseif ($arg === '-s' || $arg === '--safe' || $arg === '--safe=default') {
             $options['safe'] = true;
         } elseif ($arg === '--safe=strict') {
@@ -191,6 +195,7 @@ Options:
   -f, --format=FORMAT   Output format: html (default), text, markdown, ansi
   --safe[=MODE]         Enable safe mode (MODE: default or strict), HTML only
   -x, --xhtml           Use XHTML-compatible output (HTML only)
+  --no-sections         Do not wrap document headings in sections (HTML only)
   -w, --warnings        Show parse warnings on stderr
   --strict              Exit with code 1 if warnings are generated
   -h, --help            Show this help message
@@ -317,6 +322,7 @@ function runConvert(array $argv): int
         warnings: $warnings,
         safeMode: $safeMode,
         renderer: $renderer,
+        sections: (bool)$options['sections'],
     );
 
     $output = $converter->convert($input);

@@ -52,6 +52,16 @@ Enable safe mode for untrusted content:
 ./vendor/bin/djot convert document.djot --safe=strict
 ```
 
+### Section Wrapping
+
+Disable document heading section wrappers in HTML output:
+
+```bash
+./vendor/bin/djot convert document.djot --no-sections
+```
+
+This keeps heading ids inline and does not affect the footnote endnotes section.
+
 ### Reading from STDIN
 
 ```bash
@@ -76,6 +86,7 @@ Options:
   -o, --output=FILE     Output file (default: stdout)
   -f, --format=FORMAT   Output format: html, text, markdown, ansi
   --safe[=MODE]         Enable safe mode (default, strict)
+  --no-sections         Do not wrap document headings in sections (HTML only)
   -h, --help            Display help
 ```
 
