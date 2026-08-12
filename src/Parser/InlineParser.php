@@ -26,6 +26,7 @@ use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Parser\Utility\AttributeParser;
+use Djot\Util\StringUtil;
 
 /**
  * Inline parser for Djot
@@ -1957,14 +1958,15 @@ class InlineParser
      */
     protected function parseFootnoteRef(string $text, int $pos): ?array
     {
-        // A footnote label cannot cross a physical line. The definition marker
-        // is one line too, so accepting a newline here creates an identifier
-        // that no valid definition can bind (jgm/djot#208).
-        if (!preg_match('/\G\[\^([^\]\r\n]+)\]/', $text, $matches, 0, $pos)) {
+        // A footnote REFERENCE may cross a line ending, like a reference link.
+        // The label is normalized before lookup, so a reference a text editor
+        // has wrapped still binds to the one-line definition. The definition
+        // marker itself stays single-line; that half is the block parser's.
+        if (!preg_match('/\G\[\^([^\]]+)\]/', $text, $matches, 0, $pos)) {
             return null;
         }
 
-        $label = $matches[1];
+        $label = StringUtil::normalizeLabel($matches[1]);
 
         // Warn if footnote is not defined
         if (!$this->blockParser->hasFootnote($label)) {

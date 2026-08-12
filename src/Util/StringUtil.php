@@ -43,4 +43,24 @@ final class StringUtil
 
         return str_replace("\u{E000}", '&nbsp;', $escaped);
     }
+
+    /**
+     * Normalize a reference or footnote label for lookup.
+     *
+     * Leading and trailing whitespace is removed and every internal run of
+     * whitespace becomes a single space, so a label a text editor has wrapped
+     * still matches a definition written on one line.
+     *
+     * The character class is exactly djot.js's `normalizeLabel`
+     * (`label.trim().replace(/[ \t\r\n]+/g, " ")`) rather than PHP's `\s`,
+     * which also covers form feed and vertical tab. That difference is
+     * observable: djot.js does not bind `[t][a<FF>b]` to `[a b]: url` and a
+     * `\s`-based normalizer does.
+     */
+    public static function normalizeLabel(string $label): string
+    {
+        $collapsed = preg_replace('/[ \t\r\n]+/', ' ', $label) ?? $label;
+
+        return trim($collapsed, " \t\r\n");
+    }
 }
