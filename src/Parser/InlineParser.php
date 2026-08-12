@@ -1957,8 +1957,10 @@ class InlineParser
      */
     protected function parseFootnoteRef(string $text, int $pos): ?array
     {
-        // Match [^label] - \G anchors at offset position, avoiding extra strpos check
-        if (!preg_match('/\G\[\^([^\]]+)\]/', $text, $matches, 0, $pos)) {
+        // A footnote label cannot cross a physical line. The definition marker
+        // is one line too, so accepting a newline here creates an identifier
+        // that no valid definition can bind (jgm/djot#208).
+        if (!preg_match('/\G\[\^([^\]\r\n]+)\]/', $text, $matches, 0, $pos)) {
             return null;
         }
 
