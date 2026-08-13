@@ -39,6 +39,7 @@ use Djot\Parser\Block\TableParser;
 use Djot\Parser\Utility\AttributeParser;
 use Djot\Parser\Utility\IndentationHelper;
 use Djot\Renderer\HeadingIdTracker;
+use Djot\Util\StringUtil;
 
 /**
  * Block-level parser for Djot
@@ -642,7 +643,12 @@ class BlockParser
 
             // Match footnote definition: [^label]: content (requires whitespace after colon)
             if (preg_match('/^\[\^([^\]]+)\]:(?:[ \t]+(.*))?[ \t]*$/', $line, $matches)) {
-                $label = $matches[1];
+                // The marker is matched against ONE line, so a definition label
+                // can never cross a line ending. It is normalized for the same
+                // reason a link reference definition is (see the `[label]: url`
+                // branch above): the reference side normalizes too, and the two
+                // have to meet on the same key.
+                $label = StringUtil::normalizeLabel($matches[1]);
                 $content = $matches[2] ?? '';
 
                 // Determine base indentation (2 spaces for footnotes)
