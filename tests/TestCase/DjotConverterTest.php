@@ -380,6 +380,15 @@ class DjotConverterTest extends TestCase
         $this->assertStringContainsString('<caption>Caption after blank line</caption>', $result);
     }
 
+    public function testBlankSeparatedSecondCaptionReplacesTheFirst(): void
+    {
+        $djot = "| A | B |\n|---|---|\n| 1 | 2 |\n^ First\n\n^ Second";
+        $expected = "<table>\n<caption>Second</caption>\n<tr>\n<th>A</th>\n<th>B</th>\n</tr>\n"
+            . "<tr>\n<td>1</td>\n<td>2</td>\n</tr>\n</table>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
     public function testTableCaptionMultiline(): void
     {
         $djot = "| A | B |\n|---|---|\n| 1 | 2 |\n^ This is a long caption\nthat continues on the next line";
@@ -388,6 +397,41 @@ class DjotConverterTest extends TestCase
 
         // Djot preserves newlines in captions
         $this->assertStringContainsString("<caption>This is a long caption\nthat continues on the next line</caption>", $result);
+    }
+
+    public function testAdjacentCaptionMarkerIsLiteralTableCaptionText(): void
+    {
+        $djot = "| A | B |\n|---|---|\n| 1 | 2 |\n^ First\n^ Second";
+        $expected = "<table>\n<caption>First\n^ Second</caption>\n<tr>\n<th>A</th>\n<th>B</th>\n</tr>\n"
+            . "<tr>\n<td>1</td>\n<td>2</td>\n</tr>\n</table>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    public function testAdjacentCaptionMarkerIsLiteralImageCaptionText(): void
+    {
+        $djot = "![alt](image.png)\n^ First\n^ Second";
+        $expected = "<figure>\n<img alt=\"alt\" src=\"image.png\"><figcaption>First\n^ Second</figcaption>\n</figure>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    public function testAdjacentCaptionMarkerIsLiteralBlockquoteCaptionText(): void
+    {
+        $djot = "> q\n^ First\n^ Second";
+        $expected = "<figure>\n<blockquote>\n<p>q</p>\n</blockquote>\n<figcaption>First\n^ Second</figcaption>\n"
+            . "</figure>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    public function testTwoCaptionedTablesKeepTheirOwnCaptions(): void
+    {
+        $djot = "| A |\n|---|\n| 1 |\n^ First\n\n| B |\n|---|\n| 2 |\n^ Second";
+        $expected = "<table>\n<caption>First</caption>\n<tr>\n<th>A</th>\n</tr>\n<tr>\n<td>1</td>\n</tr>\n</table>\n"
+            . "<table>\n<caption>Second</caption>\n<tr>\n<th>B</th>\n</tr>\n<tr>\n<td>2</td>\n</tr>\n</table>\n";
+
+        $this->assertSame($expected, $this->converter->convert($djot));
     }
 
     public function testReferenceLink(): void

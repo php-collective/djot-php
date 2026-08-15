@@ -3728,7 +3728,7 @@ class BlockParser
                 break;
             }
             // Stop at block-level elements
-            if ($this->startsNewBlock($nextLine)) {
+            if ($this->startsNewBlock($nextLine) && !preg_match('/^\^ /', $nextLine)) {
                 break;
             }
             // Stop at new table

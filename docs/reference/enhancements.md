@@ -1008,7 +1008,7 @@ The `^ caption text` syntax adds captions to images, tables, and block quotes:
 - `^ ` marker at start of line triggers caption parsing
 - Can interrupt paragraphs (no blank line required before caption)
 - Blank line between element and caption is allowed for readability
-- Multi-line captions supported (continues until blank line or new block)
+- Multi-line captions supported (continues until blank line or new block; an adjacent `^ ` line is caption text with its caret preserved)
 - Full roundtrip support in HtmlToDjot converter
 
 **Multi-line caption example:**
