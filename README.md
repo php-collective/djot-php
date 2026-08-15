@@ -33,7 +33,7 @@ $html = $converter->convert('Hello *world*!');
 - **Advanced**: Footnotes, math expressions, symbols, block attributes, raw HTML blocks, comments
 - **Smart typography**: Curly quotes, en/em dashes, ellipsis
 - **Multiple renderers**: HTML, plain text, Markdown, ANSI terminal output
-- **Extensions**: Built-in extensions for external links, TOC, heading permalinks, @mentions, autolinks, default attributes, and citations
+- **Extensions**: Built-in extensions for external links, TOC, heading permalinks, @mentions, autolinks, figure groups, default attributes, and citations
 - **Extensible**: Custom inline/block patterns, render events
 - **Editor integration**: Opt-in `data-source-line` stamping on blocks, nested blocks, list items, and definition list entries for live-preview scroll-sync (`new DjotConverter(sourceLines: true)`) — see [Source-line tracking](https://php-collective.github.io/djot-php/reference/api#source-line-tracking)
 - **File support**: Parse and convert files directly
