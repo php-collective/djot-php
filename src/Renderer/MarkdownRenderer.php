@@ -556,6 +556,8 @@ class MarkdownRenderer implements RendererInterface
     {
         // Escape special Markdown characters in text
         // But be careful not to over-escape
-        return preg_replace('/([\\\\`*_\[\]#])/', '\\\\$1', $text) ?? $text;
+        $escaped = preg_replace('/([\\\\`*_\[\]#])/', '\\\\$1', $text) ?? $text;
+
+        return preg_replace('/<(?=[A-Za-z\/!?])/', '\\\\<', $escaped) ?? $escaped;
     }
 }
