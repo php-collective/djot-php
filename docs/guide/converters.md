@@ -168,6 +168,8 @@ $djot = $converter->convert($html);
 | `<figure>` + `<img>` + `<figcaption>` | Image with `^ caption` |
 | `<figure>` + `<blockquote>` + `<figcaption>` | Block quote with `^ caption` |
 
+Djot can only spell a leading header row, so a `<th>` elsewhere imports as a data cell.
+
 **File Operations:**
 
 ```php

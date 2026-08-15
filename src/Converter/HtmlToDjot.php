@@ -1592,7 +1592,6 @@ class HtmlToDjot
     {
         $rows = [];
         $headerRow = null;
-        $headerRowAttrs = '';
         $columnCount = 0;
         $captionText = '';
         $alignments = [];
@@ -1606,9 +1605,9 @@ class HtmlToDjot
         // Find all rows
         $trElements = $this->getDirectTableRows($node);
 
-        foreach ($trElements as $tr) {
+        foreach ($trElements as $rowIndex => $tr) {
             $cells = [];
-            $isHeader = false;
+            $allCellsAreHeaders = true;
 
             $columnIndex = 0;
             foreach ($tr->childNodes as $cell) {
@@ -1624,8 +1623,8 @@ class HtmlToDjot
                         } else {
                             $cells[] = $cellContent;
                         }
-                        if ($tag === 'th') {
-                            $isHeader = true;
+                        if ($tag !== 'th') {
+                            $allCellsAreHeaders = false;
                         }
                         if (!isset($alignments[$columnIndex])) {
                             $alignments[$columnIndex] = $this->extractTableCellAlignment($cell);
@@ -1644,9 +1643,8 @@ class HtmlToDjot
 
                 $row = '| ' . implode(' | ', $cells) . ' |' . $rowAttrSuffix;
 
-                if ($isHeader && $headerRow === null) {
+                if ($rowIndex === 0 && $allCellsAreHeaders) {
                     $headerRow = $row;
-                    $headerRowAttrs = $rowAttrSuffix;
                 } else {
                     $rows[] = $row;
                 }
