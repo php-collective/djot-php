@@ -55,6 +55,30 @@ class PlainTextRendererTest extends TestCase
         $this->assertSame("See a photo here.\n", $this->renderer->render($document));
     }
 
+    public function testCaptionedImage(): void
+    {
+        $djot = "![a](a.png)\n^ Panel caption";
+        $document = $this->converter->parse($djot);
+
+        $this->assertSame("a\nPanel caption\n", $this->renderer->render($document));
+    }
+
+    public function testCaptionedBlockQuote(): void
+    {
+        $djot = "> To be or not to be.\n^ Hamlet";
+        $document = $this->converter->parse($djot);
+
+        $this->assertSame("\"To be or not to be.\"\nHamlet\n", $this->renderer->render($document));
+    }
+
+    public function testFigureBetweenParagraphs(): void
+    {
+        $djot = "Before.\n\n![a](a.png)\n^ Panel caption\n\nAfter.";
+        $document = $this->converter->parse($djot);
+
+        $this->assertSame("Before.\n\na\nPanel caption\n\nAfter.\n", $this->renderer->render($document));
+    }
+
     public function testHeadings(): void
     {
         $djot = "# Welcome\n\nThis is content.";
