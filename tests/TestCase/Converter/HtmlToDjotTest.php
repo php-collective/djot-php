@@ -389,6 +389,53 @@ HTML;
         $this->assertStringContainsString('| Alice | 30 |', $result);
     }
 
+    public function testTableHeaderCellInThirdRowDoesNotReorderRows(): void
+    {
+        $html = '<table><tr><td>a</td></tr><tr><td>b</td></tr><tr><th>H</th></tr></table>';
+
+        $djot = $this->converter->convert($html);
+
+        $this->assertSame("| a |\n| b |\n| H |\n", $djot);
+        $this->assertSame(
+            "<table>\n<tr>\n<td>a</td>\n</tr>\n<tr>\n<td>b</td>\n</tr>\n<tr>\n<td>H</td>\n</tr>\n</table>\n",
+            (new DjotConverter())->convert($djot),
+        );
+    }
+
+    public function testTableMixedFirstRowImportsAsDataCells(): void
+    {
+        $html = '<table><tr><th>R</th><td>1</td></tr></table>';
+
+        $djot = $this->converter->convert($html);
+
+        $this->assertSame("| R | 1 |\n", $djot);
+        $this->assertSame(
+            "<table>\n<tr>\n<td>R</td>\n<td>1</td>\n</tr>\n</table>\n",
+            (new DjotConverter())->convert($djot),
+        );
+    }
+
+    public function testTableLeadingAllHeaderRowImportsAsHeader(): void
+    {
+        $html = '<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>';
+
+        $this->assertSame("| A | B |\n|---|---|\n| 1 | 2 |\n", $this->converter->convert($html));
+    }
+
+    public function testTableSectionsPreserveLeadingHeaderAndBodyRows(): void
+    {
+        $html = '<table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>';
+
+        $this->assertSame("| A |\n|---|\n| 1 |\n", $this->converter->convert($html));
+    }
+
+    public function testTableWithoutHeaderCellsHasNoSeparator(): void
+    {
+        $html = '<table><tr><td>a</td></tr><tr><td>b</td></tr></table>';
+
+        $this->assertSame("| a |\n| b |\n", $this->converter->convert($html));
+    }
+
     public function testNestedTableDoesNotLeakInnerRowsIntoOuterTable(): void
     {
         $html = '<table><tr><td>outer <table><tr><td>inner</td></tr></table></td></tr></table>';
