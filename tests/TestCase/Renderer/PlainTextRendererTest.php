@@ -6,6 +6,8 @@ namespace Djot\Test\TestCase\Renderer;
 
 use Djot\DjotConverter;
 use Djot\Event\RenderEvent;
+use Djot\Node\Block\Figure;
+use Djot\Node\Document;
 use Djot\Node\Inline\Symbol;
 use Djot\Renderer\PlainTextRenderer;
 use Djot\Renderer\SoftBreakMode;
@@ -77,6 +79,20 @@ class PlainTextRendererTest extends TestCase
         $document = $this->converter->parse($djot);
 
         $this->assertSame("Before.\n\na\nPanel caption\n\nAfter.\n", $this->renderer->render($document));
+    }
+
+    /**
+     * A figure with nothing renderable in it contributes no text at all - not
+     * even the blank line every other block terminates with. Reachable through
+     * the AST rather than through source: an empty figure div transformed by an
+     * extension leaves an empty panels container behind.
+     */
+    public function testEmptyFigureRendersNothing(): void
+    {
+        $document = new Document();
+        $document->appendChild(new Figure());
+
+        $this->assertSame("\n", $this->renderer->render($document));
     }
 
     public function testHeadings(): void
