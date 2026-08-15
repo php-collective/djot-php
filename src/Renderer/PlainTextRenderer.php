@@ -6,12 +6,14 @@ namespace Djot\Renderer;
 
 use Djot\Event\RenderEvent;
 use Djot\Node\Block\BlockQuote;
+use Djot\Node\Block\Caption;
 use Djot\Node\Block\CodeBlock;
 use Djot\Node\Block\Comment;
 use Djot\Node\Block\DefinitionDescription;
 use Djot\Node\Block\DefinitionList;
 use Djot\Node\Block\DefinitionTerm;
 use Djot\Node\Block\Div;
+use Djot\Node\Block\Figure;
 use Djot\Node\Block\Footnote;
 use Djot\Node\Block\Heading;
 use Djot\Node\Block\LineBlock;
@@ -121,6 +123,8 @@ class PlainTextRenderer implements RendererInterface
             $node instanceof Paragraph => $this->renderParagraph($node),
             $node instanceof Heading => $this->renderHeading($node),
             $node instanceof CodeBlock => $this->renderCodeBlock($node),
+            $node instanceof Figure => $this->renderFigure($node),
+            $node instanceof Caption => $this->renderCaption($node),
             $node instanceof Comment => '', // Skip comments
             $node instanceof RawBlock => '', // Skip raw blocks (format-specific)
             $node instanceof BlockQuote => $this->renderBlockQuote($node),
@@ -187,6 +191,33 @@ class PlainTextRenderer implements RendererInterface
     protected function renderCodeBlock(CodeBlock $node): string
     {
         return $node->getContent() . "\n\n";
+    }
+
+    protected function renderFigure(Figure $node): string
+    {
+        $pieces = [];
+
+        foreach ($node->getChildren() as $child) {
+            $piece = $child instanceof Caption
+                ? $this->renderCaption($child)
+                : $this->renderNode($child);
+            $piece = rtrim($piece, "\n");
+
+            if ($piece !== '') {
+                $pieces[] = $piece;
+            }
+        }
+
+        if ($pieces === []) {
+            return '';
+        }
+
+        return implode("\n", $pieces) . "\n\n";
+    }
+
+    protected function renderCaption(Caption $node): string
+    {
+        return trim($this->renderChildren($node));
     }
 
     protected function renderBlockQuote(BlockQuote $node): string
