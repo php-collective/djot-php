@@ -102,6 +102,44 @@ class MarkdownRendererTest extends TestCase
         $this->assertStringContainsString('`print()`', $this->renderer->render($document));
     }
 
+    public function testEscapesLessThanThatWouldOpenMarkup(): void
+    {
+        $document = $this->converter->parse('a<b>c');
+
+        $this->assertSame("a\\<b>c\n", $this->renderer->render($document));
+    }
+
+    public function testLeavesComparisonOperatorsUnescaped(): void
+    {
+        $document = $this->converter->parse('a < b and 3 > 2');
+
+        $this->assertSame("a < b and 3 > 2\n", $this->renderer->render($document));
+    }
+
+    public function testAutolinkLessThanIsNotEscaped(): void
+    {
+        $document = $this->converter->parse('<https://example.com>');
+
+        $this->assertSame("[https://example.com](https://example.com)\n", $this->renderer->render($document));
+    }
+
+    public function testCodeSpanLessThanIsNotEscaped(): void
+    {
+        $document = $this->converter->parse('`<b>`');
+
+        $this->assertSame("`<b>`\n", $this->renderer->render($document));
+    }
+
+    public function testLessThanEscapeLookahead(): void
+    {
+        $document = $this->converter->parse("5 < 6\n\nx<!DOCTYPE y\n\nz</b> w\n\nq<?php r");
+
+        $this->assertSame(
+            "5 < 6\n\nx\\<!DOCTYPE y\n\nz\\</b> w\n\nq\\<?php r\n",
+            $this->renderer->render($document),
+        );
+    }
+
     public function testUnorderedList(): void
     {
         // Test dash marker
