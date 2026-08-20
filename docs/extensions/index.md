@@ -12,6 +12,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [CodeGroupExtension](#codegroupextension) | Transforms code-group divs into tabbed code block interfaces |
 | [DefaultAttributesExtension](#defaultattributesextension) | Adds default attributes to elements by type |
 | [ExternalLinksExtension](#externallinksextension) | Adds `target="_blank"` and `rel` attributes to external links |
+| [FigureGroupExtension](#figuregroupextension) | Turns figure divs into composite figures with ordered panels |
 | [FrontmatterExtension](#frontmatterextension) | Parses YAML/NEON/TOML/JSON frontmatter at document start |
 | [HeadingReferenceExtension](#headingreferenceextension) | Resolves `[[Heading Text]]` links to headings in the current document |
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
@@ -1291,6 +1292,55 @@ $converter->addExtension(new CodeGroupExtension(
 | Syntax highlighting | Built-in callback support | Manual |
 | Output modes | CSS-only | CSS or ARIA |
 | Best for | Multi-language code examples | General tabbed content |
+
+## FigureGroupExtension
+
+Turns a bare `figure` div into one composite figure containing ordered panels. Captioned images and blockquotes become panel figures, captioned tables are wrapped in panel figures, and other content remains in place. A caret paragraph immediately after the div becomes the group caption.
+
+This composite-figure convention is not part of djot and is strictly opt-in.
+
+```php
+use Djot\Extension\FigureGroupExtension;
+
+$converter->addExtension(new FigureGroupExtension());
+```
+
+```djot
+{#fig-x .columns-2}
+::: figure
+![one](a.png)
+^ (a) One
+
+![two](b.png)
+^ (b) Two
+:::
+^ Group caption
+```
+
+```html
+<figure class="figure-group columns-2" id="fig-x">
+  <div class="figure-panels">
+    <figure class="figure-panel">
+      <img alt="one" src="a.png"><figcaption>(a) One</figcaption>
+    </figure>
+    <figure class="figure-panel">
+      <img alt="two" src="b.png"><figcaption>(b) Two</figcaption>
+    </figure>
+  </div>
+  <figcaption>Group caption</figcaption>
+</figure>
+```
+
+Constructor options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `triggerClass` | `string` | `'figure'` | Class identifying a div to transform |
+| `groupClass` | `string` | `'figure-group'` | Class placed first on the group figure |
+| `panelsClass` | `string` | `'figure-panels'` | Class on the panels div |
+| `panelClass` | `string` | `'figure-panel'` | Class on promoted or wrapped panels |
+
+All renderers receive the transformed AST, so non-HTML output retains the panel and group captions using its existing figure, div, and caption rendering.
 
 ## DefaultAttributesExtension
 
