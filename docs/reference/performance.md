@@ -18,6 +18,17 @@ Performance benchmarks for djot-php compared to other implementations.
 
 ## Quick Reference
 
+Default source-to-HTML conversion now includes a conservative borrowed-source
+route for common documents up to 64 KiB. On PHP 8.5.9 with CLI OPcache, a
+57,410-byte heading/paragraph/core-inline fixture measured 6.5 ms median versus
+49.5 ms through an explicitly configured owned-AST converter (7.7x faster),
+with byte-identical output. Absolute timings remain machine-dependent.
+
+Unsupported or ambiguous input automatically falls back to the complete parser
+and renderer. Calling `parse()`, selecting another renderer, or configuring
+profiles, safety, extensions, listeners, source lines, or output behavior also
+keeps the authoritative path.
+
 | Document Size | PHP Full | Throughput |
 |---------------|----------|------------|
 | 1 KB          | 0.51 ms  | ~2.1 MB/s  |
