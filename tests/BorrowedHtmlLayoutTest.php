@@ -28,6 +28,7 @@ final class BorrowedHtmlLayoutTest extends TestCase
     public static function acceptedDocuments(): iterable
     {
         yield 'plain paragraphs' => ["First paragraph.\ncontinues here.\n\nSecond paragraph.\n"];
+        yield 'smart punctuation' => ["A \"quote\", don't stop--now.\n"];
         yield 'core inline' => ["A *strong*, _emphasized_, and `coded` [link](https://example.com).\n"];
         yield 'sections' => ["# First heading\n\nBody.\n\n## Child heading\n\nMore body.\n"];
         yield 'code fence' => ["# Code\n\n```php\necho '<safe>';\n```\n"];
