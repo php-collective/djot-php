@@ -32,6 +32,22 @@ final class BorrowedHtmlLayoutTest extends TestCase
         yield 'sections' => ["# First heading\n\nBody.\n\n## Child heading\n\nMore body.\n"];
         yield 'code fence' => ["# Code\n\n```php\necho '<safe>';\n```\n"];
         yield 'duplicate heading ids' => ["# Same\n\n# Same\n"];
+        yield 'tight list with continuation-shaped nested markers' => [
+            "- first\n- second\n  - nested one\n  - nested *strong*\n",
+        ];
+
+        yield 'simple block quote' => ["> Quoted *strong* and [linked](https://example.com).\n"];
+        yield 'plain-cell table' => [
+            "| Name | Value |\n| --- | ---: |\n| alpha | `one` |\n",
+        ];
+
+        yield 'unresolved explicit reference and double strong' => [
+            "Paragraph has **strong** and an [unresolved][missing] reference.\n",
+        ];
+
+        yield 'title-shaped line is prose' => [
+            "[site]: https://example.com \"Example\"\n",
+        ];
     }
 
     #[DataProvider('rejectedDocuments')]
@@ -47,8 +63,6 @@ final class BorrowedHtmlLayoutTest extends TestCase
     public static function rejectedDocuments(): iterable
     {
         yield 'lazy heading continuation' => ["# Heading\ncontinued\n"];
-        yield 'lists' => ["- one\n- two\n"];
-        yield 'quotes' => ["> quote\n"];
         yield 'tables' => ["| a | b |\n|---|---|\n| 1 | 2 |\n"];
         yield 'unicode' => ["Grüße\n"];
         yield 'attributes' => ["{.note}\nParagraph\n"];

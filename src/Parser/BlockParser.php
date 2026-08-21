@@ -524,11 +524,28 @@ class BlockParser
 
         $lines = $this->splitLines($input);
 
-        // First pass: extract reference definitions, footnotes, abbreviations, and heading references
-        $this->extractReferences($lines);
-        $this->extractFootnotes($lines);
-        $this->extractAbbreviations($lines);
-        $this->extractHeadingReferences($lines);
+        // Gate document-wide collectors by syntax family. The predicates only
+        // skip impossible families; false positives merely retain the existing
+        // authoritative pass.
+        $hasReferenceDefinitions = preg_match(
+            '/(?:^|\n)\[[^\]\r\n]+\]:(?:[ \t]+\S*)?[ \t]*(?:\r?\n|$)/',
+            $input,
+        ) === 1;
+        $hasFootnotes = str_contains($input, '[^');
+        $hasAbbreviations = str_contains($input, '*[');
+        $hasImplicitHeadingReferences = preg_match('/\]\s*\[\]/', $input) === 1;
+        if ($hasReferenceDefinitions) {
+            $this->extractReferences($lines);
+        }
+        if ($hasFootnotes) {
+            $this->extractFootnotes($lines);
+        }
+        if ($hasAbbreviations) {
+            $this->extractAbbreviations($lines);
+        }
+        if ($hasImplicitHeadingReferences || $this->collectWarnings) {
+            $this->extractHeadingReferences($lines);
+        }
 
         // Second pass: parse blocks
         $this->parseBlocks($document, $lines, 0);
@@ -543,7 +560,9 @@ class BlockParser
         // attributes) and rewrite implicit heading references to the same
         // deduped ids the renderer will emit, so `[Heading][]` anchors stay
         // in sync with the rendered section id.
-        $this->rewriteHeadingReferences($document);
+        if ($hasImplicitHeadingReferences || $this->collectWarnings) {
+            $this->rewriteHeadingReferences($document);
+        }
 
         // Validate references and anchor links if warnings are enabled
         if ($this->collectWarnings) {
