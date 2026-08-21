@@ -16,6 +16,8 @@ use Djot\Util\StringUtil;
  */
 final class BorrowedHtmlLayout
 {
+    private bool $observing = false;
+
     /**
      * @var array{
      *   headingNumbers: array{minLevel: int}|null,
@@ -71,6 +73,7 @@ final class BorrowedHtmlLayout
      */
     public function render(string $source, bool $observe = false, array $events = []): ?array
     {
+        $this->observing = $observe;
         $this->events = array_replace(
             [
                 'headingNumbers' => null,
@@ -153,6 +156,9 @@ final class BorrowedHtmlLayout
      */
     private function accept(array &$stats, string $event, int $start, int $end, bool $active = false): void
     {
+        if (!$this->observing) {
+            return;
+        }
         $stats[$event]++;
         $stats['consumedLines'] += $end - $start;
         if ($active) {
@@ -195,10 +201,10 @@ final class BorrowedHtmlLayout
             ) {
                 return null;
             }
-            $definitions[$match[1]] = ['href' => $match[2], 'title' => $match[3] ?? null];
             if (isset($match[3])) {
-                return null;
+                continue;
             }
+            $definitions[$match[1]] = ['href' => $match[2], 'title' => null];
             $this->accept($stats, 'linkDefinitions', $index, $index + 1, true);
         }
 
@@ -226,7 +232,7 @@ final class BorrowedHtmlLayout
         $count = count($lines);
         while ($i < $count) {
             $line = $lines[$i];
-            if (trim($line) === '' || preg_match('/^\[[^\]]+\]:/', $line) === 1) {
+            if (trim($line) === '' || $this->isActiveDefinition($line, $definitions)) {
                 $i++;
 
                 continue;
@@ -333,7 +339,15 @@ final class BorrowedHtmlLayout
                 continue;
             }
             if (str_starts_with($line, '- ')) {
-                return null;
+                $rendered = $this->renderUnorderedList($lines, $i, $definitions, $stats);
+                if ($rendered === null) {
+                    return null;
+                }
+                $out[] = $rendered['html'];
+                $i = $rendered['next'];
+                $wrote = true;
+
+                continue;
             }
             if ($this->thematicBreak($line)) {
                 $out[] = $this->indent($depth) . '<hr>';
@@ -347,10 +361,26 @@ final class BorrowedHtmlLayout
                 return null;
             }
             if (str_starts_with($line, '> ')) {
-                return null;
+                $rendered = $this->renderBlockQuote($lines, $i, $definitions, $stats);
+                if ($rendered === null) {
+                    return null;
+                }
+                $out[] = $rendered['html'];
+                $i = $rendered['next'];
+                $wrote = true;
+
+                continue;
             }
             if (str_starts_with($line, '|')) {
-                return null;
+                $rendered = $this->renderTable($lines, $i, $definitions, $stats);
+                if ($rendered === null) {
+                    return null;
+                }
+                $out[] = $rendered['html'];
+                $i = $rendered['next'];
+                $wrote = true;
+
+                continue;
             }
             if ($this->blockish($line)) {
                 return null;
@@ -390,10 +420,13 @@ final class BorrowedHtmlLayout
      */
     private function renderInline(string $text, array $definitions): ?string
     {
+        if (preg_match('/^\[[^\]]+\]: +\S+ +"[^"]*"$/', $text) === 1) {
+            return $this->escapeText($text);
+        }
         if ($this->inlineComplex($text)) {
             return null;
         }
-        $flat = $this->renderFlatInline($text);
+        $flat = $this->renderFlatInline($text, $definitions);
         if ($flat !== false) {
             return $flat;
         }
@@ -410,6 +443,21 @@ final class BorrowedHtmlLayout
             }
             $out .= $this->escapeText(substr($text, $plain, $i - $plain));
             if ($delimiter === '*' || $delimiter === '_') {
+                if ($delimiter === '*' && ($text[$i + 1] ?? '') === '*') {
+                    $close = strpos($text, '**', $i + 2);
+                    if ($close === false || $close === $i + 2) {
+                        return null;
+                    }
+                    $inner = $this->renderInline('*' . substr($text, $i + 2, $close - $i - 2) . '*', $definitions);
+                    if ($inner === null) {
+                        return null;
+                    }
+                    $out .= '<strong>' . $inner . '</strong>';
+                    $i = $close + 2;
+                    $plain = $i;
+
+                    continue;
+                }
                 $close = strpos($text, $delimiter, $i + 1);
                 if (
                     $close === false || $close <= $i + 1 || ctype_space($text[$i + 1])
@@ -460,25 +508,25 @@ final class BorrowedHtmlLayout
                         return null;
                     }
                     $key = substr($text, $labelEnd + 2, $close - $labelEnd - 2);
-                    if (!isset($definitions[$key])) {
+                    if ($key === '') {
                         return null;
                     }
-                    $href = $definitions[$key]['href'];
-                    $title = $definitions[$key]['title'];
+                    $href = $definitions[$key]['href'] ?? null;
+                    $title = $definitions[$key]['title'] ?? null;
                     $i = $close + 1;
                 } else {
                     return null;
                 }
-                if (!$this->safeUrl($href)) {
+                if ($href !== null && !$this->safeUrl($href)) {
                     return null;
                 }
                 $inner = $this->renderInline($label, $definitions);
                 if ($inner === null) {
                     return null;
                 }
-                $out .= '<a href="' . $this->escapeAttribute($href) . '"'
+                $out .= '<a' . ($href === null ? '' : ' href="' . $this->escapeAttribute($href) . '"')
                     . ($title === null ? '' : ' title="' . $this->escapeAttribute($title) . '"')
-                    . $this->externalLinkAttributes($href)
+                    . ($href === null ? '' : $this->externalLinkAttributes($href))
                     . '>' . $inner . '</a>';
             }
             $plain = $i;
@@ -490,11 +538,15 @@ final class BorrowedHtmlLayout
     /**
      * Common non-nested inline markup is tokenized in PCRE instead of walking
      * every byte in PHP. False asks the conservative generic path to decide.
+     *
+     * @param string $text
+     * @param array<string, array{href: string, title: ?string}> $definitions
      */
-    private function renderFlatInline(string $text): string|false
+    private function renderFlatInline(string $text, array $definitions): string|false
     {
         $matched = preg_match_all(
-            '/\*([^*\n]+)\*|_([^_\n]+)_|`([^`\n]*)`|\[([^\]\n*\_`]+)\]\(([^()\s]+)\)/',
+            '/\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|_([^_\n]+)_|`([^`\n]*)`'
+                . '|\[([^\]\n*\_`]+)\]\(([^()\s]+)\)|\[([^\]\n*\_`]+)\]\[([^\]\n]+)\]/',
             $text,
             $matches,
             PREG_SET_ORDER | PREG_OFFSET_CAPTURE,
@@ -516,7 +568,9 @@ final class BorrowedHtmlLayout
 
             $delimiter = $token[0];
             if ($delimiter === '*' || $delimiter === '_') {
-                $inner = $delimiter === '*' ? ($match[1][0] ?? '') : ($match[2][0] ?? '');
+                $double = str_starts_with($token, '**');
+                $inner = $double ? ($match[1][0] ?? '')
+                    : ($delimiter === '*' ? ($match[2][0] ?? '') : ($match[3][0] ?? ''));
                 $end = $start + strlen($token);
                 if (
                     $inner === '' || strpbrk($inner, '*_`[]') !== false
@@ -527,20 +581,23 @@ final class BorrowedHtmlLayout
                     return false;
                 }
                 $tag = $delimiter === '*' ? 'strong' : 'em';
-                $out .= '<' . $tag . '>' . $this->escapeText($inner) . '</' . $tag . '>';
+                $rendered = '<' . $tag . '>' . $this->escapeText($inner) . '</' . $tag . '>';
+                $out .= $double ? '<strong>' . $rendered . '</strong>' : $rendered;
             } elseif ($delimiter === '`') {
-                $code = $match[3][0] ?? '';
+                $code = $match[4][0] ?? '';
                 if ($code !== trim($code)) {
                     return false;
                 }
                 $out .= '<code>' . $this->escape($code) . '</code>';
             } else {
-                $href = $match[5][0] ?? '';
-                if (!$this->safeUrl($href)) {
+                $direct = ($match[6][0] ?? '') !== '';
+                $label = $direct ? ($match[5][0] ?? '') : ($match[7][0] ?? '');
+                $href = $direct ? ($match[6][0] ?? '') : ($definitions[$match[8][0] ?? '']['href'] ?? null);
+                if ($href !== null && !$this->safeUrl($href)) {
                     return false;
                 }
-                $out .= '<a href="' . $this->escapeAttribute($href) . '">'
-                    . $this->escapeText($match[4][0] ?? '') . '</a>';
+                $out .= '<a' . ($href === null ? '>' : ' href="' . $this->escapeAttribute($href) . '">')
+                    . $this->escapeText($label) . '</a>';
             }
             $offset = $start + strlen($token);
         }
@@ -551,6 +608,126 @@ final class BorrowedHtmlLayout
         }
 
         return $out . $this->escapeText($tail);
+    }
+
+    /**
+     * @param string $line
+     * @param array<string, array{href: string, title: ?string}> $definitions
+     */
+    private function isActiveDefinition(string $line, array $definitions): bool
+    {
+        return preg_match('/^\[([^\]]+)\]:/', $line, $match) === 1 && isset($definitions[$match[1]]);
+    }
+
+    /**
+     * @param list<string> $lines
+     * @param int $start
+     * @param array<string, array{href: string, title: ?string}> $definitions
+     * @param array<string, int> $stats
+     *
+     * @return array{html: string, next: int}|null
+     */
+    private function renderUnorderedList(array $lines, int $start, array $definitions, array &$stats): ?array
+    {
+        $html = "<ul>\n";
+        $i = $start;
+        while (isset($lines[$i]) && str_starts_with($lines[$i], '- ')) {
+            $itemText = substr($lines[$i], 2);
+            if (str_starts_with($itemText, '- ')) {
+                return null;
+            }
+            $inline = $this->renderInline($itemText, $definitions);
+            if ($inline === null) {
+                return null;
+            }
+            $this->accept($stats, 'unorderedListItems', $i, $i + 1);
+            $html .= "<li>\n" . $inline;
+            $i++;
+            while (isset($lines[$i]) && str_starts_with($lines[$i], '  - ')) {
+                $nested = $this->renderInline(substr($lines[$i], 4), $definitions);
+                if ($nested === null) {
+                    return null;
+                }
+                $html .= "\n- " . $nested;
+                $this->accept($stats, 'unorderedListItems', $i, $i + 1);
+                $i++;
+            }
+            if (isset($lines[$i]) && trim($lines[$i]) !== '' && !str_starts_with($lines[$i], '- ')) {
+                return null;
+            }
+            $html .= "\n</li>\n";
+        }
+
+        return ['html' => $html . '</ul>', 'next' => $i];
+    }
+
+    /**
+     * @param list<string> $lines
+     * @param int $start
+     * @param array<string, array{href: string, title: ?string}> $definitions
+     * @param array<string, int> $stats
+     *
+     * @return array{html: string, next: int}|null
+     */
+    private function renderBlockQuote(array $lines, int $start, array $definitions, array &$stats): ?array
+    {
+        $parts = [];
+        $i = $start;
+        while (isset($lines[$i]) && str_starts_with($lines[$i], '> ')) {
+            $quoteText = substr($lines[$i], 2);
+            if ($this->blockish($quoteText)) {
+                return null;
+            }
+            $inline = $this->renderInline($quoteText, $definitions);
+            if ($inline === null) {
+                return null;
+            }
+            $parts[] = $inline;
+            $i++;
+        }
+        if (isset($lines[$i]) && trim($lines[$i]) !== '') {
+            return null;
+        }
+        $this->accept($stats, 'blockQuotes', $start, $i);
+
+        return ['html' => "<blockquote>\n<p>" . implode("\n", $parts) . "</p>\n</blockquote>", 'next' => $i];
+    }
+
+    /**
+     * @param list<string> $lines
+     * @param int $start
+     * @param array<string, array{href: string, title: ?string}> $definitions
+     * @param array<string, int> $stats
+     *
+     * @return array{html: string, next: int}|null
+     */
+    private function renderTable(array $lines, int $start, array $definitions, array &$stats): ?array
+    {
+        $html = "<table>\n";
+        $i = $start;
+        while (isset($lines[$i]) && str_starts_with($lines[$i], '|')) {
+            $trimmed = trim($lines[$i]);
+            if (!str_ends_with($trimmed, '|') || str_contains($trimmed, '\\|')) {
+                return null;
+            }
+            if (str_starts_with($trimmed, '|-') || str_starts_with($trimmed, '|:')) {
+                return null;
+            }
+            $cells = array_map('trim', explode('|', substr($trimmed, 1, -1)));
+            $html .= "<tr>\n";
+            foreach ($cells as $cell) {
+                $inline = $this->renderInline($cell, $definitions);
+                if ($inline === null) {
+                    return null;
+                }
+                $html .= '<td>' . $inline . "</td>\n";
+            }
+            $html .= "</tr>\n";
+            $this->accept($stats, 'tableRows', $i, $i + 1);
+            $i++;
+        }
+
+        return ['html' => $html . '</table>', 'next' => $i];
     }
 
     /**
@@ -573,7 +750,11 @@ final class BorrowedHtmlLayout
             return true;
         }
 
-        return preg_match('/[{}^\\\\<>~!@$=#\'\"]|--|\.\.\.|\/\*|\*\/|``|\+\-|\(c\)|\(r\)|\(tm\)/', $withoutContractions) === 1
+        if (substr_count($withoutContractions, '"') % 2 !== 0) {
+            return true;
+        }
+
+        return preg_match('/[{}^\\\\<>~!@$=#\']|\.\.\.|\/\*|\*\/|``|\+\-|\(c\)|\(r\)|\(tm\)/', $withoutContractions) === 1
             || substr_count($text, ':') >= 2;
     }
 
@@ -676,7 +857,24 @@ final class BorrowedHtmlLayout
 
     private function escapeText(string $text): string
     {
-        return $this->escape((string)preg_replace('/(?<=[A-Za-z0-9])\'(?=[A-Za-z0-9])/', '’', $text));
+        $text = (string)preg_replace('/(?<=[A-Za-z0-9])\'(?=[A-Za-z0-9])/', '’', $text);
+        $text = (string)preg_replace('/"([^"]*)"/', '“$1”', $text);
+        $text = (string)preg_replace_callback('/-{2,}/', static function (array $match): string {
+            $length = strlen($match[0]);
+            if ($length % 2 === 0 && $length % 3 !== 0) {
+                return str_repeat('–', intdiv($length, 2));
+            }
+            $triples = intdiv($length, 3);
+            $remainder = $length % 3;
+            if ($remainder === 1) {
+                $triples--;
+                $remainder = 4;
+            }
+
+            return str_repeat('—', $triples) . str_repeat('–', intdiv($remainder, 2));
+        }, $text);
+
+        return $this->escape($text);
     }
 
     private function escapeAttribute(string $text): string
