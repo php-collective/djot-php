@@ -423,8 +423,21 @@ final class BorrowedHtmlLayout
         if (preg_match('/^\[[^\]]+\]: +\S+ +"[^"]*"$/', $text) === 1) {
             return $this->escapeText($text);
         }
+        if (
+            strpbrk($text, "*_`[{}^\\<>~!@$=#'\":") === false
+            && !str_contains($text, '--')
+            && !str_contains($text, '...')
+            && !str_contains($text, '(c)')
+            && !str_contains($text, '(r)')
+            && !str_contains($text, '(tm)')
+        ) {
+            return $this->escape($text);
+        }
         if ($this->inlineComplex($text)) {
             return null;
+        }
+        if (strpbrk($text, '*_`[') === false) {
+            return $this->escapeText($text);
         }
         $flat = $this->renderFlatInline($text, $definitions);
         if ($flat !== false) {
@@ -745,12 +758,15 @@ final class BorrowedHtmlLayout
 
     private function inlineComplex(string $text): bool
     {
-        $withoutContractions = preg_replace('/(?<=[A-Za-z0-9])\'(?=[A-Za-z0-9])/', '', $text);
-        if ($withoutContractions === null) {
-            return true;
+        $withoutContractions = $text;
+        if (str_contains($text, "'")) {
+            $withoutContractions = preg_replace('/(?<=[A-Za-z0-9])\'(?=[A-Za-z0-9])/', '', $text);
+            if ($withoutContractions === null) {
+                return true;
+            }
         }
 
-        if (substr_count($withoutContractions, '"') % 2 !== 0) {
+        if (str_contains($withoutContractions, '"') && substr_count($withoutContractions, '"') % 2 !== 0) {
             return true;
         }
 
@@ -857,22 +873,28 @@ final class BorrowedHtmlLayout
 
     private function escapeText(string $text): string
     {
-        $text = (string)preg_replace('/(?<=[A-Za-z0-9])\'(?=[A-Za-z0-9])/', '’', $text);
-        $text = (string)preg_replace('/"([^"]*)"/', '“$1”', $text);
-        $text = (string)preg_replace_callback('/-{2,}/', static function (array $match): string {
-            $length = strlen($match[0]);
-            if ($length % 2 === 0 && $length % 3 !== 0) {
-                return str_repeat('–', intdiv($length, 2));
-            }
-            $triples = intdiv($length, 3);
-            $remainder = $length % 3;
-            if ($remainder === 1) {
-                $triples--;
-                $remainder = 4;
-            }
+        if (str_contains($text, "'")) {
+            $text = (string)preg_replace('/(?<=[A-Za-z0-9])\'(?=[A-Za-z0-9])/', '’', $text);
+        }
+        if (str_contains($text, '"')) {
+            $text = (string)preg_replace('/"([^"]*)"/', '“$1”', $text);
+        }
+        if (str_contains($text, '--')) {
+            $text = (string)preg_replace_callback('/-{2,}/', static function (array $match): string {
+                $length = strlen($match[0]);
+                if ($length % 2 === 0 && $length % 3 !== 0) {
+                    return str_repeat('–', intdiv($length, 2));
+                }
+                $triples = intdiv($length, 3);
+                $remainder = $length % 3;
+                if ($remainder === 1) {
+                    $triples--;
+                    $remainder = 4;
+                }
 
-            return str_repeat('—', $triples) . str_repeat('–', intdiv($remainder, 2));
-        }, $text);
+                return str_repeat('—', $triples) . str_repeat('–', intdiv($remainder, 2));
+            }, $text);
+        }
 
         return $this->escape($text);
     }
