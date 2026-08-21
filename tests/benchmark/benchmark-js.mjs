@@ -33,19 +33,20 @@ function loadFixtures() {
     }
 
     // Add generated fixtures
-    fixtures['generated_small'] = generateFixture(100);
-    fixtures['generated_medium'] = generateFixture(500);
-    fixtures['generated_large'] = generateFixture(2000);
-    fixtures['generated_huge'] = generateFixture(10000);
+    fixtures['generated_tiny'] = generateFixture(1024);
+    fixtures['generated_small'] = generateFixture(10 * 1024);
+    fixtures['generated_medium'] = generateFixture(50 * 1024);
+    fixtures['generated_large'] = generateFixture(200 * 1024);
+    fixtures['generated_huge'] = generateFixture(1024 * 1024);
 
     return fixtures;
 }
 
-function generateFixture(paragraphs) {
-    let content = '# Generated Document\n\n';
-    for (let i = 0; i < paragraphs; i++) {
-        content += `Paragraph ${i} with *bold* and _italic_ text. `;
-        content += `A [link](https://example.com) and \`code\`.\n\n`;
+function generateFixture(targetBytes) {
+    let content = '# Large Document Test\n\n';
+    const chunk = 'Paragraph with *bold* and _italic_ text. A [link](https://example.com) and `code`.\n\n';
+    while (Buffer.byteLength(content) + Buffer.byteLength(chunk) <= targetBytes) {
+        content += chunk;
     }
     return content;
 }

@@ -127,11 +127,8 @@ func sqrt(x float64) float64 {
 func generateContent(targetBytes int) string {
 	content := "# Large Document Test\n\n"
 	chunk := "Paragraph with *bold* and _italic_ text. A [link](https://example.com) and `code`.\n\n"
-	for len(content) < targetBytes {
+	for len(content)+len(chunk) <= targetBytes {
 		content += chunk
-	}
-	if len(content) > targetBytes {
-		content = content[:targetBytes]
 	}
 	return content
 }
@@ -238,7 +235,7 @@ func main() {
 			OS:      runtime.GOOS,
 		},
 		Name:       "godjot",
-		Version:    "latest",
+		Version:    "1.0.6",
 		Conversion: results,
 	}
 

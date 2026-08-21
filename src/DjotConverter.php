@@ -14,6 +14,7 @@ use Djot\Extension\WikilinksExtension;
 use Djot\Filter\ProfileFilter;
 use Djot\Node\Document;
 use Djot\Parser\BlockParser;
+use Djot\Performance\BorrowedHtmlLayout;
 use Djot\Renderer\AnsiRenderer;
 use Djot\Renderer\HeadingIdTracker;
 use Djot\Renderer\HtmlRenderer;
@@ -32,6 +33,10 @@ use RuntimeException;
  */
 class DjotConverter
 {
+    private bool $borrowedHtmlEligible;
+
+    private ?BorrowedHtmlLayout $borrowedHtmlLayout = null;
+
     protected BlockParser $parser;
 
     protected RendererInterface $renderer;
@@ -151,6 +156,22 @@ class DjotConverter
         bool $sourceLines = false,
         bool $sections = true,
     ) {
+        $borrowedHtmlEligible = !$xhtml
+            && !$warnings
+            && !$strict
+            && $safeMode === null
+            && $profile === null
+            && !$significantNewlines
+            && $softBreakMode === null
+            && !$roundTripMode
+            && $parser === null
+            && $renderer === null
+            && !$nestedBlocksInLists
+            && !$blocksInterruptParagraphs
+            && !$nestedListsWithoutBlankLine
+            && !$sourceLines
+            && $sections;
+
         $this->collectWarnings = $warnings;
         $this->strictMode = $strict;
 
@@ -191,6 +212,8 @@ class DjotConverter
         if ($profile !== null) {
             $this->profileFilter = new ProfileFilter();
         }
+
+        $this->borrowedHtmlEligible = $borrowedHtmlEligible;
     }
 
     /**
@@ -347,6 +370,8 @@ class DjotConverter
      */
     public function setSafeMode(SafeMode|bool|null $safeMode): self
     {
+        $this->borrowedHtmlEligible = false;
+
         if (!$this->renderer instanceof HtmlRenderer) {
             return $this;
         }
@@ -369,6 +394,8 @@ class DjotConverter
      */
     public function setProfile(?Profile $profile): self
     {
+        $this->borrowedHtmlEligible = false;
+
         $this->profile = $profile;
         if ($profile !== null && $this->profileFilter === null) {
             $this->profileFilter = new ProfileFilter();
@@ -390,8 +417,15 @@ class DjotConverter
      */
     public function convert(string $djot): string
     {
-        // Check max length before parsing
         $this->enforceProfileMaxLength($djot);
+
+        if ($this->borrowedHtmlEligible) {
+            $this->borrowedHtmlLayout ??= new BorrowedHtmlLayout();
+            $rendered = $this->borrowedHtmlLayout->render($djot);
+            if ($rendered !== null) {
+                return $rendered['html'];
+            }
+        }
 
         return $this->render($this->parse($djot));
     }
@@ -412,9 +446,7 @@ class DjotConverter
             throw new RuntimeException("Failed to read file: {$path}");
         }
 
-        $this->enforceProfileMaxLength($content);
-
-        return $this->render($this->parse($content));
+        return $this->convert($content);
     }
 
     /**
@@ -520,6 +552,8 @@ class DjotConverter
      */
     public function on(string $event, Closure $listener): self
     {
+        $this->borrowedHtmlEligible = false;
+
         if ($this->renderer instanceof HtmlRenderer) {
             $this->renderer->on($event, $listener);
         }
@@ -532,6 +566,8 @@ class DjotConverter
      */
     public function off(?string $event = null): self
     {
+        $this->borrowedHtmlEligible = false;
+
         if ($this->renderer instanceof HtmlRenderer) {
             $this->renderer->off($event);
         }
@@ -544,6 +580,8 @@ class DjotConverter
      */
     public function getRenderer(): RendererInterface
     {
+        $this->borrowedHtmlEligible = false;
+
         return $this->renderer;
     }
 
@@ -554,6 +592,8 @@ class DjotConverter
      */
     public function getHtmlRenderer(): HtmlRenderer
     {
+        $this->borrowedHtmlEligible = false;
+
         if (!$this->renderer instanceof HtmlRenderer) {
             throw new LogicException('getHtmlRenderer() is only available when using HtmlRenderer');
         }
@@ -568,6 +608,8 @@ class DjotConverter
      */
     public function getHeadingIdTracker(): HeadingIdTracker
     {
+        $this->borrowedHtmlEligible = false;
+
         if (!$this->renderer instanceof HtmlRenderer) {
             throw new LogicException('getHeadingIdTracker() is only supported with HtmlRenderer');
         }
@@ -580,6 +622,8 @@ class DjotConverter
      */
     public function getParser(): BlockParser
     {
+        $this->borrowedHtmlEligible = false;
+
         return $this->parser;
     }
 
@@ -598,6 +642,8 @@ class DjotConverter
      */
     public function addExtension(ExtensionInterface $extension): self
     {
+        $this->borrowedHtmlEligible = false;
+
         $this->assertCompatibleExtension($extension);
         $registeredExtension = $extension instanceof BeforeRenderExtensionInterface ? clone $extension : $extension;
         $this->extensions[] = $registeredExtension;
@@ -645,6 +691,8 @@ class DjotConverter
      */
     public function addOutputTransformer(Closure $transformer): self
     {
+        $this->borrowedHtmlEligible = false;
+
         $this->outputTransformers[] = $transformer;
 
         return $this;

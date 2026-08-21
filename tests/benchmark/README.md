@@ -11,6 +11,9 @@ php tests/benchmark/benchmark.php
 # Run with cross-language comparison
 ./tests/benchmark/run-all.sh --compare
 
+# Djot implementations only (PHP, JavaScript, Rust, and Go)
+node tests/benchmark/compare-languages.mjs --djot-only --iterations=20 --warmup=5
+
 # Quick benchmark (fewer iterations)
 ./tests/benchmark/run-all.sh --quick
 ```

@@ -18,6 +18,31 @@ Performance benchmarks for djot-php compared to other implementations.
 
 ## Quick Reference
 
+Default source-to-HTML conversion now includes a conservative borrowed-source
+route for common documents up to 64 KiB. On PHP 8.5.9 with CLI OPcache, a
+57,410-byte heading/paragraph/core-inline fixture measured 6.5 ms median versus
+49.5 ms through an explicitly configured owned-AST converter (7.7x faster),
+with byte-identical output. Absolute timings remain machine-dependent.
+
+The cross-language runners now generate the same paragraph-safe medium fixture
+in every runtime. A 20-iteration/5-warmup run over its 51,179 bytes produced:
+
+| Djot implementation | Median | Throughput | Relative to PHP |
+|---------------------|--------|------------|-----------------|
+| Rust jotdown 0.7 | 1.20 ms | 40.5 MB/s | 6.22x faster |
+| **PHP djot-php** | **7.46 ms** | **6.5 MB/s** | baseline |
+| JavaScript @djot/djot 0.3 | 10.99 ms | 4.4 MB/s | 1.47x slower |
+| Go godjot 1.0.6 | 17.47 ms | 2.9 MB/s | 2.34x slower |
+
+Environment: PHP 8.5.9, Node.js 22.22.2, Rust 1.97.1, and Go 1.22.2.
+Run `node tests/benchmark/compare-languages.mjs --djot-only
+--iterations=20 --warmup=5` from the repository root to reproduce it.
+
+Unsupported or ambiguous input automatically falls back to the complete parser
+and renderer. Calling `parse()`, selecting another renderer, or configuring
+profiles, safety, extensions, listeners, source lines, or output behavior also
+keeps the authoritative path.
+
 | Document Size | PHP Full | Throughput |
 |---------------|----------|------------|
 | 1 KB          | 0.51 ms  | ~2.1 MB/s  |

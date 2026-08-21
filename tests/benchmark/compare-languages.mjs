@@ -19,6 +19,7 @@ const args = process.argv.slice(2);
 const iterations = args.find(a => a.startsWith('--iterations='))?.split('=')[1] || '50';
 const warmup = args.find(a => a.startsWith('--warmup='))?.split('=')[1] || '10';
 const outputFormat = args.includes('--html') ? 'html' : (args.includes('--json') ? 'json' : 'console');
+const djotOnly = args.includes('--djot-only');
 
 // Ensure results directory exists
 if (!existsSync(resultsDir)) {
@@ -80,7 +81,7 @@ async function main() {
     console.log('1. Running PHP benchmark...');
     try {
         results.php = runCommand(
-            `php benchmark.php --iterations=${iterations} --warmup=${warmup} --json`,
+            `php -d opcache.enable_cli=1 benchmark.php --iterations=${iterations} --warmup=${warmup} --json`,
             'PHP djot-php'
         );
         if (results.php) {
@@ -112,12 +113,16 @@ async function main() {
     // Run Python benchmark
     console.log('3. Running Python benchmark...');
     try {
-        results.python = runCommand(
-            `python3 benchmark-python.py --iterations=${iterations} --warmup=${warmup} --json`,
-            'Python markdown libraries'
-        );
-        if (results.python) {
-            console.log('   ✓ Python benchmark complete\n');
+        if (djotOnly) {
+            console.log('   - skipped: --djot-only compares Djot implementations\n');
+        } else {
+            results.python = runCommand(
+                `python3 benchmark-python.py --iterations=${iterations} --warmup=${warmup} --json`,
+                'Python markdown libraries'
+            );
+            if (results.python) {
+                console.log('   ✓ Python benchmark complete\n');
+            }
         }
     } catch (e) {
         console.log('   ✗ Python benchmark failed (missing dependencies?)\n');
@@ -126,23 +131,9 @@ async function main() {
     // Run Rust benchmark
     console.log('4. Running Rust benchmark...');
     try {
-        // Check if Rust binary exists, build if needed
-        const rustBinaryPath = join(__dirname, 'rust-benchmark/target/release/benchmark');
-        if (!existsSync(rustBinaryPath)) {
-            console.log('   Building Rust benchmark...');
-            try {
-                execSync('cargo build --release', {
-                    cwd: join(__dirname, 'rust-benchmark'),
-                    stdio: 'ignore',
-                    timeout: 300000
-                });
-            } catch (buildErr) {
-                throw new Error('Rust build failed');
-            }
-        }
         results.rust = runCommand(
-            `./rust-benchmark/target/release/benchmark --iterations=${iterations} --warmup=${warmup} --json`,
-            'Rust markdown libraries'
+            `cargo run --release --quiet --manifest-path=rust-benchmark/Cargo.toml -- --iterations=${iterations} --warmup=${warmup} --json`,
+            'Rust jotdown'
         );
         if (results.rust) {
             console.log('   ✓ Rust benchmark complete\n');
@@ -154,23 +145,9 @@ async function main() {
     // Run Go benchmark
     console.log('5. Running Go benchmark...');
     try {
-        // Check if Go binary exists, build if needed
-        const goBinaryPath = join(__dirname, 'benchmark-go-bin');
-        if (!existsSync(goBinaryPath)) {
-            console.log('   Building Go benchmark...');
-            try {
-                execSync('go build -o benchmark-go-bin benchmark-go.go', {
-                    cwd: __dirname,
-                    stdio: 'ignore',
-                    timeout: 300000
-                });
-            } catch (buildErr) {
-                throw new Error('Go build failed');
-            }
-        }
         results.go = runCommand(
-            `./benchmark-go-bin --iterations=${iterations} --warmup=${warmup} --json`,
-            'Go markdown libraries'
+            `go run -mod=mod benchmark-go.go --iterations=${iterations} --warmup=${warmup} --json`,
+            'Go godjot'
         );
         if (results.go) {
             console.log('   ✓ Go benchmark complete\n');

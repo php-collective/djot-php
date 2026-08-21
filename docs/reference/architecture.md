@@ -9,14 +9,20 @@ The library follows a classic parser/renderer architecture:
 ```
 Input (Djot String)
         ↓
-   BlockParser
-        ↓
-     AST (Document)
-        ↓
-   HtmlRenderer
-        ↓
-Output (HTML String)
+default HTML facade ── accepted core document ──→ borrowed HTML layout
+        │
+        └── fallback ──→ BlockParser → AST (Document) → HtmlRenderer
+                                                    ↓
+                                            Output (HTML String)
 ```
+
+`DjotConverter::convert()` has a conservative allocation-light route for
+default HTML conversion of ASCII documents up to 64 KiB. It borrows source
+slices and constructs no public AST nodes. The route is whole-document and
+fail-closed: lazy/ambiguous headings, richer block or inline syntax, custom
+configuration, profiles, extensions, listeners, transformers, and alternate
+renderers remain on the authoritative AST pipeline. `parse()` always returns
+the full public AST.
 
 ## Components
 

@@ -1,15 +1,14 @@
+use serde::Serialize;
 /// Rust Djot Benchmark
 /// Benchmarks the jotdown crate - a Djot parser for Rust
 ///
 /// https://github.com/hellux/jotdown
-
 use std::env;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
-use serde::Serialize;
 
-use jotdown::{Parser, Render, html::Renderer};
+use jotdown::{html::Renderer, Parser, Render};
 
 #[derive(Serialize)]
 struct Stats {
@@ -75,11 +74,11 @@ fn calculate_stats(times: &mut Vec<f64>) -> Stats {
 
 fn generate_content(target_bytes: usize) -> String {
     let mut content = String::from("# Large Document Test\n\n");
-    let chunk = "Paragraph with *bold* and _italic_ text. A [link](https://example.com) and `code`.\n\n";
-    while content.len() < target_bytes {
+    let chunk =
+        "Paragraph with *bold* and _italic_ text. A [link](https://example.com) and `code`.\n\n";
+    while content.len() + chunk.len() <= target_bytes {
         content.push_str(chunk);
     }
-    content.truncate(target_bytes);
     content
 }
 
@@ -105,12 +104,14 @@ fn benchmark_jotdown(content: &str, iterations: usize, warmup: usize) -> Vec<f64
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let iterations: usize = args.iter()
+    let iterations: usize = args
+        .iter()
         .find(|a| a.starts_with("--iterations="))
         .and_then(|a| a.split('=').nth(1))
         .and_then(|s| s.parse().ok())
         .unwrap_or(50);
-    let warmup: usize = args.iter()
+    let warmup: usize = args
+        .iter()
         .find(|a| a.starts_with("--warmup="))
         .and_then(|a| a.split('=').nth(1))
         .and_then(|s| s.parse().ok())
@@ -163,8 +164,11 @@ fn main() {
         let throughput = (size as f64 / stats.mean) * 1000.0;
 
         if !json_output {
-            eprintln!("  jotdown: {:.2} ms (throughput: {:.1} MB/s)",
-                     stats.mean, throughput / 1_000_000.0);
+            eprintln!(
+                "  jotdown: {:.2} ms (throughput: {:.1} MB/s)",
+                stats.mean,
+                throughput / 1_000_000.0
+            );
         }
 
         results.push(FixtureResult {
