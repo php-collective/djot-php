@@ -190,7 +190,7 @@ class CliTest extends TestCase
     {
         $result = $this->runCli(['version']);
         $this->assertSame(0, $result['exit']);
-        $this->assertStringContainsString('djot-php version', $result['stdout']);
+        $this->assertMatchesRegularExpression('/^djot-php version (?!dev$|unknown$).+$/', trim($result['stdout']));
     }
 
     public function testHelpDocumentsConvert(): void
