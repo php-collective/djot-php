@@ -219,10 +219,17 @@ HELP;
 
 function showVersion(): void
 {
-    $composerJson = __DIR__ . '/../composer.json';
     $version = 'unknown';
 
-    if (file_exists($composerJson)) {
+    if (class_exists(Composer\InstalledVersions::class)) {
+        $installedVersion = Composer\InstalledVersions::getPrettyVersion('php-collective/djot');
+        if (is_string($installedVersion) && $installedVersion !== '') {
+            $version = $installedVersion;
+        }
+    }
+
+    $composerJson = __DIR__ . '/../composer.json';
+    if ($version === 'unknown' && file_exists($composerJson)) {
         $data = json_decode((string)file_get_contents($composerJson), true);
         if (is_array($data) && isset($data['version']) && is_string($data['version'])) {
             $version = $data['version'];
