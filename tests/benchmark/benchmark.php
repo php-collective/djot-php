@@ -42,11 +42,11 @@ $jsonOutput = isset($options['json']);
 
 // Test fixtures
 $fixtures = [
-    'tiny' => generateFixture('tiny', 10),
-    'small' => generateFixture('small', 100),
-    'medium' => generateFixture('medium', 500),
-    'large' => generateFixture('large', 2000),
-    'huge' => generateFixture('huge', 10000),
+    'tiny' => generateFixture(1024),
+    'small' => generateFixture(10 * 1024),
+    'medium' => generateFixture(50 * 1024),
+    'large' => generateFixture(200 * 1024),
+    'huge' => generateFixture(1024 * 1024),
     'complex' => generateComplexFixture(),
     'tables' => generateTableFixture(),
     'code_heavy' => generateCodeHeavyFixture(),
@@ -54,12 +54,15 @@ $fixtures = [
     'nested_lists' => generateNestedListsFixture(),
 ];
 
-function generateFixture(string $name, int $paragraphs): string
+function generateFixture(int $targetBytes): string
 {
-    $content = "# Document: {$name}\n\n";
-    for ($i = 0; $i < $paragraphs; $i++) {
-        $content .= "This is paragraph {$i} with some *bold* and _italic_ text. ";
-        $content .= "Here's a [link](https://example.com) and `inline code`.\n\n";
+    $content = "# Large Document Test\n\n";
+    $chunk = "Paragraph with *bold* and _italic_ text. A [link](https://example.com) and `code`.\n\n";
+    $length = strlen($content);
+    $chunkLength = strlen($chunk);
+    while ($length + $chunkLength <= $targetBytes) {
+        $content .= $chunk;
+        $length += $chunkLength;
     }
 
     return $content;
