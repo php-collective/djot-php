@@ -797,7 +797,9 @@ HTML;
 
         $this->assertSame("- One\n\n  > Quote\n", $result);
         $htmlBack = (new DjotConverter())->convert($result);
-        $this->assertStringContainsString("<li>\n<p>One</p>\n<blockquote>", $htmlBack);
+        // Compact-list-blocks: a blank line before a sub-block no longer loosens
+        // the item, so the lead text renders inline (tight), not wrapped in <p>.
+        $this->assertStringContainsString("<li>\nOne\n<blockquote>", $htmlBack);
         $this->assertStringContainsString('<p>Quote</p>', $htmlBack);
     }
 

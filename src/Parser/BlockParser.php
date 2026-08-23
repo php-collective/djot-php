@@ -2054,13 +2054,21 @@ class BlockParser
                 // Content after blank line with indentation belongs to previous item
                 $lastItem = $this->listParser->getLastListItem($list);
                 if ($lastItem !== null) {
-                    // Check if the first indented content is a list marker or regular text
-                    // Blank line followed by indented TEXT = loose list (multiple paragraphs)
-                    // Blank line followed by indented LIST MARKER = tight nesting
+                    // A blank line before indented content does not loosen the list
+                    // when that content OPENS A BLOCK (sub-list, block quote, fenced
+                    // code, fenced div, heading, table, thematic break). Only a
+                    // genuine second prose paragraph (blank + indented plain text)
+                    // makes the list loose. This keeps items tight while still
+                    // requiring the blank line djot needs to start the block, so
+                    // block recognition and uniformity are unchanged -- only the
+                    // tight/loose RENDERING differs from canonical djot.
                     $trimmedCurrent = ltrim($currentLine);
-                    $firstContentIsListMarker = $this->listParser->parseListItemMarker($trimmedCurrent) !== null;
-                    if (!$firstContentIsListMarker) {
-                        // Indented text after blank = loose list
+                    $firstContentOpensBlock =
+                        $this->listParser->parseListItemMarker($trimmedCurrent) !== null
+                        || $this->startsNewBlockSignificant($trimmedCurrent);
+                    if (!$firstContentOpensBlock) {
+                        // Indented plain text after a blank line = a second
+                        // paragraph in the item => loose list.
                         $list->setTight(false);
                     }
 
