@@ -1365,7 +1365,17 @@ class BlockParser
 
         $language = $info !== '' ? $info : null;
 
-        $codeBlock = new CodeBlock(trim($content, "\n"), $language);
+        // The payload is stored VERBATIM, newlines included. `trim()` here removed
+        // every leading and trailing newline, which is lossy in both directions:
+        // a fence whose payload is one blank line and a fence whose payload is
+        // empty both became "", and a leading blank line disappeared. djot.js
+        // renders those as `<pre><code>\n</code></pre>` and
+        // `<pre><code></code></pre>` respectively - two different documents.
+        //
+        // The renderer needs no change: it appends a newline only when the
+        // content does not already end in one, so a payload that carries its own
+        // terminator round-trips unchanged.
+        $codeBlock = new CodeBlock($content, $language);
         $this->applyPendingAttributes($codeBlock);
         $parent->appendChild($codeBlock);
 

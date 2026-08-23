@@ -77,7 +77,8 @@ class BlockParserTest extends TestCase
         $codeBlock = $doc->getChildren()[0];
         $this->assertInstanceOf(CodeBlock::class, $codeBlock);
         $this->assertSame('php', $codeBlock->getLanguage());
-        $this->assertSame("echo 'hello';", $codeBlock->getContent());
+        // The payload keeps its own line terminator (djot.js parity).
+        $this->assertSame("echo 'hello';\n", $codeBlock->getContent());
     }
 
     public function testParseCodeBlockWithTildes(): void
@@ -673,15 +674,33 @@ DJOT;
         $this->assertInstanceOf(Paragraph::class, $children[0]);
     }
 
-    public function testCodeBlockTrimsLeadingAndTrailingBlankLines(): void
+    public function testCodeBlockKeepsLeadingAndTrailingBlankLines(): void
     {
-        // Leading and trailing blank lines inside code block should be trimmed
+        // A blank line inside the fence is CONTENT, not padding. This asserted
+        // the opposite until the trim was removed, and the trim disagreed with
+        // djot.js: the reference renders this document as
+        // `<pre><code>\nbin/cake linter\n\n</code></pre>`, and the trimmed form
+        // rendered `<pre><code>bin/cake linter\n</code></pre>` instead.
         $doc = $this->parser->parse("```\n\nbin/cake linter\n\n```");
 
         $children = $doc->getChildren();
         $this->assertCount(1, $children);
         $this->assertInstanceOf(CodeBlock::class, $children[0]);
-        $this->assertSame('bin/cake linter', $children[0]->getContent());
+        $this->assertSame("\nbin/cake linter\n\n", $children[0]->getContent());
+    }
+
+    public function testAnAllBlankCodeBlockIsNotAnEmptyOne(): void
+    {
+        // The two collapsed to the same "" under the trim, so one blank line and
+        // no lines at all became the same document. djot.js renders them as
+        // `<pre><code>\n</code></pre>` and `<pre><code></code></pre>`.
+        $blank = $this->parser->parse("```\n\n```")->getChildren()[0];
+        $empty = $this->parser->parse("```\n```")->getChildren()[0];
+
+        $this->assertInstanceOf(CodeBlock::class, $blank);
+        $this->assertInstanceOf(CodeBlock::class, $empty);
+        $this->assertSame("\n", $blank->getContent());
+        $this->assertSame('', $empty->getContent());
     }
 
     public function testCodeBlockPreservesInternalBlankLines(): void
@@ -691,7 +710,7 @@ DJOT;
 
         $children = $doc->getChildren();
         $this->assertInstanceOf(CodeBlock::class, $children[0]);
-        $this->assertSame("line1\n\nline2", $children[0]->getContent());
+        $this->assertSame("line1\n\nline2\n", $children[0]->getContent());
     }
 
     public function testRawBlockTrimsLeadingAndTrailingBlankLines(): void
