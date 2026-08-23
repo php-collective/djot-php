@@ -211,7 +211,13 @@ class MarkdownRenderer implements RendererInterface
 
         $backticks = StringUtil::findSafeCodeFence($content, 3);
 
-        return $backticks . $language . "\n" . $content . "\n" . $backticks . "\n\n";
+        // The payload carries its own terminator, so only supply one when it does
+        // not - the same tolerance the HTML renderer already has. Appending
+        // unconditionally doubled the last newline and grew a blank line before
+        // the closing fence on every round trip.
+        $terminator = ($content === '' || str_ends_with($content, "\n")) ? '' : "\n";
+
+        return $backticks . $language . "\n" . $content . $terminator . $backticks . "\n\n";
     }
 
     protected function renderBlockQuote(BlockQuote $node): string
