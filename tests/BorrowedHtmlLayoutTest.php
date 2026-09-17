@@ -12,6 +12,18 @@ use PHPUnit\Framework\TestCase;
 
 final class BorrowedHtmlLayoutTest extends TestCase
 {
+    public function testAMarkerAfterTheSameMarkerCloserUsesTheParser(): void
+    {
+        foreach (["_x__y_\n", "*x**y*\n", "a _x__y_ b\n", "_x__y__z_\n"] as $source) {
+            self::assertNull((new BorrowedHtmlLayout())->render($source), $source);
+            self::assertSame(
+                DjotConverter::create()->convert($source),
+                (new DjotConverter())->convert($source),
+                $source,
+            );
+        }
+    }
+
     #[DataProvider('acceptedDocuments')]
     public function testAcceptedDocumentsAreByteIdenticalToTheAstPipeline(string $source): void
     {
