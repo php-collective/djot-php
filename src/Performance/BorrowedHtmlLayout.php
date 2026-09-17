@@ -436,6 +436,9 @@ final class BorrowedHtmlLayout
         if ($this->inlineComplex($text)) {
             return null;
         }
+        if (preg_match('/(?:(?<!_)_[^_\n]+__|(?<!\*)\*[^*\n]+\*\*)/', $text) === 1) {
+            return null;
+        }
         if (strpbrk($text, '*_`[') === false) {
             return $this->escapeText($text);
         }
@@ -475,7 +478,7 @@ final class BorrowedHtmlLayout
                 if (
                     $close === false || $close <= $i + 1 || ctype_space($text[$i + 1])
                     || ctype_space($text[$close - 1])
-                    || ($i > 0 && ctype_alnum($text[$i - 1]))
+                    || ($i > 0 && (ctype_alnum($text[$i - 1]) || $text[$i - 1] === $delimiter))
                     || (isset($text[$close + 1]) && ctype_alnum($text[$close + 1]))
                 ) {
                     return null;
