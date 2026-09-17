@@ -393,12 +393,129 @@ class MarkdownRenderer implements RendererInterface
 
     protected function renderEmphasis(Emphasis $node): string
     {
-        return '*' . $this->renderChildren($node) . '*';
+        return $this->renderDelimited($node, '*', 'em');
     }
 
     protected function renderStrong(Strong $node): string
     {
-        return '**' . $this->renderChildren($node) . '**';
+        return $this->renderDelimited($node, '**', 'strong');
+    }
+
+    /**
+     * Render a CommonMark delimiter run without changing its inline meaning.
+     *
+     * Padding belongs outside the run because a delimiter beside whitespace
+     * cannot open or close. Ambiguous seams use inline HTML, which is verbose
+     * but preserves the tree accepted by every CommonMark reader.
+     */
+    protected function renderDelimited(Node $node, string $delimiter, string $tag): string
+    {
+        $inner = $this->renderChildren($node);
+        preg_match('/^\s*/u', $inner, $leadingMatch);
+        preg_match('/\s*$/u', $inner, $trailingMatch);
+        $leading = $leadingMatch[0] ?? '';
+        $trailing = $trailingMatch[0] ?? '';
+        $coreLength = strlen($inner) - strlen($leading) - strlen($trailing);
+        $core = $coreLength > 0 ? substr($inner, strlen($leading), $coreLength) : '';
+
+        if ($core === '') {
+            return $inner === '' ? '' : '<' . $tag . '>' . $inner . '</' . $tag . '>';
+        }
+
+        $previous = $this->adjacentSiblingCharacter($node, false);
+        $next = $this->adjacentSiblingCharacter($node, true);
+        $first = mb_substr($core, 0, 1);
+        $last = mb_substr($core, -1);
+        $parent = $node->getParent();
+        $ambiguousSeam = ($previous !== null
+                && !$this->isWhitespaceOrPunctuation($previous)
+                && $this->isPunctuation($first))
+            || ($next !== null
+                && !$this->isWhitespaceOrPunctuation($next)
+                && $this->isPunctuation($last))
+            || (($node instanceof Emphasis || $node instanceof Strong)
+                && ($parent instanceof Emphasis || $parent instanceof Strong));
+
+        if ($ambiguousSeam) {
+            return $leading . '<' . $tag . '>' . $core . '</' . $tag . '>' . $trailing;
+        }
+
+        return $leading . $delimiter . $core . $delimiter . $trailing;
+    }
+
+    protected function adjacentSiblingCharacter(Node $node, bool $after): ?string
+    {
+        $parent = $node->getParent();
+        if ($parent === null) {
+            return null;
+        }
+        $children = $parent->getChildren();
+        $index = array_search($node, $children, true);
+        if (!is_int($index)) {
+            return null;
+        }
+        for ($at = $index + ($after ? 1 : -1); isset($children[$at]); $at += $after ? 1 : -1) {
+            $text = $this->nodeBoundaryText($children[$at], $after);
+            if ($text !== '') {
+                return $after ? mb_substr($text, 0, 1) : mb_substr($text, -1);
+            }
+        }
+        if ($parent instanceof Span) {
+            return $this->adjacentSiblingCharacter($parent, $after);
+        }
+
+        return null;
+    }
+
+    protected function nodeBoundaryText(Node $node, bool $after): string
+    {
+        if ($node instanceof Text) {
+            return $node->getContent();
+        }
+        if ($node instanceof EscapedText) {
+            return '\\' . $node->getContent();
+        }
+        if ($node instanceof Code) {
+            return '`';
+        }
+        if ($node instanceof Math) {
+            return '$';
+        }
+        if ($node instanceof RawInline) {
+            return $node->getFormat() === 'html' ? ($after ? '<' : '>') : '';
+        }
+        if ($node instanceof Link || $node instanceof Image) {
+            return $after ? '[' : ')';
+        }
+        if ($node instanceof Emphasis) {
+            return '*';
+        }
+        if ($node instanceof Strong || $node instanceof Delete) {
+            return '**';
+        }
+        $children = $node->getChildren();
+        if ($children === []) {
+            return $node instanceof SoftBreak || $node instanceof HardBreak ? "\n" : '';
+        }
+        $ordered = $after ? $children : array_reverse($children);
+        foreach ($ordered as $child) {
+            $text = $this->nodeBoundaryText($child, $after);
+            if ($text !== '') {
+                return $text;
+            }
+        }
+
+        return '';
+    }
+
+    protected function isWhitespaceOrPunctuation(string $character): bool
+    {
+        return preg_match('/[\s\p{P}\p{S}]/u', $character) === 1;
+    }
+
+    protected function isPunctuation(string $character): bool
+    {
+        return preg_match('/[\p{P}\p{S}]/u', $character) === 1;
     }
 
     protected function renderCode(Code $node): string
@@ -467,8 +584,7 @@ class MarkdownRenderer implements RendererInterface
 
     protected function renderDelete(Delete $node): string
     {
-        // Some Markdown flavors support ~~strikethrough~~
-        return '~~' . $this->renderChildren($node) . '~~';
+        return $this->renderDelimited($node, '~~', 'del');
     }
 
     protected function renderSpan(Span $node): string
@@ -562,7 +678,7 @@ class MarkdownRenderer implements RendererInterface
     {
         // Escape special Markdown characters in text
         // But be careful not to over-escape
-        $escaped = preg_replace('/([\\\\`*_\[\]#])/', '\\\\$1', $text) ?? $text;
+        $escaped = preg_replace('/([\\\\`*_\[\]#~])/', '\\\\$1', $text) ?? $text;
 
         return preg_replace('/<(?=[A-Za-z\/!?])/', '\\\\<', $escaped) ?? $escaped;
     }
