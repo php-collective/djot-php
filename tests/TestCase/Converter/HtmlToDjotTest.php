@@ -100,9 +100,9 @@ class HtmlToDjotTest extends TestCase
 
     public function testWhitespaceInInlineTags(): void
     {
-        // Whitespace should be trimmed
-        $this->assertSame("E=mc^2^\n", $this->converter->convert('E=mc<sup> 2 </sup>'));
-        $this->assertSame("H~2~O\n", $this->converter->convert('H<sub> 2 </sub>O'));
+        // Edge whitespace is content when it separates the element from text.
+        $this->assertSame("E=mc{^ 2^}\n", $this->converter->convert('E=mc<sup> 2 </sup>'));
+        $this->assertSame("H{~ 2 ~}O\n", $this->converter->convert('H<sub> 2 </sub>O'));
         $this->assertSame("*bold*\n", $this->converter->convert('<strong> bold </strong>'));
         $this->assertSame("{-deleted-}\n", $this->converter->convert('<del> deleted </del>'));
     }
@@ -1925,7 +1925,7 @@ DJOT;
         $html = '<p>She said <q>Hello</q> to me.</p>';
         $result = trim($this->converter->convert($html));
 
-        $this->assertSame('She said "Hello" to me.', $result);
+        $this->assertSame('She said “Hello” to me.', $result);
     }
 
     public function testQElementEscapesInnerQuotes(): void
@@ -1933,7 +1933,7 @@ DJOT;
         $html = '<p><q>He said "hi"</q></p>';
         $result = trim($this->converter->convert($html));
 
-        $this->assertSame('"He said \\"hi\\""', $result);
+        $this->assertSame('“He said \\"hi\\"”', $result);
         $this->assertStringContainsString('He said "hi"', (new DjotConverter())->convert($result));
     }
 
@@ -1942,7 +1942,7 @@ DJOT;
         $html = '<p>As stated: <q cite="https://example.com">Quote here</q>.</p>';
         $result = trim($this->converter->convert($html));
 
-        $this->assertSame('As stated: ["Quote here"]{cite="https://example.com"}.', $result);
+        $this->assertSame('As stated: [“Quote here”]{cite="https://example.com"}.', $result);
     }
 
     public function testQElementWithCiteEscapesInnerQuotes(): void
@@ -1950,7 +1950,7 @@ DJOT;
         $html = '<p><q cite="https://example.com">He said "hi"</q></p>';
         $result = trim($this->converter->convert($html));
 
-        $this->assertSame('["He said \\"hi\\""]{cite="https://example.com"}', $result);
+        $this->assertSame('[“He said \\"hi\\"”]{cite="https://example.com"}', $result);
         $this->assertStringContainsString('He said "hi"', (new DjotConverter())->convert($result));
     }
 
