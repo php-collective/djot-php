@@ -39,6 +39,7 @@ use Djot\Node\Inline\Image;
 use Djot\Node\Inline\Insert;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Math;
+use Djot\Node\Inline\Mention;
 use Djot\Node\Inline\RawInline;
 use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Span;
@@ -157,6 +158,7 @@ class HtmlRenderer implements RendererInterface
             Emphasis::class => 'renderEmphasis',
             Strong::class => 'renderStrong',
             Link::class => 'renderLink',
+            Mention::class => 'renderLink',
             Image::class => 'renderImage',
             Code::class => 'renderCode',
             RawInline::class => 'renderRawInline',
@@ -983,6 +985,10 @@ class HtmlRenderer implements RendererInterface
             if ($this->safeMode !== null) {
                 $href = $this->safeMode->sanitizeUrl($href);
             }
+        }
+
+        if ($href === '' && $node instanceof Mention) {
+            return '<span' . $attrs . '>' . $this->renderChildren($node) . '</span>';
         }
 
         $html = '<a';

@@ -38,6 +38,7 @@ use Djot\Node\Inline\Image;
 use Djot\Node\Inline\Insert;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Math;
+use Djot\Node\Inline\Mention;
 use Djot\Node\Inline\RawInline;
 use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Span;
@@ -537,6 +538,10 @@ class MarkdownRenderer implements RendererInterface
         $text = $this->renderChildren($node);
         $url = UrlSafety::sanitize($node->getDestination() ?? '');
         $title = $node->getTitle();
+
+        if ($url === '' && $node instanceof Mention) {
+            return $text;
+        }
 
         if ($title !== null) {
             return '[' . $text . '](' . $url . ' "' . $title . '")';

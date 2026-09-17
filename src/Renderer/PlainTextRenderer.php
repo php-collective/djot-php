@@ -34,6 +34,7 @@ use Djot\Node\Inline\HardBreak;
 use Djot\Node\Inline\Image;
 use Djot\Node\Inline\Link;
 use Djot\Node\Inline\Math;
+use Djot\Node\Inline\Mention;
 use Djot\Node\Inline\RawInline;
 use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Symbol;
@@ -326,6 +327,9 @@ class PlainTextRenderer implements RendererInterface
 
     protected function renderLink(Link $node): string
     {
+        if ($node instanceof Mention && ($node->getDestination() ?? '') === '') {
+            return $this->renderChildren($node);
+        }
         $url = $node->getDestination();
         if ($url === null || UrlSafety::hasDangerousScheme($url)) {
             return $this->renderChildren($node);
