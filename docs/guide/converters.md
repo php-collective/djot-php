@@ -13,6 +13,14 @@ $converter = new MarkdownToDjot();
 $djot = $converter->convert($markdownText);
 ```
 
+Raw HTML remains inert by default. Enable preservation only for trusted input:
+
+```php
+$converter = new MarkdownToDjot(trustedRawHtml: true);
+```
+
+In this mode, raw HTML is retained through Djot raw-inline syntax and may be emitted by the HTML renderer.
+
 **Conversion Table:**
 
 | Markdown | Djot Output |
@@ -41,6 +49,7 @@ $converter->convertFileAndSave('/path/to/input.md', '/path/to/output.djot');
 
 **Behavior:**
 - Preserves code blocks and inline code (no conversion inside them)
+- Preserves character-reference meaning and Markdown reference links
 - Handles nested formatting (bold inside italic, etc.)
 - Safe to run on mixed Markdown/Djot content
 - Block-level syntax (headings, lists, etc.) passes through unchanged

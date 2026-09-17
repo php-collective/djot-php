@@ -20,10 +20,20 @@ use RuntimeException;
 class MarkdownToDjot
 {
     /**
+     * @var array<string, true>
+     */
+    protected array $referenceLabels = [];
+
+    public function __construct(protected bool $trustedRawHtml = false)
+    {
+    }
+
+    /**
      * Convert Markdown text to Djot text
      */
     public function convert(string $markdown): string
     {
+        $this->collectReferenceLabels($markdown);
         $lines = explode("\n", $markdown);
         $result = [];
         $inCodeBlock = false;
@@ -166,6 +176,64 @@ class MarkdownToDjot
 
             return $placeholder;
         }, $line) ?? $line;
+
+        // Djot has no pointy destination form. Remove the CommonMark wrapper
+        // before its closing tag-shaped text can be mistaken for raw HTML.
+        $line = preg_replace_callback(
+            '/\]\(<([^>\n]+)>([ \t]+(?:"(?:\\\\.|[^"])*"|\'(?:\\\\.|[^\'])*\'|\([^)]*\)))?\)/',
+            fn (array $match): string => ']('
+                . str_replace([' ', '(', ')'], ['%20', '%28', '%29'], $match[1])
+                . ')'
+                . (isset($match[2]) ? '{title=' . $this->quoteMarkdownTitle($match[2]) . '}' : ''),
+            $line,
+        ) ?? $line;
+
+        if ($this->trustedRawHtml) {
+            $line = preg_replace_callback(
+                '/<!--[\s\S]*?-->|<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^>]*|\s*\/?)>/',
+                function (array $match) use (&$protected): string {
+                    if (preg_match('/^<\/?(?:mark|ins|del|s|sup|sub|em|strong|b|i|code|kbd|samp|var)>$/i', $match[0]) === 1) {
+                        return $match[0];
+                    }
+                    $placeholder = "\x00PROTECTED" . count($protected) . "\x00";
+                    $protected[$placeholder] = $this->rawHtmlInline($match[0]);
+
+                    return $placeholder;
+                },
+                $line,
+            ) ?? $line;
+        }
+
+        // Markdown character references represent characters, not authored
+        // ampersand text. Decode them before emitting Djot source.
+        $line = preg_replace_callback(
+            '/&(?:#[0-9]+|#x[0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]+);/',
+            fn (array $match): string => $this->escapeDecodedEntity(
+                html_entity_decode($match[0], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            ),
+            $line,
+        ) ?? $line;
+
+        // A defined Markdown shortcut reference must stay a reference. Bare
+        // `[label]` is a Djot span, so give the link its collapsed suffix.
+        $line = preg_replace_callback(
+            '/(?<![!\]])\[([^\]\n]+)\](?![\[(:])/',
+            function (array $match): string {
+                return isset($this->referenceLabels[$this->normalizeReferenceLabel($match[1])])
+                    ? $match[0] . '[]'
+                    : $match[0];
+            },
+            $line,
+        ) ?? $line;
+        $line = preg_replace_callback(
+            '/!\[([^\]\n]+)\](?![\[(:])/',
+            function (array $match): string {
+                return isset($this->referenceLabels[$this->normalizeReferenceLabel($match[1])])
+                    ? $match[0] . '[]'
+                    : $match[0];
+            },
+            $line,
+        ) ?? $line;
 
         // Protect existing Djot syntax from double-conversion
         // Protect {-text-}, {=text=}, {^text^}, {~text~}
@@ -328,6 +396,58 @@ class MarkdownToDjot
         }
 
         return $line;
+    }
+
+    protected function rawHtmlInline(string $html): string
+    {
+        preg_match_all('/`+/', $html, $runs);
+        $width = 1;
+        foreach ($runs[0] as $run) {
+            $width = max($width, strlen($run) + 1);
+        }
+        $fence = str_repeat('`', $width);
+
+        return $fence . $html . $fence . '{=html}';
+    }
+
+    protected function quoteMarkdownTitle(string $title): string
+    {
+        $title = trim($title);
+        $title = substr($title, 1, -1);
+        $title = preg_replace('/\\\\(.)/s', '$1', $title) ?? $title;
+
+        return '"' . str_replace(['\\', '"'], ['\\\\', '\\"'], $title) . '"';
+    }
+
+    protected function normalizeReferenceLabel(string $label): string
+    {
+        return strtolower(trim((string)preg_replace('/\s+/', ' ', $label)));
+    }
+
+    protected function collectReferenceLabels(string $markdown): void
+    {
+        $this->referenceLabels = [];
+        $fence = null;
+        foreach (explode("\n", $markdown) as $line) {
+            if (preg_match('/^[ ]{0,3}(`{3,}|~{3,})/', $line, $match) === 1) {
+                $marker = $match[1][0];
+                if ($fence === null) {
+                    $fence = $marker;
+                } elseif ($fence === $marker) {
+                    $fence = null;
+                }
+
+                continue;
+            }
+            if ($fence === null && preg_match('/^[ ]{0,3}\[([^\]]+)\]:/', $line, $match) === 1) {
+                $this->referenceLabels[$this->normalizeReferenceLabel($match[1])] = true;
+            }
+        }
+    }
+
+    protected function escapeDecodedEntity(string $text): string
+    {
+        return preg_replace('/([\\\\`*_\[\]{}~^<$="])/u', '\\\\$1', $text) ?? $text;
     }
 
     /**
