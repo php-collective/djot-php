@@ -671,6 +671,7 @@ Converts `@username` patterns into user profile links.
 
 ```php
 use Djot\Extension\MentionsExtension;
+use Djot\Extension\SocialLinkResolverInput;
 
 // Default: /users/view/{username}
 $converter->addExtension(new MentionsExtension());
@@ -680,7 +681,19 @@ $converter->addExtension(new MentionsExtension(
     urlTemplate: '/profile/{username}',
     cssClass: 'user-mention',
 ));
+
+// Resolve against host data at render time. Returning null keeps inert text.
+$converter->addExtension(new MentionsExtension(
+    resolver: static fn (SocialLinkResolverInput $input): ?string =>
+        $users->profileUrl($input->username),
+    resolverContext: $tenant,
+));
 ```
+
+The resolver receives the username, the mention node's attributes, and the
+opaque context supplied by the host. Exceptions and unsafe URL schemes produce
+an inert mention instead of a link. Resolution runs for every render, so reused
+documents can reflect current host data.
 
 **Input:**
 ```djot
