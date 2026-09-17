@@ -35,6 +35,8 @@ use RuntimeException;
  */
 class HtmlToDjot
 {
+    protected int $inlineQuoteDepth = 0;
+
     /**
      * When true, trust and re-emit the `data-djot-src` / `data-djot-raw`
      * round-trip attributes on the input. Default false: untrusted HTML must not
@@ -894,14 +896,54 @@ class HtmlToDjot
 
     protected function processInlineFormatting(DOMElement $node, string $open, string $close): string
     {
-        $content = trim($this->processChildren($node));
+        $content = $this->significantInlineContent($node);
         if ($content === '') {
             return '';
         }
 
         $attrs = $this->formatInlineAttributes($node);
 
+        if (preg_match('/^\s|\s$/u', $content) === 1 && strlen($open) === 1) {
+            return '{' . $open . $content . $close . '}' . $attrs;
+        }
+
         return $open . $content . $close . $attrs;
+    }
+
+    protected function significantInlineContent(DOMElement $node): string
+    {
+        $content = $this->processChildren($node);
+        if (trim($content) === '') {
+            return $content === '' ? '' : ' ';
+        }
+
+        $leading = preg_match('/^\s/u', $content) === 1 && $this->hasAdjacentInlineText($node, false);
+        $trailing = preg_match('/\s$/u', $content) === 1 && $this->hasAdjacentInlineText($node, true);
+        $content = trim($content);
+
+        return ($leading ? ' ' : '') . $content . ($trailing ? ' ' : '');
+    }
+
+    protected function hasAdjacentInlineText(DOMElement $node, bool $after): bool
+    {
+        $sibling = $after ? $node->nextSibling : $node->previousSibling;
+        while ($sibling !== null) {
+            if ($sibling instanceof DOMText) {
+                if ($sibling->textContent === '') {
+                    $sibling = $after ? $sibling->nextSibling : $sibling->previousSibling;
+
+                    continue;
+                }
+
+                return preg_match($after ? '/^\s/u' : '/\s$/u', $sibling->textContent) !== 1;
+            }
+            if ($sibling instanceof DOMElement && trim($sibling->textContent) !== '') {
+                return true;
+            }
+            $sibling = $after ? $sibling->nextSibling : $sibling->previousSibling;
+        }
+
+        return false;
     }
 
     protected function processCode(DOMElement $node): string
@@ -1050,7 +1092,7 @@ class HtmlToDjot
         }
 
         $href = $node->getAttribute('href');
-        $text = trim($this->processChildren($node));
+        $text = $this->significantInlineContent($node);
         $title = $node->getAttribute('title');
 
         if ($text === '') {
@@ -1212,23 +1254,34 @@ class HtmlToDjot
 
         // Process content excluding attribution elements, preserving paragraph breaks
         $parts = [];
+        $inline = '';
         foreach ($node->childNodes as $child) {
-            if ($child instanceof DOMText && trim($child->textContent) === '') {
-                continue;
-            }
-
             // Skip footer and cite elements (handled as attribution)
             if ($child instanceof DOMElement) {
                 $tag = strtolower($child->tagName);
                 if ($tag === 'footer' || $tag === 'cite') {
                     continue;
                 }
+                if (in_array($tag, $this->blockElements, true)) {
+                    $inline = trim($inline);
+                    if ($inline !== '') {
+                        $parts[] = $inline;
+                        $inline = '';
+                    }
+                    $part = rtrim($this->processNode($child), "\n");
+                    if ($part !== '') {
+                        $parts[] = $part;
+                    }
+
+                    continue;
+                }
             }
 
-            $part = rtrim($this->processNode($child), "\n");
-            if ($part !== '') {
-                $parts[] = $part;
-            }
+            $inline = $this->appendInline($inline, $this->processNode($child));
+        }
+        $inline = trim($inline);
+        if ($inline !== '') {
+            $parts[] = $inline;
         }
 
         $content = implode("\n\n", $parts);
@@ -2033,11 +2086,13 @@ class HtmlToDjot
      */
     protected function processInlineQuote(DOMElement $node): string
     {
+        $depth = $this->inlineQuoteDepth++;
         $content = $this->processChildren($node);
-        $escapedContent = str_replace(['\\', '"'], ['\\\\', '\\"'], $content);
-
-        // Wrap in quotes
-        $quoted = '"' . $escapedContent . '"';
+        $this->inlineQuoteDepth--;
+        $content = preg_replace('/(?<!\\\\)"/', '\\"', $content) ?? $content;
+        $quoted = $depth % 2 === 0
+            ? "\u{201C}" . $content . "\u{201D}"
+            : "\u{2018}" . $content . "\u{2019}";
 
         // If there's a cite attribute, wrap in span with the attribute
         $cite = $node->getAttribute('cite');
@@ -2419,16 +2474,28 @@ class HtmlToDjot
      */
     protected function escapeDjotText(string $text, bool $atLineStart): string
     {
-        // Reverse the parser's deterministic smart-punctuation mapping
-        // (`...` -> `…`, `--` -> `–`, `---` -> `—`) so the regenerated source
-        // keeps the ASCII the author wrote. Runs before the escapers because it
-        // only emits `.` and `-`, neither of which they touch.
-        $text = $this->reverseSmartPunctuation($text, $atLineStart);
-
         // `]` is escaped alongside `[` so that a literal bracket in text never
         // closes an enclosing link/span label early on the next parse. Structural
         // `]` emitted by child-element processors is not text and is unaffected.
         $escaped = preg_replace('/[\\\\`*\[\]{~^<]/', '\\\\$0', $text) ?? $text;
+        $firstPunctuation = true;
+        $escaped = preg_replace_callback(
+            '/\x{2014}|\x{2013}|\x{2026}|---|--|\.\.\./u',
+            static function (array $match) use ($atLineStart, &$firstPunctuation, $escaped): string {
+                $isLeading = $atLineStart && $firstPunctuation && str_starts_with($escaped, $match[0]);
+                $firstPunctuation = false;
+
+                return match ($match[0]) {
+                    "\u{2014}" => $isLeading ? "\u{2014}" : '---',
+                    "\u{2013}" => $isLeading ? "\u{2013}" : '--',
+                    "\u{2026}" => '...',
+                    '---' => '\-\-\-',
+                    '--' => '\-\-',
+                    default => '\.\.\.',
+                };
+            },
+            $escaped,
+        ) ?? $escaped;
 
         // Underscores only delimit emphasis at word boundaries; intraword `_`
         // (snake_case, SCREAMING_CASE, file_name) is literal in Djot, so leave
@@ -2440,31 +2507,6 @@ class HtmlToDjot
         }
 
         return $escaped;
-    }
-
-    /**
-     * Reverse the parser's smart-punctuation transforms back to ASCII so a
-     * Djot -> HTML -> Djot round-trip preserves the author's original source.
-     *
-     * The parser maps `...` -> `…`, `--` -> en dash and `---` -> em dash
-     * deterministically, so reversing stays HTML-stable: re-rendering the ASCII
-     * reproduces the same typographic characters. Ellipsis is never a block
-     * marker, so it is always reversed. A typographic dash at the start of a
-     * line is kept literal: reversing it to `---`/`--` at column zero would
-     * re-parse as a thematic break or interact with the leading-marker escaper.
-     * Keeping it as the typographic character there is still HTML-stable.
-     */
-    protected function reverseSmartPunctuation(string $text, bool $atLineStart): string
-    {
-        $text = str_replace("\u{2026}", '...', $text);
-
-        if ($atLineStart && preg_match('/^([\x{2013}\x{2014}])(.*)$/su', $text, $matches) === 1) {
-            $rest = str_replace(["\u{2014}", "\u{2013}"], ['---', '--'], $matches[2]);
-
-            return $matches[1] . $rest;
-        }
-
-        return str_replace(["\u{2014}", "\u{2013}"], ['---', '--'], $text);
     }
 
     /**
