@@ -178,6 +178,16 @@ class BlockParser
     protected int $lineOffset = 0;
 
     /**
+     * @var array<string>
+     */
+    protected array $sourceLines = [];
+
+    /**
+     * @var array<int, int>
+     */
+    protected array $warningColumnCursors = [];
+
+    /**
      * Custom block patterns: array of [pattern => callback]
      * Callback receives (array $lines, int $startIndex, Node $parent, BlockParser $parser)
      * and should return number of lines consumed, or null if not matched
@@ -500,6 +510,18 @@ class BlockParser
         }
     }
 
+    protected function addSourceWarning(
+        string $message,
+        int $line,
+        int $column = 1,
+        ?string $category = null,
+        ?string $suggestion = null,
+    ): void {
+        if ($this->collectWarnings) {
+            $this->warnings[] = new ParseWarning($message, $line + 1, $column, $category, $suggestion);
+        }
+    }
+
     public function parse(string $input): Document
     {
         $this->references = [];
@@ -523,6 +545,8 @@ class BlockParser
         }
 
         $lines = $this->splitLines($input);
+        $this->sourceLines = $lines;
+        $this->warningColumnCursors = [];
 
         // Gate document-wide collectors by syntax family. The predicates only
         // skip impossible families; false positives merely retain the existing
@@ -1051,7 +1075,7 @@ class BlockParser
                 && !str_contains(self::BLOCK_MARKER_CHARS, $marker)
                 && !($marker >= 'A' && preg_match('/^[ \t]*[A-Za-z]+[.)](?:\{[^{}]+\})?([ \t]|$)/', $line) === 1)
             ) {
-                $consumedFast = $this->tryParseParagraph($parent, $lines, $i);
+                $consumedFast = $this->tryParseParagraph($parent, $lines, $i, $lineMap);
                 $this->stampSourceLine($parent, $childrenBefore, $sourceLine);
                 $i += $consumedFast;
 
@@ -1077,7 +1101,7 @@ class BlockParser
                 ?? $this->tryParseReferenceDefinition($lines, $i)
                 ?? $this->tryParseAbbreviationDefinition($lines, $i)
                 ?? $this->tryParseCaption($parent, $lines, $i)
-                ?? $this->tryParseParagraph($parent, $lines, $i);
+                ?? $this->tryParseParagraph($parent, $lines, $i, $lineMap);
 
             $this->stampSourceLine($parent, $childrenBefore, $sourceLine);
             $i += $consumed;
@@ -2537,7 +2561,12 @@ class BlockParser
                     // branch above; here that surplus indent would leak into the
                     // inline text (e.g. an over-indented continuation rendering as
                     // "  c" instead of "c").
-                    $this->inlineParser->parse($paragraph, implode("\n", array_map('ltrim', $itemLines)), $start);
+                    $this->inlineParser->parse(
+                        $paragraph,
+                        implode("\n", array_map('ltrim', $itemLines)),
+                        $itemLineMap[0] ?? $start,
+                        $itemLineMap,
+                    );
                     $listItem->appendChild($paragraph);
                 }
             } elseif ($itemLines !== ['']) {
@@ -3681,12 +3710,14 @@ class BlockParser
      * @param \Djot\Node\Node $parent
      * @param array<string> $lines
      * @param int $start
+     * @param array<int, int>|null $lineMap
      */
-    protected function tryParseParagraph(Node $parent, array $lines, int $start): int
+    protected function tryParseParagraph(Node $parent, array $lines, int $start, ?array $lineMap = null): int
     {
         $line = $lines[$start];
         // Strip leading whitespace from first line (matching JS reference)
         $content = ltrim($line);
+        $inlineLineMap = [$this->sourceLineFor($lineMap, $start)];
 
         $i = $start + 1;
         $count = count($lines);
@@ -3713,12 +3744,13 @@ class BlockParser
             $nextLine = ltrim($nextLine);
             $segment = "\n" . $nextLine;
             $content .= $segment;
+            $inlineLineMap[] = $this->sourceLineFor($lineMap, $i);
             $braceState = $this->scanBraceState($segment, $braceState);
             $i++;
         }
 
         $paragraph = new Paragraph();
-        $this->inlineParser->parse($paragraph, $content, $start);
+        $this->inlineParser->parse($paragraph, $content, $inlineLineMap[0], $inlineLineMap);
         $this->applyPendingAttributes($paragraph);
         $parent->appendChild($paragraph);
 
@@ -4249,29 +4281,74 @@ class BlockParser
     /**
      * Add warning for undefined reference (called from InlineParser)
      */
-    public function addUndefinedReferenceWarning(string $ref, int $line, int $column): void
+    public function addUndefinedReferenceWarning(string $ref, int $line, int $column, bool $sourceMapped = false): void
     {
-        $this->addWarning(
-            "Undefined reference '{$ref}'",
-            $line,
-            $column,
-            false,
-            'reference',
-            "Define with [{$ref}]: url or use inline link",
-        );
+        $message = "Undefined reference '{$ref}'";
+        $suggestion = "Define with [{$ref}]: url or use inline link";
+        if ($sourceMapped) {
+            $this->addSourceWarning($message, $line, $column, 'reference', $suggestion);
+        } else {
+            $this->addWarning($message, $line, $column, false, 'reference', $suggestion);
+        }
     }
 
     /**
      * Add warning for undefined footnote (called from InlineParser)
      */
-    public function addUndefinedFootnoteWarning(string $label, int $line, int $column): void
+    public function addUndefinedFootnoteWarning(string $label, int $line, int $column, bool $sourceMapped = false): void
     {
+        if ($sourceMapped) {
+            $this->addSourceWarning("Undefined footnote '{$label}'", $line, $column);
+
+            return;
+        }
         $this->addWarning("Undefined footnote '{$label}'", $line, $column, false);
     }
 
     public function addUnattachedAttributeWarning(int $line, int $column): void
     {
         $this->addWarning('Ignoring unattached attribute', $line, $column, false);
+    }
+
+    /**
+     * Map a position in normalized inline text back to its authored column.
+     *
+     * Block parsers remove markers and indentation before inline parsing. The
+     * remaining line is still a byte-for-byte substring of the source line, so
+     * its first occurrence supplies the missing column offset.
+     */
+    public function sourceColumn(int $sourceLine, string $inlineLine, int $inlineColumn): int
+    {
+        $source = $this->sourceLines[$sourceLine] ?? '';
+        $offset = $inlineLine === '' ? false : strpos($source, $inlineLine);
+
+        return ($offset === false ? 0 : $offset) + $inlineColumn;
+    }
+
+    public function sourceWarningColumn(int $sourceLine, string $marker, int $fallback): int
+    {
+        $source = $this->sourceLines[$sourceLine] ?? '';
+        $cursor = $this->warningColumnCursors[$sourceLine] ?? 0;
+        $fallbackOffset = $fallback - 1;
+        $offset = $fallbackOffset >= $cursor && substr($source, $fallbackOffset, strlen($marker)) === $marker
+            ? $fallbackOffset
+            : strpos($source, $marker, $cursor);
+        if ($offset === false) {
+            return $fallback;
+        }
+        $this->warningColumnCursors[$sourceLine] = $offset + 1;
+
+        return $offset + 1;
+    }
+
+    public function getLineOffset(): int
+    {
+        return $this->lineOffset;
+    }
+
+    public function collectsWarnings(): bool
+    {
+        return $this->collectWarnings;
     }
 
     /**

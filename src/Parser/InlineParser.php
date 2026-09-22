@@ -72,6 +72,25 @@ class InlineParser
      */
     protected int $currentLine = 0;
 
+    protected string $sourceText = '';
+
+    /**
+     * @var list<string>
+     */
+    protected array $sourceTextLines = [];
+
+    /**
+     * @var list<int>
+     */
+    protected array $sourceLineMap = [];
+
+    /**
+     * @var list<int>
+     */
+    protected array $sourceColumnMap = [];
+
+    protected int $textOrigin = 0;
+
     /**
      * Custom inline patterns: array of [pattern => callback]
      * Callback receives (string $match, array $groups, InlineParser $parser)
@@ -230,15 +249,37 @@ class InlineParser
      * @param \Djot\Node\Node $parent
      * @param string $text
      * @param int $sourceLine Source line number (0-indexed) for error reporting
+     * @param list<int>|null $sourceLineMap Original source line for each line in $text
+     * @param int|null $sourceColumn Authored column where the first line starts
      */
-    public function parse(Node $parent, string $text, int $sourceLine = 0): void
-    {
+    public function parse(
+        Node $parent,
+        string $text,
+        int $sourceLine = 0,
+        ?array $sourceLineMap = null,
+        ?int $sourceColumn = null,
+    ): void {
         $this->delimiterStack = [];
         $this->currentLine = $sourceLine;
-        $this->parseInlines($parent, $text);
+        if ($this->blockParser->collectsWarnings()) {
+            if ($sourceLineMap !== null && ($sourceLineMap[0] ?? -1) < 0) {
+                $sourceLineMap = null;
+            }
+            $this->sourceText = $text;
+            $this->sourceTextLines = explode("\n", $text);
+            $mappedStart = $sourceLine + ($sourceLineMap === null ? $this->blockParser->getLineOffset() : 0);
+            $this->sourceLineMap = $sourceLineMap ?? range($mappedStart, $mappedStart + substr_count($text, "\n"));
+            $this->sourceColumnMap = [];
+            foreach ($this->sourceTextLines as $index => $line) {
+                $this->sourceColumnMap[] = $index === 0 && $sourceColumn !== null
+                    ? $sourceColumn
+                    : $this->blockParser->sourceColumn($this->sourceLineMap[$index] ?? $mappedStart, $line, 1);
+            }
+        }
+        $this->parseInlines($parent, $text, 0);
     }
 
-    protected function parseInlines(Node $parent, string $text): void
+    protected function parseInlines(Node $parent, string $text, int $origin = 0): void
     {
         // Inline-nesting DoS guard: deeply nested inline constructs (e.g. a bomb
         // of nested links `[[[...](#)](#)...`) recurse through parseInlines and
@@ -254,11 +295,37 @@ class InlineParser
         }
 
         $this->inlineDepth++;
+        $previousOrigin = $this->textOrigin;
+        $this->textOrigin = $origin;
         try {
             $this->parseInlinesImpl($parent, $text);
         } finally {
+            $this->textOrigin = $previousOrigin;
             $this->inlineDepth--;
         }
+    }
+
+    /**
+     * @return array{line: int, column: int}
+     */
+    protected function warningLocation(int $pos, string $marker): array
+    {
+        if (!$this->blockParser->collectsWarnings()) {
+            return ['line' => $this->currentLine, 'column' => $pos + 1];
+        }
+        $absolute = $this->textOrigin + $pos;
+        $before = substr($this->sourceText, 0, $absolute);
+        $lineIndex = substr_count($before, "\n");
+        $lineStart = strrpos($before, "\n");
+        $column = $absolute - ($lineStart === false ? 0 : $lineStart + 1) + 1;
+        $sourceLine = $this->sourceLineMap[$lineIndex] ?? ($this->currentLine + $lineIndex);
+
+        $fallback = ($this->sourceColumnMap[$lineIndex] ?? 1) + $column - 1;
+
+        return [
+            'line' => $sourceLine,
+            'column' => $this->blockParser->sourceWarningColumn($sourceLine, $marker, $fallback),
+        ];
     }
 
     protected function parseInlinesImpl(Node $parent, string $text): void
@@ -455,7 +522,7 @@ class InlineParser
                     if (isset($result['unclosed_link'])) {
                         // Output [ then parse linkText in isolation then output ](
                         $parent->appendChild(new Text('['));
-                        $this->parseInlines($parent, $result['link_text']);
+                        $this->parseInlines($parent, $result['link_text'], $this->textOrigin + $pos + 1);
                         $parent->appendChild(new Text(']('));
                         $pos = $result['continue_pos'];
 
@@ -878,7 +945,7 @@ class InlineParser
                 // Process escape sequences in URL (e.g., \* -> *)
                 $url = preg_replace('/\\\\(.)/', '$1', $url) ?? $url;
                 $link = new Link($url);
-                $this->parseInlines($link, $linkText);
+                $this->parseInlines($link, $linkText, $this->textOrigin + $pos + 1);
 
                 // Track anchor links for validation
                 if (preg_match('/^#(.+)$/', $url, $anchorMatch)) {
@@ -934,7 +1001,7 @@ class InlineParser
                     $link = new Link($refDef->url);
                     // Store reference info for round-trip support
                     $link->setReferenceLabel($originalRefBracket === '' ? '' : $ref);
-                    $this->parseInlines($link, $linkText);
+                    $this->parseInlines($link, $linkText, $this->textOrigin + $pos + 1);
 
                     // Track anchor links for validation
                     if (preg_match('/^#(.+)$/', $refDef->url, $anchorMatch)) {
@@ -964,12 +1031,13 @@ class InlineParser
                 }
 
                 // Reference not found - create link without href (null) and warn
-                $this->blockParser->addUndefinedReferenceWarning($ref, $this->currentLine, $pos + 1);
+                $location = $this->warningLocation($pos, substr($text, $pos, $refEnd - $pos + 1));
+                $this->blockParser->addUndefinedReferenceWarning($ref, $location['line'], $location['column'], true);
 
                 $link = new Link(null);
                 // Store reference info for round-trip support
                 $link->setReferenceLabel($originalRefBracket === '' ? '' : $ref);
-                $this->parseInlines($link, $linkText);
+                $this->parseInlines($link, $linkText, $this->textOrigin + $pos + 1);
 
                 $endPos = $refEnd + 1;
 
@@ -1002,7 +1070,7 @@ class InlineParser
                     // consecutive attribute blocks.
                     $this->applyAttributesToNode($span, $attrStr);
                     $endPos = $this->applyConsecutiveAttributes($span, $text, $attrEnd + 1);
-                    $this->parseInlines($span, $linkText);
+                    $this->parseInlines($span, $linkText, $this->textOrigin + $pos + 1);
 
                     return [
                         'node' => $span,
@@ -1254,7 +1322,7 @@ class InlineParser
                     }
 
                     $node = new $nodeClass();
-                    $this->parseInlines($node, $content);
+                    $this->parseInlines($node, $content, $this->textOrigin + $pos + 1);
 
                     $endPos = $actualClose + 1;
 
@@ -1351,7 +1419,7 @@ class InlineParser
             if ($text[$searchPos] === $marker && $text[$searchPos + 1] === '}') {
                 $content = substr($text, $pos + 2, $searchPos - $pos - 2);
                 $node = new $nodeClass();
-                $this->parseInlines($node, $content);
+                $this->parseInlines($node, $content, $this->textOrigin + $pos + 2);
 
                 $endPos = $searchPos + 2;
 
@@ -1974,7 +2042,8 @@ class InlineParser
 
         // Warn if footnote is not defined
         if (!$this->blockParser->hasFootnote($label)) {
-            $this->blockParser->addUndefinedFootnoteWarning($label, $this->currentLine, $pos + 1);
+            $location = $this->warningLocation($pos, $matches[0]);
+            $this->blockParser->addUndefinedFootnoteWarning($label, $location['line'], $location['column'], true);
         }
 
         return [
