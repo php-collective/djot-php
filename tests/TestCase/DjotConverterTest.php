@@ -1763,6 +1763,57 @@ DJOT;
         $this->assertSame(1, $warnings[0]->getLine());
     }
 
+    public function testWarningForUnattachedAttributeAtStartOfParagraph(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+
+        $this->assertSame("<p> foo</p>\n", $converter->convert('{.a} foo'));
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertSame('Ignoring unattached attribute', $warnings[0]->getMessage());
+        $this->assertSame(1, $warnings[0]->getLine());
+        $this->assertSame(1, $warnings[0]->getColumn());
+    }
+
+    public function testAttachedAttributeDoesNotWarn(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+
+        $this->assertSame("<p><span class=\"a\">word</span></p>\n", $converter->convert('word{.a}'));
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testParagraphLeadingAttributeWarningUsesTheParagraphLine(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+
+        $converter->convert("first\n\n{.a} second");
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertSame(3, $warnings[0]->getLine());
+        $this->assertSame(1, $warnings[0]->getColumn());
+    }
+
+    public function testAttributeAfterAnInlineNodeDoesNotGetAParagraphLeadingWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+
+        $converter->convert('x{.a}{.b}');
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
+    public function testHeadingAttributeDoesNotGetAParagraphLeadingWarning(): void
+    {
+        $converter = new DjotConverter(warnings: true);
+
+        $converter->convert('# {.a} heading');
+
+        $this->assertFalse($converter->hasWarnings());
+    }
+
     public function testStrictModeThrowsOnUnclosedCodeFence(): void
     {
         $converter = new DjotConverter(strict: true);

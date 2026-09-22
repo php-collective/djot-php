@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Parser;
 
+use Djot\Node\Block\Paragraph;
 use Djot\Node\Inline\Abbreviation;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
@@ -1654,6 +1655,9 @@ class InlineParser
         // If no preceding word, attributes don't attach to anything
         // But they still consume the braces (according to the spec)
         if ($precedingWord === '') {
+            if ($parent instanceof Paragraph && $parent->getChildren() === [] && $textBuffer === '') {
+                $this->blockParser->addUnattachedAttributeWarning($this->currentLine, $pos + 1);
+            }
             // Flush text and skip attributes - they produce nothing
             $this->flushText($parent, $textBuffer);
 

@@ -4269,6 +4269,11 @@ class BlockParser
         $this->addWarning("Undefined footnote '{$label}'", $line, $column, false);
     }
 
+    public function addUnattachedAttributeWarning(int $line, int $column): void
+    {
+        $this->addWarning('Ignoring unattached attribute', $line, $column, false);
+    }
+
     /**
      * Track an anchor link for validation (called from InlineParser)
      * Only tracks when collectWarnings is enabled.
