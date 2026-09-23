@@ -636,7 +636,7 @@ class DjotConverter
      * ```php
      * $converter->addExtension(new ExternalLinksExtension());
      * $converter->addExtension(new MentionsExtension(
-     *     userUrlTemplate: 'https://github.com/{username}',
+     *     urlTemplate: 'https://github.com/{username}',
      * ));
      * ```
      */

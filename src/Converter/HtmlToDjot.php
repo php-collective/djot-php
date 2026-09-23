@@ -1114,6 +1114,14 @@ class HtmlToDjot
             }
         }
 
+        // Check for #tag (round-trip support for MentionsExtension)
+        if ($node->hasAttribute('data-tag')) {
+            $tag = $node->getAttribute('data-tag');
+            if ($node->textContent === '#' . $tag) {
+                return '#' . $tag;
+            }
+        }
+
         // Check for autolink (round-trip support)
         if ($node->hasAttribute('data-djot-autolink')) {
             // Skip href and data-djot-autolink since they're in the autolink syntax
@@ -1942,6 +1950,13 @@ class HtmlToDjot
         }
 
         $content = $this->processChildren($node);
+
+        if ($node->hasAttribute('data-tag')) {
+            $tag = $node->getAttribute('data-tag');
+            if ($node->textContent === '#' . $tag) {
+                return '#' . $tag;
+            }
+        }
 
         // Use getElementAttributes to get all attributes including data-*
         $attrs = $this->getElementAttributes($node);

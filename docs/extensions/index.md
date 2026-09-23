@@ -18,7 +18,7 @@ Extensions provide a clean way to bundle related customizations together. Each e
 | [HeadingPermalinksExtension](#headingpermalinksextension) | Adds clickable anchor links to headings |
 | [InlineFootnotesExtension](#inlinefootnotesextension) | Converts `[content]{.fn}` spans to inline footnotes |
 | [LineBlockDivExtension](#lineblockdivextension) | Adds a fenced `::: |` line block (verse/addresses) without prefixing every line |
-| [MentionsExtension](#mentionsextension) | Converts `@username` patterns to profile links |
+| [MentionsExtension](#mentionsextension) | Converts `@username` and opt-in `#tag` patterns to links |
 | [MermaidExtension](#mermaidextension) | Transforms mermaid code blocks into diagrams |
 | [SemanticSpanExtension](#semanticspanextension) | Converts span attributes to semantic HTML elements (`<kbd>`, `<dfn>`, `<abbr>`) |
 | [SmartQuotesExtension](#smartquotesextension) | Configures locale-specific smart quote characters |
@@ -667,7 +667,8 @@ This follows the approach discussed in [djot issue #29](https://github.com/jgm/d
 
 ## MentionsExtension
 
-Converts `@username` patterns into user profile links.
+Converts `@username` patterns into user profile links. Tag parsing is disabled by
+default because Djot has no built-in inline `#tag` syntax.
 
 ```php
 use Djot\Extension\MentionsExtension;
@@ -680,29 +681,42 @@ $converter->addExtension(new MentionsExtension());
 $converter->addExtension(new MentionsExtension(
     urlTemplate: '/profile/{username}',
     cssClass: 'user-mention',
+    tagUrlTemplate: '/topics/{tag}',
+    tagCssClass: 'topic-tag',
 ));
 
 // Resolve against host data at render time. Returning null keeps inert text.
 $converter->addExtension(new MentionsExtension(
     resolver: static fn (SocialLinkResolverInput $input): ?string =>
-        $users->profileUrl($input->username),
+        $users->profileUrl($input->name),
     resolverContext: $tenant,
+));
+
+// A tag resolver also enables tags. Returning null renders an inert span.
+$converter->addExtension(new MentionsExtension(
+    tagResolver: static fn (SocialLinkResolverInput $input): ?string =>
+        $topics->url($input->name),
 ));
 ```
 
-The resolver receives the username, the mention node's attributes, and the
-opaque context supplied by the host. Exceptions and unsafe URL schemes produce
-an inert mention instead of a link. Resolution runs for every render, so reused
-documents can reflect current host data.
+`SocialLinkResolverInput` contains `kind`, `name`, `attributes`, and `context`.
+The kind is `mention` or `tag`, and the context is shared by both resolvers.
+Resolvers run for every render. Exceptions, non-string return values, and unsafe
+URL schemes produce an inert span instead of a link.
+
+Set `tagUrlTemplate` to a template containing `{tag}` to enable tag links. The
+tag name is encoded with `rawurlencode`. Set the template to an empty string to
+render tags as spans. Supplying `tagResolver` also enables tags and makes that
+resolver authoritative.
 
 **Input:**
 ```djot
-Thanks @johndoe for the help!
+Thanks @johndoe for the #php help!
 ```
 
 **Output:**
 ```html
-<p>Thanks <a href="/users/view/johndoe" data-username="johndoe" class="mention">@johndoe</a> for the help!</p>
+<p>Thanks <a href="/users/view/johndoe" data-username="johndoe" class="mention">@johndoe</a> for the <a href="/topics/php" data-tag="php" class="topic-tag">#php</a> help!</p>
 ```
 
 ## MermaidExtension

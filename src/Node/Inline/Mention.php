@@ -6,13 +6,31 @@ namespace Djot\Node\Inline;
 
 final class Mention extends Link
 {
-    public function __construct(protected string $username, string $destination = '')
-    {
+    /**
+     * @var string
+     */
+    public const KIND_MENTION = 'mention';
+
+    /**
+     * @var string
+     */
+    public const KIND_TAG = 'tag';
+
+    public function __construct(
+        protected string $name,
+        string $destination = '',
+        protected string $kind = self::KIND_MENTION,
+    ) {
         parent::__construct($destination);
     }
 
-    public function getUsername(): string
+    public function getName(): string
     {
-        return $this->username;
+        return $this->name;
+    }
+
+    public function getKind(): string
+    {
+        return $this->kind;
     }
 }
