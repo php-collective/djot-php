@@ -540,7 +540,9 @@ class MarkdownRenderer implements RendererInterface
         $title = $node->getTitle();
 
         if ($url === '' && $node instanceof Mention) {
-            return $text;
+            $prefix = $node->getKind() === Mention::KIND_TAG ? '#' : '@';
+
+            return $prefix . $node->getName();
         }
 
         if ($title !== null) {

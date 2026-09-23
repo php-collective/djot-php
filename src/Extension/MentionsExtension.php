@@ -33,6 +33,7 @@ use Exception;
  * ```php
  * $converter->addExtension(new MentionsExtension(
  *     urlTemplate: '/profile/{username}',
+ *     tagUrlTemplate: '/tags/{tag}',
  * ));
  * ```
  */
@@ -40,19 +41,28 @@ class MentionsExtension implements BeforeRenderExtensionInterface
 {
     protected ?Closure $resolver;
 
+    protected ?Closure $tagResolver;
+
     /**
      * @param string $urlTemplate URL template for @mentions. Use {username} placeholder.
      * @param string $cssClass CSS class for mention links
      * @param callable(\Djot\Extension\SocialLinkResolverInput): (?string)|null $resolver Authoritative mention resolver
      * @param mixed $resolverContext Opaque host context passed to the resolver
+     * @param string|null $tagUrlTemplate URL template for #tags. Use {tag} placeholder; null disables tags.
+     * @param string $tagCssClass CSS class for tag links
+     * @param callable(\Djot\Extension\SocialLinkResolverInput): (?string)|null $tagResolver Authoritative tag resolver
      */
     public function __construct(
         protected string $urlTemplate = '/users/view/{username}',
         protected string $cssClass = 'mention',
         ?callable $resolver = null,
         protected mixed $resolverContext = null,
+        protected ?string $tagUrlTemplate = null,
+        protected string $tagCssClass = 'tag',
+        ?callable $tagResolver = null,
     ) {
         $this->resolver = $resolver === null ? null : Closure::fromCallable($resolver);
+        $this->tagResolver = $tagResolver === null ? null : Closure::fromCallable($tagResolver);
     }
 
     public function register(DjotConverter $converter): void
@@ -77,6 +87,25 @@ class MentionsExtension implements BeforeRenderExtensionInterface
             },
         );
 
+        if ($this->tagUrlTemplate !== null || $this->tagResolver !== null) {
+            $tagUrlTemplate = $this->tagUrlTemplate ?? '';
+            $inlineParser->addInlinePattern(
+                '/(?<![A-Za-z0-9_&])#([a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*)/',
+                function (string $match, array $groups) use ($tagUrlTemplate): Link {
+                    $tag = $groups[1];
+                    $url = $this->tagResolver === null
+                        ? str_replace('{tag}', rawurlencode($tag), $tagUrlTemplate)
+                        : '';
+
+                    $link = new Mention($tag, $url, Mention::KIND_TAG);
+                    $link->setAttribute('data-tag', $tag);
+                    $link->appendChild(new Text('#' . $tag));
+
+                    return $link;
+                },
+            );
+        }
+
         // Add render listener to apply CSS class
         $converter->on('render.link', function (RenderEvent $event): void {
             $node = $event->getNode();
@@ -84,7 +113,8 @@ class MentionsExtension implements BeforeRenderExtensionInterface
                 return;
             }
 
-            foreach (explode(' ', $this->cssClass) as $class) {
+            $cssClass = $node->getKind() === Mention::KIND_TAG ? $this->tagCssClass : $this->cssClass;
+            foreach (explode(' ', $cssClass) as $class) {
                 $node->addClass($class);
             }
         });
@@ -97,22 +127,32 @@ class MentionsExtension implements BeforeRenderExtensionInterface
         return $document;
     }
 
-    protected function resolveMentions(Node $node): void
+    protected function resolveMentions(Node $node, bool $insideLink = false): void
     {
-        if ($node instanceof Mention && $this->resolver !== null) {
-            try {
-                $destination = ($this->resolver)(new SocialLinkResolverInput(
-                    $node->getUsername(),
-                    $node->getAttributes(),
-                    $this->resolverContext,
-                ));
-                $node->setDestination(is_string($destination) ? UrlSafety::sanitize($destination) : '');
-            } catch (Exception) {
-                $node->setDestination('');
+        // Links cannot nest: a mention or tag inside a link label stays text.
+        if ($node instanceof Mention && $insideLink) {
+            $node->getParent()?->replaceChildNode($node, new Text(($node->getKind() === Mention::KIND_TAG ? '#' : '@') . $node->getName()));
+
+            return;
+        }
+        if ($node instanceof Mention) {
+            $resolver = $node->getKind() === Mention::KIND_TAG ? $this->tagResolver : $this->resolver;
+            if ($resolver !== null) {
+                try {
+                    $destination = $resolver(new SocialLinkResolverInput(
+                        $node->getKind(),
+                        $node->getName(),
+                        $node->getAttributes(),
+                        $this->resolverContext,
+                    ));
+                    $node->setDestination(is_string($destination) ? UrlSafety::sanitize($destination) : '');
+                } catch (Exception) {
+                    $node->setDestination('');
+                }
             }
         }
         foreach ($node->getChildren() as $child) {
-            $this->resolveMentions($child);
+            $this->resolveMentions($child, $insideLink || $node instanceof Link);
         }
     }
 }
