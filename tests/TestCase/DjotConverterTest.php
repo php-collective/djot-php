@@ -16,6 +16,7 @@ use Djot\Profile;
 use Djot\Renderer\MarkdownRenderer;
 use Djot\Renderer\SoftBreakMode;
 use LengthException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Transliterator;
@@ -1774,6 +1775,32 @@ DJOT;
         $this->assertSame('Ignoring unattached attribute', $warnings[0]->getMessage());
         $this->assertSame(1, $warnings[0]->getLine());
         $this->assertSame(1, $warnings[0]->getColumn());
+        $this->assertSame('attribute', $warnings[0]->getCategory());
+    }
+
+    /**
+     * @return array<string, array{string, int, int}>
+     */
+    public static function unattachedAttributeInContainerProvider(): array
+    {
+        return [
+            'block quote' => ['> {.a} foo', 1, 3],
+            'list item' => ['- {.a} foo', 1, 3],
+            'later list paragraph' => ["- item\n\n  {.a} foo", 3, 3],
+            'list in quote' => ["> - x\n>\n>   {.a} foo", 3, 5],
+        ];
+    }
+
+    #[DataProvider('unattachedAttributeInContainerProvider')]
+    public function testUnattachedAttributeWarningReportsTheAuthoredColumn(string $source, int $line, int $column): void
+    {
+        $converter = new DjotConverter(warnings: true);
+        $converter->convert($source);
+
+        $warnings = $converter->getWarnings();
+        $this->assertCount(1, $warnings);
+        $this->assertSame($line, $warnings[0]->getLine());
+        $this->assertSame($column, $warnings[0]->getColumn());
     }
 
     public function testAttachedAttributeDoesNotWarn(): void

@@ -313,7 +313,7 @@ The following extensions support round-trip via the `data-djot-src` attribute:
 The following extensions support round-trip via specific data attributes:
 - `HeadingReferenceExtension` - Wikilinks `[[Heading]]`
 - `InlineFootnotesExtension` - Inline footnotes
-- `MentionsExtension` - `@username` patterns (via `data-username`)
+- `MentionsExtension` - `@username` patterns (via `data-username`) and `#tag` patterns (via `data-tag`)
 - `AdmonitionExtension` - Admonition divs with type/title/collapsible (via `data-djot-admonition-*`)
 
 When using explicit AST transforms through `DjotConverter::transform()`, renderer-aware transforms such as `HeadingLevelShiftTransform` automatically preserve round-trip metadata when the converter uses `HtmlRenderer` with round-trip mode enabled.

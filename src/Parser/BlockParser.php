@@ -4305,9 +4305,14 @@ class BlockParser
         $this->addWarning("Undefined footnote '{$label}'", $line, $column, false);
     }
 
-    public function addUnattachedAttributeWarning(int $line, int $column): void
+    public function addUnattachedAttributeWarning(int $line, int $column, bool $sourceMapped = false): void
     {
-        $this->addWarning('Ignoring unattached attribute', $line, $column, false);
+        if ($sourceMapped) {
+            $this->addSourceWarning('Ignoring unattached attribute', $line, $column, 'attribute');
+
+            return;
+        }
+        $this->addWarning('Ignoring unattached attribute', $line, $column, false, 'attribute');
     }
 
     /**

@@ -1724,7 +1724,8 @@ class InlineParser
         // But they still consume the braces (according to the spec)
         if ($precedingWord === '') {
             if ($parent instanceof Paragraph && $parent->getChildren() === [] && $textBuffer === '') {
-                $this->blockParser->addUnattachedAttributeWarning($this->currentLine, $pos + 1);
+                $location = $this->warningLocation($pos, substr($text, $pos, $attrEnd - $pos + 1));
+                $this->blockParser->addUnattachedAttributeWarning($location['line'], $location['column'], true);
             }
             // Flush text and skip attributes - they produce nothing
             $this->flushText($parent, $textBuffer);
