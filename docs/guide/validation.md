@@ -41,6 +41,7 @@ if ($converter->hasWarnings()) {
 | Undefined footnote | `[^missing]` | `footnote` |
 | Unused reference | Defined but never linked | `reference` |
 | Broken anchor link | `[link](#nonexistent)` | `anchor` |
+| Unattached attribute | `{.note} text` at the start of a paragraph | `attribute` |
 
 ## Strict Mode
 
