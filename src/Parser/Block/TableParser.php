@@ -345,6 +345,10 @@ class TableParser
         $codeDelimLength = 0;
 
         for ($i = 0; $i < $length; $i++) {
+            $i += strcspn($line, '`', $i);
+            if ($i >= $length) {
+                break;
+            }
             $char = $line[$i];
 
             if ($char === '`' && !$inCode) {
@@ -407,12 +411,23 @@ class TableParser
             $line = substr($line, 0, -1);
         }
 
+        if (!str_contains($line, '\\')) {
+            return explode('|', $line);
+        }
+
         // Simple split on |, handling escaped pipes
         $cells = [];
         $currentCell = '';
         $length = strlen($line);
 
         for ($i = 0; $i < $length; $i++) {
+            $plain = strcspn($line, '|\\', $i);
+            if ($plain > 0) {
+                $currentCell .= substr($line, $i, $plain);
+                $i += $plain - 1;
+
+                continue;
+            }
             $char = $line[$i];
 
             // Check for escaped pipe
@@ -653,6 +668,10 @@ class TableParser
         $lastPipeOutsideCode = -1;
 
         for ($i = 0; $i < $length; $i++) {
+            $i += strcspn($line, '`|', $i);
+            if ($i >= $length) {
+                break;
+            }
             $char = $line[$i];
 
             // Track code spans

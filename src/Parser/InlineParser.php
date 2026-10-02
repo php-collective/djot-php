@@ -75,6 +75,13 @@ class InlineParser
     protected string $sourceText = '';
 
     /**
+     * @var list<int>
+     */
+    private array $lineBreakOffsets = [];
+
+    private int $warningLineIndex = 0;
+
+    /**
      * @var list<string>
      */
     protected array $sourceTextLines = [];
@@ -276,6 +283,14 @@ class InlineParser
             }
             $this->sourceText = $text;
             $this->sourceTextLines = explode("\n", $text);
+            $this->lineBreakOffsets = [];
+            $this->warningLineIndex = 0;
+            $offset = 0;
+            foreach ($this->sourceTextLines as $line) {
+                $offset += strlen($line);
+                $this->lineBreakOffsets[] = $offset++;
+            }
+            array_pop($this->lineBreakOffsets);
             $mappedStart = $sourceLine + ($sourceLineMap === null ? $this->blockParser->getLineOffset() : 0);
             $this->sourceLineMap = $sourceLineMap ?? range($mappedStart, $mappedStart + substr_count($text, "\n"));
             $this->sourceColumnMap = [];
@@ -333,10 +348,28 @@ class InlineParser
             return ['line' => $this->currentLine, 'column' => $pos + 1];
         }
         $absolute = $this->textOrigin + $pos;
-        $before = substr($this->sourceText, 0, $absolute);
-        $lineIndex = substr_count($before, "\n");
-        $lineStart = strrpos($before, "\n");
-        $column = $absolute - ($lineStart === false ? 0 : $lineStart + 1) + 1;
+        $breaks = $this->lineBreakOffsets;
+        $lineIndex = $this->warningLineIndex;
+        if ($lineIndex > 0 && $breaks[$lineIndex - 1] >= $absolute) {
+            $low = 0;
+            $high = $lineIndex;
+            while ($low < $high) {
+                $mid = intdiv($low + $high, 2);
+                if ($breaks[$mid] < $absolute) {
+                    $low = $mid + 1;
+                } else {
+                    $high = $mid;
+                }
+            }
+            $lineIndex = $low;
+        } else {
+            while (isset($breaks[$lineIndex]) && $breaks[$lineIndex] < $absolute) {
+                $lineIndex++;
+            }
+        }
+        $this->warningLineIndex = $lineIndex;
+        $previousBreak = $breaks[$lineIndex - 1] ?? -1;
+        $column = $absolute - $previousBreak;
         $sourceLine = $this->sourceLineMap[$lineIndex] ?? ($this->currentLine + $lineIndex);
 
         $fallback = ($this->sourceColumnMap[$lineIndex] ?? 1) + $column - 1;
@@ -824,12 +857,7 @@ class InlineParser
             // Skip if this is inside a longer run of backticks
             if ($beforeClose === '`' || $afterChar === '`') {
                 // Move past this backtick run to find the next potential match
-                while ($searchPos < $length && $text[$searchPos] === '`') {
-                    $searchPos++;
-                }
-                if ($searchPos < $length) {
-                    $searchPos++;
-                }
+                $searchPos = $closePos + strspn($text, '`', $closePos);
 
                 continue;
             }
@@ -881,7 +909,10 @@ class InlineParser
             ];
         }
 
-        return null;
+        return [
+            'node' => new Code(substr($text, $contentStart)),
+            'pos' => $length,
+        ];
     }
 
     /**
@@ -1278,12 +1309,21 @@ class InlineParser
         // A closer needs the delimiter to appear again after the opening run.
         // Without this, every opener scans the whole tail looking for a close
         // that is not there (the other half of the O(n^2)).
-        if (strpos($text, $delimiter, $openingRunEnd) === false) {
+        $firstClose = strpos($text, $delimiter, $openingRunEnd);
+        if ($firstClose === false) {
             return null;
         }
         // Skip the opening run to look for content and closing run
         $searchPos = $openingRunEnd;
+        $bulkScan = $firstClose - $openingRunEnd >= 32;
+        $significant = $delimiter . '{`<]\\';
         while ($searchPos < $length) {
+            if ($bulkScan) {
+                $searchPos += strcspn($text, $significant, $searchPos);
+                if ($searchPos >= $length) {
+                    break;
+                }
+            }
             $char = $text[$searchPos];
 
             // Skip over attribute blocks {....} respecting quotes
@@ -1459,31 +1499,28 @@ class InlineParser
 
         // Find closing: marker}
         // For braced syntax, we allow spaces inside (unlike bare delimiters)
-        $searchPos = $pos + 2;
-        while ($searchPos < $length - 1) {
-            if ($text[$searchPos] === $marker && $text[$searchPos + 1] === '}') {
-                $content = substr($text, $pos + 2, $searchPos - $pos - 2);
-                $node = new $nodeClass();
-                $this->parseInlines($node, $content, $this->textOrigin + $pos + 2);
+        $searchPos = strpos($text, $marker . '}', $pos + 2);
+        if ($searchPos !== false) {
+            $content = substr($text, $pos + 2, $searchPos - $pos - 2);
+            $node = new $nodeClass();
+            $this->parseInlines($node, $content, $this->textOrigin + $pos + 2);
 
-                $endPos = $searchPos + 2;
+            $endPos = $searchPos + 2;
 
-                // Check for trailing attributes: {=text=}{.class}{.more}
-                // But NOT if it's another braced inline like {=text=}{=more=}
-                if ($endPos < $length && $text[$endPos] === '{') {
-                    $nextChar = $text[$endPos + 1] ?? '';
-                    // Braced inline markers that should NOT be treated as attributes
-                    if (!in_array($nextChar, ['=', '+', '-', '~', '^', '_', '*'], true)) {
-                        $endPos = $this->applyConsecutiveAttributes($node, $text, $endPos);
-                    }
+            // Check for trailing attributes: {=text=}{.class}{.more}
+            // But NOT if it's another braced inline like {=text=}{=more=}
+            if ($endPos < $length && $text[$endPos] === '{') {
+                $nextChar = $text[$endPos + 1] ?? '';
+                // Braced inline markers that should NOT be treated as attributes
+                if (!in_array($nextChar, ['=', '+', '-', '~', '^', '_', '*'], true)) {
+                    $endPos = $this->applyConsecutiveAttributes($node, $text, $endPos);
                 }
-
-                return [
-                    'node' => $node,
-                    'pos' => $endPos,
-                ];
             }
-            $searchPos++;
+
+            return [
+                'node' => $node,
+                'pos' => $endPos,
+            ];
         }
 
         return null;
