@@ -16,6 +16,13 @@ Performance benchmarks for djot-php compared to other implementations.
 > cross-language, profiles) are pending a re-measurement on an unloaded machine
 > and still show the previous figures.
 
+## October 2026 backports
+
+[Paired measurements and reproduction commands](./performance-backports.md)
+cover nested lists, aligned tables and parser scan improvements. On the current
+core workload, updated Djot measures 12.70 MiB/s versus baseline Djot's 1.84
+and current Carve's 10.17. The historical tables below use different fixtures.
+
 ## Quick Reference
 
 Default source-to-HTML conversion now includes a conservative borrowed-source

@@ -71,6 +71,11 @@ class FencedBlockParser
      */
     public function isCodeFenceCloser(string $line, string $fenceChar, int $fenceLength): bool
     {
+        $at = strspn($line, " \t\n\r\v\f");
+        if (($fenceChar === '`' || $fenceChar === '~') && ($line[$at] ?? '') !== $fenceChar) {
+            return false;
+        }
+
         return preg_match('/^\s*' . preg_quote($fenceChar, '/') . '{' . $fenceLength . ',}\s*$/', $line) === 1;
     }
 

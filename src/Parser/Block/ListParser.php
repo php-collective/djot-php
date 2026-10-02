@@ -57,6 +57,10 @@ class ListParser
      */
     public function parseListItemMarker(string $line): ?array
     {
+        if (static::class === self::class && !$this->markerCanStart($line)) {
+            return null;
+        }
+
         // Task list: - [.] where . is any single character
         // Standard markers: ' ' (unchecked), 'x'/'X' (checked)
         // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred), etc.
@@ -202,6 +206,24 @@ class ListParser
         }
 
         return null;
+    }
+
+    private function markerCanStart(string $line): bool
+    {
+        $first = $line[0] ?? '';
+        if ($first === '') {
+            return false;
+        }
+        if (str_contains('-*+(:', $first)) {
+            return true;
+        }
+        $run = strspn($line, '0123456789');
+        if ($run === 0) {
+            $run = strspn($line, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ');
+        }
+        $delimiter = $line[$run] ?? '';
+
+        return $run > 0 && ($delimiter === '.' || $delimiter === ')');
     }
 
     /**
