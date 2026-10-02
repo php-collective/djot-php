@@ -1,0 +1,90 @@
+[
+    {
+        "source": "``prefix```tail",
+        "html": "<p><code>prefix```tail</code></p>\n"
+    },
+    {
+        "source": "``prefix```between`` after",
+        "html": "<p><code>prefix```between</code> after</p>\n"
+    },
+    {
+        "source": "```a``b```",
+        "html": "<p><code>a``b</code></p>\n"
+    },
+    {
+        "source": "````a`b``c```d````",
+        "html": "<p><code>a`b``c```d</code></p>\n"
+    },
+    {
+        "source": "`",
+        "html": "<p><code></code></p>\n"
+    },
+    {
+        "source": "_before words `a_b` after_",
+        "html": "<p><em>before words <code>a_b</code> after</em></p>\n"
+    },
+    {
+        "source": "_a [b](url_with_) c_",
+        "html": "<p><em>a <a href=\"url_with_\">b</a> c</em></p>\n"
+    },
+    {
+        "source": "_a \\_ b_",
+        "html": "<p><em>a _ b</em></p>\n"
+    },
+    {
+        "source": "_a <https://x/_> z_",
+        "html": "<p><em>a <a href=\"https://x/_\">https://x/_</a> z</em></p>\n"
+    },
+    {
+        "source": "_a {key=\"_\"} b_",
+        "html": "<p><em>a  b</em></p>\n"
+    },
+    {
+        "source": "_a {=b=}_",
+        "html": "<p><em>a <mark>b</mark></em></p>\n"
+    },
+    {
+        "source": "{=a \\= b=}",
+        "html": "<p><mark>a = b</mark></p>\n"
+    },
+    {
+        "source": "{=a =} next",
+        "html": "<p><mark>a </mark> next</p>\n"
+    },
+    {
+        "source": "{+underlined +}{.blue}",
+        "html": "<p><ins class=\"blue\">underlined </ins></p>\n"
+    },
+    {
+        "source": "_{=a =} b_",
+        "html": "<p><em><mark>a </mark> b</em></p>\n"
+    },
+    {
+        "source": "__a__",
+        "html": "<p><em><em>a</em></em></p>\n"
+    },
+    {
+        "source": "_ a_",
+        "html": "<p>_ a_</p>\n"
+    },
+    {
+        "source": "_a _",
+        "html": "<p>_a _</p>\n"
+    },
+    {
+        "source": "_é 字_",
+        "html": "<p><em>é 字</em></p>\n"
+    },
+    {
+        "source": "{=é 字=}",
+        "html": "<p><mark>é 字</mark></p>\n"
+    },
+    {
+        "source": "_{key=\"_\"} a_",
+        "html": "<p><em> a</em></p>\n"
+    },
+    {
+        "source": "_ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words `code_with_underscore` [a](url_with_) \\_ escaped tail_",
+        "html": "<p><em>ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words ordinary words <code>code_with_underscore</code> <a href=\"url_with_\">a</a> _ escaped tail</em></p>\n"
+    }
+]

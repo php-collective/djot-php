@@ -39,6 +39,7 @@ final class BorrowedHtmlLayoutTest extends TestCase
      */
     public static function acceptedDocuments(): iterable
     {
+        yield 'unicode letters' => ["Grüße\n"];
         yield 'plain paragraphs' => ["First paragraph.\ncontinues here.\n\nSecond paragraph.\n"];
         yield 'smart punctuation' => ["A \"quote\", don't stop--now.\n"];
         yield 'core inline' => ["A *strong*, _emphasized_, and `coded` [link](https://example.com).\n"];
@@ -104,7 +105,7 @@ final class BorrowedHtmlLayoutTest extends TestCase
         yield 'table spanning cell' => ["| a | b |\n|---|---|\n| ^ | c |\n"];
 
         yield 'lazy heading continuation' => ["# Heading\ncontinued\n"];
-        yield 'unicode' => ["Grüße\n"];
+        yield 'unicode punctuation' => ["Grüße 😀\n"];
         yield 'attributes' => ["{.note}\nParagraph\n"];
         yield 'unsafe direct link' => ["[x](javascript:alert)\n"];
     }

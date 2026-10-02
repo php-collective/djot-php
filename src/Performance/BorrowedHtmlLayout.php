@@ -123,16 +123,42 @@ final class BorrowedHtmlLayout
     private function eligibleSource(string $source): bool
     {
         return strlen($source) <= self::MAX_SOURCE_BYTES
-            && preg_match('/[^\x00-\x7F]|[\x00\x09\x0B\x0C\x0D]/', $source) !== 1
+            && $this->eligibleText($source)
             && !str_starts_with($source, '---')
             && !str_contains($source, '[^')
             && !str_contains($source, '^[')
             && !str_contains($source, '[@')
             && !str_contains($source, '</#')
-            && !str_contains($source, '![')
             && !str_contains($source, '%%')
             && !str_contains($source, ':::')
-            && preg_match('/(?:^|\n)( *)- [^\n]*\n\n(?:\n)*\1- /', $source) !== 1;
+            && preg_match('/(?:^|\n)( *)([-*+]) [^\n]*\n\n(?:\n)*\1\2 /', $source) !== 1;
+    }
+
+    private function simpleImage(string $text): ?string
+    {
+        if (preg_match('/^!\[([A-Za-z0-9 ,.&-]*)\]\(([A-Za-z0-9:\/?#&=._%+-]+)\)$/D', $text, $match) !== 1) {
+            return null;
+        }
+        $label = $match[1];
+        $url = $match[2];
+        if (trim($label) !== $label || str_contains($label, '--') || str_contains($label, '...')) {
+            return null;
+        }
+        if (!$this->safeUrl($url) && preg_match('#^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$#D', $url) !== 1) {
+            return null;
+        }
+
+        return '<img alt="' . $this->escapeAttribute($label) . '" src="' . $this->escapeAttribute($url) . '">';
+    }
+
+    private function eligibleText(string $source): bool
+    {
+        if (preg_match('/[^\x00-\x7F]|[\x00\x09\x0B\x0C\x0D]/', $source) === 0) {
+            return true;
+        }
+
+        return strpbrk($source, "\x00\t\v\f\r*/_`[\"'") === false
+            && preg_match('/[^\x00-\x7F\p{L}\p{M}\p{N}]/u', $source) === 0;
     }
 
     /**
@@ -246,7 +272,7 @@ final class BorrowedHtmlLayout
                 }
                 $level = strlen($heading[1]);
                 $title = rtrim($heading[2]);
-                if ($this->inlineComplex($title) || preg_match('/[*\/`[]/', $title) === 1) {
+                if ($this->inlineComplex($title) || preg_match('/[*_\/`[]/', $title) === 1) {
                     return null;
                 }
                 while ($sections !== [] && end($sections) >= $level) {
@@ -257,8 +283,12 @@ final class BorrowedHtmlLayout
                     $out[] = "\n";
                 }
                 $previousMath = false;
-                $id = $ids->uniqueId($ids->normalizeId($title));
-                $heading = $this->escape($title);
+                $normalizedId = $ids->normalizeId($title);
+                if ($normalizedId === '') {
+                    return null;
+                }
+                $id = $ids->uniqueId($normalizedId);
+                $heading = $this->escapeText($title);
                 if ($this->events['headingNumbers'] !== null) {
                     $number = $this->nextHeadingNumber($level, $this->events['headingNumbers']['minLevel']);
                     if ($number !== null) {
@@ -283,7 +313,7 @@ final class BorrowedHtmlLayout
                     $this->headings[] = [
                         'level' => $level,
                         'text' => $title,
-                        'html' => $this->escape($title),
+                        'html' => $this->escapeText($title),
                         'id' => $id,
                     ];
                 }
@@ -341,21 +371,21 @@ final class BorrowedHtmlLayout
 
                 continue;
             }
-            if (str_starts_with($line, '- ')) {
+            if ($this->thematicBreak($line)) {
+                $out[] = $this->indent($depth) . '<hr>';
+                $this->accept($stats, 'thematicBreaks', $i, $i + 1);
+                $i++;
+                $wrote = true;
+
+                continue;
+            }
+            if (str_starts_with($line, '- ') || str_starts_with($line, '* ') || str_starts_with($line, '+ ')) {
                 $rendered = $this->renderUnorderedList($lines, $i, $definitions, $stats);
                 if ($rendered === null) {
                     return null;
                 }
                 $out[] = $rendered['html'];
                 $i = $rendered['next'];
-                $wrote = true;
-
-                continue;
-            }
-            if ($this->thematicBreak($line)) {
-                $out[] = $this->indent($depth) . '<hr>';
-                $this->accept($stats, 'thematicBreaks', $i, $i + 1);
-                $i++;
                 $wrote = true;
 
                 continue;
@@ -435,6 +465,12 @@ final class BorrowedHtmlLayout
             && !str_contains($text, '(tm)')
         ) {
             return $this->escape($text);
+        }
+        if (str_starts_with($text, '![')) {
+            $image = $this->simpleImage($text);
+            if ($image !== null) {
+                return $image;
+            }
         }
         if ($this->inlineComplex($text)) {
             return null;
@@ -657,12 +693,16 @@ final class BorrowedHtmlLayout
             return null;
         }
         $prefix = str_repeat(' ', $offset);
-        $marker = $prefix . '- ';
+        $bullet = $lines[$start][$offset];
+        $marker = $prefix . $bullet . ' ';
         $html = "<ul>\n";
         $i = $start;
         while (isset($lines[$i]) && str_starts_with($lines[$i], $marker)) {
             $itemText = substr($lines[$i], $offset + 2);
-            if ($itemText === '' || $this->blockish($itemText)) {
+            if (
+                $itemText === '' || $this->blockish($itemText) || $this->thematicBreak($itemText)
+                || (($bullet === '-' || $bullet === '*') && str_ends_with($itemText, $bullet))
+            ) {
                 return null;
             }
             $inline = $this->renderInline($itemText, $definitions);
@@ -674,6 +714,9 @@ final class BorrowedHtmlLayout
             $i++;
             // Without a blank, indented markers continue the item's paragraph.
             while (isset($lines[$i]) && str_starts_with($lines[$i], $prefix . '  - ')) {
+                if ($bullet !== '-') {
+                    return null;
+                }
                 $nestedText = substr($lines[$i], $offset + 4);
                 if ($nestedText === '' || $this->blockish($nestedText)) {
                     return null;
@@ -692,6 +735,9 @@ final class BorrowedHtmlLayout
                     $next++;
                 }
                 if (isset($lines[$next]) && str_starts_with($lines[$next], $prefix . '  - ')) {
+                    if ($bullet !== '-') {
+                        return null;
+                    }
                     $nested = $this->renderUnorderedList($lines, $next, $definitions, $stats, $offset + 2);
                     if ($nested === null) {
                         return null;
@@ -866,7 +912,7 @@ final class BorrowedHtmlLayout
 
     private function thematicBreak(string $line): bool
     {
-        return preg_match('/^[*-]{3,}$/', $line) === 1;
+        return preg_match('/^(?:[-*] *){3,}$/', $line) === 1;
     }
 
     /**
