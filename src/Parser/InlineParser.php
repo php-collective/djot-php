@@ -121,6 +121,15 @@ class InlineParser
 
     protected bool $linkTriggerPresent = false;
 
+    private ?string $bracketText = null;
+
+    /**
+     * @var array<int, int|null>
+     */
+    private array $bracketEnds = [];
+
+    private int|false $lastBracketCloser = false;
+
     /**
      * Cached abbreviation keys for the current pattern
      *
@@ -294,6 +303,11 @@ class InlineParser
             return;
         }
 
+        $outerBracketText = $this->bracketText;
+        $outerBracketEnds = $this->bracketEnds;
+        $outerLastCloser = $this->lastBracketCloser;
+        $outerTriggerText = $this->linkTriggerText;
+        $outerTriggerPresent = $this->linkTriggerPresent;
         $this->inlineDepth++;
         $previousOrigin = $this->textOrigin;
         $this->textOrigin = $origin;
@@ -301,6 +315,11 @@ class InlineParser
             $this->parseInlinesImpl($parent, $text);
         } finally {
             $this->textOrigin = $previousOrigin;
+            $this->bracketText = $outerBracketText;
+            $this->bracketEnds = $outerBracketEnds;
+            $this->lastBracketCloser = $outerLastCloser;
+            $this->linkTriggerText = $outerTriggerText;
+            $this->linkTriggerPresent = $outerTriggerPresent;
             $this->inlineDepth--;
         }
     }
@@ -866,17 +885,58 @@ class InlineParser
     }
 
     /**
+     * Index nested pairs and failed openers in one scan, using Djot's escapes.
+     */
+    protected function findBalancedBracketEnd(string $text, int $open): ?int
+    {
+        if (array_key_exists($open, $this->bracketEnds)) {
+            return $this->bracketEnds[$open];
+        }
+        $starts = [$open];
+        $length = strlen($text);
+        $at = $open + 1;
+        while ($at < $length) {
+            $at += strcspn($text, '[]\\', $at);
+            if ($at >= $length) {
+                break;
+            }
+            $char = $text[$at];
+            if ($char === '\\' && $at + 1 < $length) {
+                $at += 2;
+
+                continue;
+            }
+            if ($char === '[') {
+                $starts[] = $at;
+            } elseif ($char === ']') {
+                $start = array_pop($starts);
+                $this->bracketEnds[$start] = $at;
+                if ($starts === []) {
+                    return $at;
+                }
+            }
+            $at++;
+        }
+        foreach ($starts as $start) {
+            $this->bracketEnds[$start] = null;
+        }
+
+        return null;
+    }
+
+    /**
      * @return array{node: \Djot\Node\Inline\Link|\Djot\Node\Inline\Span, pos: int}|array{unclosed_link: true, link_text: string, continue_pos: int}|null
      */
     protected function parseLink(string $text, int $pos): ?array
     {
         $length = strlen($text);
 
-        // A link/image needs a closing `]`. Without this guard, every `[` runs
-        // the char-by-char depth scan below to end-of-text, so an unbalanced run
-        // like `[[[[...` is O(n^2). strpos is a C-level memchr that short-circuits
-        // when no `]` follows.
-        if (strpos($text, ']', $pos + 1) === false) {
+        if ($text !== $this->bracketText) {
+            $this->bracketText = $text;
+            $this->bracketEnds = [];
+            $this->lastBracketCloser = strrpos($text, ']');
+        }
+        if ($this->lastBracketCloser === false || $this->lastBracketCloser <= $pos) {
             return null;
         }
 
@@ -895,23 +955,8 @@ class InlineParser
             return null;
         }
 
-        // Find closing ]
-        $bracketDepth = 1;
-        $textEnd = $pos + 1;
-        while ($textEnd < $length && $bracketDepth > 0) {
-            if ($text[$textEnd] === '[') {
-                $bracketDepth++;
-            } elseif ($text[$textEnd] === ']') {
-                $bracketDepth--;
-            } elseif ($text[$textEnd] === '\\' && $textEnd + 1 < $length) {
-                $textEnd++; // Skip escaped char
-            }
-            if ($bracketDepth > 0) {
-                $textEnd++;
-            }
-        }
-
-        if ($bracketDepth !== 0) {
+        $textEnd = $this->findBalancedBracketEnd($text, $pos);
+        if ($textEnd === null) {
             return null;
         }
 

@@ -49,6 +49,17 @@ final class BorrowedHtmlLayoutTest extends TestCase
             "- first\n- second\n  - nested one\n  - nested *strong*\n",
         ];
 
+        yield 'nested list after a blank' => ["- first\n- second\n\n  - child *strong*\n  - child _emphasis_\n"];
+        yield 'nested list followed by a sibling' => ["- first\n\n  - child\n- second\n"];
+        yield 'three list levels' => ["- first\n\n  - child\n\n    - grandchild\n"];
+        yield 'table header' => ["| a | b |\n|---|---|\n| 1 | 2 |\n"];
+        yield 'aligned table header' => ["| a | b | c |\n|:---|---:|:---:|\n| *one* | `two` | [three](https://example.com) |\n"];
+        yield 'header without body' => ["| a | b |\n|---|---|\n"];
+        yield 'nested list and aligned table in a section' => [
+            "# Heading\n\n- first\n- second\n\n  - child\n  - another\n\n"
+                . "| a | b |\n|:---|---:|\n| 1 | 2 |\n\n---\n",
+        ];
+
         yield 'simple block quote' => ["> Quoted *strong* and [linked](https://example.com).\n"];
         yield 'plain-cell table' => [
             "| Name | Value |\n| --- | ---: |\n| alpha | `one` |\n",
@@ -75,11 +86,79 @@ final class BorrowedHtmlLayoutTest extends TestCase
      */
     public static function rejectedDocuments(): iterable
     {
+        yield 'padded reference key' => ["[site]: https://example.com\n\n[a][ site ]\n"];
+        yield 'repeated spaces in reference key' => ["[site x]: https://example.com\n\n[a][site  x]\n"];
+        yield 'padded definition key' => ["[ site ]: https://example.com\n\n[a][site]\n"];
+        yield 'repeated spaces in definition key' => ["[site  x]: https://example.com\n\n[a][site x]\n"];
+
+        yield 'unclosed outer direct link label' => ["[[ok](https://example.com)\n"];
+        yield 'unclosed outer reference label' => ["[[ok][missing]\n"];
+
+        yield 'loose nested list' => ["- first\n\n  - child\n\n  - sibling\n"];
+        yield 'nested continuation paragraph' => ["- first\n\n  - child\n  continuation\n"];
+        yield 'nested attributes' => ["- first\n\n  {.blue}\n  - child\n"];
+        yield 'over-indented nested marker' => ["- first\n\n   - child\n"];
+        yield 'ragged aligned table' => ["| a | b |\n|---|---|\n| one |\n"];
+        yield 'late table separator' => ["| a | b |\n| c | d |\n|---|---|\n"];
+        yield 'repeated table separator' => ["| a | b |\n|---|---|\n|---|---|\n"];
+        yield 'table spanning cell' => ["| a | b |\n|---|---|\n| ^ | c |\n"];
+
         yield 'lazy heading continuation' => ["# Heading\ncontinued\n"];
-        yield 'tables' => ["| a | b |\n|---|---|\n| 1 | 2 |\n"];
         yield 'unicode' => ["Grüße\n"];
         yield 'attributes' => ["{.note}\nParagraph\n"];
         yield 'unsafe direct link' => ["[x](javascript:alert)\n"];
+    }
+
+    public function testOfficialSourcesAcceptedByTheFacadeMatchTheAstPipeline(): void
+    {
+        $layout = new BorrowedHtmlLayout();
+        $converter = DjotConverter::create();
+        $accepted = 0;
+        foreach (OfficialTestSuiteTest::officialTestProvider() as $name => [$source]) {
+            $result = $layout->render($source);
+            if ($result !== null) {
+                self::assertSame($converter->convert($source), $result['html'], $name);
+                $accepted++;
+            }
+        }
+        self::assertGreaterThan(0, $accepted);
+    }
+
+    public function testGeneratedListBoundariesMatchTheAstPipeline(): void
+    {
+        $layout = new BorrowedHtmlLayout();
+        $converter = DjotConverter::create();
+        $pieces = ["- sibling\n", "\n", "  - child\n", "    - grandchild\n", "text\n", "  text\n"];
+        $accepted = 0;
+        foreach ($pieces as $first) {
+            foreach ($pieces as $second) {
+                foreach ($pieces as $third) {
+                    foreach ($pieces as $fourth) {
+                        $source = "- first\n" . $first . $second . $third . $fourth;
+                        $result = $layout->render($source);
+                        if ($result !== null) {
+                            self::assertSame($converter->convert($source), $result['html'], $source);
+                            $accepted++;
+                        }
+                    }
+                }
+            }
+        }
+        self::assertGreaterThan(50, $accepted);
+    }
+
+    public function testNestedSpeculationAndSourceSizeRemainBounded(): void
+    {
+        $brackets = str_repeat('[', 4096) . "[ok](https://example.com)\n";
+        self::assertNull((new BorrowedHtmlLayout())->render($brackets));
+        self::assertSame(DjotConverter::create()->convert($brackets), (new DjotConverter())->convert($brackets));
+
+        $source = "- first\n";
+        for ($level = 1; $level <= 18; $level++) {
+            $source .= "\n" . str_repeat('  ', $level) . "- child\n";
+        }
+        self::assertNull((new BorrowedHtmlLayout())->render($source));
+        self::assertNull((new BorrowedHtmlLayout())->render(str_repeat("text\n\n", 11000)));
     }
 
     public function testCustomRendererNeverUsesTheDefaultFacade(): void

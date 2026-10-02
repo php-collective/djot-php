@@ -204,6 +204,9 @@ final class BorrowedHtmlLayout
             if (isset($match[3])) {
                 continue;
             }
+            if ($match[1] !== trim($match[1]) || str_contains($match[1], '  ')) {
+                return null;
+            }
             $definitions[$match[1]] = ['href' => $match[2], 'title' => null];
             $this->accept($stats, 'linkDefinitions', $index, $index + 1, true);
         }
@@ -524,7 +527,7 @@ final class BorrowedHtmlLayout
                         return null;
                     }
                     $key = substr($text, $labelEnd + 2, $close - $labelEnd - 2);
-                    if ($key === '') {
+                    if ($key === '' || $key !== trim($key) || str_contains($key, '  ')) {
                         return null;
                     }
                     $href = $definitions[$key]['href'] ?? null;
@@ -562,7 +565,7 @@ final class BorrowedHtmlLayout
     {
         $matched = preg_match_all(
             '/\*\*([^*\n]+)\*\*|\*([^*\n]+)\*|_([^_\n]+)_|`([^`\n]*)`'
-                . '|\[([^\]\n*\_`]+)\]\(([^()\s]+)\)|\[([^\]\n*\_`]+)\]\[([^\]\n]+)\]/',
+                . '|\[([^\]\[\n*\_`]+)\]\(([^()\s]+)\)|\[([^\]\[\n*\_`]+)\]\[([^\]\n]+)\]/',
             $text,
             $matches,
             PREG_SET_ORDER | PREG_OFFSET_CAPTURE,
@@ -608,6 +611,10 @@ final class BorrowedHtmlLayout
             } else {
                 $direct = ($match[6][0] ?? '') !== '';
                 $label = $direct ? ($match[5][0] ?? '') : ($match[7][0] ?? '');
+                $key = $match[8][0] ?? '';
+                if (!$direct && ($key !== trim($key) || str_contains($key, '  '))) {
+                    return false;
+                }
                 $href = $direct ? ($match[6][0] ?? '') : ($definitions[$match[8][0] ?? '']['href'] ?? null);
                 if ($href !== null && !$this->safeUrl($href)) {
                     return false;
@@ -640,16 +647,22 @@ final class BorrowedHtmlLayout
      * @param int $start
      * @param array<string, array{href: string, title: ?string}> $definitions
      * @param array<string, int> $stats
+     * @param int $offset
      *
      * @return array{html: string, next: int}|null
      */
-    private function renderUnorderedList(array $lines, int $start, array $definitions, array &$stats): ?array
+    private function renderUnorderedList(array $lines, int $start, array $definitions, array &$stats, int $offset = 0): ?array
     {
+        if ($offset > 32) {
+            return null;
+        }
+        $prefix = str_repeat(' ', $offset);
+        $marker = $prefix . '- ';
         $html = "<ul>\n";
         $i = $start;
-        while (isset($lines[$i]) && str_starts_with($lines[$i], '- ')) {
-            $itemText = substr($lines[$i], 2);
-            if (str_starts_with($itemText, '- ')) {
+        while (isset($lines[$i]) && str_starts_with($lines[$i], $marker)) {
+            $itemText = substr($lines[$i], $offset + 2);
+            if ($itemText === '' || $this->blockish($itemText)) {
                 return null;
             }
             $inline = $this->renderInline($itemText, $definitions);
@@ -659,8 +672,13 @@ final class BorrowedHtmlLayout
             $this->accept($stats, 'unorderedListItems', $i, $i + 1);
             $html .= "<li>\n" . $inline;
             $i++;
-            while (isset($lines[$i]) && str_starts_with($lines[$i], '  - ')) {
-                $nested = $this->renderInline(substr($lines[$i], 4), $definitions);
+            // Without a blank, indented markers continue the item's paragraph.
+            while (isset($lines[$i]) && str_starts_with($lines[$i], $prefix . '  - ')) {
+                $nestedText = substr($lines[$i], $offset + 4);
+                if ($nestedText === '' || $this->blockish($nestedText)) {
+                    return null;
+                }
+                $nested = $this->renderInline($nestedText, $definitions);
                 if ($nested === null) {
                     return null;
                 }
@@ -668,10 +686,41 @@ final class BorrowedHtmlLayout
                 $this->accept($stats, 'unorderedListItems', $i, $i + 1);
                 $i++;
             }
-            if (isset($lines[$i]) && trim($lines[$i]) !== '' && !str_starts_with($lines[$i], '- ')) {
-                return null;
+            if (isset($lines[$i]) && trim($lines[$i]) === '') {
+                $next = $i;
+                while (isset($lines[$next]) && trim($lines[$next]) === '') {
+                    $next++;
+                }
+                if (isset($lines[$next]) && str_starts_with($lines[$next], $prefix . '  - ')) {
+                    $nested = $this->renderUnorderedList($lines, $next, $definitions, $stats, $offset + 2);
+                    if ($nested === null) {
+                        return null;
+                    }
+                    $html .= "\n" . $nested['html'];
+                    $i = $nested['next'];
+                }
             }
             $html .= "\n</li>\n";
+            if (isset($lines[$i]) && trim($lines[$i]) === '') {
+                $next = $i;
+                while (isset($lines[$next]) && trim($lines[$next]) === '') {
+                    $next++;
+                }
+                // Blank-separated siblings may make the entire list loose.
+                if (isset($lines[$next]) && str_starts_with($lines[$next], $marker)) {
+                    return null;
+                }
+
+                break;
+            }
+            if (isset($lines[$i]) && !str_starts_with($lines[$i], $marker)) {
+                $leading = strlen($lines[$i]) - strlen(ltrim($lines[$i], ' '));
+                if ($offset === 0 || $leading >= $offset) {
+                    return null;
+                }
+
+                break;
+            }
         }
 
         return ['html' => $html . '</ul>', 'next' => $i];
@@ -719,28 +768,53 @@ final class BorrowedHtmlLayout
      */
     private function renderTable(array $lines, int $start, array $definitions, array &$stats): ?array
     {
-        $html = "<table>\n";
+        $rows = [];
+        $alignments = [];
         $i = $start;
         while (isset($lines[$i]) && str_starts_with($lines[$i], '|')) {
-            $trimmed = trim($lines[$i]);
-            if (!str_ends_with($trimmed, '|') || str_contains($trimmed, '\\|')) {
+            $line = $lines[$i];
+            if (!str_ends_with($line, '|') || str_contains($line, '\\|')) {
                 return null;
             }
-            if (str_starts_with($trimmed, '|-') || str_starts_with($trimmed, '|:')) {
-                return null;
-            }
-            $cells = array_map('trim', explode('|', substr($trimmed, 1, -1)));
-            $html .= "<tr>\n";
-            foreach ($cells as $cell) {
-                $inline = $this->renderInline($cell, $definitions);
-                if ($inline === null) {
+            $cells = explode('|', substr($line, 1, -1));
+            $separator = preg_match('/^\|(?::?-+:? *\|)+$/', $line) === 1;
+            if ($separator) {
+                if (count($rows) !== 1 || $alignments !== [] || count($cells) !== count($rows[0])) {
                     return null;
                 }
-                $html .= '<td>' . $inline . "</td>\n";
+                foreach ($cells as $cell) {
+                    $cell = rtrim($cell, ' ');
+                    $alignments[] = str_ends_with($cell, ':')
+                        ? (str_starts_with($cell, ':') ? 'center' : 'right')
+                        : (str_starts_with($cell, ':') ? 'left' : '');
+                }
+            } else {
+                $row = [];
+                foreach ($cells as $cell) {
+                    $inline = $this->renderInline(trim($cell), $definitions);
+                    if ($inline === null) {
+                        return null;
+                    }
+                    $row[] = $inline;
+                }
+                if ($alignments !== [] && count($row) !== count($alignments)) {
+                    return null;
+                }
+                $rows[] = $row;
+                $this->accept($stats, 'tableRows', $i, $i + 1);
+            }
+            $i++;
+        }
+        $html = "<table>\n";
+        foreach ($rows as $index => $row) {
+            $tag = $index === 0 && $alignments !== [] ? 'th' : 'td';
+            $html .= "<tr>\n";
+            foreach ($row as $column => $inline) {
+                $alignment = $alignments[$column] ?? '';
+                $html .= '<' . $tag . ($alignment === '' ? '' : ' style="text-align: ' . $alignment . ';"')
+                    . '>' . $inline . '</' . $tag . ">\n";
             }
             $html .= "</tr>\n";
-            $this->accept($stats, 'tableRows', $i, $i + 1);
-            $i++;
         }
 
         return ['html' => $html . '</table>', 'next' => $i];
@@ -792,7 +866,7 @@ final class BorrowedHtmlLayout
 
     private function thematicBreak(string $line): bool
     {
-        return preg_match('/^\*{3,}$/', $line) === 1;
+        return preg_match('/^[*-]{3,}$/', $line) === 1;
     }
 
     /**
