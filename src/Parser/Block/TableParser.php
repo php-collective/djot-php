@@ -185,6 +185,10 @@ class TableParser
         // Remove leading and trailing |
         $line = substr($line, 1, -1);
 
+        if (!str_contains($line, '`') && !str_contains($line, '\\')) {
+            return explode('|', $line);
+        }
+
         // Split by | but not \| and not | inside code spans
         $cells = [];
         $currentCell = '';

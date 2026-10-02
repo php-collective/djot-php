@@ -8,6 +8,7 @@ use Djot\Node\Block\Paragraph;
 use Djot\Node\Document;
 use Djot\Parser\Block\FencedBlockParser;
 use Djot\Parser\Block\ListParser;
+use Djot\Parser\Block\TableParser;
 use Djot\Parser\BlockParser;
 use Djot\Parser\InlineParser;
 use Djot\Renderer\HtmlRenderer;
@@ -25,6 +26,62 @@ final class PerformanceBackportTest extends TestCase
                 $line = $head . $tail;
                 self::assertSame($patterns->parseListItemMarker($line), $screened->parseListItemMarker($line), $line);
             }
+        }
+    }
+
+    public function testMarkerCachePreservesResultsAcrossEvictionAndCallerMutation(): void
+    {
+        $cached = new ListParser();
+        $uncached = new class extends ListParser {
+        };
+        $line = 'iv.{.blue} item';
+        $expected = $uncached->parseListItemMarker($line);
+        $result = $cached->parseListItemMarker($line);
+        self::assertSame($expected, $result);
+        $result['content'] = 'changed';
+        self::assertSame($expected, $cached->parseListItemMarker($line));
+        foreach (range(1, 256) as $number) {
+            $source = $number . '. item ' . $number;
+            self::assertSame($uncached->parseListItemMarker($source), $cached->parseListItemMarker($source));
+        }
+        self::assertSame($expected, $cached->parseListItemMarker($line));
+        $long = '- ' . str_repeat('x', 4096);
+        self::assertSame($uncached->parseListItemMarker($long), $cached->parseListItemMarker($long));
+    }
+
+    public function testMarkerCacheDoesNotMemoizeSubclassHooks(): void
+    {
+        $parser = new class extends ListParser {
+            private int $calls = 0;
+
+            protected function withMarkerAttrs(array $result, string $attrs): array
+            {
+                $result = parent::withMarkerAttrs($result, $attrs);
+                $result['content'] = (string)++$this->calls;
+
+                return $result;
+            }
+        };
+        self::assertSame('1', $parser->parseListItemMarker('- item')['content']);
+        self::assertSame('2', $parser->parseListItemMarker('- item')['content']);
+    }
+
+    public function testTableCellShortcutPreservesWhitespaceEscapesAndCode(): void
+    {
+        $parser = new TableParser();
+        foreach (
+            [
+                ['| alpha | beta |', [' alpha ', ' beta ']],
+                ["| α | &<> | |\t", [' α ', ' &<> ', ' ']],
+                ['|||', ['', '']],
+                ['| alpha | beta |{.row}', [' alpha ', ' beta ']],
+                ['| a\\|b | c |', [' a|b ', ' c ']],
+                ['| `a|b` | c |', [' `a|b` ', ' c ']],
+                ['| ``a`|b`` | c |', [' ``a`|b`` ', ' c ']],
+                ['| `a\\|b` | c |', [' `a|b` ', ' c ']],
+            ] as [$source, $expected]
+        ) {
+            self::assertSame($expected, $parser->parseTableCells($source), $source);
         }
     }
 

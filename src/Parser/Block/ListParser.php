@@ -20,6 +20,11 @@ use Djot\Node\Block\ListItem;
 class ListParser
 {
     /**
+     * @var array<string, array{type: string, marker: string, content: string, start?: int, checked?: bool, taskMarker?: string, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string, attrs?: string}|null>
+     */
+    private array $parsedMarkerCache = [];
+
+    /**
      * Roman numeral values for conversion
      *
      * @var array<string, int>
@@ -57,10 +62,32 @@ class ListParser
      */
     public function parseListItemMarker(string $line): ?array
     {
-        if (static::class === self::class && !$this->markerCanStart($line)) {
+        if (static::class !== self::class) {
+            return $this->parseListItemMarkerUncached($line);
+        }
+        if (!$this->markerCanStart($line)) {
             return null;
         }
+        if (strlen($line) > 2048) {
+            return $this->parseListItemMarkerUncached($line);
+        }
+        if (array_key_exists($line, $this->parsedMarkerCache)) {
+            return $this->parsedMarkerCache[$line];
+        }
+        if (count($this->parsedMarkerCache) >= 128) {
+            $this->parsedMarkerCache = [];
+        }
 
+        return $this->parsedMarkerCache[$line] = $this->parseListItemMarkerUncached($line);
+    }
+
+    /**
+     * @param string $line The line to parse
+     *
+     * @return array{type: string, marker: string, content: string, start?: int, checked?: bool, taskMarker?: string, style?: string, marker_indent?: int, ambiguous?: bool, alpha_start?: int, alpha_style?: string, attrs?: string}|null
+     */
+    private function parseListItemMarkerUncached(string $line): ?array
+    {
         // Task list: - [.] where . is any single character
         // Standard markers: ' ' (unchecked), 'x'/'X' (checked)
         // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred), etc.
