@@ -24,3 +24,7 @@
 /docs/.vitepress/cache/
 /docs/.vitepress/dist/
 /docs/.vitepress/grammars/
+
+# Local performance reports
+/docs/reference/performance-backports.md
+/docs/reference/performance-backports.json
