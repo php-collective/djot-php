@@ -1618,9 +1618,6 @@ class BlockParser
         $this->pendingAttributes = [];
         $this->pendingAttributeSourceLines = [];
 
-        $innerLines = [];
-        $innerLineMap = [];
-        $sourceLines = [...$divAttributeSourceLines, $line];
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
@@ -1638,9 +1635,6 @@ class BlockParser
                     $inCodeBlock = true;
                     $codeBlockFence = $codeFenceInfo['char'];
                     $codeBlockFenceLength = $codeFenceInfo['length'];
-                    $sourceLines[] = $currentLine;
-                    $innerLines[] = $currentLine;
-                    $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
                     $i++;
 
                     continue;
@@ -1651,9 +1645,6 @@ class BlockParser
                 if ($this->fencedBlockParser->isCodeFenceCloser($currentLine, $codeBlockFence, $codeBlockFenceLength)) {
                     $inCodeBlock = false;
                 }
-                $sourceLines[] = $currentLine;
-                $innerLines[] = $currentLine;
-                $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
                 $i++;
 
                 continue;
@@ -1661,22 +1652,32 @@ class BlockParser
 
             // Check for closing fence (equal or longer) - only when not in code block
             if ($this->fencedBlockParser->isDivFenceCloser($currentLine, $fenceLength)) {
-                $sourceLines[] = $currentLine;
                 $i++;
                 $closed = true;
 
                 break;
             }
 
-            $sourceLines[] = $currentLine;
-            $innerLines[] = $currentLine;
-            $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
             $i++;
+        }
+
+        $bodyLength = $i - $start - ($closed ? 2 : 1);
+        $innerLines = array_slice($lines, $start + 1, $bodyLength);
+        if ($lineMap === null) {
+            $innerLineMap = $bodyLength > 0 ? range($start + 1, $start + $bodyLength) : [];
+        } elseif (array_is_list($lineMap) && count($lineMap) >= $start + 1 + $bodyLength) {
+            $innerLineMap = array_slice($lineMap, $start + 1, $bodyLength);
+        } else {
+            $innerLineMap = [];
+            for ($index = $start + 1; $index <= $start + $bodyLength; $index++) {
+                $innerLineMap[] = $this->sourceLineFor($lineMap, $index);
+            }
         }
 
         if (!$closed) {
             $this->addWarning('Unclosed div', $start, 1, true);
         } else {
+            $sourceLines = [...$divAttributeSourceLines, ...array_slice($lines, $start, $i - $start)];
             $div->setSource(implode("\n", $sourceLines));
         }
 

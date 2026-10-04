@@ -136,6 +136,10 @@ class FencedBlockParser
      */
     public function isDivFenceCloser(string $line, int $fenceLength): bool
     {
+        if ($fenceLength > 0 && ($line[0] ?? '') !== ':') {
+            return false;
+        }
+
         return preg_match('/^:{' . $fenceLength . ',}\s*$/', $line) === 1;
     }
 
