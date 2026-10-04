@@ -27,6 +27,7 @@ use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Parser\Utility\AttributeParser;
+use Djot\Parser\Utility\BacktickRunIndex;
 use Djot\Util\StringUtil;
 
 /**
@@ -136,6 +137,48 @@ class InlineParser
     private array $bracketEnds = [];
 
     private int|false $lastBracketCloser = false;
+
+    private ?string $delimiterScanText = null;
+
+    /**
+     * @var array<string, array<int, true>>
+     */
+    private array $delimiterNoCloseFrom = [];
+
+    /**
+     * @var array<string, array{int, int}>
+     */
+    private array $openingDelimiterRuns = [];
+
+    private ?string $attributeScanText = null;
+
+    /**
+     * @var array<int, int|null>
+     */
+    private array $attributeEnds = [];
+
+    /**
+     * @var array<int, true>
+     */
+    private array $invalidAttributeStarts = [];
+
+    private ?string $destinationScanText = null;
+
+    /**
+     * @var array<int, int|null>
+     */
+    private array $destinationEnds = [];
+
+    private ?string $backtickScanText = null;
+
+    private ?BacktickRunIndex $backtickRuns = null;
+
+    private ?string $terminatorText = null;
+
+    /**
+     * @var array<string, int|false>
+     */
+    private array $lastTerminators = [];
 
     /**
      * Cached abbreviation keys for the current pattern
@@ -323,6 +366,18 @@ class InlineParser
         $outerLastCloser = $this->lastBracketCloser;
         $outerTriggerText = $this->linkTriggerText;
         $outerTriggerPresent = $this->linkTriggerPresent;
+        $outerDelimiterText = $this->delimiterScanText;
+        $outerDelimiterFailures = $this->delimiterNoCloseFrom;
+        $outerDelimiterRuns = $this->openingDelimiterRuns;
+        $outerAttributeText = $this->attributeScanText;
+        $outerAttributeEnds = $this->attributeEnds;
+        $outerInvalidAttributes = $this->invalidAttributeStarts;
+        $outerDestinationText = $this->destinationScanText;
+        $outerDestinationEnds = $this->destinationEnds;
+        $outerBacktickText = $this->backtickScanText;
+        $outerBacktickRuns = $this->backtickRuns;
+        $outerTerminatorText = $this->terminatorText;
+        $outerTerminators = $this->lastTerminators;
         $this->inlineDepth++;
         $previousOrigin = $this->textOrigin;
         $this->textOrigin = $origin;
@@ -335,6 +390,18 @@ class InlineParser
             $this->lastBracketCloser = $outerLastCloser;
             $this->linkTriggerText = $outerTriggerText;
             $this->linkTriggerPresent = $outerTriggerPresent;
+            $this->delimiterScanText = $outerDelimiterText;
+            $this->delimiterNoCloseFrom = $outerDelimiterFailures;
+            $this->openingDelimiterRuns = $outerDelimiterRuns;
+            $this->attributeScanText = $outerAttributeText;
+            $this->attributeEnds = $outerAttributeEnds;
+            $this->invalidAttributeStarts = $outerInvalidAttributes;
+            $this->destinationScanText = $outerDestinationText;
+            $this->destinationEnds = $outerDestinationEnds;
+            $this->backtickScanText = $outerBacktickText;
+            $this->backtickRuns = $outerBacktickRuns;
+            $this->terminatorText = $outerTerminatorText;
+            $this->lastTerminators = $outerTerminators;
             $this->inlineDepth--;
         }
     }
@@ -997,23 +1064,9 @@ class InlineParser
         // Inline link: [text](url) or [text](url){.class}
         if ($afterBracket < $length && $text[$afterBracket] === '(') {
             $urlStart = $afterBracket + 1;
-            $parenDepth = 1;
-            $urlEnd = $urlStart;
-
-            while ($urlEnd < $length && $parenDepth > 0) {
-                if ($text[$urlEnd] === '(') {
-                    $parenDepth++;
-                } elseif ($text[$urlEnd] === ')') {
-                    $parenDepth--;
-                } elseif ($text[$urlEnd] === '\\' && $urlEnd + 1 < $length) {
-                    $urlEnd++;
-                }
-                if ($parenDepth > 0) {
-                    $urlEnd++;
-                }
-            }
-
-            if ($parenDepth === 0) {
+            $destinationEnd = $this->cachedLinkDestinationEnd($text, $afterBracket);
+            if ($destinationEnd !== null) {
+                $urlEnd = $destinationEnd - 1;
                 $url = substr($text, $urlStart, $urlEnd - $urlStart);
                 // Remove newlines from URL (soft breaks are ignored in URLs)
                 $url = str_replace(["\r\n", "\r", "\n"], '', $url);
@@ -1138,7 +1191,7 @@ class InlineParser
         // is still inline-parsed, e.g. [*x*]{???} -> [<strong>x</strong>]{???}.
         if ($afterBracket < $length && $text[$afterBracket] === '{') {
             $attrEnd = $this->findAttributeEnd($text, $afterBracket);
-            if ($attrEnd !== null) {
+            if ($attrEnd !== null && !($this::class === self::class && $this->attributeScanText === $text && isset($this->invalidAttributeStarts[$afterBracket]))) {
                 $attrStr = substr($text, $afterBracket + 1, $attrEnd - $afterBracket - 1);
                 if ($this->isValidAttrPayload($attrStr)) {
                     $span = new Span();
@@ -1221,8 +1274,8 @@ class InlineParser
     protected function parseAutolink(string $text, int $pos): ?array
     {
         $length = strlen($text);
-        $end = strpos($text, '>', $pos);
-        if ($end === false) {
+        $end = $this->findAutolinkCloser($text, $pos);
+        if ($end === null) {
             return null;
         }
 
@@ -1301,7 +1354,21 @@ class InlineParser
         // First, measure the consecutive opening run. strspn is a C-level scan;
         // a PHP char-by-char loop here made a long delimiter run (`****...`)
         // O(n^2), since every opener re-counts the run from its position.
-        $openingRunEnd = $pos + strspn($text, $delimiter, $pos);
+        if ($this->delimiterScanText !== $text) {
+            $this->delimiterScanText = $text;
+            $this->delimiterNoCloseFrom = [];
+            $this->openingDelimiterRuns = [];
+        }
+        $run = $this->openingDelimiterRuns[$delimiter] ?? null;
+        if ($run !== null && $pos >= $run[0] && $pos < $run[1]) {
+            $openingRunEnd = $run[1];
+        } else {
+            $openingRunEnd = $pos + strspn($text, $delimiter, $pos);
+            $this->openingDelimiterRuns[$delimiter] = [$pos, $openingRunEnd];
+        }
+        if (isset($this->delimiterNoCloseFrom[$delimiter][$openingRunEnd])) {
+            return null;
+        }
         // If the opening run extends to end of string (all delimiters), no valid emphasis
         if ($openingRunEnd >= $length) {
             return null;
@@ -1311,13 +1378,19 @@ class InlineParser
         // that is not there (the other half of the O(n^2)).
         $firstClose = strpos($text, $delimiter, $openingRunEnd);
         if ($firstClose === false) {
+            $this->delimiterNoCloseFrom[$delimiter][$openingRunEnd] = true;
+
             return null;
         }
         // Skip the opening run to look for content and closing run
+        $failedStarts = [$openingRunEnd];
         $searchPos = $openingRunEnd;
         $bulkScan = $firstClose - $openingRunEnd >= 32;
         $significant = $delimiter . '{`<]\\';
         while ($searchPos < $length) {
+            if (isset($this->delimiterNoCloseFrom[$delimiter][$searchPos])) {
+                break;
+            }
             if ($bulkScan) {
                 $searchPos += strcspn($text, $significant, $searchPos);
                 if ($searchPos >= $length) {
@@ -1375,6 +1448,12 @@ class InlineParser
                 continue;
             }
 
+            // Only record traversed boundaries; positions inside opaque spans
+            // and escapes can start a different search.
+            if ($char === $delimiter) {
+                $failedStarts[] = $searchPos + strspn($text, $delimiter, $searchPos);
+            }
+
             // Check for closing delimiter
             if ($char === $delimiter) {
                 // Check if this can be a closer (not preceded by whitespace)
@@ -1424,6 +1503,10 @@ class InlineParser
             }
 
             $searchPos++;
+        }
+
+        foreach ($failedStarts as $failedStart) {
+            $this->delimiterNoCloseFrom[$delimiter][$failedStart] = true;
         }
 
         return null;
@@ -1499,6 +1582,9 @@ class InlineParser
 
         // Find closing: marker}
         // For braced syntax, we allow spaces inside (unlike bare delimiters)
+        if (!$this->hasTerminatorAfter($text, $marker . '}', $pos + 2)) {
+            return null;
+        }
         $searchPos = strpos($text, $marker . '}', $pos + 2);
         if ($searchPos !== false) {
             $content = substr($text, $pos + 2, $searchPos - $pos - 2);
@@ -1739,7 +1825,7 @@ class InlineParser
 
         // Find the closing brace, handling quoted strings
         $attrEnd = $this->findAttributeEnd($text, $pos);
-        if ($attrEnd === null) {
+        if ($attrEnd === null || ($this->attributeScanText === $text && isset($this->invalidAttributeStarts[$pos]))) {
             return null;
         }
 
@@ -1849,21 +1935,85 @@ class InlineParser
         ]);
     }
 
+    private function findAutolinkCloser(string $text, int $pos): ?int
+    {
+        if (!$this->hasTerminatorAfter($text, '>', $pos + 1)) {
+            return null;
+        }
+        $end = $pos + 1 + strcspn($text, " \t\n\r\v\f<>", $pos + 1);
+        if (($text[$end] ?? '') === '>') {
+            return $end;
+        }
+        // The existing URL regex accepts a final newline before its end anchor.
+        if (($text[$end] ?? '') === "\n" && ($text[$end + 1] ?? '') === '>') {
+            return $end + 1;
+        }
+
+        // FILTER_VALIDATE_EMAIL rejects addresses longer than 320 bytes.
+        // Keep quoted local parts, including dot-separated quoted segments.
+        $emailWindow = substr($text, $pos + 1, 321);
+        $emailEnd = strpos($emailWindow, '>');
+
+        return $emailEnd === false ? null : $pos + 1 + $emailEnd;
+    }
+
+    private function hasTerminatorAfter(string $text, string $marker, int $pos): bool
+    {
+        if ($this->terminatorText !== $text) {
+            $this->terminatorText = $text;
+            $this->lastTerminators = [];
+        }
+        if (!array_key_exists($marker, $this->lastTerminators)) {
+            $this->lastTerminators[$marker] = strrpos($text, $marker);
+        }
+        $last = $this->lastTerminators[$marker];
+
+        return $last !== false && $last >= $pos;
+    }
+
     /**
      * Find the end of an attribute block, handling quoted strings
      */
     protected function findAttributeEnd(string $text, int $pos): ?int
     {
+        if ($this->attributeScanText !== $text) {
+            $this->attributeScanText = $text;
+            $this->attributeEnds = [];
+            $this->invalidAttributeStarts = [];
+        }
+        if (!$this->hasTerminatorAfter($text, '}', $pos + 1)) {
+            return null;
+        }
+        if (array_key_exists($pos, $this->attributeEnds)) {
+            return $this->attributeEnds[$pos];
+        }
+
+        return $this->scanAttributeEnd($text, $pos);
+    }
+
+    /**
+     * Record nested matches and failed starts outside quoted or escaped text.
+     */
+    protected function scanAttributeEnd(string $text, int $pos): ?int
+    {
         $length = strlen($text);
         $i = $pos + 1;
         $inQuote = null;
-        $depth = 1;
+        $openers = [$pos];
+        $percentCount = 0;
+        $percentStarts = [$pos => 0];
 
         while ($i < $length) {
             $char = $text[$i];
+            if ($char === '%') {
+                $percentCount++;
+            }
 
             // Handle escape sequences
             if ($char === '\\' && $i + 1 < $length) {
+                if ($text[$i + 1] === '%') {
+                    $percentCount++;
+                }
                 $i += 2;
 
                 continue;
@@ -1887,15 +2037,26 @@ class InlineParser
             }
 
             if ($char === '{') {
-                $depth++;
+                $opener = $openers[count($openers) - 1];
+                // A nested brace before any comment cannot validate as an attribute.
+                if ($percentStarts[$opener] === $percentCount) {
+                    $this->invalidAttributeStarts[$opener] = true;
+                }
+                $percentStarts[$i] = $percentCount;
+                $openers[] = $i;
             } elseif ($char === '}') {
-                $depth--;
-                if ($depth === 0) {
+                $opener = array_pop($openers);
+                $this->attributeEnds[$opener] = $i;
+                if ($openers === []) {
                     return $i;
                 }
             }
 
             $i++;
+        }
+
+        foreach ($openers as $opener) {
+            $this->attributeEnds[$opener] = null;
         }
 
         return null;
@@ -1908,40 +2069,23 @@ class InlineParser
      */
     protected function findCodeSpanEnd(string $text, int $pos): ?int
     {
-        $length = strlen($text);
-
-        // Count opening backticks
-        $openBackticks = 0;
-        while ($pos + $openBackticks < $length && $text[$pos + $openBackticks] === '`') {
-            $openBackticks++;
-        }
-
-        if ($openBackticks === 0) {
+        $width = strspn($text, '`', $pos);
+        if ($width === 0) {
             return null;
         }
+        $contentStart = $pos + $width;
+        if ($width === 1) {
+            $start = strpos($text, '`', $contentStart);
 
-        $contentStart = $pos + $openBackticks;
-
-        // Find matching closing backticks
-        $closingPattern = str_repeat('`', $openBackticks);
-        $searchPos = $contentStart;
-
-        while ($searchPos < $length) {
-            $closePos = strpos($text, $closingPattern, $searchPos);
-            if ($closePos === false) {
-                return null;
-            }
-
-            // Make sure we have exactly the right number of backticks (not more)
-            $afterClose = $closePos + $openBackticks;
-            if ($afterClose >= $length || $text[$afterClose] !== '`') {
-                return $afterClose;
-            }
-
-            $searchPos = $closePos + 1;
+            return $start === false ? null : $start + strspn($text, '`', $start);
+        }
+        if ($this->backtickScanText !== $text || $this->backtickRuns === null) {
+            $this->backtickScanText = $text;
+            $this->backtickRuns = new BacktickRunIndex($text);
         }
 
-        return null;
+        // Preserve the lookahead's minimum-width rule for longer closing runs.
+        return $this->backtickRuns->findCloser($contentStart, $width);
     }
 
     /**
@@ -1955,35 +2099,45 @@ class InlineParser
      */
     protected function findLinkDestinationEnd(string $text, int $pos): ?int
     {
+        return $this->cachedLinkDestinationEnd($text, $pos);
+    }
+
+    private function cachedLinkDestinationEnd(string $text, int $pos): ?int
+    {
         $length = strlen($text);
         if ($pos >= $length || $text[$pos] !== '(') {
             return null;
         }
-
-        $parenDepth = 1;
-        $i = $pos + 1;
-
-        while ($i < $length && $parenDepth > 0) {
-            $char = $text[$i];
-            if ($char === '(') {
-                $parenDepth++;
-            } elseif ($char === ')') {
-                $parenDepth--;
-            } elseif ($char === '\\' && $i + 1 < $length) {
-                // Skip escaped character
-                $i++;
-            }
-            if ($parenDepth > 0) {
-                $i++;
-            }
+        if ($this->destinationScanText !== $text) {
+            $this->destinationScanText = $text;
+            $this->destinationEnds = [];
         }
-
-        if ($parenDepth !== 0) {
+        if (!$this->hasTerminatorAfter($text, ')', $pos + 1)) {
             return null;
         }
+        if (array_key_exists($pos, $this->destinationEnds)) {
+            return $this->destinationEnds[$pos];
+        }
+        $openers = [$pos];
+        for ($i = $pos + 1; $i < $length; $i++) {
+            $char = $text[$i];
+            if ($char === '(') {
+                $openers[] = $i;
+            } elseif ($char === ')') {
+                $opener = array_pop($openers);
+                $this->destinationEnds[$opener] = $i + 1;
+                if ($openers === []) {
+                    return $i + 1;
+                }
+            } elseif ($char === '\\' && $i + 1 < $length) {
+                $i++;
+            }
+        }
+        foreach ($openers as $opener) {
+            $this->destinationEnds[$opener] = null;
+        }
 
-        // Return position after the closing )
-        return $i + 1;
+        return null;
     }
 
     /**
@@ -1999,8 +2153,8 @@ class InlineParser
             return null;
         }
 
-        $end = strpos($text, '>', $pos);
-        if ($end === false) {
+        $end = $this->findAutolinkCloser($text, $pos);
+        if ($end === null) {
             return null;
         }
 
@@ -2087,7 +2241,7 @@ class InlineParser
 
         while ($pos < $length && $text[$pos] === '{') {
             $attrEnd = $this->findAttributeEnd($text, $pos);
-            if ($attrEnd === null) {
+            if ($attrEnd === null || ($this::class === self::class && $this->attributeScanText === $text && isset($this->invalidAttributeStarts[$pos]))) {
                 break;
             }
 
@@ -2145,18 +2299,8 @@ class InlineParser
         $length = strlen($text);
 
         // Check for display math $$
-        $display = false;
-        $dollarCount = 0;
-        while ($pos + $dollarCount < $length && $text[$pos + $dollarCount] === '$') {
-            $dollarCount++;
-        }
-
-        if ($dollarCount >= 2) {
-            $display = true;
-            $startPos = $pos + 2;
-        } else {
-            $startPos = $pos + 1;
-        }
+        $display = ($text[$pos] ?? '') === '$' && ($text[$pos + 1] ?? '') === '$';
+        $startPos = $pos + ($display ? 2 : 1);
 
         // Must be followed by backtick
         if ($startPos >= $length || $text[$startPos] !== '`') {
