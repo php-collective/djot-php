@@ -120,6 +120,8 @@ class InlineParser
      */
     protected ?string $abbreviationPattern = null;
 
+    private bool $wordAbbreviations = false;
+
     /**
      * Memoized per-text check: does the text contain any link/span trigger
      * (`](`, `][`, `]{`)? Lets parseLink skip the O(n) bracket-depth scan for
@@ -806,24 +808,46 @@ class InlineParser
      */
     protected function flushTextWithAbbreviations(Node $parent, string $text, array $abbreviations): void
     {
-        // Cache the regex pattern for abbreviations (built once per document)
         if ($this->cachedAbbreviations !== $abbreviations) {
-            // Sort abbreviations by length (longest first) to match longer abbreviations first
-            $abbrKeys = array_keys($abbreviations);
-            usort($abbrKeys, fn ($a, $b) => strlen($b) - strlen($a));
+            $keys = array_map(static fn (string|int $key): string => (string)$key, array_keys($abbreviations));
+            $this->wordAbbreviations = $this::class === self::class;
+            foreach ($keys as $key) {
+                if (preg_match('/^[A-Za-z0-9]+$/D', $key) !== 1) {
+                    $this->wordAbbreviations = false;
 
-            // Build a regex pattern that matches any abbreviation at word boundaries
-            // We need to escape special regex characters in abbreviation keys
-            $escapedKeys = array_map(fn ($key) => preg_quote($key, '/'), $abbrKeys);
-            $this->abbreviationPattern = '/\b(' . implode('|', $escapedKeys) . ')\b/u';
+                    break;
+                }
+            }
+            if (!$this->wordAbbreviations) {
+                usort($keys, static fn (string $a, string $b): int => strlen($b) - strlen($a));
+                $escaped = array_map(static fn (string $key): string => preg_quote($key, '/'), $keys);
+                $this->abbreviationPattern = '/\b(' . implode('|', $escaped) . ')\b/u';
+            }
             $this->cachedAbbreviations = $abbreviations;
         }
 
-        // Split text by abbreviation matches, keeping the delimiters
-        // Pattern is guaranteed to be set at this point
-        /** @var string $pattern */
-        $pattern = $this->abbreviationPattern;
-        $parts = preg_split($pattern, $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+        if ($this->wordAbbreviations) {
+            $matched = preg_match_all('/\b[A-Za-z0-9]++\b/u', $text, $words, PREG_OFFSET_CAPTURE);
+            $parts = $matched === false ? false : [];
+            if ($parts !== false) {
+                $cursor = 0;
+                foreach ($words[0] as [$word, $at]) {
+                    if (!isset($abbreviations[$word])) {
+                        continue;
+                    }
+                    if ($at > $cursor) {
+                        $parts[] = substr($text, $cursor, $at - $cursor);
+                    }
+                    $parts[] = $word;
+                    $cursor = $at + strlen($word);
+                }
+                if ($cursor < strlen($text)) {
+                    $parts[] = substr($text, $cursor);
+                }
+            }
+        } else {
+            $parts = preg_split((string)$this->abbreviationPattern, $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+        }
 
         if ($parts === false) {
             // Fallback: just output as plain text

@@ -314,6 +314,7 @@ class HtmlRenderer implements RendererInterface
         // Djot footnote labels cannot contain ']', so including it here ensures uniqueness.
         $label = '_inline_]' . $number;
         $context->footnoteNumbers[$label] = $number;
+        $context->pendingFootnoteLabels[] = $label;
         $context->footnoteRefCounts[$label] = 1;
 
         // Store deferred content renderer
@@ -1455,37 +1456,42 @@ class HtmlRenderer implements RendererInterface
         $context = $this->getRenderContext();
 
         // Pre-render all footnote contents to discover any nested footnote references
-        // Keep iterating until no new footnotes are discovered
+        // References appended while rendering a body join the same queue.
         $renderedContents = [];
+
+        $context->pendingFootnoteLabels = array_keys($context->footnoteNumbers);
         $processedNumbers = [];
+        for ($cursor = 0; isset($context->pendingFootnoteLabels[$cursor]); $cursor++) {
+            $label = $context->pendingFootnoteLabels[$cursor];
+            $number = $context->footnoteNumbers[$label];
+            if (isset($processedNumbers[$number])) {
+                continue;
+            }
+            $processedNumbers[$number] = true;
 
-        do {
-            $newFootnotes = false;
-            foreach ($context->footnoteNumbers as $label => $number) {
-                if (isset($processedNumbers[$number])) {
-                    continue;
-                }
-                $processedNumbers[$number] = true;
+            if (isset($context->inlineFootnoteRenderers[$number])) {
+                // Inline footnote - invoke deferred renderer
+                $renderedContents[$number] = trim(($context->inlineFootnoteRenderers[$number])());
+            } elseif (isset($context->collectedFootnotes[$label])) {
+                // Regular footnote - rendering may discover new footnote references
+                $renderedContents[$number] = trim($this->renderChildren($context->collectedFootnotes[$label]));
+            } else {
+                $renderedContents[$number] = '';
+            }
 
-                if (isset($context->inlineFootnoteRenderers[$number])) {
-                    // Inline footnote - invoke deferred renderer
-                    $renderedContents[$number] = trim(($context->inlineFootnoteRenderers[$number])());
-                } elseif (isset($context->collectedFootnotes[$label])) {
-                    // Regular footnote - rendering may discover new footnote references
-                    $renderedContents[$number] = trim($this->renderChildren($context->collectedFootnotes[$label]));
-                } else {
-                    $renderedContents[$number] = '';
-                }
-
-                // Check if new footnotes were discovered during rendering
-                if (count($context->footnoteNumbers) > count($processedNumbers)) {
-                    $newFootnotes = true;
+            if (count($context->footnoteNumbers) !== count($context->pendingFootnoteLabels)) {
+                $queued = array_fill_keys($context->pendingFootnoteLabels, true);
+                foreach ($context->footnoteNumbers as $newLabel => $_number) {
+                    if (!isset($queued[$newLabel])) {
+                        $context->pendingFootnoteLabels[] = $newLabel;
+                    }
                 }
             }
-        } while ($newFootnotes);
+        }
 
         // Sort footnotes by their reference number order
         ksort($renderedContents);
+        $footnoteLabelsByNumber = array_flip($context->footnoteNumbers);
 
         $html = '<section role="doc-endnotes">' . "\n";
         $html .= $this->xhtml ? "<hr />\n" : "<hr>\n";
@@ -1495,7 +1501,7 @@ class HtmlRenderer implements RendererInterface
             $liAttrs = '';
 
             // Find the label for this footnote number
-            $label = array_search($number, $context->footnoteNumbers, true);
+            $label = $footnoteLabelsByNumber[$number] ?? false;
 
             if ($this->roundTripMode && isset($context->inlineFootnoteRenderers[$number])) {
                 $liAttrs = ' data-djot-inline-footnote="1"';
@@ -1569,6 +1575,7 @@ class HtmlRenderer implements RendererInterface
         if (!isset($context->footnoteNumbers[$label])) {
             $context->footnoteCounter++;
             $context->footnoteNumbers[$label] = $context->footnoteCounter;
+            $context->pendingFootnoteLabels[] = $label;
         }
         $number = $context->footnoteNumbers[$label];
 
