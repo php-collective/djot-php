@@ -39,6 +39,7 @@ use Djot\Parser\Block\TableParser;
 use Djot\Parser\Utility\AttributeParser;
 use Djot\Parser\Utility\IndentationHelper;
 use Djot\Renderer\HeadingIdTracker;
+use Djot\Util\CycleCollection;
 use Djot\Util\StringUtil;
 
 /**
@@ -526,6 +527,11 @@ class BlockParser
     }
 
     public function parse(string $input): Document
+    {
+        return CycleCollection::paused(fn () => $this->parseDocument($input));
+    }
+
+    private function parseDocument(string $input): Document
     {
         $this->mayHaveTableRowspans = str_contains($input, '^');
         $this->references = [];
@@ -1034,6 +1040,7 @@ class BlockParser
         $count = count($lines);
 
         while ($i < $count) {
+            CycleCollection::checkpoint();
             $line = $lines[$i];
 
             // Skip blank lines
@@ -3072,6 +3079,7 @@ class BlockParser
         $unitSpans = null;
 
         while ($i < $count) {
+            CycleCollection::checkpoint();
             $currentLine = $lines[$i];
 
             // Strip row attributes for validation (|...|{.class} → |...|)
