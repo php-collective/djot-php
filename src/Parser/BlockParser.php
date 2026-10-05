@@ -3305,10 +3305,7 @@ class BlockParser
                 if ($cellInfo['type'] === 'rowspan_marker') {
                     $targetCol = $cellInfo['colPosition'];
                     if ($indexedSpans) {
-                        $cellFound = $cellInfo['origin'] ?? null;
-                        if (!($cellFound instanceof TableCell)) {
-                            continue;
-                        }
+                        $cellFound = $cellInfo['origin'];
                         $cellId = spl_object_id($cellFound);
                         if (!isset($extendedCells[$cellId])) {
                             $cellFound->setRowspan($cellFound->getRowspan() + 1);
@@ -3364,7 +3361,7 @@ class BlockParser
 
             if ($indexedSpans) {
                 foreach ($rowCellData as $cellInfo) {
-                    if ($cellInfo['type'] === 'cell' && isset($cellInfo['cell']) && !isset($occupiedColumns[$cellInfo['colPosition']])) {
+                    if ($cellInfo['type'] === 'cell' && !isset($occupiedColumns[$cellInfo['colPosition']])) {
                         $row->appendChild($cellInfo['cell']);
                     }
                 }
