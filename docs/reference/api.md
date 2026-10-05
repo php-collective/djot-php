@@ -1029,6 +1029,7 @@ $node->getType(): string
 $node->getChildren(): array
 $node->appendChild(Node $child): void
 $node->prependChild(Node $child): void
+$node->removeChildren(array $children): int
 
 // Attributes
 $node->getAttribute(string $key): mixed
@@ -1037,6 +1038,9 @@ $node->getAttributes(): array
 $node->setAttributes(array $attrs): void
 $node->addClass(string $class): void
 ```
+
+`removeChildren()` removes matching child identities in one pass, keeps sibling
+order, clears the removed children's parent links, and returns their count.
 
 ## Significant Newlines Mode
 
