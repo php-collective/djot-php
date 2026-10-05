@@ -82,6 +82,8 @@ class BlockParser
 
     private int $nestingDepth = 0;
 
+    private bool $mayHaveTableRowspans = true;
+
     protected InlineParser $inlineParser;
 
     protected ListParser $listParser;
@@ -442,6 +444,7 @@ class BlockParser
      */
     public function parseBlockContent(Node $parent, array $lines): void
     {
+        $this->mayHaveTableRowspans = true;
         $this->parseBlocks($parent, $lines, 0, array_fill(0, count($lines), -1));
     }
 
@@ -524,6 +527,7 @@ class BlockParser
 
     public function parse(string $input): Document
     {
+        $this->mayHaveTableRowspans = str_contains($input, '^');
         $this->references = [];
         $this->footnotes = [];
         $this->abbreviations = [];
@@ -3060,7 +3064,8 @@ class BlockParser
         $alignments = [];
         $headerFound = false;
         $hasRowspans = false;
-        $indexedSpans = $this::class === self::class && $this->canIndexTableSpans($lines, $start);
+        $indexedSpans = $this::class === self::class && $this->mayHaveTableRowspans
+            && $this->canIndexTableSpans($lines, $start);
         /** @var array<int, array{cell: \Djot\Node\Block\TableCell, row: int, column: int}> $columnOrigins */
         $columnOrigins = [];
 

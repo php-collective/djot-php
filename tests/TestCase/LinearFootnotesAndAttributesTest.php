@@ -50,9 +50,17 @@ class LinearFootnotesAndAttributesTest extends TestCase
         $parser = new BlockParser(blocksInterruptParagraphs: true);
         (new ReflectionProperty(BlockParser::class, 'tableParser'))->setValue($parser, $tables);
         $converter = new DjotConverter(parser: $parser);
-        $html = $converter->convert(str_repeat("|a|\n|-|\n+b|\n", 512));
+        $html = $converter->convert("plain ^ text\n\n" . str_repeat("|a|\n|-|\n+b|\n", 512));
         $this->assertSame(512, substr_count($html, '<table>'));
         $this->assertLessThan(512 * 32, $tables->calls);
+    }
+
+    public function testCustomBlockContentMayIntroduceRowspans(): void
+    {
+        $parser = new BlockParser();
+        $document = $parser->parse('plain');
+        $parser->parseBlockContent($document, ['| a | b |', '| ^ | ^ |']);
+        $this->assertStringContainsString('<td rowspan="2">a</td>', (new HtmlRenderer())->render($document));
     }
 
     public function testChainedAndCyclicFootnotesKeepDiscoveryOrder(): void
