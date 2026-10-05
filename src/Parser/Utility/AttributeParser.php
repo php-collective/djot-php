@@ -127,7 +127,7 @@ class AttributeParser
      *
      * @param string $attrStr The attribute string to parse
      *
-     * @return array<string, string> Parsed attributes in source order
+     * @return array<array-key, string> Parsed attributes in source order
      */
     public static function parseOrdered(string $attrStr): array
     {
@@ -187,21 +187,55 @@ class AttributeParser
     /**
      * Parse attribute string and merge with existing attributes
      *
-     * @param array<string, string> $existing Existing attributes to merge with
+     * @param array<array-key, string> $existing Existing attributes to merge with
      * @param string $attrStr The attribute string to parse
      *
-     * @return array<string, string> Merged attributes
+     * @return array<array-key, string> Merged attributes
      */
     public static function parseAndMerge(array $existing, string $attrStr): array
     {
         $parsed = self::parseOrdered($attrStr);
-
-        // Special handling for class: merge rather than replace
-        if (isset($parsed['class']) && isset($existing['class'])) {
+        if (isset($parsed['class'], $existing['class'])) {
             $parsed['class'] = trim($existing['class'] . ' ' . $parsed['class']);
         }
 
         return array_merge($existing, $parsed);
+    }
+
+    /**
+     * Append to parser-owned attributes without copying the accumulated prefix.
+     *
+     * @param array<array-key, string> $existing
+     * @param string $attrStr
+     *
+     * @return void
+     */
+    public static function parseAndMergeInto(array &$existing, string $attrStr): void
+    {
+        foreach (self::parseOrdered($attrStr) as $key => $value) {
+            if ($key === 'class' && isset($existing['class'])) {
+                $value = rtrim($value);
+                if ($value === '') {
+                    $class = $existing['class'];
+                    if ($class !== '' && (str_contains(" \t\n\r\0\x0B", $class[0]) || str_contains(" \t\n\r\0\x0B", $class[strlen($class) - 1]))) {
+                        $existing['class'] = trim($class);
+                    }
+                } else {
+                    if ($existing['class'] !== '' && str_contains(" \t\n\r\0\x0B", $existing['class'][0])) {
+                        $existing['class'] = ltrim($existing['class']);
+                    }
+                    if ($existing['class'] === '') {
+                        $existing['class'] = ltrim($value);
+                    } else {
+                        $existing['class'] .= ' ' . $value;
+                    }
+                }
+            } elseif (is_int($key)) {
+                $existing[] = $value;
+            } else {
+                $existing[$key] = $value;
+            }
+        }
     }
 
     /**

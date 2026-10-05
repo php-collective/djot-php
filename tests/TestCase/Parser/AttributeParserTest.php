@@ -26,6 +26,16 @@ class AttributeParserTest extends TestCase
         $this->converter = new DjotConverter();
     }
 
+    public function testInPlaceMergeKeepsWhitespaceAndNumericKeySemantics(): void
+    {
+        $existing = ['class' => ' a ', 0 => 'old'];
+        AttributeParser::parseAndMergeInto($existing, 'class=" b " 7=x');
+        self::assertSame(['class' => 'a   b', 0 => 'old', 1 => 'x'], $existing);
+        AttributeParser::parseAndMergeInto($existing, 'class=""');
+        self::assertSame('a   b', $existing['class']);
+        self::assertSame([0 => 'old', 'class' => 'b'], AttributeParser::parseAndMerge([9 => 'old'], '.b'));
+    }
+
     public function testDotInDoubleQuotedValueDoesNotCreateClass(): void
     {
         $result = AttributeParser::parse('include="note.dj"');

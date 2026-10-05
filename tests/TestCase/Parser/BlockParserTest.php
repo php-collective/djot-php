@@ -28,6 +28,15 @@ class BlockParserTest extends TestCase
         $this->parser = new BlockParser();
     }
 
+    public function testRepeatedAttributeLinesKeepClassesAndOverwriteKeys(): void
+    {
+        $doc = $this->parser->parse("{.a k=old}\n{.b q=x}\n{.a k=new}\n\ntext\n");
+        $attrs = $doc->getChildren()[0]->getAttributes();
+        self::assertSame('new', $attrs['k']);
+        self::assertSame('x', $attrs['q']);
+        self::assertSame('a b a', $attrs['class']);
+    }
+
     public function testParseParagraph(): void
     {
         $doc = $this->parser->parse('Hello world');
