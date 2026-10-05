@@ -82,6 +82,8 @@ class BlockParser
 
     private int $nestingDepth = 0;
 
+    private bool $mayHaveTableRowspans = true;
+
     protected InlineParser $inlineParser;
 
     protected ListParser $listParser;
@@ -442,6 +444,7 @@ class BlockParser
      */
     public function parseBlockContent(Node $parent, array $lines): void
     {
+        $this->mayHaveTableRowspans = true;
         $this->parseBlocks($parent, $lines, 0, array_fill(0, count($lines), -1));
     }
 
@@ -524,6 +527,7 @@ class BlockParser
 
     public function parse(string $input): Document
     {
+        $this->mayHaveTableRowspans = str_contains($input, '^');
         $this->references = [];
         $this->footnotes = [];
         $this->abbreviations = [];
@@ -3060,6 +3064,10 @@ class BlockParser
         $alignments = [];
         $headerFound = false;
         $hasRowspans = false;
+        $indexedSpans = $this::class === self::class && $this->mayHaveTableRowspans
+            && $this->canIndexTableSpans($lines, $start);
+        /** @var array<int, array{cell: \Djot\Node\Block\TableCell, row: int, column: int}> $columnOrigins */
+        $columnOrigins = [];
 
         while ($i < $count) {
             $currentLine = $lines[$i];
@@ -3113,6 +3121,21 @@ class BlockParser
                         }
                         // Replace last row
                         $table->replaceChild(count($children) - 1, $headerRow);
+                        if ($indexedSpans) {
+                            $oldCells = $lastRow->getChildren();
+                            $newCells = $headerRow->getChildren();
+                            $replacements = [];
+                            foreach ($oldCells as $idx => $oldCell) {
+                                $replacement = $newCells[$idx] ?? null;
+                                if ($replacement instanceof TableCell) {
+                                    $replacements[spl_object_id($oldCell)] = $replacement;
+                                }
+                            }
+                            foreach ($columnOrigins as &$origin) {
+                                $origin['cell'] = $replacements[spl_object_id($origin['cell'])] ?? $origin['cell'];
+                            }
+                            unset($origin);
+                        }
                     }
                 }
                 $i++;
@@ -3162,7 +3185,7 @@ class BlockParser
                 } else {
                     // Regular cell, apply accumulated colspan
                     $cellData['colspan'] = $colspanAccumulator;
-                    array_unshift($processedCells, $cellData);
+                    $processedCells[] = $cellData;
                     $colspanAccumulator = 1;
                 }
             }
@@ -3171,9 +3194,11 @@ class BlockParser
             // merge: each becomes an empty cell rather than being dropped
             // (djot-js / carve parity).
             while ($colspanAccumulator > 1) {
-                array_unshift($processedCells, ['content' => '', 'attributes' => [], 'colspan' => 1]);
+                $processedCells[] = ['content' => '', 'attributes' => [], 'colspan' => 1];
                 $colspanAccumulator--;
             }
+
+            $processedCells = array_reverse($processedCells);
 
             // Parse regular row
             $row = new TableRow(false);
@@ -3183,6 +3208,7 @@ class BlockParser
 
             // Store row data for rowspan processing
             // Track column positions for cells accounting for rowspan markers
+            /** @var list<array{type: 'cell', cell: \Djot\Node\Block\TableCell, colPosition: int}|array{type: 'rowspan_marker', colPosition: int, origin: \Djot\Node\Block\TableCell}> $rowCellData */
             $rowCellData = [];
             $colPosition = 0;
 
@@ -3202,7 +3228,13 @@ class BlockParser
                     // a column with no origin) cannot merge: it becomes an empty
                     // cell rather than being dropped (djot-js / carve parity).
                     $cellAbove = null;
-                    for ($prevRowIdx = $currentRowIndex - 1; $prevRowIdx >= 0; $prevRowIdx--) {
+                    if ($indexedSpans) {
+                        $origin = $columnOrigins[$colPosition] ?? null;
+                        if ($origin !== null && $origin['row'] + $origin['cell']->getRowspan() >= $currentRowIndex) {
+                            $cellAbove = $origin['cell'];
+                        }
+                    }
+                    for ($prevRowIdx = $currentRowIndex - 1; !$indexedSpans && $prevRowIdx >= 0; $prevRowIdx--) {
                         if (!($tableChildren[$prevRowIdx] instanceof TableRow)) {
                             continue;
                         }
@@ -3220,7 +3252,9 @@ class BlockParser
                     if ($cellAbove === null) {
                         $alignment = $alignments[$index] ?? TableCell::ALIGN_DEFAULT;
                         $cell = new TableCell(false, $alignment, 1, $colspan);
-                        $row->appendChild($cell);
+                        if (!$indexedSpans) {
+                            $row->appendChild($cell);
+                        }
                         $rowCellData[] = [
                             'type' => 'cell',
                             'cell' => $cell,
@@ -3235,6 +3269,7 @@ class BlockParser
                     $rowCellData[] = [
                         'type' => 'rowspan_marker',
                         'colPosition' => $colPosition,
+                        'origin' => $cellAbove,
                     ];
                     $colPosition += $colspan;
                 } else {
@@ -3249,7 +3284,9 @@ class BlockParser
                     } else {
                         $this->inlineParser->parse($cell, $trimmedContent, $baseLineForRow);
                     }
-                    $row->appendChild($cell);
+                    if (!$indexedSpans) {
+                        $row->appendChild($cell);
+                    }
                     $rowCellData[] = [
                         'type' => 'cell',
                         'cell' => $cell,
@@ -3267,10 +3304,26 @@ class BlockParser
             // Track which cells have already been extended in this row
             // (multiple ^ markers under a colspan should only extend once)
             $extendedCells = [];
+            $occupiedColumns = [];
 
             foreach ($rowCellData as $cellInfo) {
                 if ($cellInfo['type'] === 'rowspan_marker') {
                     $targetCol = $cellInfo['colPosition'];
+                    if ($indexedSpans) {
+                        $cellFound = $cellInfo['origin'];
+                        $cellId = spl_object_id($cellFound);
+                        if (!isset($extendedCells[$cellId])) {
+                            $cellFound->setRowspan($cellFound->getRowspan() + 1);
+                            $extendedCells[$cellId] = true;
+                            $hasRowspans = true;
+                            $originStart = ($columnOrigins[$targetCol] ?? [])['column'] ?? $targetCol;
+                            for ($col = $originStart; $col < $originStart + $cellFound->getColspan(); $col++) {
+                                $occupiedColumns[$col] = true;
+                            }
+                        }
+
+                        continue;
+                    }
 
                     // Look in previous rows for the cell that spans into this column
                     for ($prevRowIdx = $currentRowIndex - 1; $prevRowIdx >= 0; $prevRowIdx--) {
@@ -3307,8 +3360,29 @@ class BlockParser
             // This handles the case where a cell has both rowspan and colspan,
             // and the intersection area contains content that should be dropped
             // Only needed when rowspans exist (avoids O(n²) scan for simple tables)
-            if ($hasRowspans) {
+            if ($hasRowspans && !$indexedSpans) {
                 $this->removeOverlappingCells($table, $row, $rowCellData, $currentRowIndex);
+            }
+
+            if ($indexedSpans) {
+                foreach ($rowCellData as $cellInfo) {
+                    if ($cellInfo['type'] === 'cell' && !isset($occupiedColumns[$cellInfo['colPosition']])) {
+                        $row->appendChild($cellInfo['cell']);
+                    }
+                }
+                $column = 0;
+                foreach ($row->getChildren() as $cell) {
+                    if (!($cell instanceof TableCell)) {
+                        continue;
+                    }
+                    while (isset($occupiedColumns[$column])) {
+                        $column++;
+                    }
+                    for ($col = $column; $col < $column + $cell->getColspan(); $col++) {
+                        $columnOrigins[$col] = ['cell' => $cell, 'row' => $currentRowIndex, 'column' => $column];
+                    }
+                    $column += $cell->getColspan();
+                }
             }
 
             // Release the copy-on-write alias taken above so appendChild() mutates the
@@ -3329,6 +3403,73 @@ class BlockParser
         // Caption parsing is now handled by tryParseCaption
 
         return $i - $start;
+    }
+
+    /**
+     * @param array<string> $lines
+     * @param int $start
+     */
+    private function canIndexTableSpans(array $lines, int $start): bool
+    {
+        $count = count($lines);
+        $hasCaret = false;
+        $canContinue = false;
+        for ($i = $start; $i < $count; $i++) {
+            if ($canContinue && $this->tableParser->isContinuationRow($lines[$i])) {
+                if (str_contains($lines[$i], '^')) {
+                    $hasCaret = true;
+
+                    break;
+                }
+
+                continue;
+            }
+            $line = $this->tableParser->stripRowAttributes($lines[$i]);
+            if (!preg_match('/^\|.*\|[ \t]*$/', $line)) {
+                break;
+            }
+            $canContinue = !$this->tableParser->isSeparatorRow($line);
+            if (str_contains($lines[$i], '^')) {
+                $hasCaret = true;
+
+                break;
+            }
+        }
+        if (!$hasCaret) {
+            return false;
+        }
+        $width = null;
+        $hasMarkers = false;
+        for ($i = $start; $i < $count; $i++) {
+            $line = $this->tableParser->stripRowAttributes($lines[$i]);
+            if (!preg_match('/^\|.*\|[ \t]*$/', $line)) {
+                break;
+            }
+            if ($this->tableParser->isSeparatorRow($line)) {
+                continue;
+            }
+            $cells = array_map(static fn (array $cell): string => $cell['content'], $this->tableParser->parseTableCellsWithAttributes($lines[$i]));
+            while ($i + 1 < $count && $this->tableParser->isContinuationRow($lines[$i + 1])) {
+                $i++;
+                $cells = $this->tableParser->mergeCellContents($cells, $this->tableParser->parseContinuationCells($lines[$i]));
+            }
+            $width ??= count($cells);
+            if (count($cells) !== $width || ($cells !== [] && $this->tableParser->isColspanMarker($cells[0]))) {
+                return false;
+            }
+            $markers = 0;
+            foreach ($cells as $content) {
+                if ($this->tableParser->isRowspanMarker($content)) {
+                    $markers++;
+                }
+            }
+            if ($markers !== 0 && $markers !== $width) {
+                return false;
+            }
+            $hasMarkers = $hasMarkers || $markers !== 0;
+        }
+
+        return $hasMarkers;
     }
 
     /**

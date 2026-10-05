@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Djot\Node;
 
+use ReflectionMethod;
+use WeakMap;
+
 /**
  * Base class for all AST nodes
  */
@@ -20,6 +23,16 @@ abstract class Node
      * @var array<string, string>
      */
     protected array $attributes = [];
+
+    /**
+     * @var \WeakMap<\Djot\Node\Node, \Djot\Node\ClassMembership>|null
+     */
+    private static ?WeakMap $classMemberships = null;
+
+    /**
+     * @var array<class-string, bool>
+     */
+    private static array $nativeClassAccess = [];
 
     public function appendChild(Node $child): void
     {
@@ -132,6 +145,11 @@ abstract class Node
     public function setAttribute(string $key, string $value): void
     {
         $this->attributes[$key] = $value;
+        if ($key === 'class') {
+            if (self::$classMemberships !== null) {
+                unset(self::$classMemberships[$this]);
+            }
+        }
     }
 
     public function getAttribute(string $key): ?string
@@ -153,6 +171,11 @@ abstract class Node
     public function setAttributes(array $attributes): void
     {
         $this->attributes = array_merge($this->attributes, $attributes);
+        if (isset($attributes['class'])) {
+            if (self::$classMemberships !== null) {
+                unset(self::$classMemberships[$this]);
+            }
+        }
     }
 
     public function hasAttribute(string $key): bool
@@ -163,6 +186,11 @@ abstract class Node
     public function removeAttribute(string $key): void
     {
         unset($this->attributes[$key]);
+        if ($key === 'class') {
+            if (self::$classMemberships !== null) {
+                unset(self::$classMemberships[$this]);
+            }
+        }
     }
 
     /**
@@ -172,6 +200,44 @@ abstract class Node
     {
         $class = trim($class);
         if ($class === '') {
+            return;
+        }
+
+        $native = self::$nativeClassAccess[$this::class] ??= str_starts_with($this::class, __NAMESPACE__ . '\\')
+            && (new ReflectionMethod($this, 'getType'))->getDeclaringClass()->getName() === $this::class
+            && (new ReflectionMethod($this, 'getAttribute'))->getDeclaringClass()->getName() === self::class
+            && (new ReflectionMethod($this, 'setAttribute'))->getDeclaringClass()->getName() === self::class
+            && (new ReflectionMethod($this, 'setAttributes'))->getDeclaringClass()->getName() === self::class
+            && (new ReflectionMethod($this, 'removeAttribute'))->getDeclaringClass()->getName() === self::class;
+        if (
+            $native && preg_match('/\s/', $class) === 0
+            && (strlen($this->attributes['class'] ?? '') >= 128
+                || (self::$classMemberships !== null && isset(self::$classMemberships[$this])))
+        ) {
+            self::$classMemberships ??= new WeakMap();
+            if (!isset(self::$classMemberships[$this])) {
+                $value = $this->attributes['class'] ?? '';
+                $list = $value !== '' ? (preg_split('/\s+/', trim($value)) ?: []) : [];
+                self::$classMemberships[$this] = new ClassMembership(array_fill_keys($list, true));
+                unset($value);
+            }
+            $membership = self::$classMemberships[$this];
+            if (!isset($membership->members[$class])) {
+                if ($membership->needsNormalization) {
+                    $this->attributes['class'] = implode(' ', preg_split('/\s+/', trim($this->attributes['class'] ?? '')) ?: []);
+                    $membership->needsNormalization = false;
+                }
+                $membership->members[$class] = true;
+                if (isset($membership->members[''])) {
+                    unset($membership->members['']);
+                    $membership->needsNormalization = true;
+                    $this->attributes['class'] .= ' ' . $class;
+
+                    return;
+                }
+                $this->attributes['class'] .= $this->attributes['class'] !== '' ? ' ' . $class : $class;
+            }
+
             return;
         }
 

@@ -52,6 +52,7 @@ use Djot\Renderer\Utility\AbbreviationBudgetTrait;
 use Djot\Renderer\Utility\EventDispatcherTrait;
 use Djot\Util\StringUtil;
 use Djot\Util\UrlSafety;
+use WeakMap;
 
 /**
  * Renders AST to Markdown (CommonMark compatible where possible)
@@ -71,6 +72,11 @@ class MarkdownRenderer implements RendererInterface
 {
     use AbbreviationBudgetTrait;
     use EventDispatcherTrait;
+
+    /**
+     * @var \WeakMap<\Djot\Node\Node, array<int, array{?string, ?string}>>|null
+     */
+    private ?WeakMap $siblingBoundaries = null;
 
     protected int $listDepth = 0;
 
@@ -101,6 +107,7 @@ class MarkdownRenderer implements RendererInterface
     public function render(Document $document): string
     {
         $this->resetAbbreviationBudget($document->getSourceLength());
+        $this->siblingBoundaries = new WeakMap();
 
         $markdown = $this->renderChildren($document);
 
@@ -450,6 +457,45 @@ class MarkdownRenderer implements RendererInterface
         if ($parent === null) {
             return null;
         }
+        if ($this::class === self::class && !$this->hasAnyListeners()) {
+            $this->siblingBoundaries ??= new WeakMap();
+            if (!isset($this->siblingBoundaries[$parent])) {
+                $children = $parent->getChildren();
+                /** @var array<int, array{?string, ?string}> $boundaries */
+                $boundaries = [];
+                $previous = null;
+                foreach ($children as $at => $child) {
+                    $boundaries[spl_object_id($child)] = [$previous, null];
+                    $text = $at + 1 < count($children) ? $this->nodeBoundaryText($child, false) : '';
+                    if ($text !== '') {
+                        $previous = mb_substr($text, -1);
+                    }
+                }
+                $next = null;
+                for ($at = count($children) - 1; $at >= 0; $at--) {
+                    $child = $children[$at];
+                    $previous = $boundaries[spl_object_id($child)][0] ?? null;
+                    $boundaries[spl_object_id($child)] = [$previous, $next];
+                    $text = $at > 0 ? $this->nodeBoundaryText($child, true) : '';
+                    if ($text !== '') {
+                        $next = mb_substr($text, 0, 1);
+                    }
+                }
+                $this->siblingBoundaries[$parent] = $boundaries;
+            }
+            $boundaries = $this->siblingBoundaries[$parent];
+            $boundary = $boundaries[spl_object_id($node)] ?? null;
+            if ($boundary === null) {
+                return null;
+            }
+            $character = $boundary[$after ? 1 : 0] ?? null;
+            if ($character === null && $parent instanceof Span) {
+                return $this->adjacentSiblingCharacter($parent, $after);
+            }
+
+            return $character;
+        }
+
         $children = $parent->getChildren();
         $index = array_search($node, $children, true);
         if (!is_int($index)) {
