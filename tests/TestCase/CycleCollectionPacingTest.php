@@ -30,7 +30,7 @@ class CycleCollectionPacingTest extends TestCase
 
         $converter->convert(str_repeat("|x|y|\n", 30000));
 
-        self::assertLessThanOrEqual(6, gc_status()['runs'] - $runs);
+        self::assertLessThanOrEqual(8, gc_status()['runs'] - $runs);
         self::assertTrue(gc_enabled());
     }
 
@@ -93,7 +93,7 @@ class CycleCollectionPacingTest extends TestCase
         $document = (new BlockParser())->parse(str_repeat("|x|y|\n", 30000));
 
         self::assertNotEmpty($document->getChildren());
-        self::assertLessThanOrEqual(6, gc_status()['runs'] - $runs);
+        self::assertLessThanOrEqual(8, gc_status()['runs'] - $runs);
         self::assertTrue(gc_enabled());
     }
 

@@ -67,7 +67,7 @@ final class CycleCollection
             try {
                 if (self::$depth === 1) {
                     try {
-                        self::checkpoint();
+                        self::finish();
                     } finally {
                         gc_enable();
                     }
@@ -88,6 +88,19 @@ final class CycleCollection
         }
 
         self::collect();
+    }
+
+    private static function finish(): void
+    {
+        if (memory_get_usage() >= self::$collectAt) {
+            self::collect();
+
+            return;
+        }
+        $status = gc_status();
+        if ($status['roots'] >= $status['threshold']) {
+            self::collect();
+        }
     }
 
     /**

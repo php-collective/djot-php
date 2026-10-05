@@ -428,7 +428,7 @@ class DjotConverter
             }
         }
 
-        return $this->render($this->parse($djot));
+        return CycleCollection::paused(fn () => $this->render($this->parse($djot)));
     }
 
     /**
