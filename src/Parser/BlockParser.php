@@ -39,6 +39,7 @@ use Djot\Parser\Block\TableParser;
 use Djot\Parser\Utility\AttributeParser;
 use Djot\Parser\Utility\IndentationHelper;
 use Djot\Renderer\HeadingIdTracker;
+use Djot\Util\CycleCollection;
 use Djot\Util\StringUtil;
 
 /**
@@ -1034,6 +1035,7 @@ class BlockParser
         $count = count($lines);
 
         while ($i < $count) {
+            CycleCollection::checkpoint();
             $line = $lines[$i];
 
             // Skip blank lines

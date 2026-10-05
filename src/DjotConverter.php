@@ -24,6 +24,7 @@ use Djot\Renderer\RendererInterface;
 use Djot\Renderer\SoftBreakMode;
 use Djot\Transform\RenderAwareTransformerInterface;
 use Djot\Transform\TransformerInterface;
+use Djot\Util\CycleCollection;
 use LengthException;
 use LogicException;
 use RuntimeException;
@@ -454,6 +455,11 @@ class DjotConverter
      */
     public function parse(string $djot): Document
     {
+        return CycleCollection::paused(fn () => $this->parseDocument($djot));
+    }
+
+    private function parseDocument(string $djot): Document
+    {
         $this->enforceProfileMaxLength($djot);
 
         $document = $this->parser->parse($djot);
@@ -508,6 +514,11 @@ class DjotConverter
      * Render an AST document to HTML
      */
     public function render(Document $document): string
+    {
+        return CycleCollection::paused(fn () => $this->renderDocument($document));
+    }
+
+    private function renderDocument(Document $document): string
     {
         $document = $this->prepareDocumentForRender($document);
 
