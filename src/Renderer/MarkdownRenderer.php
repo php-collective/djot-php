@@ -461,6 +461,7 @@ class MarkdownRenderer implements RendererInterface
             $this->siblingBoundaries ??= new WeakMap();
             if (!isset($this->siblingBoundaries[$parent])) {
                 $children = $parent->getChildren();
+                /** @var array<int, array{?string, ?string}> $boundaries */
                 $boundaries = [];
                 $previous = null;
                 foreach ($children as $at => $child) {
@@ -473,7 +474,8 @@ class MarkdownRenderer implements RendererInterface
                 $next = null;
                 for ($at = count($children) - 1; $at >= 0; $at--) {
                     $child = $children[$at];
-                    $boundaries[spl_object_id($child)][1] = $next;
+                    $previous = $boundaries[spl_object_id($child)][0] ?? null;
+                    $boundaries[spl_object_id($child)] = [$previous, $next];
                     $text = $at > 0 ? $this->nodeBoundaryText($child, true) : '';
                     if ($text !== '') {
                         $next = mb_substr($text, 0, 1);
@@ -486,7 +488,7 @@ class MarkdownRenderer implements RendererInterface
             if ($boundary === null) {
                 return null;
             }
-            $character = $boundary[$after ? 1 : 0];
+            $character = $boundary[$after ? 1 : 0] ?? null;
             if ($character === null && $parent instanceof Span) {
                 return $this->adjacentSiblingCharacter($parent, $after);
             }

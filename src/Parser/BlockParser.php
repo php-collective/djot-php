@@ -3061,6 +3061,7 @@ class BlockParser
         $headerFound = false;
         $hasRowspans = false;
         $indexedSpans = $this::class === self::class && $this->canIndexTableSpans($lines, $start);
+        /** @var array<int, array{cell: \Djot\Node\Block\TableCell, row: int, column: int}> $columnOrigins */
         $columnOrigins = [];
 
         while ($i < $count) {
@@ -3120,7 +3121,10 @@ class BlockParser
                             $newCells = $headerRow->getChildren();
                             $replacements = [];
                             foreach ($oldCells as $idx => $oldCell) {
-                                $replacements[spl_object_id($oldCell)] = $newCells[$idx];
+                                $replacement = $newCells[$idx] ?? null;
+                                if ($replacement instanceof TableCell) {
+                                    $replacements[spl_object_id($oldCell)] = $replacement;
+                                }
                             }
                             foreach ($columnOrigins as &$origin) {
                                 $origin['cell'] = $replacements[spl_object_id($origin['cell'])] ?? $origin['cell'];
@@ -3199,6 +3203,7 @@ class BlockParser
 
             // Store row data for rowspan processing
             // Track column positions for cells accounting for rowspan markers
+            /** @var list<array{type: 'cell', cell: \Djot\Node\Block\TableCell, colPosition: int}|array{type: 'rowspan_marker', colPosition: int, origin: \Djot\Node\Block\TableCell}> $rowCellData */
             $rowCellData = [];
             $colPosition = 0;
 
@@ -3300,13 +3305,16 @@ class BlockParser
                 if ($cellInfo['type'] === 'rowspan_marker') {
                     $targetCol = $cellInfo['colPosition'];
                     if ($indexedSpans) {
-                        $cellFound = $cellInfo['origin'];
+                        $cellFound = $cellInfo['origin'] ?? null;
+                        if (!($cellFound instanceof TableCell)) {
+                            continue;
+                        }
                         $cellId = spl_object_id($cellFound);
                         if (!isset($extendedCells[$cellId])) {
                             $cellFound->setRowspan($cellFound->getRowspan() + 1);
                             $extendedCells[$cellId] = true;
                             $hasRowspans = true;
-                            $originStart = $columnOrigins[$targetCol]['column'];
+                            $originStart = ($columnOrigins[$targetCol] ?? [])['column'] ?? $targetCol;
                             for ($col = $originStart; $col < $originStart + $cellFound->getColspan(); $col++) {
                                 $occupiedColumns[$col] = true;
                             }
@@ -3316,7 +3324,7 @@ class BlockParser
                     }
 
                     // Look in previous rows for the cell that spans into this column
-                    for ($prevRowIdx = $currentRowIndex - 1; !$indexedSpans && $prevRowIdx >= 0; $prevRowIdx--) {
+                    for ($prevRowIdx = $currentRowIndex - 1; $prevRowIdx >= 0; $prevRowIdx--) {
                         $prevRow = $tableChildren[$prevRowIdx];
                         if (!($prevRow instanceof TableRow)) {
                             continue;
@@ -3356,12 +3364,15 @@ class BlockParser
 
             if ($indexedSpans) {
                 foreach ($rowCellData as $cellInfo) {
-                    if ($cellInfo['type'] === 'cell' && !isset($occupiedColumns[$cellInfo['colPosition']])) {
+                    if ($cellInfo['type'] === 'cell' && isset($cellInfo['cell']) && !isset($occupiedColumns[$cellInfo['colPosition']])) {
                         $row->appendChild($cellInfo['cell']);
                     }
                 }
                 $column = 0;
                 foreach ($row->getChildren() as $cell) {
+                    if (!($cell instanceof TableCell)) {
+                        continue;
+                    }
                     while (isset($occupiedColumns[$column])) {
                         $column++;
                     }
