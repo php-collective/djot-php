@@ -829,32 +829,35 @@ class InlineParser
                 usort($keys, static fn (string $a, string $b): int => strlen($b) - strlen($a));
                 $escaped = array_map(static fn (string $key): string => preg_quote($key, '/'), $keys);
                 $this->abbreviationPattern = '/\b(' . implode('|', $escaped) . ')\b/u';
-                $validKeys = true;
-                foreach ($keys as $key) {
-                    if (preg_match('//u', $key) !== 1) {
-                        $validKeys = false;
-
-                        break;
-                    }
-                }
                 if (
-                    $this::class === self::class && (count($keys) >= 128 || strlen($this->abbreviationPattern) >= 8192)
-                    && !in_array('', $keys, true) && $validKeys
+                    $this::class === self::class && strlen($this->abbreviationPattern) >= 8192
+                    && @preg_match($this->abbreviationPattern, '') === false
                 ) {
-                    try {
-                        $this->abbreviationMatcher = new AbbreviationMatcher($keys);
-                    } catch (LengthException) {
-                        $this->abbreviationPatternValid = @preg_match($this->abbreviationPattern, '') !== false;
+                    $this->abbreviationPatternValid = false;
+                    $validKeys = !in_array('', $keys, true);
+                    foreach ($keys as $key) {
+                        if (preg_match('//u', $key) !== 1) {
+                            $validKeys = false;
+
+                            break;
+                        }
+                    }
+                    if ($validKeys) {
+                        try {
+                            $this->abbreviationMatcher = new AbbreviationMatcher($keys);
+                        } catch (LengthException) {
+                            $this->abbreviationMatcher = null;
+                        }
                     }
                 }
             }
             $this->cachedAbbreviations = $abbreviations;
         }
 
-        if (!$this->abbreviationPatternValid) {
-            $parts = false;
-        } elseif ($this->abbreviationMatcher !== null) {
+        if ($this->abbreviationMatcher !== null) {
             $parts = $this->abbreviationMatcher->split($text);
+        } elseif (!$this->abbreviationPatternValid) {
+            $parts = false;
         } elseif ($this->wordAbbreviations) {
             $matched = preg_match_all('/\b[A-Za-z0-9]++\b/u', $text, $words, PREG_OFFSET_CAPTURE);
             $parts = $matched === false ? false : [];
