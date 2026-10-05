@@ -26,6 +26,26 @@ class AttributeParserTest extends TestCase
         $this->converter = new DjotConverter();
     }
 
+    public function testInPlaceClassMergeMatchesCopyingMergeAtWhitespaceEdges(): void
+    {
+        foreach (
+            [
+                [[], '.a'],
+                [['class' => ''], 'class=" x "'],
+                [['class' => ' a '], 'class=""'],
+                [['class' => 'a'], 'class=""'],
+                [['class' => 'a'], 'class="   "'],
+                [['class' => '  '], 'class=" x "'],
+                [['class' => ' a'], 'class=" b "'],
+                [['class' => 'a ', 'k' => 'old'], 'k=new class=" b " 7=x'],
+            ] as [$existing, $source]
+        ) {
+            $expected = AttributeParser::parseAndMerge($existing, $source);
+            AttributeParser::parseAndMergeInto($existing, $source);
+            self::assertSame($expected, $existing);
+        }
+    }
+
     public function testInPlaceMergeKeepsWhitespaceAndNumericKeySemantics(): void
     {
         $existing = ['class' => ' a ', 0 => 'old'];
