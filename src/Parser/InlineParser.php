@@ -29,6 +29,7 @@ use Djot\Node\Node;
 use Djot\Parser\Utility\AttributeParser;
 use Djot\Parser\Utility\BacktickRunIndex;
 use Djot\Util\StringUtil;
+use LengthException;
 
 /**
  * Inline parser for Djot
@@ -188,6 +189,10 @@ class InlineParser
      * @var array<string, string>|null
      */
     protected ?array $cachedAbbreviations = null;
+
+    private ?AbbreviationMatcher $abbreviationMatcher = null;
+
+    private bool $abbreviationPatternValid = true;
 
     /**
      * Smart quote characters (configurable via SmartQuotesExtension for locale support)
@@ -818,15 +823,39 @@ class InlineParser
                     break;
                 }
             }
+            $this->abbreviationMatcher = null;
+            $this->abbreviationPatternValid = true;
             if (!$this->wordAbbreviations) {
                 usort($keys, static fn (string $a, string $b): int => strlen($b) - strlen($a));
                 $escaped = array_map(static fn (string $key): string => preg_quote($key, '/'), $keys);
                 $this->abbreviationPattern = '/\b(' . implode('|', $escaped) . ')\b/u';
+                $validKeys = true;
+                foreach ($keys as $key) {
+                    if (preg_match('//u', $key) !== 1) {
+                        $validKeys = false;
+
+                        break;
+                    }
+                }
+                if (
+                    $this::class === self::class && (count($keys) >= 128 || strlen($this->abbreviationPattern) >= 8192)
+                    && !in_array('', $keys, true) && $validKeys
+                ) {
+                    try {
+                        $this->abbreviationMatcher = new AbbreviationMatcher($keys);
+                    } catch (LengthException) {
+                        $this->abbreviationPatternValid = @preg_match($this->abbreviationPattern, '') !== false;
+                    }
+                }
             }
             $this->cachedAbbreviations = $abbreviations;
         }
 
-        if ($this->wordAbbreviations) {
+        if (!$this->abbreviationPatternValid) {
+            $parts = false;
+        } elseif ($this->abbreviationMatcher !== null) {
+            $parts = $this->abbreviationMatcher->split($text);
+        } elseif ($this->wordAbbreviations) {
             $matched = preg_match_all('/\b[A-Za-z0-9]++\b/u', $text, $words, PREG_OFFSET_CAPTURE);
             $parts = $matched === false ? false : [];
             if ($parts !== false) {
