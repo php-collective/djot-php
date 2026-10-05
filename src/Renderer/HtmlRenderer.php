@@ -1491,7 +1491,10 @@ class HtmlRenderer implements RendererInterface
 
         // Sort footnotes by their reference number order
         ksort($renderedContents);
-        $footnoteLabelsByNumber = array_flip($context->footnoteNumbers);
+        $footnoteLabelsByNumber = [];
+        foreach ($context->footnoteNumbers as $label => $number) {
+            $footnoteLabelsByNumber[$number] ??= $label;
+        }
 
         $html = '<section role="doc-endnotes">' . "\n";
         $html .= $this->xhtml ? "<hr />\n" : "<hr>\n";

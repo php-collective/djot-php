@@ -101,6 +101,84 @@ class LinearFootnotesAndAttributesTest extends TestCase
         $this->assertSame('a', $node->getAttribute('class'));
     }
 
+    public function testLargeClassMembershipRemainsIdempotentAfterCloningAndReplacement(): void
+    {
+        $node = new Span();
+        $classes = [];
+        for ($i = 0; $i < 256; $i++) {
+            $class = 'class' . $i;
+            $classes[] = $class;
+            $node->addClass($class);
+            $node->addClass($class);
+        }
+        $expected = implode(' ', $classes);
+        $this->assertSame($expected, $node->getAttribute('class'));
+        $clone = clone $node;
+        $clone->addClass('class255');
+        $this->assertEquals($node, $clone);
+        $clone->addClass('extra');
+        $this->assertSame($expected, $node->getAttribute('class'));
+        $this->assertSame($expected . ' extra', $clone->getAttribute('class'));
+        $node->setAttribute('class', str_repeat('a', 128));
+        $node->addClass('extra');
+        $this->assertSame(str_repeat('a', 128) . ' extra', $node->getAttribute('class'));
+        $node->setAttributes(['class' => str_repeat('b', 128)]);
+        $node->addClass('class255');
+        $this->assertSame(str_repeat('b', 128) . ' class255', $node->getAttribute('class'));
+        $node->removeAttribute('class');
+        $node->addClass('class255');
+        $this->assertSame('class255', $node->getAttribute('class'));
+    }
+
+    public function testIndexedClassNormalizationKeepsLegacyWhitespaceSemantics(): void
+    {
+        foreach ([[str_repeat(' ', 128), ' c'], [str_repeat("\f", 128), '  c']] as [$value, $first]) {
+            $node = new Span();
+            $node->setAttribute('class', $value);
+            $node->addClass('c');
+            $this->assertSame($first, $node->getAttribute('class'));
+            $node->addClass('d');
+            $this->assertSame('c d', $node->getAttribute('class'));
+        }
+    }
+
+    public function testNumericAbbreviationKeysAreExpandedWithoutATypeError(): void
+    {
+        $html = DjotConverter::create()->convert("*[12]: twelve\n\n12 x12 12x\n");
+        $this->assertSame("<p><abbr title=\"twelve\">12</abbr> x12 12x</p>\n", $html);
+    }
+
+    public function testFootnoteHooksMayRegisterNumbersWithoutQueueingLabels(): void
+    {
+        foreach ([99, 2] as $number) {
+            $renderer = new class extends HtmlRenderer {
+                public int $extraNumber = 99;
+
+                protected function renderFootnoteRef(FootnoteRef $node): string
+                {
+                    $html = parent::renderFootnoteRef($node);
+                    if ($node->getLabel() === 'b') {
+                        $this->getRenderContext()->footnoteNumbers['c'] = $this->extraNumber;
+                    }
+
+                    return $html;
+                }
+            };
+            $renderer->setRoundTripMode(true);
+            $renderer->extraNumber = $number;
+            $converter = DjotConverter::create(renderer: $renderer);
+            $html = $converter->convert("[^a]\n\n[^a]: first [^b]\n\n[^b]: second\n\n[^c]: extra\n");
+            $this->assertSame($number === 99 ? 3 : 2, substr_count($html, '<li id="fn'));
+            $this->assertStringContainsString('<li id="fn2" data-djot-footnote-label="b"', $html);
+            if ($number === 99) {
+                $this->assertStringContainsString('<li id="fn99"', $html);
+                $this->assertStringContainsString('extra', $html);
+            } else {
+                $this->assertStringNotContainsString('extra', $html);
+            }
+        }
+    }
+
     public function testCompositeClassesKeepTheExistingAppendBehavior(): void
     {
         $node = new Span();
