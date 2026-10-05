@@ -127,6 +127,37 @@ abstract class Node
     }
 
     /**
+     * Remove matching child identities in one pass, preserving sibling order.
+     *
+     * @param list<\Djot\Node\Node> $children
+     *
+     * @return int Number of removed children.
+     */
+    public function removeChildren(array $children): int
+    {
+        if ($children === []) {
+            return 0;
+        }
+        $remove = [];
+        foreach ($children as $child) {
+            $remove[spl_object_id($child)] = true;
+        }
+        $kept = [];
+        $count = 0;
+        foreach ($this->children as $child) {
+            if (isset($remove[spl_object_id($child)])) {
+                $child->parent = null;
+                $count++;
+            } else {
+                $kept[] = $child;
+            }
+        }
+        $this->children = $kept;
+
+        return $count;
+    }
+
+    /**
      * Remove child at index
      */
     public function removeChildAt(int $index): ?Node

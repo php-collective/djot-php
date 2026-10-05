@@ -3068,6 +3068,8 @@ class BlockParser
             && $this->canIndexTableSpans($lines, $start);
         /** @var array<int, array{cell: \Djot\Node\Block\TableCell, row: int, column: int}> $columnOrigins */
         $columnOrigins = [];
+        $unitEligible = $this::class === self::class && $this->mayHaveTableRowspans && !$indexedSpans;
+        $unitSpans = null;
 
         while ($i < $count) {
             $currentLine = $lines[$i];
@@ -3093,7 +3095,9 @@ class BlockParser
                 // Mark previous row as header and apply alignments to it
                 $children = $table->getChildren();
                 if ($children !== []) {
-                    $lastRow = $children[count($children) - 1];
+                    $lastRowIndex = count($children) - 1;
+                    $lastRow = $children[$lastRowIndex];
+                    unset($children);
                     if ($lastRow instanceof TableRow) {
                         // Recreate as header row with alignments
                         $headerRow = new TableRow(true);
@@ -3120,7 +3124,8 @@ class BlockParser
                             }
                         }
                         // Replace last row
-                        $table->replaceChild(count($children) - 1, $headerRow);
+                        $table->replaceChild($lastRowIndex, $headerRow);
+                        $unitSpans?->replaceRow($headerRow, $lastRowIndex);
                         if ($indexedSpans) {
                             $oldCells = $lastRow->getChildren();
                             $newCells = $headerRow->getChildren();
@@ -3199,6 +3204,16 @@ class BlockParser
             }
 
             $processedCells = array_reverse($processedCells);
+            if ($unitEligible) {
+                foreach ($processedCells as $cellData) {
+                    if ($cellData['colspan'] !== 1) {
+                        $unitEligible = false;
+                        $unitSpans = null;
+
+                        break;
+                    }
+                }
+            }
 
             // Parse regular row
             $row = new TableRow(false);
@@ -3234,7 +3249,18 @@ class BlockParser
                             $cellAbove = $origin['cell'];
                         }
                     }
-                    for ($prevRowIdx = $currentRowIndex - 1; !$indexedSpans && $prevRowIdx >= 0; $prevRowIdx--) {
+                    if ($unitEligible && $unitSpans === null) {
+                        $unitSpans = new UnitTableSpanIndex();
+                        foreach ($tableChildren as $previousIndex => $previousRow) {
+                            if ($previousRow instanceof TableRow) {
+                                $unitSpans->addRow($previousRow, $previousIndex);
+                            }
+                        }
+                    }
+                    if ($unitSpans !== null) {
+                        $cellAbove = $unitSpans->findOrigin($colPosition, $currentRowIndex);
+                    }
+                    for ($prevRowIdx = $currentRowIndex - 1; !$indexedSpans && $unitSpans === null && $prevRowIdx >= 0; $prevRowIdx--) {
                         if (!($tableChildren[$prevRowIdx] instanceof TableRow)) {
                             continue;
                         }
@@ -3304,6 +3330,7 @@ class BlockParser
             // Track which cells have already been extended in this row
             // (multiple ^ markers under a colspan should only extend once)
             $extendedCells = [];
+            $unitExtended = [];
             $occupiedColumns = [];
 
             foreach ($rowCellData as $cellInfo) {
@@ -3320,6 +3347,19 @@ class BlockParser
                             for ($col = $originStart; $col < $originStart + $cellFound->getColspan(); $col++) {
                                 $occupiedColumns[$col] = true;
                             }
+                        }
+
+                        continue;
+                    }
+
+                    if ($unitSpans !== null) {
+                        $cellFound = $cellInfo['origin'];
+                        $cellId = spl_object_id($cellFound);
+                        if (!isset($extendedCells[$cellId])) {
+                            $cellFound->setRowspan($cellFound->getRowspan() + 1);
+                            $extendedCells[$cellId] = true;
+                            $unitExtended[] = $cellFound;
+                            $hasRowspans = true;
                         }
 
                         continue;
@@ -3360,7 +3400,18 @@ class BlockParser
             // This handles the case where a cell has both rowspan and colspan,
             // and the intersection area contains content that should be dropped
             // Only needed when rowspans exist (avoids O(n²) scan for simple tables)
-            if ($hasRowspans && !$indexedSpans) {
+            if ($unitSpans !== null) {
+                $occupiedColumns = $unitSpans->overlappingColumns($unitExtended, $colPosition);
+                $remove = [];
+                foreach ($rowCellData as $cellInfo) {
+                    if ($cellInfo['type'] === 'cell' && isset($occupiedColumns[$cellInfo['colPosition']])) {
+                        $remove[] = $cellInfo['cell'];
+                    }
+                }
+                $row->removeChildren($remove);
+                $unitSpans->addRow($row, $currentRowIndex);
+            }
+            if ($hasRowspans && !$indexedSpans && $unitSpans === null) {
                 $this->removeOverlappingCells($table, $row, $rowCellData, $currentRowIndex);
             }
 

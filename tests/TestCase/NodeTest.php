@@ -13,6 +13,26 @@ use PHPUnit\Framework\TestCase;
  */
 class NodeTest extends TestCase
 {
+    public function testRemoveChildrenKeepsIdentityOrderAndParentLinks(): void
+    {
+        $paragraph = new Paragraph();
+        $children = [new Text('same'), new Text('same'), new Text('last')];
+        foreach ($children as $child) {
+            $paragraph->appendChild($child);
+        }
+        $other = new Paragraph();
+        $foreign = new Text('same');
+        $other->appendChild($foreign);
+        $this->assertSame(0, $paragraph->removeChildren([]));
+        $this->assertSame(1, $paragraph->removeChildren([$children[1], $children[1], $foreign]));
+        $this->assertSame([$children[0], $children[2]], $paragraph->getChildren());
+        $this->assertNull($children[1]->getParent());
+        $this->assertSame($paragraph, $children[0]->getParent());
+        $this->assertSame($paragraph, $children[2]->getParent());
+        $this->assertSame($other, $foreign->getParent());
+        $this->assertSame(0, $paragraph->removeChildren([$foreign]));
+    }
+
     public function testRemoveChild(): void
     {
         $paragraph = new Paragraph();
