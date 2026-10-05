@@ -13,9 +13,9 @@ use Closure;
  * roots reach, which in a tree with parent links is the whole tree. Its
  * threshold grows by a fixed step, so a large document paid O(n^1.5) in
  * collections that freed nothing. Inside a paused section a collection runs
- * only at a checkpoint after memory has grown by half (at least 4 MB, at most
- * 64 MB), and the threshold carries over between calls so garbage from earlier
- * conversions is still collected.
+ * only at a checkpoint after memory has grown by half (normally 4 to 64 MB).
+ * Near the memory limit, checkpoints use the remaining headroom. The threshold
+ * carries over between calls so garbage from earlier conversions is collected.
  *
  * @internal
  */
@@ -54,22 +54,27 @@ final class CycleCollection
             if (!gc_enabled()) {
                 return $work();
             }
-            gc_disable();
             // Kept across calls: garbage from earlier conversions counts too.
-            if (self::$collectAt === 0) {
-                self::$collectAt = self::nextCollection();
-            }
+            $next = self::nextCollection();
+            gc_disable();
+            self::$collectAt = self::$collectAt === 0 ? $next : min(self::$collectAt, $next);
         }
 
         self::$depth++;
         try {
             return $work();
         } finally {
-            if (self::$depth === 1) {
-                self::checkpoint();
-                gc_enable();
+            try {
+                if (self::$depth === 1) {
+                    try {
+                        self::checkpoint();
+                    } finally {
+                        gc_enable();
+                    }
+                }
+            } finally {
+                self::$depth--;
             }
-            self::$depth--;
         }
     }
 
@@ -104,6 +109,32 @@ final class CycleCollection
 
         $growth = min(max((int)($usage * self::GROWTH), self::MIN_GROWTH_BYTES), self::MAX_GROWTH_BYTES);
 
+        $limit = self::memoryLimit();
+        if ($limit > $usage) {
+            $headroom = max(0, $limit - $usage);
+            $growth = min($growth, max(256 << 10, intdiv($headroom, 2)));
+        }
+
         return $usage + $growth;
+    }
+
+    private static function memoryLimit(): int
+    {
+        $raw = trim((string)ini_get('memory_limit'));
+        if (preg_match('/\A(-?[0-9]+)([KMG]?)\z/i', $raw, $parts) !== 1) {
+            return -1;
+        }
+        $amount = (int)$parts[1];
+        $shift = match (strtoupper($parts[2])) {
+            'K' => 10,
+            'M' => 20,
+            'G' => 30,
+            default => 0,
+        };
+        if ($amount <= 0 || $amount > (PHP_INT_MAX >> $shift)) {
+            return -1;
+        }
+
+        return $amount << $shift;
     }
 }

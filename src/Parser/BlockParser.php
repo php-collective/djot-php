@@ -528,6 +528,11 @@ class BlockParser
 
     public function parse(string $input): Document
     {
+        return CycleCollection::paused(fn () => $this->parseDocument($input));
+    }
+
+    private function parseDocument(string $input): Document
+    {
         $this->mayHaveTableRowspans = str_contains($input, '^');
         $this->references = [];
         $this->footnotes = [];
@@ -3074,6 +3079,7 @@ class BlockParser
         $unitSpans = null;
 
         while ($i < $count) {
+            CycleCollection::checkpoint();
             $currentLine = $lines[$i];
 
             // Strip row attributes for validation (|...|{.class} → |...|)
