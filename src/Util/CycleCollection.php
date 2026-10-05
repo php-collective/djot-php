@@ -13,7 +13,8 @@ use Closure;
  * roots reach, which in a tree with parent links is the whole tree. Its
  * threshold grows by a fixed step, so a large document paid O(n^1.5) in
  * collections that freed nothing. Inside a paused section a collection runs
- * only at a checkpoint after memory has grown by half (normally 4 to 64 MB).
+ * at checkpoints after memory has grown by half (normally 4 to 64 MB),
+ * or at the end of the outer scope when its root buffer is full.
  * Near the memory limit, checkpoints use the remaining headroom. The threshold
  * carries over between calls so garbage from earlier conversions is collected.
  *
