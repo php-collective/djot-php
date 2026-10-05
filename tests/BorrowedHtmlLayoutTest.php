@@ -12,6 +12,27 @@ use PHPUnit\Framework\TestCase;
 
 final class BorrowedHtmlLayoutTest extends TestCase
 {
+    public function testLargePlainDocumentsStayBorrowedAndPreserveLateFallback(): void
+    {
+        foreach ([65535, 65536, 65537, 262144] as $size) {
+            $source = str_repeat('x', $size) . "\n";
+            $attempt = (new BorrowedHtmlLayout())->render($source);
+            self::assertNotNull($attempt);
+            self::assertSame(DjotConverter::create()->convert($source), $attempt['html']);
+            self::assertSame($attempt['html'], (new DjotConverter())->convert($source));
+        }
+        $source = str_repeat("café paragraph\n\n", 8192);
+        $attempt = (new BorrowedHtmlLayout())->render($source);
+        self::assertNotNull($attempt);
+        self::assertSame(DjotConverter::create()->convert($source), $attempt['html']);
+        $prefix = str_repeat("plain paragraph\n\n", 4096);
+        foreach (["_emphasis_\n", "😀\n", "- loose\n\n- list\n", "paragraph \n", "*bold*\n", "1. item\n", "# heading\n", "(c)\n", "...\n", "--\n"] as $tail) {
+            $source = $prefix . $tail;
+            self::assertNull((new BorrowedHtmlLayout())->render($source));
+            self::assertSame(DjotConverter::create()->convert($source), (new DjotConverter())->convert($source));
+        }
+    }
+
     public function testAMarkerAfterTheSameMarkerCloserUsesTheParser(): void
     {
         foreach (["_x__y_\n", "*x**y*\n", "a _x__y_ b\n", "_x__y__z_\n"] as $source) {
@@ -159,7 +180,7 @@ final class BorrowedHtmlLayoutTest extends TestCase
             $source .= "\n" . str_repeat('  ', $level) . "- child\n";
         }
         self::assertNull((new BorrowedHtmlLayout())->render($source));
-        self::assertNull((new BorrowedHtmlLayout())->render(str_repeat("text\n\n", 11000)));
+        self::assertNull((new BorrowedHtmlLayout())->render(str_repeat("*text*\n\n", 11000)));
     }
 
     public function testCustomRendererNeverUsesTheDefaultFacade(): void

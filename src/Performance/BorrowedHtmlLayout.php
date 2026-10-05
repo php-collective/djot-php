@@ -122,7 +122,7 @@ final class BorrowedHtmlLayout
 
     private function eligibleSource(string $source): bool
     {
-        return strlen($source) <= self::MAX_SOURCE_BYTES
+        return (strlen($source) <= self::MAX_SOURCE_BYTES || $this->largePlainSource($source))
             && $this->eligibleText($source)
             && !str_starts_with($source, '---')
             && !str_contains($source, '[^')
@@ -159,6 +159,12 @@ final class BorrowedHtmlLayout
 
         return strpbrk($source, "\x00\t\v\f\r*/_`[\"'") === false
             && preg_match('/[^\x00-\x7F\p{L}\p{M}\p{N}]/u', $source) === 0;
+    }
+
+    private function largePlainSource(string $source): bool
+    {
+        // Keep the size budget for recursive layouts; larger plain paragraphs need no marker parsing.
+        return preg_match('/[*\/`\[\]{}^\\\\<>_~!@$=#\'":%+|]|--|\.\.\.|\((?:c|r|tm)\)|(?:^|\n)(?:[ .-]|[A-Za-z0-9]+[.)] )/', $source) === 0;
     }
 
     /**

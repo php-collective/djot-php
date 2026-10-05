@@ -1288,7 +1288,7 @@ class BlockParser
      */
     protected function parseAttributeString(string $attrStr): void
     {
-        $this->pendingAttributes = AttributeParser::parseAndMerge($this->pendingAttributes, $attrStr);
+        AttributeParser::parseAndMergeInto($this->pendingAttributes, $attrStr);
     }
 
     /**
@@ -2424,7 +2424,7 @@ class BlockParser
             if (isset($itemInfo['attrs'])) {
                 /** @var string $markerAttrsRaw */
                 $markerAttrsRaw = $itemInfo['attrs'];
-                $itemAttributes = AttributeParser::parseOrdered($markerAttrsRaw);
+                $itemAttributes = array_merge(AttributeParser::parseOrdered($markerAttrsRaw));
             }
             $parseItemLinesAsBlocks = $markerLineSublistParsed;
             if (!$markerLineSublistParsed && $i < $count) {
@@ -2454,8 +2454,8 @@ class BlockParser
                         && preg_match('/^\{([^{}]+)\}\s*$/', ltrim($lines[$i + 1]), $peekAttrMatch);
 
                     if ($peekLineIsAttribute) {
-                        $itemAttributes = AttributeParser::parseAndMerge($itemAttributes, $attrMatch[1]);
-                        $itemAttributes = AttributeParser::parseAndMerge($itemAttributes, $peekAttrMatch[1]);
+                        AttributeParser::parseAndMergeInto($itemAttributes, $attrMatch[1]);
+                        AttributeParser::parseAndMergeInto($itemAttributes, $peekAttrMatch[1]);
                         $i += 2;
 
                         while ($i < $count) {
@@ -2471,7 +2471,7 @@ class BlockParser
                             if (!preg_match('/^\{([^{}]+)\}\s*$/', $contTrimmed, $contAttrMatch)) {
                                 break;
                             }
-                            $itemAttributes = AttributeParser::parseAndMerge($itemAttributes, $contAttrMatch[1]);
+                            AttributeParser::parseAndMergeInto($itemAttributes, $contAttrMatch[1]);
                             $i++;
                         }
 
@@ -2538,7 +2538,7 @@ class BlockParser
                             }
                         }
                     } else {
-                        $itemAttributes = AttributeParser::parseAndMerge($itemAttributes, $attrMatch[1]);
+                        AttributeParser::parseAndMergeInto($itemAttributes, $attrMatch[1]);
                         $i++;
                     }
                 }
