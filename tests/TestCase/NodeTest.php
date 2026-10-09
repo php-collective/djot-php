@@ -95,6 +95,26 @@ class NodeTest extends TestCase
         $this->assertCount(1, $paragraph->getChildren());
     }
 
+    public function testRemoveChildAtEndKeepsOrderAndParentLinks(): void
+    {
+        $paragraph = new Paragraph();
+        $first = new Text('first');
+        $last = new Text('last');
+        $paragraph->appendChild($first);
+        $paragraph->appendChild($last);
+        self::assertSame($last, $paragraph->removeChildAt(1));
+        self::assertNull($last->getParent());
+        self::assertSame([$first], $paragraph->getChildren());
+        self::assertSame($paragraph, $first->getParent());
+        self::assertSame($first, $paragraph->removeChildAt(0));
+        self::assertNull($first->getParent());
+        self::assertSame([], $paragraph->getChildren());
+        self::assertNull($paragraph->removeChildAt(0));
+        $paragraph->appendChild($last);
+        self::assertSame([$last], $paragraph->getChildren());
+        self::assertSame($paragraph, $last->getParent());
+    }
+
     public function testReplaceChildNode(): void
     {
         $paragraph = new Paragraph();

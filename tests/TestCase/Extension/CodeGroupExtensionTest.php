@@ -40,6 +40,17 @@ DJOT;
         $this->assertStringContainsString('language-javascript', $html);
     }
 
+    public function testLabeledFenceKeepsLeadingBlankContentLine(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new CodeGroupExtension());
+        $input = "::: code-group\n``` php [Install]\n\ncomposer require x\n```\n:::\n";
+        $html = $converter->convert($input);
+
+        self::assertStringContainsString('>Install</label>', $html);
+        self::assertStringContainsString("<code class=\"language-php\">\ncomposer require x\n</code>", $html);
+    }
+
     public function testCustomLabels(): void
     {
         $converter = new DjotConverter();

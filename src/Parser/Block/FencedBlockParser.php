@@ -42,6 +42,12 @@ class FencedBlockParser
         $fenceChar = $fence[0];
         $fenceLength = strlen($fence);
         $info = trim($matches[3]);
+        if (
+            preg_match('/\s/', $info) === 1
+            && preg_match('/^(?:[^\s\[]+\s*)?\[[^\]]+\]$/', $info) !== 1
+        ) {
+            return null;
+        }
 
         // Check for inline code on a single line: ``` foo ``` should be inline code
         if ($fenceChar === '`') {
@@ -92,6 +98,7 @@ class FencedBlockParser
      */
     public function parseDivFenceOpener(string $line): ?array
     {
+        $line = ltrim($line, " \t");
         // Fast early exit: divs start with :
         if (!isset($line[0]) || $line[0] !== ':') {
             return null;
@@ -190,19 +197,12 @@ class FencedBlockParser
             return false;
         }
 
-        // Check if there's a closing %} on the same line
-        $closePos = strpos($trimmed, '%}');
-        if ($closePos === false) {
-            // No closing on this line - it's a multi-line block comment
+        $closePos = AttributeParser::findEnd($trimmed);
+        if ($closePos === null) {
             return true;
         }
 
-        // There's a closing %} - check if there's content after it
-        $afterClose = trim(substr($trimmed, $closePos + 2));
-
-        // If nothing after the closing, treat as block comment
-        // If there's content after, let inline parser handle it
-        return $afterClose === '';
+        return trim(substr($trimmed, $closePos + 1)) === '';
     }
 
     /**
