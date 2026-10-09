@@ -30,11 +30,18 @@ class BlockParserTest extends TestCase
 
     public function testRepeatedAttributeLinesKeepClassesAndOverwriteKeys(): void
     {
-        $doc = $this->parser->parse("{.a k=old}\n{.b q=x}\n{.a k=new}\n\ntext\n");
+        $doc = $this->parser->parse("{.a k=old}\n{.b q=x}\n{.a k=new}\ntext\n");
         $attrs = $doc->getChildren()[0]->getAttributes();
         self::assertSame('new', $attrs['k']);
         self::assertSame('x', $attrs['q']);
         self::assertSame('a b a', $attrs['class']);
+    }
+
+    public function testMultilineCommentKeepsBracesInItsContent(): void
+    {
+        $converter = new DjotConverter();
+        $input = "{%\nTODO: fix {x} later\nmore\n%}\n\npara\n";
+        self::assertSame("<p>para</p>\n", $converter->convert($input));
     }
 
     public function testParseParagraph(): void

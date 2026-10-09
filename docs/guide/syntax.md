@@ -656,7 +656,11 @@ See the [Parser Options guide](/guide/parser-options#nested-lists-without-blank-
 
 ### Definition Lists
 
-Terms are prefixed with `: ` and definitions are indented below.
+Terms are prefixed with `: ` and definitions are indented below. A term may have
+an empty definition, including after another block. Unindented prose continues
+an open definition paragraph; a blank line or an unindented block marker ends it.
+After a table, thematic break, or closed code block in a definition, unindented
+prose starts a paragraph outside the definition list.
 
 ::: code-group
 ```djot [Basic]
@@ -1287,7 +1291,8 @@ For an overview of where attributes attach for each block construct
 [Attachment Model](/reference/enhancements#attachment-model) in the
 reference.
 
-Apply attributes to the following block using `{...}` syntax.
+Place `{...}` on the line immediately before its block. A blank line discards
+the attributes. Whitespace inside the braces is allowed, including an empty `{ }`.
 
 **Input:**
 ```djot
@@ -1410,6 +1415,9 @@ For literal backticks: `` `code` ``
 
 #### Inline Links
 
+A backslash in a link destination escapes ASCII punctuation. Before other
+characters, such as in `a\b`, the backslash stays in the URL.
+
 **Input:**
 ```djot
 [Link text](https://example.com)
@@ -1433,6 +1441,11 @@ For literal backticks: `` `code` ``
 </OutputTabs>
 
 #### Reference Links
+
+A reference definition must start at a block boundary. Directly after paragraph
+text, `[ref]: /url` continues the paragraph and does not define a reference.
+With `blocksInterruptParagraphs` enabled, an interrupting block such as a thematic
+break establishes a boundary for the following reference definition.
 
 **Input:**
 ```djot
@@ -1637,7 +1650,17 @@ H~2~O
 
 ### Spans with Attributes
 
-Apply attributes to inline text.
+Apply attributes to inline text. Whitespace inside the braces is allowed:
+`word{ .c }` styles the word. A word includes all adjacent ordinary text before
+the braces, up to ASCII whitespace or a delimited element. Literal punctuation
+and escaped characters belong to the word: `foo*bar{.c}` and `foo\*bar{.c}` both
+wrap `foo*bar` in a span. In `_e_x{.c}`, only `x` gets the attributes.
+Attributes immediately after emphasis, a span, a link, code or math apply to
+that element. Empty, whitespace-only and comment-only specifiers add no
+attributes and do not wrap a word; `[text]{}` still creates a span.
+
+Within attributes, `%` starts a comment that ends at the next `%` or the closing
+`}`. Braces, quotes and backslashes inside the comment are ordinary comment text.
 
 **Input:**
 ```djot
@@ -1668,6 +1691,9 @@ Apply attributes to inline text.
 ### Math
 
 #### Inline Math
+
+Attributes immediately after the closing backtick apply to the math span. For
+example, ``$`m`{#i .c}`` adds the ID and class to that span.
 
 **Input:**
 ```djot
@@ -1827,6 +1853,10 @@ The parser automatically converts certain character sequences.
 
 ### Quotes
 
+Use `{"` or `{'` to force an opening quote, and `"}` or `'}` to force a closing
+quote. These markers stay literal in code, raw text, math, link destinations
+and attribute values.
+
 **Input:**
 ```djot
 "Double quotes" and 'single quotes'
@@ -1895,7 +1925,8 @@ Wait for it...
 
 ## Hard Line Breaks
 
-End a line with a backslash for a hard break.
+End a line with a backslash for a hard break. Spaces and tabs immediately
+before the backslash are discarded.
 
 **Input:**
 ```djot

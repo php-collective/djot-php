@@ -165,6 +165,12 @@ class InlineParser
      */
     private array $invalidAttributeStarts = [];
 
+    protected int $attributeWordBoundary = 0;
+
+    protected int $attributeWordBeforeEmpty = 0;
+
+    protected int $attributeWordBoundaryEnd = -1;
+
     private ?string $destinationScanText = null;
 
     /**
@@ -385,6 +391,12 @@ class InlineParser
         $outerBacktickRuns = $this->backtickRuns;
         $outerTerminatorText = $this->terminatorText;
         $outerTerminators = $this->lastTerminators;
+        $outerWordBoundary = $this->attributeWordBoundary;
+        $outerWordBeforeEmpty = $this->attributeWordBeforeEmpty;
+        $outerWordBoundaryEnd = $this->attributeWordBoundaryEnd;
+        $this->attributeWordBoundary = count($parent->getChildren());
+        $this->attributeWordBeforeEmpty = $this->attributeWordBoundary;
+        $this->attributeWordBoundaryEnd = -1;
         $this->inlineDepth++;
         $previousOrigin = $this->textOrigin;
         $this->textOrigin = $origin;
@@ -409,6 +421,9 @@ class InlineParser
             $this->backtickRuns = $outerBacktickRuns;
             $this->terminatorText = $outerTerminatorText;
             $this->lastTerminators = $outerTerminators;
+            $this->attributeWordBoundary = $outerWordBoundary;
+            $this->attributeWordBeforeEmpty = $outerWordBeforeEmpty;
+            $this->attributeWordBoundaryEnd = $outerWordBoundaryEnd;
             $this->inlineDepth--;
         }
     }
@@ -459,6 +474,7 @@ class InlineParser
         $length = strlen($text);
         $pos = 0;
         $textBuffer = '';
+        $literalBrace = -1;
 
         // Pre-compute single quote matches to avoid O(n²) complexity
         $this->singleQuoteMatchCache = $this->buildSingleQuoteMatchCache($text);
@@ -484,7 +500,7 @@ class InlineParser
             // A backslash at the very end of the content (no following
             // character) still produces a hard break
             if ($char === '\\' && $pos + 1 >= $length) {
-                $this->flushText($parent, $textBuffer);
+                $this->flushText($parent, rtrim($textBuffer, " \t"));
                 $textBuffer = '';
                 $parent->appendChild(new HardBreak());
                 $pos++;
@@ -497,7 +513,7 @@ class InlineParser
                 $escaped = $text[$pos + 1];
                 if ($escaped === "\n") {
                     // Hard break
-                    $this->flushText($parent, $textBuffer);
+                    $this->flushText($parent, rtrim($textBuffer, " \t"));
                     $textBuffer = '';
                     $parent->appendChild(new HardBreak());
                     $pos += 2;
@@ -675,6 +691,13 @@ class InlineParser
                 }
             }
 
+            if ($literalBrace >= 0 && $literalBrace === $pos - 1 && str_contains('_*^~', $char)) {
+                $textBuffer .= $char;
+                $pos++;
+
+                continue;
+            }
+
             // Emphasis: _text_
             if ($char === '_') {
                 $this->flushText($parent, $textBuffer);
@@ -727,6 +750,17 @@ class InlineParser
                 }
             }
 
+            // Explicit quote direction overrides the quote heuristic.
+            if (
+                $char === '{' && ($nextChar === '"' || $nextChar === "'")
+                && ($text[$pos + 1 + strspn($text, $nextChar, $pos + 1)] ?? '') !== '}'
+            ) {
+                $textBuffer .= $nextChar === '"' ? $this->openDoubleQuote : $this->openSingleQuote;
+                $pos += 2;
+
+                continue;
+            }
+
             // Special braced syntax: {=highlight=}, {+insert+}, {-delete-}, or inline attributes {.class}
             if ($char === '{') {
                 // First check for inline attributes that apply to preceding word
@@ -748,13 +782,18 @@ class InlineParser
 
                     continue;
                 }
+                $literalBrace = $pos;
             }
 
             // Smart quotes
             if ($char === '"' || $char === "'") {
-                $smartQuote = $this->parseSmartQuote($text, $pos, $char);
-                $textBuffer .= $smartQuote;
-                $pos++;
+                if ($nextChar === '}') {
+                    $textBuffer .= $char === '"' ? $this->closeDoubleQuote : $this->closeSingleQuote;
+                    $pos += 2;
+                } else {
+                    $textBuffer .= $this->parseSmartQuote($text, $pos, $char);
+                    $pos++;
+                }
 
                 continue;
             }
@@ -1128,7 +1167,7 @@ class InlineParser
                 $url = str_replace(["\r\n", "\r", "\n"], '', $url);
                 $url = trim($url);
                 // Process escape sequences in URL (e.g., \* -> *)
-                $url = preg_replace('/\\\\(.)/', '$1', $url) ?? $url;
+                $url = preg_replace('/\\\\([!"#$%&\'()*+,\-.\/:;<=>?@\[\\\\\]\^_`{|}~])/', '$1', $url) ?? $url;
                 $link = new Link($url);
                 $this->parseInlines($link, $linkText, $this->textOrigin + $pos + 1);
 
@@ -1177,6 +1216,17 @@ class InlineParser
 
                 // Store original bracket content before normalization
                 $originalRefBracket = substr($text, $afterBracket + 1, $refEnd - $afterBracket - 1);
+
+                if ($this->blockParser->defersReferences()) {
+                    $location = $this->warningLocation($pos, substr($text, $pos, $refEnd - $pos + 1));
+                    $link = new Link();
+                    $link->setReferenceLabel($originalRefBracket === '' ? '' : $ref);
+                    $this->parseInlines($link, $linkText, $this->textOrigin + $pos + 1);
+                    $endPos = $this->applyConsecutiveAttributes($link, $text, $refEnd + 1);
+                    $this->blockParser->deferReference($link, $ref, $location['line'], $location['column']);
+
+                    return ['node' => $link, 'pos' => $endPos];
+                }
 
                 $refDef = $this->blockParser->getReference($ref);
                 if ($refDef !== null) {
@@ -1293,6 +1343,8 @@ class InlineParser
         $alt = $this->extractText($link);
 
         $image = new Image($link->getDestination() ?? '', $alt, $link->getTitle());
+
+        $this->blockParser->transferDeferredReference($link, $image);
 
         // Transfer reference label for round-trip support
         if ($link->getReferenceLabel() !== null) {
@@ -1422,7 +1474,7 @@ class InlineParser
             $openingRunEnd = $pos + strspn($text, $delimiter, $pos);
             $this->openingDelimiterRuns[$delimiter] = [$pos, $openingRunEnd];
         }
-        if (isset($this->delimiterNoCloseFrom[$delimiter][$openingRunEnd])) {
+        if (isset($this->delimiterNoCloseFrom[$delimiter][$pos])) {
             return null;
         }
         // If the opening run extends to end of string (all delimiters), no valid emphasis
@@ -1434,15 +1486,22 @@ class InlineParser
         // that is not there (the other half of the O(n^2)).
         $firstClose = strpos($text, $delimiter, $openingRunEnd);
         if ($firstClose === false) {
-            $this->delimiterNoCloseFrom[$delimiter][$openingRunEnd] = true;
+            for ($opener = $pos; $opener < $openingRunEnd; $opener++) {
+                $this->delimiterNoCloseFrom[$delimiter][$opener] = true;
+            }
 
             return null;
         }
         // Skip the opening run to look for content and closing run
-        $failedStarts = [$openingRunEnd];
+        $lastOpeningPos = $openingRunEnd - 1;
+        if (ctype_space($text[$openingRunEnd]) || $text[$openingRunEnd] === '}') {
+            $lastOpeningPos--;
+        }
+        $openers = range($pos, $lastOpeningPos);
         $searchPos = $openingRunEnd;
         $bulkScan = $firstClose - $openingRunEnd >= 32;
         $significant = $delimiter . '{`<]\\';
+        $literalBrace = -1;
         while ($searchPos < $length) {
             if (isset($this->delimiterNoCloseFrom[$delimiter][$searchPos])) {
                 break;
@@ -1463,6 +1522,7 @@ class InlineParser
 
                     continue;
                 }
+                $literalBrace = $searchPos;
             }
 
             // Skip over code spans `...`
@@ -1504,42 +1564,33 @@ class InlineParser
                 continue;
             }
 
-            // Only record traversed boundaries; positions inside opaque spans
-            // and escapes can start a different search.
             if ($char === $delimiter) {
-                $failedStarts[] = $searchPos + strspn($text, $delimiter, $searchPos);
-            }
+                if ($literalBrace === $searchPos - 1) {
+                    $searchPos++;
 
-            // Check for closing delimiter
-            if ($char === $delimiter) {
-                // Check if this can be a closer (not preceded by whitespace)
-                $beforeClose = $searchPos > 0 ? $text[$searchPos - 1] : ' ';
-                if (!ctype_space($beforeClose)) {
-                    // A braced closer (like _} or *}) can only close a braced opener
-                    // Since we're looking for a non-braced closer, skip if followed by }
-                    $afterClose = $text[$searchPos + 1] ?? '';
-                    if ($afterClose === '}') {
-                        $searchPos++;
+                    continue;
+                }
+                $before = $text[$searchPos - 1] ?? ' ';
+                $after = $text[$searchPos + 1] ?? ' ';
+                $lastOpener = $openers[count($openers) - 1];
+                $canClose = !ctype_space($before) && $after !== '}' && $lastOpener !== $searchPos - 1;
+                if ($canClose) {
+                    $closingRunEnd = $searchPos + strspn($text, $delimiter, $searchPos);
+                    $closerCount = $closingRunEnd - $searchPos;
+                    if (($text[$closingRunEnd] ?? '') === '}') {
+                        $closerCount--;
+                    }
+                    $openerCount = count($openers);
+                    if ($closerCount < $openerCount) {
+                        for ($closer = 0; $closer < $closerCount; $closer++) {
+                            array_pop($openers);
+                        }
+                        $searchPos += $closerCount;
 
                         continue;
                     }
-                    // For runs of delimiters like *****, we want to find the LAST one
-                    // to match our opener (outer-to-outer matching)
-                    // Find the end of this run of closers
-                    $runEnd = $searchPos;
-                    while ($runEnd + 1 < $length && $text[$runEnd + 1] === $delimiter) {
-                        $runEnd++;
-                    }
-                    // Use the last delimiter in this closing run
-                    $actualClose = $runEnd;
-
-                    // Check content isn't empty
+                    $actualClose = $searchPos + $openerCount - 1;
                     $content = substr($text, $pos + 1, $actualClose - $pos - 1);
-                    if ($content === '') {
-                        $searchPos = $runEnd + 1;
-
-                        continue;
-                    }
 
                     $node = new $nodeClass();
                     $this->parseInlines($node, $content, $this->textOrigin + $pos + 1);
@@ -1556,13 +1607,17 @@ class InlineParser
                         'pos' => $endPos,
                     ];
                 }
+                if (!ctype_space($after) && $after !== '}') {
+                    $openers[] = $searchPos;
+                }
             }
 
             $searchPos++;
         }
 
-        foreach ($failedStarts as $failedStart) {
-            $this->delimiterNoCloseFrom[$delimiter][$failedStart] = true;
+        // Cache each unmatched opener; later openers in the same run may still match.
+        foreach ($openers as $opener) {
+            $this->delimiterNoCloseFrom[$delimiter][$opener] = true;
         }
 
         return null;
@@ -1885,7 +1940,14 @@ class InlineParser
             return null;
         }
 
-        $attrStr = substr($text, $pos + 1, $attrEnd - $pos - 1);
+        $rawAttrStr = substr($text, $pos + 1, $attrEnd - $pos - 1);
+        $attrStr = trim($rawAttrStr);
+        if (
+            $rawAttrStr !== ltrim($rawAttrStr) && $attrStr !== ''
+            && !preg_match('/^[.#%]|^[a-zA-Z][a-zA-Z0-9_:-]*=/', $attrStr)
+        ) {
+            return null;
+        }
 
         // Check if this looks like valid attributes (starts with ., #, % comment, or key=)
         // Exclude _ * = + - ~ ^ which are braced inline markers
@@ -1902,51 +1964,63 @@ class InlineParser
         // Remove comments from attributes: % ... % or % to end
         $attrStr = $this->removeAttributeComments($attrStr);
 
-        // Empty attributes: hi{} - just skip them
+        $wordBoundary = $pos === $this->attributeWordBoundaryEnd
+            ? $this->attributeWordBeforeEmpty : $this->attributeWordBoundary;
+
+        // Empty specifiers end the word but allow adjacent attributes to attach.
         if (trim($attrStr) === '') {
+            $this->flushText($parent, $textBuffer);
+            $textBuffer = '';
+            $this->attributeWordBeforeEmpty = $wordBoundary;
+            $this->attributeWordBoundary = count($parent->getChildren());
+            $this->attributeWordBoundaryEnd = $attrEnd + 1;
+
             return [
                 'textBuffer' => $textBuffer,
                 'pos' => $attrEnd + 1,
             ];
         }
 
-        // Find the preceding word to attach attributes to
-        // A word is a sequence of alphanumeric characters (plus some allowed chars)
-        $precedingWord = '';
-        $wordStart = strlen($textBuffer);
-
-        // Scan backwards to find word boundary
-        // Per djot spec: a word is a sequence of non-ASCII-whitespace characters
-        // However, smart/curly quotes act as word boundaries for attribute attachment
-        while ($wordStart > 0) {
-            $char = $textBuffer[$wordStart - 1];
-
-            // Stop at ASCII whitespace
-            if ($char === ' ' || $char === "\t" || $char === "\n" || $char === "\r") {
-                break;
-            }
-
-            // Check for multi-byte configured quote characters
-            // These act as word boundaries for attribute attachment
-            foreach ($this->getConfiguredQuoteStrings() as $quoteStr) {
-                $quoteLen = strlen($quoteStr);
-                if ($wordStart >= $quoteLen && substr($textBuffer, $wordStart - $quoteLen, $quoteLen) === $quoteStr) {
-                    break 2;
-                }
-            }
-
-            $wordStart--;
+        $wordStart = $this->attributeWordStart($textBuffer);
+        $wordNodes = [];
+        if ($wordStart < strlen($textBuffer)) {
+            $wordNodes[] = new Text(substr($textBuffer, $wordStart));
         }
+        $textBuffer = substr($textBuffer, 0, $wordStart);
 
-        $textBufferLen = strlen($textBuffer);
-        if ($wordStart < $textBufferLen) {
-            $precedingWord = substr($textBuffer, $wordStart);
-            $textBuffer = substr($textBuffer, 0, $wordStart);
+        // Failed delimiters and escapes can flush parts of one ordinary word.
+        $removeCount = 0;
+        if ($wordStart === 0) {
+            $children = $parent->getChildren();
+            $lastIndex = count($children) - 1;
+            for ($index = $lastIndex; $index >= $wordBoundary; $index--) {
+                $child = $children[$index];
+                if (!($child instanceof Text || $child instanceof EscapedText)) {
+                    break;
+                }
+                $content = $child->getContent();
+                $start = $child instanceof EscapedText ? 0 : $this->attributeWordStart($content);
+                if ($start === strlen($content)) {
+                    break;
+                }
+                if ($start > 0) {
+                    $wordNodes[] = new Text(substr($content, $start));
+                    $child->setContent(substr($content, 0, $start));
+
+                    break;
+                }
+                $removeCount++;
+                $wordNodes[] = $child;
+            }
+            unset($children);
+            for ($offset = 0; $offset < $removeCount; $offset++) {
+                $parent->removeChildAt($lastIndex - $offset);
+            }
         }
 
         // If no preceding word, attributes don't attach to anything
         // But they still consume the braces (according to the spec)
-        if ($precedingWord === '') {
+        if ($wordNodes === []) {
             if ($parent instanceof Paragraph && $parent->getChildren() === [] && $textBuffer === '') {
                 $location = $this->warningLocation($pos, substr($text, $pos, $attrEnd - $pos + 1));
                 $this->blockParser->addUnattachedAttributeWarning($location['line'], $location['column'], true);
@@ -1965,14 +2039,40 @@ class InlineParser
 
         // Create a span with the word and apply attributes
         $span = new Span();
-        $span->appendChild(new Text($precedingWord));
+        foreach (array_reverse($wordNodes) as $wordNode) {
+            $span->appendChild($wordNode);
+        }
         $this->applyAttributesToNode($span, $attrStr);
+        $endPos = $this->applyConsecutiveAttributes($span, $text, $attrEnd + 1);
         $parent->appendChild($span);
 
         return [
             'textBuffer' => '',
-            'pos' => $attrEnd + 1,
+            'pos' => $endPos,
         ];
+    }
+
+    protected function attributeWordStart(string $text): int
+    {
+        $start = strlen($text);
+        $quotes = $this->getConfiguredQuoteStrings();
+        while ($start > 0) {
+            if ($start >= 3 && substr_compare($text, "\u{E000}", $start - 3, 3) === 0) {
+                break;
+            }
+            if (str_contains(" \t\n\r\v\f", $text[$start - 1])) {
+                break;
+            }
+            foreach ($quotes as $quote) {
+                $length = strlen($quote);
+                if ($length > 0 && $start >= $length && substr_compare($text, $quote, $start - $length, $length) === 0) {
+                    break 2;
+                }
+            }
+            $start--;
+        }
+
+        return $start;
     }
 
     /**
@@ -2056,13 +2156,23 @@ class InlineParser
         $i = $pos + 1;
         $inQuote = null;
         $openers = [$pos];
+        $inComment = false;
         $percentCount = 0;
         $percentStarts = [$pos => 0];
 
         while ($i < $length) {
             $char = $text[$i];
-            if ($char === '%') {
+            if ($inQuote === null && $char === '%') {
                 $percentCount++;
+                $inComment = !$inComment;
+                $i++;
+
+                continue;
+            }
+            if ($inComment && $char !== '}') {
+                $i++;
+
+                continue;
             }
 
             // Handle escape sequences
@@ -2234,19 +2344,7 @@ class InlineParser
      */
     protected function removeAttributeComments(string $attrStr): string
     {
-        // Remove % ... % comments
-        $result = preg_replace('/%[^%]*%/', '', $attrStr);
-        if ($result === null) {
-            return $attrStr;
-        }
-
-        // Remove % to end of string comments
-        $percentPos = strpos($result, '%');
-        if ($percentPos !== false) {
-            $result = substr($result, 0, $percentPos);
-        }
-
-        return $result;
+        return AttributeParser::removeComments($attrStr);
     }
 
     /**
@@ -2381,9 +2479,12 @@ class InlineParser
 
         $content = substr($text, $contentStart, $closePos - $contentStart);
 
+        $math = new Math($content, $display);
+        $endPos = $this->applyConsecutiveAttributes($math, $text, $closePos + $backtickCount);
+
         return [
-            'node' => new Math($content, $display),
-            'pos' => $closePos + $backtickCount,
+            'node' => $math,
+            'pos' => $endPos,
         ];
     }
 

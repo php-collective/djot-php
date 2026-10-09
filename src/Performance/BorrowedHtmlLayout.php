@@ -906,7 +906,7 @@ final class BorrowedHtmlLayout
     private function blockish(string $text): bool
     {
         if (
-            $text === ':' || $text === '-' || $text === '+'
+            str_starts_with($text, ': ') || $text === ':' || $text === '-' || $text === '+'
             || preg_match('/^(?:\([A-Za-z0-9]+\)|\d+[.)]|[A-Za-z][.)]|[ivxlcdmIVXLCDM]+[.)])(?: |$)/', $text) === 1
         ) {
             return true;

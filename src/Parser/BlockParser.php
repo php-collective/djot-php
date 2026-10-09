@@ -93,6 +93,15 @@ class BlockParser
 
     protected FencedBlockParser $fencedBlockParser;
 
+    private bool $collectingReferences = false;
+
+    private int $referenceSourceLine = 0;
+
+    /**
+     * @var array<int, array{node: \Djot\Node\Inline\Link|\Djot\Node\Inline\Image, label: string, line: int, column: int}>
+     */
+    private array $deferredReferences = [];
+
     /**
      * @var array<string, \Djot\Parser\ReferenceDefinition>
      */
@@ -164,16 +173,6 @@ class BlockParser
      * @var array<string, true>
      */
     protected array $headingIds = [];
-
-    /**
-     * Labels in $references that were registered by a heading (not by an
-     * explicit `[label]: url` definition). Only those are rewritten by the
-     * post-parse `rewriteHeadingReferences` pass — an explicit definition
-     * always wins over the heading's auto-id.
-     *
-     * @var array<string, true>
-     */
-    protected array $headingReferenceLabels = [];
 
     /**
      * Current line offset for nested parsing (0-indexed internally, 1-indexed for errors)
@@ -528,13 +527,20 @@ class BlockParser
 
     public function parse(string $input): Document
     {
-        return CycleCollection::paused(fn () => $this->parseDocument($input));
+        try {
+            return CycleCollection::paused(fn () => $this->parseDocument($input));
+        } finally {
+            $this->collectingReferences = false;
+            $this->deferredReferences = [];
+        }
     }
 
     private function parseDocument(string $input): Document
     {
         $this->mayHaveTableRowspans = str_contains($input, '^');
         $this->references = [];
+        $this->collectingReferences = false;
+        $this->deferredReferences = [];
         $this->footnotes = [];
         $this->abbreviations = [];
         $this->pendingAttributes = [];
@@ -543,7 +549,6 @@ class BlockParser
         $this->usedReferences = [];
         $this->anchorLinks = [];
         $this->headingIds = [];
-        $this->headingReferenceLabels = [];
         $this->lineOffset = 0;
         $document = new Document();
 
@@ -562,12 +567,13 @@ class BlockParser
         // skip impossible families; false positives merely retain the existing
         // authoritative pass.
         $hasReferenceDefinitions = preg_match(
-            '/(?:^|\n)\[[^\]\r\n]+\]:(?:[ \t]+\S*)?[ \t]*(?:\r?\n|$)/',
+            '/\[[^\]\r\n]+\]:(?:[ \t]+\S*)?[ \t]*(?:\r?\n|$)/',
             $input,
         ) === 1;
         $hasFootnotes = str_contains($input, '[^');
         $hasAbbreviations = str_contains($input, '*[');
-        $hasImplicitHeadingReferences = preg_match('/\]\s*\[\]/', $input) === 1;
+        $hasImplicitHeadingReferences = preg_match('/\]\s*\[/', $input) === 1;
+        $this->collectingReferences = $hasImplicitHeadingReferences || $this->collectWarnings;
         if ($hasReferenceDefinitions) {
             $this->extractReferences($lines);
         }
@@ -576,9 +582,6 @@ class BlockParser
         }
         if ($hasAbbreviations) {
             $this->extractAbbreviations($lines);
-        }
-        if ($hasImplicitHeadingReferences || $this->collectWarnings) {
-            $this->extractHeadingReferences($lines);
         }
 
         // Second pass: parse blocks
@@ -589,19 +592,24 @@ class BlockParser
             $document->appendChild($footnote);
         }
 
-        // Third pass (post-parse): now that the AST exists we can pre-reserve
-        // every explicit `{#id}` (heading or non-heading, including inline
-        // attributes) and rewrite implicit heading references to the same
-        // deduped ids the renderer will emit, so `[Heading][]` anchors stay
-        // in sync with the rendered section id.
+        // Apply explicit reference attributes before reserving IDs. Heading
+        // labels then come from parsed nodes, including container content.
         if ($hasImplicitHeadingReferences || $this->collectWarnings) {
-            $this->rewriteHeadingReferences($document);
+            $this->resolveDeferredReferences(false);
+            $this->extractHeadingReferences($document);
         }
+        $this->resolveDeferredReferences();
+        $this->collectingReferences = false;
 
         // Validate references and anchor links if warnings are enabled
         if ($this->collectWarnings) {
             $this->validateReferences();
             $this->validateAnchorLinks($document);
+            usort(
+                $this->warnings,
+                static fn (ParseWarning $a, ParseWarning $b): int => [$a->getLine(), $a->getColumn()]
+                    <=> [$b->getLine(), $b->getColumn()],
+            );
         }
 
         // Store abbreviations on document for round-trip support
@@ -613,72 +621,13 @@ class BlockParser
     }
 
     /**
-     * Extract reference link definitions from the document
+     * Collect definitions during block parsing and resolve reference nodes afterward.
      *
      * @param array<string> $lines
      */
     protected function extractReferences(array $lines): void
     {
-        $i = 0;
-        $count = count($lines);
-        $pendingAttrs = [];
-
-        while ($i < $count) {
-            $line = $lines[$i];
-
-            // Check for attributes that may precede a reference definition
-            if (preg_match('/^\{([^}]+)\}\s*$/', $line, $attrMatches)) {
-                $pendingAttrs = AttributeParser::parse($attrMatches[1]);
-                $i++;
-
-                continue;
-            }
-
-            // Match reference definition: [label]: url
-            // - whitespace required after colon (jgm/djot.js#107)
-            // - URL must be a single non-whitespace token; trailing junk like Markdown
-            //   `"Title"` makes the line not a reference definition (matches djot.js)
-            if (preg_match('/^\[([^\]]+)\]:(?:[ \t]+(\S*))?[ \t]*$/', $line, $matches)) {
-                // Normalize label: collapse whitespace, trim
-                $label = preg_replace('/\s+/', ' ', trim($matches[1])) ?? '';
-                $url = trim($matches[2] ?? '');
-
-                // Collect continuation lines (URL can start on continuation line)
-                $j = $i + 1;
-                while ($j < $count) {
-                    $nextLine = $lines[$j];
-                    if (IndentationHelper::isBlankLine($nextLine)) {
-                        break;
-                    }
-                    // Check if next line starts a new reference definition
-                    if (preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)/', $nextLine)) {
-                        break;
-                    }
-                    if ($this->startsNewBlock($nextLine)) {
-                        break;
-                    }
-                    if (preg_match('/^\s+(\S.*)$/', $nextLine, $contMatch)) {
-                        $url .= $contMatch[1];
-                        $j++;
-                    } else {
-                        break;
-                    }
-                }
-
-                $this->references[$label] = new ReferenceDefinition($url, $pendingAttrs, $i);
-                $pendingAttrs = [];
-                $i = $j;
-
-                continue;
-            }
-
-            // Non-reference line, clear any pending attributes
-            if (!IndentationHelper::isBlankLine($line)) {
-                $pendingAttrs = [];
-            }
-
-            $i++;
-        }
+        $this->collectingReferences = true;
     }
 
     /**
@@ -819,120 +768,22 @@ class BlockParser
     }
 
     /**
-     * Extract heading IDs as implicit reference definitions
-     * This allows [Heading][] style links to headings
-     *
-     * @param array<string> $lines
+     * Register implicit heading references from the parsed document.
      */
-    protected function extractHeadingReferences(array $lines): void
-    {
-        $headingIdTracker = new HeadingIdTracker($this->headingIdTransformer);
-        $pendingId = null;
-        $count = count($lines);
-
-        // NOTE: this pass is line-based and runs *before* the AST exists, so
-        // it cannot reliably pre-reserve every explicit id the way the
-        // renderer's AST-walking `reserveExplicitIds` does. As a result, the
-        // implicit-reference href computed here can disagree with the rendered
-        // section id when a heading's auto-id collides with a non-heading
-        // explicit id elsewhere in the document. Tracked as a follow-up.
-
-        for ($i = 0; $i < $count; $i++) {
-            $line = $lines[$i];
-
-            // Check for explicit ID attribute before heading: {#custom-id}
-            if (preg_match('/^\{#([^\s}]+)\}\s*$/', $line, $attrMatch)) {
-                $pendingId = $attrMatch[1];
-
-                continue;
-            }
-
-            // Match heading: optional leading spaces, 1-6 # characters, followed by space(s) and content
-            // Space after # is syntax delimiter, not indentation - must be space(s) per spec, not tab
-            if (preg_match('/^[ ]{0,3}(#{1,6})(?: +(.*))?$/', $line, $matches)) {
-                $headingText = trim($matches[2] ?? '');
-
-                // Collect continuation lines
-                $j = $i + 1;
-                while ($j < $count) {
-                    $nextLine = $lines[$j];
-                    if (trim($nextLine) === '' || preg_match('/^[ ]{0,3}#{1,6}/', $nextLine)) {
-                        break;
-                    }
-                    if (!$this->startsNewBlock($nextLine)) {
-                        $headingText .= ' ' . trim($nextLine);
-                        $j++;
-                    } else {
-                        break;
-                    }
-                }
-
-                $heading = new Heading(strlen($matches[1]));
-                if ($pendingId !== null) {
-                    $heading->setAttribute('id', $pendingId);
-                    $pendingId = null;
-                }
-                $this->inlineParser->parse($heading, $headingText, $i);
-
-                $plainText = $headingIdTracker->getPlainText($heading);
-                $id = $headingIdTracker->getIdForHeading($heading);
-                $this->headingIds[$id] = true;
-
-                // Register as reference if not already defined
-                // Use normalized plain text as the label (for [Heading][] style links)
-                $label = preg_replace('/\s+/', ' ', trim($plainText)) ?? $plainText;
-                if (!isset($this->references[$label])) {
-                    $this->references[$label] = new ReferenceDefinition('#' . $id, [], $i);
-                    // Mark so the post-parse rewrite knows this came from a
-                    // heading; an explicit `[label]: url` always wins.
-                    $this->headingReferenceLabels[$label] = true;
-                }
-            } else {
-                // Non-heading, non-attribute line - clear pending ID
-                if (!IndentationHelper::isBlankLine($line)) {
-                    $pendingId = null;
-                }
-            }
-        }
-    }
-
-    /**
-     * Rewrite implicit heading references against the parsed AST
-     *
-     * `extractHeadingReferences()` runs before the AST exists, so its
-     * estimated heading ids can disagree with the renderer once explicit
-     * `{#id}` attributes (especially on non-heading blocks or inline
-     * elements) force the renderer to dedupe. This post-parse pass walks
-     * the document with the same `reserveExplicitIds` the renderer uses,
-     * computes the actual heading ids, and re-targets both the references
-     * map and any built reference-Link nodes accordingly.
-     */
-    protected function rewriteHeadingReferences(Document $document): void
+    protected function extractHeadingReferences(Document $document): void
     {
         $tracker = new HeadingIdTracker($this->headingIdTransformer);
         $tracker->reserveExplicitIds($document);
 
-        /** @var array<string, string> $newUrlByLabel */
-        $newUrlByLabel = [];
-        $this->collectHeadingIds($document, $tracker, $newUrlByLabel);
-
-        // Only rewrite labels that came from a heading — an explicit
-        // `[label]: url` reference always wins over the heading's id.
-        $headingOnly = [];
-        foreach ($newUrlByLabel as $label => $url) {
-            if (isset($this->headingReferenceLabels[$label])) {
-                $headingOnly[$label] = $url;
+        /** @var array<string, string> $urlByLabel */
+        $urlByLabel = [];
+        $this->collectHeadingIds($document, $tracker, $urlByLabel);
+        foreach ($urlByLabel as $label => $url) {
+            // Explicit reference definitions take precedence over heading labels.
+            if (!isset($this->references[$label])) {
+                $this->references[$label] = new ReferenceDefinition($url);
             }
         }
-
-        foreach ($headingOnly as $label => $url) {
-            if (isset($this->references[$label])) {
-                $old = $this->references[$label];
-                $this->references[$label] = new ReferenceDefinition($url, $old->attributes, $old->line);
-            }
-        }
-
-        $this->retargetHeadingLinks($document, $headingOnly, $tracker);
     }
 
     /**
@@ -951,9 +802,8 @@ class BlockParser
 
                 $plain = $tracker->getPlainText($child);
                 $label = preg_replace('/\s+/', ' ', trim($plain)) ?? $plain;
-                // First-wins: an implicit `[Foo][]` link resolves to the
-                // first heading with that label, matching the line-based
-                // pass and djot.js. Later duplicates only get deduped ids.
+                // The first heading with a label owns its reference; later
+                // duplicates only receive deduplicated IDs.
                 if (!isset($out[$label])) {
                     $out[$label] = '#' . $id;
                 }
@@ -961,39 +811,6 @@ class BlockParser
                 continue;
             }
             $this->collectHeadingIds($child, $tracker, $out);
-        }
-    }
-
-    /**
-     * @param \Djot\Node\Node $node
-     * @param array<string, string> $newUrlByLabel
-     * @param \Djot\Renderer\HeadingIdTracker $tracker
-     */
-    protected function retargetHeadingLinks(Node $node, array $newUrlByLabel, HeadingIdTracker $tracker): void
-    {
-        foreach ($node->getChildren() as $child) {
-            // Both reference Links (`[Text][]`) and reference Images
-            // (`![Text][]`) carry the implicit-reference label and need
-            // their target rewritten when a heading id is deduped. Images
-            // store their text in the `alt` string; Links keep it as child
-            // nodes — extract each appropriately for the lookup key.
-            if (($child instanceof Link || $child instanceof Image) && $child->getReferenceLabel() !== null) {
-                $refLabel = $child->getReferenceLabel();
-                if ($refLabel === '') {
-                    $raw = $child instanceof Link ? $tracker->getPlainText($child) : $child->getAlt();
-                    $key = preg_replace('/\s+/', ' ', trim($raw)) ?? '';
-                } else {
-                    $key = preg_replace('/\s+/', ' ', trim($refLabel)) ?? $refLabel;
-                }
-                if ($key !== '' && isset($newUrlByLabel[$key])) {
-                    if ($child instanceof Link) {
-                        $child->setDestination($newUrlByLabel[$key]);
-                    } else {
-                        $child->setSource($newUrlByLabel[$key]);
-                    }
-                }
-            }
-            $this->retargetHeadingLinks($child, $newUrlByLabel, $tracker);
         }
     }
 
@@ -1045,6 +862,8 @@ class BlockParser
 
             // Skip blank lines
             if (IndentationHelper::isBlankLine($line)) {
+                $this->pendingAttributes = [];
+                $this->pendingAttributeSourceLines = [];
                 $i++;
 
                 continue;
@@ -1109,7 +928,7 @@ class BlockParser
                 ?? $this->tryParseLineBlock($parent, $lines, $i)
                 ?? $this->tryParseTable($parent, $lines, $i)
                 ?? $this->tryParseFootnoteDefinition($lines, $i)
-                ?? $this->tryParseReferenceDefinition($lines, $i)
+                ?? $this->tryParseReferenceDefinitionAtLine($lines, $i, $sourceLine)
                 ?? $this->tryParseAbbreviationDefinition($lines, $i)
                 ?? $this->tryParseCaption($parent, $lines, $i)
                 ?? $this->tryParseParagraph($parent, $lines, $i, $lineMap);
@@ -1203,16 +1022,23 @@ class BlockParser
         }
 
         // Check for empty attribute block {} - just skip it
-        if (preg_match('/^\{\}\s*$/', $line)) {
+        if (preg_match('/^\{\s*\}\s*$/', $line)) {
             return 1;
         }
 
         // Check for single-line attribute: {.class} or {#id} or {key=value}
-        if (preg_match('/^\{(.+)\}\s*$/', $line, $matches)) {
-            $attrStr = $matches[1];
+        $attrEnd = AttributeParser::findEnd($line);
+        if ($attrEnd !== null) {
+            if (trim(substr($line, $attrEnd + 1)) !== '') {
+                return null;
+            }
+            $attrStr = trim(substr($line, 1, $attrEnd - 1));
             // Exclude _ * = + - ~ ^ which are braced inline markers (not block attributes)
-            // Exclude % which starts comments (handled by tryParseComment)
-            if (!preg_match('/^[.#a-zA-Z]/', $attrStr) || str_starts_with($attrStr, '%')) {
+            // Comment-only blocks retain their Comment node.
+            if (
+                !preg_match('/^[.#a-zA-Z%]/', $attrStr)
+                || (str_starts_with($attrStr, '%') && AttributeParser::parse($attrStr) === [])
+            ) {
                 return null;
             }
 
@@ -1226,11 +1052,11 @@ class BlockParser
             // (they were already applied during extractReferences)
             $count = count($lines);
             $nextIdx = $start + 1;
-            while ($nextIdx < $count && IndentationHelper::isBlankLine($lines[$nextIdx])) {
-                $nextIdx++;
-            }
             if ($nextIdx < $count && preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)/', $lines[$nextIdx])) {
-                // Attributes precede a reference definition, don't store them as block attrs
+                if ($this->collectingReferences) {
+                    $this->parseAttributeString($attrStr);
+                }
+
                 return 1;
             }
 
@@ -1353,6 +1179,13 @@ class BlockParser
         $fenceLength = $fenceInfo['length'];
         $info = $fenceInfo['info'];
         $indentLen = strlen($fenceInfo['indent']);
+        if (
+            preg_match('/\s/', $info) === 1
+            && !(preg_match('/^(?:[^\s\[]+\s*)?\[[^\]]+\]$/', $info) === 1
+                && isset($lines[$start + 1]))
+        ) {
+            return null;
+        }
 
         $content = '';
         $i = $start + 1;
@@ -1375,23 +1208,6 @@ class BlockParser
 
             $content .= $currentLine . "\n";
             $i++;
-        }
-
-        // An unterminated single-line backtick fence whose info string carries
-        // internal whitespace is not a code block but an inline verbatim span
-        // (e.g. "``` not a code block" -> <p><code> not a code block</code></p>,
-        // per the djot.js reference and the official conformance suite). A bare
-        // fence ("```") or a single-token language specifier ("``` php") still
-        // opens an (empty) code block. Fences with content lines use the
-        // enhanced lang+label syntax and are left untouched.
-        if (
-            !$closed
-            && $fenceChar === '`'
-            && $i === $start + 1
-            && $info !== ''
-            && preg_match('/\s/', $info) === 1
-        ) {
-            return null;
         }
 
         if (!$closed) {
@@ -1449,9 +1265,9 @@ class BlockParser
                     $inComment = true;
                     $afterOpen = substr($currentLine, $openPos + 2);
                     // Check if closing is on same line
-                    $closePos = strpos($afterOpen, '%}');
+                    $closePos = strpos($afterOpen, '}');
                     if ($closePos !== false) {
-                        $content .= substr($afterOpen, 0, $closePos);
+                        $content .= rtrim(substr($afterOpen, 0, $closePos), '%');
                         $i++;
                         $closed = true;
 
@@ -1662,7 +1478,7 @@ class BlockParser
             }
 
             // Check for closing fence (equal or longer) - only when not in code block
-            if ($this->fencedBlockParser->isDivFenceCloser($currentLine, $fenceLength)) {
+            if ($this->fencedBlockParser->isDivFenceCloser(ltrim($currentLine, " \t"), $fenceLength)) {
                 $i++;
                 $closed = true;
 
@@ -1755,10 +1571,10 @@ class BlockParser
                 break;
             }
 
-            // Check for continuation with # prefix (same level or less) - these continue the heading
+            // A repeated marker of the same level continues the heading.
             // e.g., "# Heading\n# more" becomes "Heading\nmore" for a level-1 heading.
             // A bare marker line ("#") continues the heading but contributes no content.
-            if (preg_match('/^[ ]{0,3}#{1,' . $level . '}(?: +(.*))?[ ]*$/', $nextLine, $contMatch)) {
+            if (preg_match('/^[ ]{0,3}#{' . $level . '}(?: +(.*))?[ ]*$/', $nextLine, $contMatch)) {
                 $contContent = trim($contMatch[1] ?? '');
                 if ($contContent !== '') {
                     if ($content !== '') {
@@ -1770,7 +1586,7 @@ class BlockParser
             } elseif (preg_match('/^[ ]{0,3}#{1,6}(?: |$)/', $nextLine)) {
                 // Different level heading marker (or empty heading) starts a new heading
                 break;
-            } elseif (!$this->startsNewBlock($nextLine)) {
+            } elseif (!$this->startsHeadingBlock($nextLine)) {
                 // "Lazy" continuation - plain text continues the heading
                 if ($content !== '') {
                     $content .= "\n";
@@ -1788,6 +1604,41 @@ class BlockParser
         $parent->appendChild($heading);
 
         return $i - $start;
+    }
+
+    /**
+     * Headings allow block openers to interrupt unmarked continuation lines.
+     */
+    protected function startsHeadingBlock(string $line): bool
+    {
+        $line = ltrim($line, " \t");
+        if ($line === '') {
+            return false;
+        }
+        if (
+            preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $line)
+            || $this->fencedBlockParser->parseCodeFenceOpener($line) !== null
+            || $this->fencedBlockParser->parseDivFenceOpener($line) !== null
+            || $this->listParser->parseListItemMarker($line) !== null
+            || $this->tableParser->isTableRow($line)
+            || preg_match('/^(?:>(?:[ \t]|$)|:(?: |$))/', $line)
+        ) {
+            return true;
+        }
+        $attributeEnd = $line[0] === '{' ? AttributeParser::findEnd($line) : null;
+        if (
+            $attributeEnd !== null
+            && trim(substr($line, $attributeEnd + 1)) === ''
+            && AttributeParser::isValid(substr($line, 1, $attributeEnd - 1))
+        ) {
+            return true;
+        }
+        $markers = preg_replace('/\s+/', '', $line) ?? $line;
+        if (preg_match('/^[-*]{3,}$/', $markers)) {
+            return true;
+        }
+
+        return $this->startsNewBlock($line);
     }
 
     protected function tryParseThematicBreak(Node $parent, string $line, int $start): ?int
@@ -1892,7 +1743,10 @@ class BlockParser
                 $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
                 $this->trackBlockQuoteLazyState('', $lazyState);
                 $i++;
-            } elseif ($lazyState['paragraphOpen'] && !$this->startsNewBlock($currentLine)) {
+            } elseif (
+                $lazyState['paragraphOpen'] && !$this->startsNewBlock($currentLine)
+                && !preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $currentLine)
+            ) {
                 // Lazy continuation only extends an OPEN paragraph (djot rule).
                 // A non-">" line inside an open code fence/comment, or after a
                 // block that left no open paragraph (a just-opened div, a closed
@@ -2002,6 +1856,86 @@ class BlockParser
         // list item, heading, nested quote) - all leave an open paragraph a lazy line
         // may continue.
         $state['paragraphOpen'] = true;
+    }
+
+    /**
+     * @param string $content
+     * @param array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool} $state
+     * @param array<int> $divFences
+     * @param int $quoteDepth
+     */
+    private function trackDefinitionLazyState(string $content, array &$state, array &$divFences, int &$quoteDepth): void
+    {
+        if ($state['inFence'] || $state['inComment']) {
+            for ($depth = 0; $depth < $quoteDepth; $depth++) {
+                if (!preg_match('/^>[ \t]?(.*)$/', $content, $matches)) {
+                    $state['inFence'] = false;
+                    $state['inComment'] = false;
+                    $state['paragraphOpen'] = false;
+                    $quoteDepth = 0;
+
+                    break;
+                }
+                $content = $matches[1];
+            }
+        }
+        if (!$state['inFence'] && !$state['inComment']) {
+            $divFence = $divFences !== [] ? $divFences[count($divFences) - 1] : null;
+            if ($divFence !== null && $this->fencedBlockParser->isDivFenceCloser($content, $divFence)) {
+                array_pop($divFences);
+                $state['paragraphOpen'] = false;
+
+                return;
+            }
+            if (!$state['paragraphOpen'] || $this->startsNewBlock($content)) {
+                $divInfo = $this->fencedBlockParser->parseDivFenceOpener($content);
+                if ($divInfo !== null) {
+                    $divFences[] = $divInfo['length'];
+                    $state['paragraphOpen'] = false;
+
+                    return;
+                }
+                // These blocks contain no paragraph for an unindented line to extend.
+                if (
+                    $this->tableParser->isTableRow($content)
+                    || preg_match('/^(?:[-*][ \t]*){3,}$/', $content)
+                    || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $content)
+                ) {
+                    $state['paragraphOpen'] = false;
+
+                    return;
+                }
+                if (str_starts_with($content, '{')) {
+                    $attrEnd = AttributeParser::findEnd($content);
+                    if (
+                        $attrEnd !== null && trim(substr($content, $attrEnd + 1)) === ''
+                        && AttributeParser::isValid(substr($content, 1, $attrEnd - 1))
+                    ) {
+                        $state['paragraphOpen'] = false;
+
+                        return;
+                    }
+                }
+                if (preg_match('/^>[ \t]?(.*)$/', $content, $matches)) {
+                    $this->trackDefinitionLazyState($matches[1], $state, $divFences, $quoteDepth);
+                    if ($state['inFence'] || $state['inComment']) {
+                        $quoteDepth++;
+                    }
+
+                    return;
+                }
+                $marker = $this->listParser->parseListItemMarker($content);
+                if ($marker !== null) {
+                    $this->trackDefinitionLazyState($marker['content'], $state, $divFences, $quoteDepth);
+
+                    return;
+                }
+            }
+        }
+        $this->trackBlockQuoteLazyState($content, $state);
+        if (!$state['inFence'] && !$state['inComment']) {
+            $quoteDepth = 0;
+        }
     }
 
     /**
@@ -2273,16 +2207,43 @@ class BlockParser
                 $markerWidth = 2;
             }
             $contentIndent = $baseIndent + $markerWidth;
+            $itemState = [
+                'inFence' => false,
+                'fenceChar' => '',
+                'fenceLength' => 0,
+                'inComment' => false,
+                'commentLength' => 0,
+                'paragraphOpen' => false,
+            ];
+            $itemDivFences = [];
+            $itemQuoteDepth = 0;
+            $this->trackDefinitionLazyState($itemContent, $itemState, $itemDivFences, $itemQuoteDepth);
 
             while ($i < $count) {
                 $nextLine = $lines[$i];
 
                 if (IndentationHelper::isBlankLine($nextLine)) {
-                    break;
+                    if (!$itemState['inFence'] && !$itemState['inComment'] && $itemDivFences === []) {
+                        break;
+                    }
+                    $itemLines[] = '';
+                    $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
+                    $this->trackDefinitionLazyState('', $itemState, $itemDivFences, $itemQuoteDepth);
+                    $hasNonMarkerContinuation = true;
+                    $i++;
+
+                    continue;
                 }
 
                 $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
                 $nextTrimmed = ltrim($nextLine);
+                if (
+                    $nextIndent <= $baseIndent
+                    && (!$itemState['paragraphOpen']
+                        || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $nextLine))
+                ) {
+                    break;
+                }
 
                 // Check if next line starts a new list item at same level (base indent)
                 if ($nextIndent === $baseIndent) {
@@ -2304,8 +2265,9 @@ class BlockParser
 
                 // Check for list item attributes (must be at content indent, be a standalone attribute block)
                 if (
-                    $nextIndent >= $contentIndent &&
-                    preg_match('/^\{([^{}]+)\}\s*$/', $nextTrimmed, $attrMatch)
+                    !$itemState['inFence'] && !$itemState['inComment']
+                    && $nextIndent >= $contentIndent
+                    && preg_match('/^\{([^{}]+)\}\s*$/', $nextTrimmed, $attrMatch)
                 ) {
                     // This is a list item attribute line - don't add to content
                     break;
@@ -2318,20 +2280,31 @@ class BlockParser
                 if ($nextIndent >= $contentIndent) {
                     // If the active list-nesting mode treats this indented line
                     // as a nested block, break out so normal nesting handles it.
-                    if ($this->allowsImmediateNestedBlock($nextTrimmed, $lines, $i)) {
+                    if (
+                        !$itemState['inFence'] && !$itemState['inComment'] && $itemDivFences === []
+                        && $this->allowsImmediateNestedBlock($nextTrimmed, $lines, $i)
+                    ) {
                         break;
                     }
                     // Text continuation of the item (not a nested block, which
                     // breaks out above): strip all leading whitespace. Indentation
                     // beyond the content column is not significant for plain text,
                     // matching the reference implementation.
-                    $itemLines[] = $nextTrimmed;
+                    $itemLines[] = $itemState['inFence'] || $itemState['inComment'] || $itemDivFences !== []
+                        ? IndentationHelper::stripLeadingIndent($nextLine, $contentIndent)
+                        : $nextTrimmed;
                     $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
                 } else {
                     // Lazy continuation (not properly indented but not at base level either)
                     $itemLines[] = $nextTrimmed;
                     $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
                 }
+                $this->trackDefinitionLazyState(
+                    $itemLines[count($itemLines) - 1],
+                    $itemState,
+                    $itemDivFences,
+                    $itemQuoteDepth,
+                );
                 $hasNonMarkerContinuation = true;
                 $i++;
             }
@@ -2560,7 +2533,10 @@ class BlockParser
             // still allowing blockquotes, code blocks, etc. to be properly recognized.
             if ($hasNonMarkerContinuation) {
                 $firstLine = $itemLines[0];
-                if ($parseItemLinesAsBlocks || $this->isBlockElementStart($firstLine)) {
+                if (
+                    $parseItemLinesAsBlocks || $this->isBlockElementStart($firstLine)
+                    || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $firstLine)
+                ) {
                     // Content starts with a block element (blockquote, code fence,
                     // etc.) or we pushed a {...} back into itemLines that must be
                     // recognized as a block attribute for the next block.
@@ -2823,10 +2799,25 @@ class BlockParser
                 $defLineMap[] = $lastTerm === false ? -1 : $lastTerm['sourceLine'];
             }
 
+            $lazyState = [
+                'inFence' => false,
+                'fenceChar' => '',
+                'fenceLength' => 0,
+                'inComment' => false,
+                'commentLength' => 0,
+                'paragraphOpen' => false,
+            ];
+            if ($codeFenceInfo !== null) {
+                $this->trackBlockQuoteLazyState($codeFenceInfo, $lazyState);
+            }
+            $divFences = [];
+            $quoteDepth = 0;
+
             while ($i < $count) {
                 $defLine = $lines[$i];
 
                 if (IndentationHelper::isBlankLine($defLine)) {
+                    $lazyState['paragraphOpen'] = false;
                     $defLines[] = '';
                     $defLineMap[] = $this->sourceLineFor($lineMap, $i);
                     $i++;
@@ -2836,6 +2827,7 @@ class BlockParser
 
                 // Check for continuation marker `: +` - creates new dd for same term
                 if ($defLine === ': +') {
+                    $lazyState['paragraphOpen'] = false;
                     if ($defLines !== []) {
                         $allDefBlocks[] = ['lines' => $defLines, 'map' => $defLineMap];
                         $defLines = [];
@@ -2853,7 +2845,15 @@ class BlockParser
 
                 // Definition content must be indented by 2 spaces
                 if (preg_match('/^  (.*)$/', $defLine, $defMatch)) {
+                    $this->trackDefinitionLazyState($defMatch[1], $lazyState, $divFences, $quoteDepth);
                     $defLines[] = $defMatch[1];
+                    $defLineMap[] = $this->sourceLineFor($lineMap, $i);
+                    $i++;
+                } elseif (
+                    $lazyState['paragraphOpen'] && !$this->isBlockElementStart($defLine)
+                    && !preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)|^\{/', $defLine)
+                ) {
+                    $defLines[] = $defLine;
                     $defLineMap[] = $this->sourceLineFor($lineMap, $i);
                     $i++;
                 } else {
@@ -3796,7 +3796,7 @@ class BlockParser
      */
     protected function tryParseFootnoteDefinition(array $lines, int $start): ?int
     {
-        $line = $lines[$start];
+        $line = ltrim($lines[$start], " \t");
 
         // Match footnote definition: [^label]: content (requires whitespace after colon)
         if (!preg_match('/^\[\^([^\]]+)\]:(?=[ \t]|$)/', $line)) {
@@ -3825,20 +3825,38 @@ class BlockParser
     }
 
     /**
-     * Skip reference definitions (already extracted in first pass)
+     * @param array<string> $lines
+     * @param int $start
+     * @param int $sourceLine
+     */
+    private function tryParseReferenceDefinitionAtLine(array $lines, int $start, int $sourceLine): ?int
+    {
+        $previousLine = $this->referenceSourceLine;
+        $this->referenceSourceLine = $sourceLine;
+        try {
+            return $this->tryParseReferenceDefinition($lines, $start);
+        } finally {
+            $this->referenceSourceLine = $previousLine;
+        }
+    }
+
+    /**
+     * Collect reference definitions during the block pass.
      *
      * @param array<string> $lines
      * @param int $start
      */
     protected function tryParseReferenceDefinition(array $lines, int $start): ?int
     {
-        $line = $lines[$start];
+        $line = ltrim($lines[$start], " \t");
 
         // Match reference definition: [label]: url
         // URL must be a single non-whitespace token; see extractReferences().
         if (!preg_match('/^\[([^\]]+)\]:(?:[ \t]+(\S*))?[ \t]*$/', $line, $matches)) {
             return null;
         }
+
+        $url = trim($matches[2] ?? '');
 
         // Collect continuation lines
         $i = $start + 1;
@@ -3850,18 +3868,30 @@ class BlockParser
                 break;
             }
             // Check if next line starts a new reference definition
-            if (preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)/', $nextLine)) {
+            if (preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)/', ltrim($nextLine, " \t"))) {
                 break;
             }
             if ($this->startsNewBlock($nextLine)) {
                 break;
             }
             if (preg_match('/^\s+(\S.*)$/', $nextLine, $contMatch)) {
+                $url .= $contMatch[1];
                 $i++;
             } else {
                 break;
             }
         }
+
+        if ($this->collectingReferences) {
+            $label = preg_replace('/\s+/', ' ', trim($matches[1])) ?? '';
+            $this->references[$label] = new ReferenceDefinition(
+                $url,
+                $this->pendingAttributes,
+                $this->referenceSourceLine,
+            );
+        }
+        $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
 
         return $i - $start;
     }
@@ -4436,6 +4466,87 @@ class BlockParser
                     'reference',
                     null,
                 );
+            }
+        }
+    }
+
+    public function defersReferences(): bool
+    {
+        return $this->collectingReferences;
+    }
+
+    public function deferReference(Link $node, string $label, int $line, int $column): void
+    {
+        $this->deferredReferences[spl_object_id($node)] = compact('node', 'label', 'line', 'column');
+    }
+
+    public function transferDeferredReference(Link $link, Image $image): void
+    {
+        $key = spl_object_id($link);
+        if (!isset($this->deferredReferences[$key])) {
+            return;
+        }
+        $reference = $this->deferredReferences[$key];
+        unset($this->deferredReferences[$key]);
+        $reference['node'] = $image;
+        $this->deferredReferences[spl_object_id($image)] = $reference;
+    }
+
+    private function resolveDeferredReferences(bool $final = true): void
+    {
+        foreach ($this->deferredReferences as $key => $reference) {
+            $definition = $this->references[$reference['label']] ?? null;
+            if ($definition === null) {
+                if (!$final) {
+                    continue;
+                }
+                unset($this->deferredReferences[$key]);
+                $this->addUndefinedReferenceWarning(
+                    $reference['label'],
+                    $reference['line'],
+                    $reference['column'],
+                    true,
+                );
+
+                continue;
+            }
+            unset($this->deferredReferences[$key]);
+            $node = $reference['node'];
+            if ($node instanceof Link) {
+                $node->setDestination($definition->url);
+            } else {
+                $node->setSource($definition->url);
+            }
+            $this->markReferenceUsed($reference['label'], $reference['line']);
+            if (preg_match('/^#(.+)$/', $definition->url, $matches)) {
+                $this->trackAnchorLink($matches[1], $reference['line'], $reference['column']);
+            }
+            $attributesByTarget = [];
+            $parent = $node->getParent();
+            foreach ($definition->attributes as $key => $value) {
+                $target = $node instanceof Image && $parent instanceof Figure && !in_array($key, ['src', 'alt', 'title'], true)
+                    ? $parent
+                    : $node;
+                $targetId = spl_object_id($target);
+                $attributesByTarget[$targetId]['node'] = $target;
+                $attributesByTarget[$targetId]['attributes'][$key] = $value;
+            }
+            foreach ($attributesByTarget as $entry) {
+                $target = $entry['node'];
+                $inlineAttributes = $target->getAttributes();
+                foreach ($inlineAttributes as $key => $value) {
+                    $target->removeAttribute($key);
+                }
+                $target->setAttributes($entry['attributes']);
+                foreach ($inlineAttributes as $key => $value) {
+                    if ($key === 'class') {
+                        foreach (preg_split('/\s+/', trim($value)) ?: [] as $class) {
+                            $target->addClass($class);
+                        }
+                    } else {
+                        $target->setAttribute($key, $value);
+                    }
+                }
             }
         }
     }

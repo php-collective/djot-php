@@ -167,7 +167,11 @@ abstract class Node
         }
 
         $child = $this->children[$index];
-        array_splice($this->children, $index, 1);
+        if ($index === array_key_last($this->children)) {
+            array_pop($this->children);
+        } else {
+            array_splice($this->children, $index, 1);
+        }
         $child->parent = null;
 
         return $child;

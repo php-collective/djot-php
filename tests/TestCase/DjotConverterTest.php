@@ -91,10 +91,10 @@ class DjotConverterTest extends TestCase
         $this->assertSame($expected, $this->converter->convert($djot));
     }
 
-    public function testCodeBlockLanguageEscapesQuotesInAttributeContext(): void
+    public function testCodeFenceWithSpacesInLanguageRendersAsInlineCode(): void
     {
         $djot = "``` php\" onclick=\"alert(1)\necho 1;\n```";
-        $expected = "<pre><code class=\"language-php&quot; onclick=&quot;alert(1)\">echo 1;\n</code></pre>\n";
+        $expected = "<p><code> php\" onclick=\"alert(1)\necho 1;\n</code></p>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
     }

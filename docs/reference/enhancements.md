@@ -385,7 +385,7 @@ container.
 
 | Target | Attribute position | Notes |
 |--------|--------------------|-------|
-| Any block (list as a whole, table, fenced div, paragraph, etc.) | `{...}` on the **preceding** line | Standard djot. Applied to the next block. |
+| Any block (list as a whole, table, fenced div, paragraph, etc.) | `{...}` on the **preceding** line | Standard djot. Applied to the next block only when no blank line separates them. |
 | Inline span | `text{...}` **adjacent** (no space) | Standard djot. Adjacency selects the tightest target. |
 | List item `<li>` | `{...}` as the **last content line of the item**, at content indent | djot-php extension. If another block follows the `{...}` in the same item, `{...}` reverts to a preceding block-attribute for that following block. |
 | `<dt>` (term) | `{...}` on the **line after** the term, at content indent | djot-php extension. |

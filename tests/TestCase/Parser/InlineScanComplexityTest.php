@@ -12,11 +12,77 @@ use Djot\Parser\Block\FencedBlockParser;
 use Djot\Parser\BlockParser;
 use Djot\Parser\InlineParser;
 use Djot\Parser\Utility\BacktickRunIndex;
+use Djot\Renderer\HtmlRenderer;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 
 final class InlineScanComplexityTest extends TestCase
 {
+    public function testUnclosedBracedOpenersDoNotStartBareDelimiterScans(): void
+    {
+        foreach (['_', '*', '^', '~'] as $delimiter) {
+            $parser = new class (new BlockParser()) extends InlineParser {
+                public int $delimiterProbes = 0;
+
+                /**
+                 * @return array{node: \Djot\Node\Node, pos: int}|null
+                 */
+                protected function parseDelimited(string $text, int $pos, string $delimiter, string $nodeClass): ?array
+                {
+                    $this->delimiterProbes++;
+
+                    return parent::parseDelimited($text, $pos, $delimiter, $nodeClass);
+                }
+            };
+            $input = str_repeat('{' . $delimiter . 'a', 512);
+            $paragraph = new Paragraph();
+            $parser->parse($paragraph, $input);
+            self::assertSame('<p>' . $input . "</p>\n", (new HtmlRenderer())->renderNodeFragment($paragraph));
+            self::assertSame(0, $parser->delimiterProbes);
+        }
+    }
+
+    public function testFailedOpenersAreCachedWhenLaterOpenersInTheRunMatch(): void
+    {
+        foreach (['*' => 'strong', '_' => 'em'] as $delimiter => $tag) {
+            $parser = new class (new BlockParser()) extends InlineParser {
+                public int $codeProbes = 0;
+
+                protected function findCodeSpanEnd(string $text, int $pos): ?int
+                {
+                    $this->codeProbes++;
+
+                    return parent::findCodeSpanEnd($text, $pos);
+                }
+            };
+            $input = str_repeat($delimiter . $delimiter . 'a' . $delimiter . ' `code` ', 512);
+            $expected = str_repeat($delimiter . '<' . $tag . '>a</' . $tag . '> <code>code</code> ', 512);
+            $paragraph = new Paragraph();
+            $parser->parse($paragraph, rtrim($input));
+            self::assertSame('<p>' . rtrim($expected) . "</p>\n", (new HtmlRenderer())->renderNodeFragment($paragraph));
+            self::assertLessThanOrEqual(512, $parser->codeProbes);
+        }
+    }
+
+    public function testUnmatchedOpenerCachePreservesNestedMatchesAndParserReuse(): void
+    {
+        $converter = DjotConverter::create();
+        self::assertSame("<p>*<strong>a</strong> *<strong>b</strong></p>\n", $converter->convert('**a* **b*'));
+        self::assertSame("<p>_<em>a</em> _<em>b</em></p>\n", $converter->convert('__a_ __b_'));
+        self::assertSame("<p>**<strong>a</strong> *<strong>b</strong></p>\n", $converter->convert('***a* **b*'));
+        self::assertSame("<p><strong><strong>a</strong></strong></p>\n", $converter->convert('**a**'));
+        self::assertSame("<p><em><em>b</em></em></p>\n", $converter->convert('__b__'));
+    }
+
+    public function testClosingRunsPreserveSurplusDelimitersAndBracedClosers(): void
+    {
+        $converter = DjotConverter::create();
+        self::assertSame("<p><strong><strong>a</strong></strong>*</p>\n", $converter->convert('**a***'));
+        self::assertSame("<p>**<strong>a</strong>*}</p>\n", $converter->convert('***a**}'));
+        self::assertSame("<p><strong><strong>a</strong>b</strong>*</p>\n", $converter->convert('**a*b**'));
+        self::assertSame("<p><strong><strong>a<code>*</code></strong></strong></p>\n", $converter->convert('**a`*`**'));
+    }
+
     public function testFailedEmphasisScansVisitOpaqueSpansOnce(): void
     {
         $parser = new class (new BlockParser()) extends InlineParser {
@@ -215,8 +281,8 @@ final class InlineScanComplexityTest extends TestCase
     {
         $converter = DjotConverter::create();
         self::assertSame("<p>{a }</p>\n", $converter->convert('{a {a }}'));
-        self::assertSame("<p><span a=\"\">word</span></p>\n", $converter->convert('word{a % {nested} %}'));
-        self::assertSame("<p><span>word</span></p>\n", $converter->convert('word{a="{%}"}'));
+        self::assertSame("<p><span a=\"\">word</span> %}</p>\n", $converter->convert('word{a % {nested} %}'));
+        self::assertSame("<p><span a=\"{%}\">word</span></p>\n", $converter->convert('word{a="{%}"}'));
         self::assertStringContainsString('<span a="">x</span>', $converter->convert(str_repeat('[x]{a ', 512) . str_repeat('}', 512)));
     }
 

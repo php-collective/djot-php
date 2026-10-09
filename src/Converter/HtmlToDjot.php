@@ -1863,7 +1863,7 @@ class HtmlToDjot
     {
         // Definition list level attributes
         $dlAttrs = $this->formatBlockAttributes($node);
-        $output = $dlAttrs . "\n";
+        $output = $dlAttrs !== '' ? $dlAttrs : "\n";
         $lastWasTerm = false;
         $ddCount = 0;
 

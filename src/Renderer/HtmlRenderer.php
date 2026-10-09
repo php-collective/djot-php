@@ -1612,11 +1612,17 @@ class HtmlRenderer implements RendererInterface
     {
         $content = $this->escape($node->getContent());
 
-        if ($node->isDisplay()) {
-            return '<span class="math display">\\[' . $content . '\\]</span>';
+        $attrs = $this->getRenderableAttributes($node);
+        $class = 'math ' . ($node->isDisplay() ? 'display' : 'inline');
+        if (isset($attrs['class']) && $attrs['class'] !== '') {
+            $class .= ' ' . $attrs['class'];
         }
+        unset($attrs['class']);
+        $attributes = $this->renderAttributeArray(['class' => $class] + $attrs);
+        $open = $node->isDisplay() ? '\\[' : '\\(';
+        $close = $node->isDisplay() ? '\\]' : '\\)';
 
-        return '<span class="math inline">\\(' . $content . '\\)</span>';
+        return '<span' . $attributes . '>' . $open . $content . $close . '</span>';
     }
 
     protected function renderSymbol(Symbol $node): string

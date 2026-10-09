@@ -14,6 +14,51 @@ use Djot\Node\Node;
 class AttributeParser
 {
     /**
+     * Find a closing attribute brace outside quoted values and escapes.
+     */
+    public static function findEnd(string $text, int $start = 0): ?int
+    {
+        if (strpos($text, '}', $start + 1) === false) {
+            return null;
+        }
+
+        $quote = null;
+        $comment = false;
+        $length = strlen($text);
+        for ($i = $start + 1; $i < $length; $i++) {
+            $char = $text[$i];
+            if ($comment) {
+                if ($char === '}') {
+                    return $i;
+                }
+                if ($char === '%') {
+                    $comment = false;
+                }
+
+                continue;
+            }
+            if ($char === '\\') {
+                $i++;
+
+                continue;
+            }
+            if ($quote !== null) {
+                if ($char === $quote) {
+                    $quote = null;
+                }
+            } elseif ($char === '"' || $char === "'") {
+                $quote = $char;
+            } elseif ($char === '%') {
+                $comment = true;
+            } elseif ($char === '}') {
+                return $i;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Parse attribute string and return as array
      *
      * Supports:
@@ -354,12 +399,11 @@ class AttributeParser
      * Comments are only recognized outside of quoted strings.
      * For example, title="100% done" keeps the % as part of the value.
      */
-    protected static function removeComments(string $attrStr): string
+    public static function removeComments(string $attrStr): string
     {
         $result = '';
         $length = strlen($attrStr);
         $i = 0;
-        $inComment = false;
 
         while ($i < $length) {
             $char = $attrStr[$i];
@@ -392,37 +436,18 @@ class AttributeParser
                 continue;
             }
 
-            // Handle comments (only outside quotes)
+            // Quotes and braces inside a comment have no special meaning.
             if ($char === '%') {
-                if ($inComment) {
-                    // End of inline comment
-                    $inComment = false;
-                    $i++;
-
-                    continue;
-                }
-
-                // Check if this is start of inline comment (has closing %)
                 $closePos = strpos($attrStr, '%', $i + 1);
-                if ($closePos !== false) {
-                    // Check if there's a quote before the closing % (would mean % is in a value)
-                    $inlineContent = substr($attrStr, $i + 1, $closePos - $i - 1);
-                    if (strpos($inlineContent, '"') === false && strpos($inlineContent, "'") === false) {
-                        // Inline comment - skip to closing %
-                        $inComment = true;
-                        $i++;
-
-                        continue;
-                    }
+                if ($closePos === false) {
+                    break;
                 }
+                $i = $closePos + 1;
 
-                // Trailing comment - skip rest of string
-                break;
+                continue;
             }
 
-            if (!$inComment) {
-                $result .= $char;
-            }
+            $result .= $char;
             $i++;
         }
 

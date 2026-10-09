@@ -1,0 +1,2297 @@
+[
+  {
+    "id": "delimiters-001",
+    "source": "text __{ a}\n",
+    "html": "<p>text __{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-002",
+    "source": "text __ {}\\\n",
+    "html": "<p>text __ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-003",
+    "source": "text _{{ a}\n",
+    "html": "<p>text _{{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-004",
+    "source": "text _{ {}\\\n",
+    "html": "<p>text _{ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-005",
+    "source": "text _{ a}\n",
+    "html": "<p>text _{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-006",
+    "source": "text _{ a}_\n",
+    "html": "<p>text <em>{ a}</em></p>\n"
+  },
+  {
+    "id": "delimiters-007",
+    "source": "text _{ a}{\n",
+    "html": "<p>text _{ a}{</p>\n"
+  },
+  {
+    "id": "delimiters-008",
+    "source": "text _{ a}}\n",
+    "html": "<p>text _{ a}}</p>\n"
+  },
+  {
+    "id": "delimiters-009",
+    "source": "text _{ a}\\\n",
+    "html": "<p>text _{ a}<br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-010",
+    "source": "text _{ a}a\n",
+    "html": "<p>text _{ a}a</p>\n"
+  },
+  {
+    "id": "delimiters-011",
+    "source": "text _{ a} \n",
+    "html": "<p>text _{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-012",
+    "source": "text _{ aa}\n",
+    "html": "<p>text _{ aa}</p>\n"
+  },
+  {
+    "id": "delimiters-013",
+    "source": "text _{ a }\n",
+    "html": "<p>text _{ a }</p>\n"
+  },
+  {
+    "id": "delimiters-014",
+    "source": "text _{  a}\n",
+    "html": "<p>text _{  a}</p>\n"
+  },
+  {
+    "id": "delimiters-015",
+    "source": "text _}{ a}\n",
+    "html": "<p>text _}{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-016",
+    "source": "text _} {}\\\n",
+    "html": "<p>text _} <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-017",
+    "source": "text _a{ a}\n",
+    "html": "<p>text _a{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-018",
+    "source": "text _a {}\\\n",
+    "html": "<p>text _a <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-019",
+    "source": "text _ {}\\\n",
+    "html": "<p>text _ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-020",
+    "source": "text _ { a}\n",
+    "html": "<p>text _ { a}</p>\n"
+  },
+  {
+    "id": "delimiters-021",
+    "source": "text _  {}\\\n",
+    "html": "<p>text _  <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-022",
+    "source": "text {_{ a}\n",
+    "html": "<p>text {_{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-023",
+    "source": "text {_ {}\\\n",
+    "html": "<p>text {_ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-024",
+    "source": "text {{ a_}\n",
+    "html": "<p>text {{ a_}</p>\n"
+  },
+  {
+    "id": "delimiters-025",
+    "source": "text {{ a}_\n",
+    "html": "<p>text {{ a}_</p>\n"
+  },
+  {
+    "id": "delimiters-026",
+    "source": "text { a__}\n",
+    "html": "<p>text { a__}</p>\n"
+  },
+  {
+    "id": "delimiters-027",
+    "source": "text { a_}\n",
+    "html": "<p>text { a_}</p>\n"
+  },
+  {
+    "id": "delimiters-028",
+    "source": "text { a_}{\n",
+    "html": "<p>text { a_}{</p>\n"
+  },
+  {
+    "id": "delimiters-029",
+    "source": "text { a_}}\n",
+    "html": "<p>text { a_}}</p>\n"
+  },
+  {
+    "id": "delimiters-030",
+    "source": "text { a_}\\\n",
+    "html": "<p>text { a_}<br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-031",
+    "source": "text { a_}a\n",
+    "html": "<p>text { a_}a</p>\n"
+  },
+  {
+    "id": "delimiters-032",
+    "source": "text { a_} \n",
+    "html": "<p>text { a_}</p>\n"
+  },
+  {
+    "id": "delimiters-033",
+    "source": "text { a_a}\n",
+    "html": "<p>text { a_a}</p>\n"
+  },
+  {
+    "id": "delimiters-034",
+    "source": "text { a_ }\n",
+    "html": "<p>text { a_ }</p>\n"
+  },
+  {
+    "id": "delimiters-035",
+    "source": "text { a}_\n",
+    "html": "<p>text { a}_</p>\n"
+  },
+  {
+    "id": "delimiters-036",
+    "source": "text { a}__\n",
+    "html": "<p>text { a}__</p>\n"
+  },
+  {
+    "id": "delimiters-037",
+    "source": "text { a}_{\n",
+    "html": "<p>text { a}_{</p>\n"
+  },
+  {
+    "id": "delimiters-038",
+    "source": "text { a}_}\n",
+    "html": "<p>text { a}_}</p>\n"
+  },
+  {
+    "id": "delimiters-039",
+    "source": "text { a}_\\\n",
+    "html": "<p>text { a}_<br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-040",
+    "source": "text { a}_a\n",
+    "html": "<p>text { a}_a</p>\n"
+  },
+  {
+    "id": "delimiters-041",
+    "source": "text { a}_ \n",
+    "html": "<p>text { a}_</p>\n"
+  },
+  {
+    "id": "delimiters-042",
+    "source": "text { a}{_\n",
+    "html": "<p>text { a}{_</p>\n"
+  },
+  {
+    "id": "delimiters-043",
+    "source": "text { a}}_\n",
+    "html": "<p>text { a}}_</p>\n"
+  },
+  {
+    "id": "delimiters-044",
+    "source": "text { a}\\_\n",
+    "html": "<p>text { a}_</p>\n"
+  },
+  {
+    "id": "delimiters-045",
+    "source": "text { a}a_\n",
+    "html": "<p>text { a}a_</p>\n"
+  },
+  {
+    "id": "delimiters-046",
+    "source": "text { a} _\n",
+    "html": "<p>text { a} _</p>\n"
+  },
+  {
+    "id": "delimiters-047",
+    "source": "text { aa_}\n",
+    "html": "<p>text { aa_}</p>\n"
+  },
+  {
+    "id": "delimiters-048",
+    "source": "text { aa}_\n",
+    "html": "<p>text { aa}_</p>\n"
+  },
+  {
+    "id": "delimiters-049",
+    "source": "text { a }_\n",
+    "html": "<p>text { a }_</p>\n"
+  },
+  {
+    "id": "delimiters-050",
+    "source": "text {  a_}\n",
+    "html": "<p>text {  a_}</p>\n"
+  },
+  {
+    "id": "delimiters-051",
+    "source": "text {  a}_\n",
+    "html": "<p>text {  a}_</p>\n"
+  },
+  {
+    "id": "delimiters-052",
+    "source": "text }_{ a}\n",
+    "html": "<p>text }_{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-053",
+    "source": "text }_ {}\\\n",
+    "html": "<p>text }_ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-054",
+    "source": "text }{ a_}\n",
+    "html": "<p>text }{ a_}</p>\n"
+  },
+  {
+    "id": "delimiters-055",
+    "source": "text }{ a}_\n",
+    "html": "<p>text }{ a}_</p>\n"
+  },
+  {
+    "id": "delimiters-056",
+    "source": "text \\_{ a}\n",
+    "html": "<p>text _{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-057",
+    "source": "text \\_ {}\\\n",
+    "html": "<p>text _ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-058",
+    "source": "text a_{ a}\n",
+    "html": "<p>text a_{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-059",
+    "source": "text a_ {}\\\n",
+    "html": "<p>text a_ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-060",
+    "source": "text a{ a_}\n",
+    "html": "<p>text a{ a_}</p>\n"
+  },
+  {
+    "id": "delimiters-061",
+    "source": "text a{ a}_\n",
+    "html": "<p>text a{ a}_</p>\n"
+  },
+  {
+    "id": "delimiters-062",
+    "source": "text  _{ a}\n",
+    "html": "<p>text  _{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-063",
+    "source": "text  _ {}\\\n",
+    "html": "<p>text  _ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-064",
+    "source": "text  { a_}\n",
+    "html": "<p>text  { a_}</p>\n"
+  },
+  {
+    "id": "delimiters-065",
+    "source": "text  { a}_\n",
+    "html": "<p>text  { a}_</p>\n"
+  },
+  {
+    "id": "delimiters-066",
+    "source": "text **{ a}\n",
+    "html": "<p>text **{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-067",
+    "source": "text ** {}\\\n",
+    "html": "<p>text ** <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-068",
+    "source": "text *{{ a}\n",
+    "html": "<p>text *{{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-069",
+    "source": "text *{ {}\\\n",
+    "html": "<p>text *{ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-070",
+    "source": "text *{ a}\n",
+    "html": "<p>text *{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-071",
+    "source": "text *{ a}*\n",
+    "html": "<p>text <strong>{ a}</strong></p>\n"
+  },
+  {
+    "id": "delimiters-072",
+    "source": "text *{ a}{\n",
+    "html": "<p>text *{ a}{</p>\n"
+  },
+  {
+    "id": "delimiters-073",
+    "source": "text *{ a}}\n",
+    "html": "<p>text *{ a}}</p>\n"
+  },
+  {
+    "id": "delimiters-074",
+    "source": "text *{ a}\\\n",
+    "html": "<p>text *{ a}<br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-075",
+    "source": "text *{ a}a\n",
+    "html": "<p>text *{ a}a</p>\n"
+  },
+  {
+    "id": "delimiters-076",
+    "source": "text *{ a} \n",
+    "html": "<p>text *{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-077",
+    "source": "text *{ aa}\n",
+    "html": "<p>text *{ aa}</p>\n"
+  },
+  {
+    "id": "delimiters-078",
+    "source": "text *{ a }\n",
+    "html": "<p>text *{ a }</p>\n"
+  },
+  {
+    "id": "delimiters-079",
+    "source": "text *{  a}\n",
+    "html": "<p>text *{  a}</p>\n"
+  },
+  {
+    "id": "delimiters-080",
+    "source": "text *}{ a}\n",
+    "html": "<p>text *}{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-081",
+    "source": "text *} {}\\\n",
+    "html": "<p>text *} <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-082",
+    "source": "text *a{ a}\n",
+    "html": "<p>text *a{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-083",
+    "source": "text *a {}\\\n",
+    "html": "<p>text *a <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-084",
+    "source": "text * {}\\\n",
+    "html": "<p>text * <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-085",
+    "source": "text * { a}\n",
+    "html": "<p>text * { a}</p>\n"
+  },
+  {
+    "id": "delimiters-086",
+    "source": "text *  {}\\\n",
+    "html": "<p>text *  <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-087",
+    "source": "text {*{ a}\n",
+    "html": "<p>text {*{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-088",
+    "source": "text {* {}\\\n",
+    "html": "<p>text {* <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-089",
+    "source": "text {{ a}*\n",
+    "html": "<p>text {{ a}*</p>\n"
+  },
+  {
+    "id": "delimiters-090",
+    "source": "text { a}*\n",
+    "html": "<p>text { a}*</p>\n"
+  },
+  {
+    "id": "delimiters-091",
+    "source": "text { a}**\n",
+    "html": "<p>text { a}**</p>\n"
+  },
+  {
+    "id": "delimiters-092",
+    "source": "text { a}*{\n",
+    "html": "<p>text { a}*{</p>\n"
+  },
+  {
+    "id": "delimiters-093",
+    "source": "text { a}*}\n",
+    "html": "<p>text { a}*}</p>\n"
+  },
+  {
+    "id": "delimiters-094",
+    "source": "text { a}*\\\n",
+    "html": "<p>text { a}*<br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-095",
+    "source": "text { a}*a\n",
+    "html": "<p>text { a}*a</p>\n"
+  },
+  {
+    "id": "delimiters-096",
+    "source": "text { a}* \n",
+    "html": "<p>text { a}*</p>\n"
+  },
+  {
+    "id": "delimiters-097",
+    "source": "text { a}{*\n",
+    "html": "<p>text { a}{*</p>\n"
+  },
+  {
+    "id": "delimiters-098",
+    "source": "text { a}}*\n",
+    "html": "<p>text { a}}*</p>\n"
+  },
+  {
+    "id": "delimiters-099",
+    "source": "text { a}\\*\n",
+    "html": "<p>text { a}*</p>\n"
+  },
+  {
+    "id": "delimiters-100",
+    "source": "text { a}a*\n",
+    "html": "<p>text { a}a*</p>\n"
+  },
+  {
+    "id": "delimiters-101",
+    "source": "text { a} *\n",
+    "html": "<p>text { a} *</p>\n"
+  },
+  {
+    "id": "delimiters-102",
+    "source": "text { aa}*\n",
+    "html": "<p>text { aa}*</p>\n"
+  },
+  {
+    "id": "delimiters-103",
+    "source": "text { a }*\n",
+    "html": "<p>text { a }*</p>\n"
+  },
+  {
+    "id": "delimiters-104",
+    "source": "text {  a}*\n",
+    "html": "<p>text {  a}*</p>\n"
+  },
+  {
+    "id": "delimiters-105",
+    "source": "text }*{ a}\n",
+    "html": "<p>text }*{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-106",
+    "source": "text }* {}\\\n",
+    "html": "<p>text }* <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-107",
+    "source": "text }{ a}*\n",
+    "html": "<p>text }{ a}*</p>\n"
+  },
+  {
+    "id": "delimiters-108",
+    "source": "text \\*{ a}\n",
+    "html": "<p>text *{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-109",
+    "source": "text \\* {}\\\n",
+    "html": "<p>text * <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-110",
+    "source": "text a*{ a}\n",
+    "html": "<p>text a*{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-111",
+    "source": "text a* {}\\\n",
+    "html": "<p>text a* <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-112",
+    "source": "text a{ a}*\n",
+    "html": "<p>text a{ a}*</p>\n"
+  },
+  {
+    "id": "delimiters-113",
+    "source": "text  *{ a}\n",
+    "html": "<p>text  *{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-114",
+    "source": "text  * {}\\\n",
+    "html": "<p>text  * <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-115",
+    "source": "text  { a}*\n",
+    "html": "<p>text  { a}*</p>\n"
+  },
+  {
+    "id": "delimiters-116",
+    "source": "text ^^{ a}\n",
+    "html": "<p>text ^^{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-117",
+    "source": "text ^^ {}\\\n",
+    "html": "<p>text ^^ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-118",
+    "source": "text ^{{ a}\n",
+    "html": "<p>text ^{{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-119",
+    "source": "text ^{ {}\\\n",
+    "html": "<p>text ^{ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-120",
+    "source": "text ^{ a}\n",
+    "html": "<p>text ^{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-121",
+    "source": "text ^{ a}^\n",
+    "html": "<p>text <sup>{ a}</sup></p>\n"
+  },
+  {
+    "id": "delimiters-122",
+    "source": "text ^{ a}{\n",
+    "html": "<p>text ^{ a}{</p>\n"
+  },
+  {
+    "id": "delimiters-123",
+    "source": "text ^{ a}}\n",
+    "html": "<p>text ^{ a}}</p>\n"
+  },
+  {
+    "id": "delimiters-124",
+    "source": "text ^{ a}\\\n",
+    "html": "<p>text ^{ a}<br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-125",
+    "source": "text ^{ a}a\n",
+    "html": "<p>text ^{ a}a</p>\n"
+  },
+  {
+    "id": "delimiters-126",
+    "source": "text ^{ a} \n",
+    "html": "<p>text ^{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-127",
+    "source": "text ^{ aa}\n",
+    "html": "<p>text ^{ aa}</p>\n"
+  },
+  {
+    "id": "delimiters-128",
+    "source": "text ^{ a }\n",
+    "html": "<p>text ^{ a }</p>\n"
+  },
+  {
+    "id": "delimiters-129",
+    "source": "text ^{  a}\n",
+    "html": "<p>text ^{  a}</p>\n"
+  },
+  {
+    "id": "delimiters-130",
+    "source": "text ^}{ a}\n",
+    "html": "<p>text ^}{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-131",
+    "source": "text ^} {}\\\n",
+    "html": "<p>text ^} <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-132",
+    "source": "text ^a{ a}\n",
+    "html": "<p>text ^a{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-133",
+    "source": "text ^a {}\\\n",
+    "html": "<p>text ^a <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-134",
+    "source": "text ^ {}\\\n",
+    "html": "<p>text ^ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-135",
+    "source": "text ^ { a}\n",
+    "html": "<p>text ^ { a}</p>\n"
+  },
+  {
+    "id": "delimiters-136",
+    "source": "text ^  {}\\\n",
+    "html": "<p>text ^  <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-137",
+    "source": "text {^{ a}\n",
+    "html": "<p>text {^{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-138",
+    "source": "text {^ {}\\\n",
+    "html": "<p>text {^ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-139",
+    "source": "text {{ a}^\n",
+    "html": "<p>text {{ a}^</p>\n"
+  },
+  {
+    "id": "delimiters-140",
+    "source": "text { a}^\n",
+    "html": "<p>text { a}^</p>\n"
+  },
+  {
+    "id": "delimiters-141",
+    "source": "text { a}^^\n",
+    "html": "<p>text { a}^^</p>\n"
+  },
+  {
+    "id": "delimiters-142",
+    "source": "text { a}^{\n",
+    "html": "<p>text { a}^{</p>\n"
+  },
+  {
+    "id": "delimiters-143",
+    "source": "text { a}^}\n",
+    "html": "<p>text { a}^}</p>\n"
+  },
+  {
+    "id": "delimiters-144",
+    "source": "text { a}^\\\n",
+    "html": "<p>text { a}^<br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-145",
+    "source": "text { a}^a\n",
+    "html": "<p>text { a}^a</p>\n"
+  },
+  {
+    "id": "delimiters-146",
+    "source": "text { a}^ \n",
+    "html": "<p>text { a}^</p>\n"
+  },
+  {
+    "id": "delimiters-147",
+    "source": "text { a}{^\n",
+    "html": "<p>text { a}{^</p>\n"
+  },
+  {
+    "id": "delimiters-148",
+    "source": "text { a}}^\n",
+    "html": "<p>text { a}}^</p>\n"
+  },
+  {
+    "id": "delimiters-149",
+    "source": "text { a}\\^\n",
+    "html": "<p>text { a}^</p>\n"
+  },
+  {
+    "id": "delimiters-150",
+    "source": "text { a}a^\n",
+    "html": "<p>text { a}a^</p>\n"
+  },
+  {
+    "id": "delimiters-151",
+    "source": "text { a} ^\n",
+    "html": "<p>text { a} ^</p>\n"
+  },
+  {
+    "id": "delimiters-152",
+    "source": "text { aa}^\n",
+    "html": "<p>text { aa}^</p>\n"
+  },
+  {
+    "id": "delimiters-153",
+    "source": "text { a }^\n",
+    "html": "<p>text { a }^</p>\n"
+  },
+  {
+    "id": "delimiters-154",
+    "source": "text {  a}^\n",
+    "html": "<p>text {  a}^</p>\n"
+  },
+  {
+    "id": "delimiters-155",
+    "source": "text }^{ a}\n",
+    "html": "<p>text }^{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-156",
+    "source": "text }^ {}\\\n",
+    "html": "<p>text }^ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-157",
+    "source": "text }{ a}^\n",
+    "html": "<p>text }{ a}^</p>\n"
+  },
+  {
+    "id": "delimiters-158",
+    "source": "text \\^{ a}\n",
+    "html": "<p>text ^{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-159",
+    "source": "text \\^ {}\\\n",
+    "html": "<p>text ^ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-160",
+    "source": "text a^{ a}\n",
+    "html": "<p>text a^{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-161",
+    "source": "text a^ {}\\\n",
+    "html": "<p>text a^ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-162",
+    "source": "text a{ a}^\n",
+    "html": "<p>text a{ a}^</p>\n"
+  },
+  {
+    "id": "delimiters-163",
+    "source": "text  ^{ a}\n",
+    "html": "<p>text  ^{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-164",
+    "source": "text  ^ {}\\\n",
+    "html": "<p>text  ^ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-165",
+    "source": "text  { a}^\n",
+    "html": "<p>text  { a}^</p>\n"
+  },
+  {
+    "id": "delimiters-166",
+    "source": "text ~~{ a}\n",
+    "html": "<p>text ~~{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-167",
+    "source": "text ~~ {}\\\n",
+    "html": "<p>text ~~ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-168",
+    "source": "text ~{{ a}\n",
+    "html": "<p>text ~{{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-169",
+    "source": "text ~{ {}\\\n",
+    "html": "<p>text ~{ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-170",
+    "source": "text ~{ a}\n",
+    "html": "<p>text ~{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-171",
+    "source": "text ~{ a}~\n",
+    "html": "<p>text <sub>{ a}</sub></p>\n"
+  },
+  {
+    "id": "delimiters-172",
+    "source": "text ~{ a}{\n",
+    "html": "<p>text ~{ a}{</p>\n"
+  },
+  {
+    "id": "delimiters-173",
+    "source": "text ~{ a}}\n",
+    "html": "<p>text ~{ a}}</p>\n"
+  },
+  {
+    "id": "delimiters-174",
+    "source": "text ~{ a}\\\n",
+    "html": "<p>text ~{ a}<br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-175",
+    "source": "text ~{ a}a\n",
+    "html": "<p>text ~{ a}a</p>\n"
+  },
+  {
+    "id": "delimiters-176",
+    "source": "text ~{ a} \n",
+    "html": "<p>text ~{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-177",
+    "source": "text ~{ aa}\n",
+    "html": "<p>text ~{ aa}</p>\n"
+  },
+  {
+    "id": "delimiters-178",
+    "source": "text ~{ a }\n",
+    "html": "<p>text ~{ a }</p>\n"
+  },
+  {
+    "id": "delimiters-179",
+    "source": "text ~{  a}\n",
+    "html": "<p>text ~{  a}</p>\n"
+  },
+  {
+    "id": "delimiters-180",
+    "source": "text ~}{ a}\n",
+    "html": "<p>text ~}{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-181",
+    "source": "text ~} {}\\\n",
+    "html": "<p>text ~} <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-182",
+    "source": "text ~a{ a}\n",
+    "html": "<p>text ~a{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-183",
+    "source": "text ~a {}\\\n",
+    "html": "<p>text ~a <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-184",
+    "source": "text ~ {}\\\n",
+    "html": "<p>text ~ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-185",
+    "source": "text ~ { a}\n",
+    "html": "<p>text ~ { a}</p>\n"
+  },
+  {
+    "id": "delimiters-186",
+    "source": "text ~  {}\\\n",
+    "html": "<p>text ~  <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-187",
+    "source": "text {~{ a}\n",
+    "html": "<p>text {~{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-188",
+    "source": "text {~ {}\\\n",
+    "html": "<p>text {~ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-189",
+    "source": "text {{ a}~\n",
+    "html": "<p>text {{ a}~</p>\n"
+  },
+  {
+    "id": "delimiters-190",
+    "source": "text { a}~\n",
+    "html": "<p>text { a}~</p>\n"
+  },
+  {
+    "id": "delimiters-191",
+    "source": "text { a}~~\n",
+    "html": "<p>text { a}~~</p>\n"
+  },
+  {
+    "id": "delimiters-192",
+    "source": "text { a}~{\n",
+    "html": "<p>text { a}~{</p>\n"
+  },
+  {
+    "id": "delimiters-193",
+    "source": "text { a}~}\n",
+    "html": "<p>text { a}~}</p>\n"
+  },
+  {
+    "id": "delimiters-194",
+    "source": "text { a}~\\\n",
+    "html": "<p>text { a}~<br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-195",
+    "source": "text { a}~a\n",
+    "html": "<p>text { a}~a</p>\n"
+  },
+  {
+    "id": "delimiters-196",
+    "source": "text { a}~ \n",
+    "html": "<p>text { a}~</p>\n"
+  },
+  {
+    "id": "delimiters-197",
+    "source": "text { a}{~\n",
+    "html": "<p>text { a}{~</p>\n"
+  },
+  {
+    "id": "delimiters-198",
+    "source": "text { a}}~\n",
+    "html": "<p>text { a}}~</p>\n"
+  },
+  {
+    "id": "delimiters-199",
+    "source": "text { a}\\~\n",
+    "html": "<p>text { a}~</p>\n"
+  },
+  {
+    "id": "delimiters-200",
+    "source": "text { a}a~\n",
+    "html": "<p>text { a}a~</p>\n"
+  },
+  {
+    "id": "delimiters-201",
+    "source": "text { a} ~\n",
+    "html": "<p>text { a} ~</p>\n"
+  },
+  {
+    "id": "delimiters-202",
+    "source": "text { aa}~\n",
+    "html": "<p>text { aa}~</p>\n"
+  },
+  {
+    "id": "delimiters-203",
+    "source": "text { a }~\n",
+    "html": "<p>text { a }~</p>\n"
+  },
+  {
+    "id": "delimiters-204",
+    "source": "text {  a}~\n",
+    "html": "<p>text {  a}~</p>\n"
+  },
+  {
+    "id": "delimiters-205",
+    "source": "text }~{ a}\n",
+    "html": "<p>text }~{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-206",
+    "source": "text }~ {}\\\n",
+    "html": "<p>text }~ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-207",
+    "source": "text }{ a}~\n",
+    "html": "<p>text }{ a}~</p>\n"
+  },
+  {
+    "id": "delimiters-208",
+    "source": "text \\~{ a}\n",
+    "html": "<p>text ~{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-209",
+    "source": "text \\~ {}\\\n",
+    "html": "<p>text ~ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-210",
+    "source": "text a~{ a}\n",
+    "html": "<p>text a~{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-211",
+    "source": "text a~ {}\\\n",
+    "html": "<p>text a~ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-212",
+    "source": "text a{ a}~\n",
+    "html": "<p>text a{ a}~</p>\n"
+  },
+  {
+    "id": "delimiters-213",
+    "source": "text  ~{ a}\n",
+    "html": "<p>text  ~{ a}</p>\n"
+  },
+  {
+    "id": "delimiters-214",
+    "source": "text  ~ {}\\\n",
+    "html": "<p>text  ~ <br>\n</p>\n"
+  },
+  {
+    "id": "delimiters-215",
+    "source": "text  { a}~\n",
+    "html": "<p>text  { a}~</p>\n"
+  },
+  {
+    "id": "words-216",
+    "source": "text \\ *{.c}\n",
+    "html": "<p>text &nbsp;<span class=\"c\">*</span></p>\n"
+  },
+  {
+    "id": "words-217",
+    "source": "text \\ *{#i}\n",
+    "html": "<p>text &nbsp;<span id=\"i\">*</span></p>\n"
+  },
+  {
+    "id": "words-218",
+    "source": "text \\ _{.c}\n",
+    "html": "<p>text &nbsp;<span class=\"c\">_</span></p>\n"
+  },
+  {
+    "id": "words-219",
+    "source": "text \\ _{#i}\n",
+    "html": "<p>text &nbsp;<span id=\"i\">_</span></p>\n"
+  },
+  {
+    "id": "words-220",
+    "source": "text \\ ^{.c}\n",
+    "html": "<p>text &nbsp;<span class=\"c\">^</span></p>\n"
+  },
+  {
+    "id": "words-221",
+    "source": "text \\ ^{#i}\n",
+    "html": "<p>text &nbsp;<span id=\"i\">^</span></p>\n"
+  },
+  {
+    "id": "words-222",
+    "source": "text \\ ~{.c}\n",
+    "html": "<p>text &nbsp;<span class=\"c\">~</span></p>\n"
+  },
+  {
+    "id": "words-223",
+    "source": "text \\ ~{#i}\n",
+    "html": "<p>text &nbsp;<span id=\"i\">~</span></p>\n"
+  },
+  {
+    "id": "words-224",
+    "source": "text \\ [{.c}\n",
+    "html": "<p>text &nbsp;<span class=\"c\">[</span></p>\n"
+  },
+  {
+    "id": "words-225",
+    "source": "text \\ [{#i}\n",
+    "html": "<p>text &nbsp;<span id=\"i\">[</span></p>\n"
+  },
+  {
+    "id": "words-226",
+    "source": "text \\ {{.c}\n",
+    "html": "<p>text &nbsp;<span class=\"c\">{</span></p>\n"
+  },
+  {
+    "id": "words-227",
+    "source": "text \\ {{#i}\n",
+    "html": "<p>text &nbsp;<span id=\"i\">{</span></p>\n"
+  },
+  {
+    "id": "words-228",
+    "source": "text a\\ *{.c}\n",
+    "html": "<p>text a&nbsp;<span class=\"c\">*</span></p>\n"
+  },
+  {
+    "id": "words-229",
+    "source": "text a\\ *{#i}\n",
+    "html": "<p>text a&nbsp;<span id=\"i\">*</span></p>\n"
+  },
+  {
+    "id": "words-230",
+    "source": "text a\\ _{.c}\n",
+    "html": "<p>text a&nbsp;<span class=\"c\">_</span></p>\n"
+  },
+  {
+    "id": "words-231",
+    "source": "text a\\ _{#i}\n",
+    "html": "<p>text a&nbsp;<span id=\"i\">_</span></p>\n"
+  },
+  {
+    "id": "words-232",
+    "source": "text a\\ ^{.c}\n",
+    "html": "<p>text a&nbsp;<span class=\"c\">^</span></p>\n"
+  },
+  {
+    "id": "words-233",
+    "source": "text a\\ ^{#i}\n",
+    "html": "<p>text a&nbsp;<span id=\"i\">^</span></p>\n"
+  },
+  {
+    "id": "words-234",
+    "source": "text a\\ ~{.c}\n",
+    "html": "<p>text a&nbsp;<span class=\"c\">~</span></p>\n"
+  },
+  {
+    "id": "words-235",
+    "source": "text a\\ ~{#i}\n",
+    "html": "<p>text a&nbsp;<span id=\"i\">~</span></p>\n"
+  },
+  {
+    "id": "words-236",
+    "source": "text a\\ [{.c}\n",
+    "html": "<p>text a&nbsp;<span class=\"c\">[</span></p>\n"
+  },
+  {
+    "id": "words-237",
+    "source": "text a\\ [{#i}\n",
+    "html": "<p>text a&nbsp;<span id=\"i\">[</span></p>\n"
+  },
+  {
+    "id": "words-238",
+    "source": "text a\\ {{.c}\n",
+    "html": "<p>text a&nbsp;<span class=\"c\">{</span></p>\n"
+  },
+  {
+    "id": "words-239",
+    "source": "text a\\ {{#i}\n",
+    "html": "<p>text a&nbsp;<span id=\"i\">{</span></p>\n"
+  },
+  {
+    "id": "words-240",
+    "source": "text a{}*{.c}\n",
+    "html": "<p>text a<span class=\"c\">*</span></p>\n"
+  },
+  {
+    "id": "words-241",
+    "source": "text a{}*{#i}\n",
+    "html": "<p>text a<span id=\"i\">*</span></p>\n"
+  },
+  {
+    "id": "words-242",
+    "source": "text a{}_{.c}\n",
+    "html": "<p>text a<span class=\"c\">_</span></p>\n"
+  },
+  {
+    "id": "words-243",
+    "source": "text a{}_{#i}\n",
+    "html": "<p>text a<span id=\"i\">_</span></p>\n"
+  },
+  {
+    "id": "words-244",
+    "source": "text a{}^{.c}\n",
+    "html": "<p>text a<span class=\"c\">^</span></p>\n"
+  },
+  {
+    "id": "words-245",
+    "source": "text a{}^{#i}\n",
+    "html": "<p>text a<span id=\"i\">^</span></p>\n"
+  },
+  {
+    "id": "words-246",
+    "source": "text a{}~{.c}\n",
+    "html": "<p>text a<span class=\"c\">~</span></p>\n"
+  },
+  {
+    "id": "words-247",
+    "source": "text a{}~{#i}\n",
+    "html": "<p>text a<span id=\"i\">~</span></p>\n"
+  },
+  {
+    "id": "words-248",
+    "source": "text a{}[{.c}\n",
+    "html": "<p>text a<span class=\"c\">[</span></p>\n"
+  },
+  {
+    "id": "words-249",
+    "source": "text a{}[{#i}\n",
+    "html": "<p>text a<span id=\"i\">[</span></p>\n"
+  },
+  {
+    "id": "words-250",
+    "source": "text a{}{{.c}\n",
+    "html": "<p>text a<span class=\"c\">{</span></p>\n"
+  },
+  {
+    "id": "words-251",
+    "source": "text a{}{{#i}\n",
+    "html": "<p>text a<span id=\"i\">{</span></p>\n"
+  },
+  {
+    "id": "words-252",
+    "source": "text a*\\ *{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">*</span></p>\n"
+  },
+  {
+    "id": "words-253",
+    "source": "text a*\\ *{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">*</span></p>\n"
+  },
+  {
+    "id": "words-254",
+    "source": "text a*\\ _{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">_</span></p>\n"
+  },
+  {
+    "id": "words-255",
+    "source": "text a*\\ _{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">_</span></p>\n"
+  },
+  {
+    "id": "words-256",
+    "source": "text a*\\ ^{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">^</span></p>\n"
+  },
+  {
+    "id": "words-257",
+    "source": "text a*\\ ^{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">^</span></p>\n"
+  },
+  {
+    "id": "words-258",
+    "source": "text a*\\ ~{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">~</span></p>\n"
+  },
+  {
+    "id": "words-259",
+    "source": "text a*\\ ~{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">~</span></p>\n"
+  },
+  {
+    "id": "words-260",
+    "source": "text a*\\ [{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">[</span></p>\n"
+  },
+  {
+    "id": "words-261",
+    "source": "text a*\\ [{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">[</span></p>\n"
+  },
+  {
+    "id": "words-262",
+    "source": "text a*\\ {{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">{</span></p>\n"
+  },
+  {
+    "id": "words-263",
+    "source": "text a*\\ {{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">{</span></p>\n"
+  },
+  {
+    "id": "words-264",
+    "source": "text a*{}_{.c}\n",
+    "html": "<p>text a*<span class=\"c\">_</span></p>\n"
+  },
+  {
+    "id": "words-265",
+    "source": "text a*{}_{#i}\n",
+    "html": "<p>text a*<span id=\"i\">_</span></p>\n"
+  },
+  {
+    "id": "words-266",
+    "source": "text a*{}^{.c}\n",
+    "html": "<p>text a*<span class=\"c\">^</span></p>\n"
+  },
+  {
+    "id": "words-267",
+    "source": "text a*{}^{#i}\n",
+    "html": "<p>text a*<span id=\"i\">^</span></p>\n"
+  },
+  {
+    "id": "words-268",
+    "source": "text a*{}~{.c}\n",
+    "html": "<p>text a*<span class=\"c\">~</span></p>\n"
+  },
+  {
+    "id": "words-269",
+    "source": "text a*{}~{#i}\n",
+    "html": "<p>text a*<span id=\"i\">~</span></p>\n"
+  },
+  {
+    "id": "words-270",
+    "source": "text a*{}[{.c}\n",
+    "html": "<p>text a*<span class=\"c\">[</span></p>\n"
+  },
+  {
+    "id": "words-271",
+    "source": "text a*{}[{#i}\n",
+    "html": "<p>text a*<span id=\"i\">[</span></p>\n"
+  },
+  {
+    "id": "words-272",
+    "source": "text a*{}{{.c}\n",
+    "html": "<p>text a*<span class=\"c\">{</span></p>\n"
+  },
+  {
+    "id": "words-273",
+    "source": "text a*{}{{#i}\n",
+    "html": "<p>text a*<span id=\"i\">{</span></p>\n"
+  },
+  {
+    "id": "words-274",
+    "source": "text a\\*\\ *{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">*</span></p>\n"
+  },
+  {
+    "id": "words-275",
+    "source": "text a\\*\\ *{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">*</span></p>\n"
+  },
+  {
+    "id": "words-276",
+    "source": "text a\\*\\ _{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">_</span></p>\n"
+  },
+  {
+    "id": "words-277",
+    "source": "text a\\*\\ _{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">_</span></p>\n"
+  },
+  {
+    "id": "words-278",
+    "source": "text a\\*\\ ^{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">^</span></p>\n"
+  },
+  {
+    "id": "words-279",
+    "source": "text a\\*\\ ^{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">^</span></p>\n"
+  },
+  {
+    "id": "words-280",
+    "source": "text a\\*\\ ~{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">~</span></p>\n"
+  },
+  {
+    "id": "words-281",
+    "source": "text a\\*\\ ~{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">~</span></p>\n"
+  },
+  {
+    "id": "words-282",
+    "source": "text a\\*\\ [{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">[</span></p>\n"
+  },
+  {
+    "id": "words-283",
+    "source": "text a\\*\\ [{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">[</span></p>\n"
+  },
+  {
+    "id": "words-284",
+    "source": "text a\\*\\ {{.c}\n",
+    "html": "<p>text a*&nbsp;<span class=\"c\">{</span></p>\n"
+  },
+  {
+    "id": "words-285",
+    "source": "text a\\*\\ {{#i}\n",
+    "html": "<p>text a*&nbsp;<span id=\"i\">{</span></p>\n"
+  },
+  {
+    "id": "words-286",
+    "source": "text a\\*{}a{.c}\n",
+    "html": "<p>text a*<span class=\"c\">a</span></p>\n"
+  },
+  {
+    "id": "words-287",
+    "source": "text a\\*{}a{#i}\n",
+    "html": "<p>text a*<span id=\"i\">a</span></p>\n"
+  },
+  {
+    "id": "words-288",
+    "source": "text a\\*{}b{.c}\n",
+    "html": "<p>text a*<span class=\"c\">b</span></p>\n"
+  },
+  {
+    "id": "words-289",
+    "source": "text a\\*{}b{#i}\n",
+    "html": "<p>text a*<span id=\"i\">b</span></p>\n"
+  },
+  {
+    "id": "words-290",
+    "source": "text a\\*{}*{.c}\n",
+    "html": "<p>text a*<span class=\"c\">*</span></p>\n"
+  },
+  {
+    "id": "words-291",
+    "source": "text a\\*{}*{#i}\n",
+    "html": "<p>text a*<span id=\"i\">*</span></p>\n"
+  },
+  {
+    "id": "words-292",
+    "source": "text a\\*{}_{.c}\n",
+    "html": "<p>text a*<span class=\"c\">_</span></p>\n"
+  },
+  {
+    "id": "words-293",
+    "source": "text a\\*{}_{#i}\n",
+    "html": "<p>text a*<span id=\"i\">_</span></p>\n"
+  },
+  {
+    "id": "words-294",
+    "source": "text a\\*{}^{.c}\n",
+    "html": "<p>text a*<span class=\"c\">^</span></p>\n"
+  },
+  {
+    "id": "words-295",
+    "source": "text a\\*{}^{#i}\n",
+    "html": "<p>text a*<span id=\"i\">^</span></p>\n"
+  },
+  {
+    "id": "words-296",
+    "source": "text a\\*{}~{.c}\n",
+    "html": "<p>text a*<span class=\"c\">~</span></p>\n"
+  },
+  {
+    "id": "words-297",
+    "source": "text a\\*{}~{#i}\n",
+    "html": "<p>text a*<span id=\"i\">~</span></p>\n"
+  },
+  {
+    "id": "words-298",
+    "source": "text a\\*{}[{.c}\n",
+    "html": "<p>text a*<span class=\"c\">[</span></p>\n"
+  },
+  {
+    "id": "words-299",
+    "source": "text a\\*{}[{#i}\n",
+    "html": "<p>text a*<span id=\"i\">[</span></p>\n"
+  },
+  {
+    "id": "words-300",
+    "source": "text a\\*{}]{.c}\n",
+    "html": "<p>text a*<span class=\"c\">]</span></p>\n"
+  },
+  {
+    "id": "words-301",
+    "source": "text a\\*{}]{#i}\n",
+    "html": "<p>text a*<span id=\"i\">]</span></p>\n"
+  },
+  {
+    "id": "words-302",
+    "source": "text a\\*{}{{.c}\n",
+    "html": "<p>text a*<span class=\"c\">{</span></p>\n"
+  },
+  {
+    "id": "words-303",
+    "source": "text a\\*{}{{#i}\n",
+    "html": "<p>text a*<span id=\"i\">{</span></p>\n"
+  },
+  {
+    "id": "words-304",
+    "source": "text a\\*{}}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">}</span></p>\n"
+  },
+  {
+    "id": "words-305",
+    "source": "text a\\*{}}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">}</span></p>\n"
+  },
+  {
+    "id": "words-306",
+    "source": "text _x_\\ *{.c}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span class=\"c\">*</span></p>\n"
+  },
+  {
+    "id": "words-307",
+    "source": "text _x_\\ *{#i}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span id=\"i\">*</span></p>\n"
+  },
+  {
+    "id": "words-308",
+    "source": "text _x_\\ _{.c}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span class=\"c\">_</span></p>\n"
+  },
+  {
+    "id": "words-309",
+    "source": "text _x_\\ _{#i}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span id=\"i\">_</span></p>\n"
+  },
+  {
+    "id": "words-310",
+    "source": "text _x_\\ ^{.c}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span class=\"c\">^</span></p>\n"
+  },
+  {
+    "id": "words-311",
+    "source": "text _x_\\ ^{#i}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span id=\"i\">^</span></p>\n"
+  },
+  {
+    "id": "words-312",
+    "source": "text _x_\\ ~{.c}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span class=\"c\">~</span></p>\n"
+  },
+  {
+    "id": "words-313",
+    "source": "text _x_\\ ~{#i}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span id=\"i\">~</span></p>\n"
+  },
+  {
+    "id": "words-314",
+    "source": "text _x_\\ [{.c}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span class=\"c\">[</span></p>\n"
+  },
+  {
+    "id": "words-315",
+    "source": "text _x_\\ [{#i}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span id=\"i\">[</span></p>\n"
+  },
+  {
+    "id": "words-316",
+    "source": "text _x_\\ {{.c}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span class=\"c\">{</span></p>\n"
+  },
+  {
+    "id": "words-317",
+    "source": "text _x_\\ {{#i}\n",
+    "html": "<p>text <em>x</em>&nbsp;<span id=\"i\">{</span></p>\n"
+  },
+  {
+    "id": "words-318",
+    "source": "text a \\ *{.c}\n",
+    "html": "<p>text a &nbsp;<span class=\"c\">*</span></p>\n"
+  },
+  {
+    "id": "words-319",
+    "source": "text a \\ *{#i}\n",
+    "html": "<p>text a &nbsp;<span id=\"i\">*</span></p>\n"
+  },
+  {
+    "id": "words-320",
+    "source": "text a \\ _{.c}\n",
+    "html": "<p>text a &nbsp;<span class=\"c\">_</span></p>\n"
+  },
+  {
+    "id": "words-321",
+    "source": "text a \\ _{#i}\n",
+    "html": "<p>text a &nbsp;<span id=\"i\">_</span></p>\n"
+  },
+  {
+    "id": "words-322",
+    "source": "text a \\ ^{.c}\n",
+    "html": "<p>text a &nbsp;<span class=\"c\">^</span></p>\n"
+  },
+  {
+    "id": "words-323",
+    "source": "text a \\ ^{#i}\n",
+    "html": "<p>text a &nbsp;<span id=\"i\">^</span></p>\n"
+  },
+  {
+    "id": "words-324",
+    "source": "text a \\ ~{.c}\n",
+    "html": "<p>text a &nbsp;<span class=\"c\">~</span></p>\n"
+  },
+  {
+    "id": "words-325",
+    "source": "text a \\ ~{#i}\n",
+    "html": "<p>text a &nbsp;<span id=\"i\">~</span></p>\n"
+  },
+  {
+    "id": "words-326",
+    "source": "text a \\ [{.c}\n",
+    "html": "<p>text a &nbsp;<span class=\"c\">[</span></p>\n"
+  },
+  {
+    "id": "words-327",
+    "source": "text a \\ [{#i}\n",
+    "html": "<p>text a &nbsp;<span id=\"i\">[</span></p>\n"
+  },
+  {
+    "id": "words-328",
+    "source": "text a \\ {{.c}\n",
+    "html": "<p>text a &nbsp;<span class=\"c\">{</span></p>\n"
+  },
+  {
+    "id": "words-329",
+    "source": "text a \\ {{#i}\n",
+    "html": "<p>text a &nbsp;<span id=\"i\">{</span></p>\n"
+  },
+  {
+    "id": "references-top-0-plain",
+    "source": "[a]: /a\n[b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-0-continued",
+    "source": "[a]: /a\n  path\n[b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-0-attributes",
+    "source": "[a]: /a\n{.c}\n[b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-1-plain",
+    "source": " [a]: /a\n [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-1-continued",
+    "source": " [a]: /a\n   path\n [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-1-attributes",
+    "source": " [a]: /a\n{.c}\n [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-2-plain",
+    "source": "  [a]: /a\n  [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-2-continued",
+    "source": "  [a]: /a\n    path\n  [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-2-attributes",
+    "source": "  [a]: /a\n{.c}\n  [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-3-plain",
+    "source": "   [a]: /a\n   [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-3-continued",
+    "source": "   [a]: /a\n     path\n   [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-3-attributes",
+    "source": "   [a]: /a\n{.c}\n   [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-4-plain",
+    "source": "    [a]: /a\n    [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-4-continued",
+    "source": "    [a]: /a\n      path\n    [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-4-attributes",
+    "source": "    [a]: /a\n{.c}\n    [b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-5-plain",
+    "source": "\t[a]: /a\n\t[b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-5-continued",
+    "source": "\t[a]: /a\n\t  path\n\t[b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-5-attributes",
+    "source": "\t[a]: /a\n{.c}\n\t[b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-6-plain",
+    "source": " \t[a]: /a\n \t[b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-6-continued",
+    "source": " \t[a]: /a\n \t  path\n \t[b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n"
+  },
+  {
+    "id": "references-top-6-attributes",
+    "source": " \t[a]: /a\n{.c}\n \t[b]: /b\n\n[a][] [b][]\n",
+    "html": "<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n"
+  },
+  {
+    "id": "references-quote-0-plain",
+    "source": "> [a]: /a\n> [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-0-continued",
+    "source": "> [a]: /a\n>    path\n> [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-0-attributes",
+    "source": "> [a]: /a\n> {.c}\n> [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-1-plain",
+    "source": ">  [a]: /a\n>  [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-1-continued",
+    "source": ">  [a]: /a\n>     path\n>  [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-1-attributes",
+    "source": ">  [a]: /a\n> {.c}\n>  [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-2-plain",
+    "source": ">   [a]: /a\n>   [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-2-continued",
+    "source": ">   [a]: /a\n>      path\n>   [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-2-attributes",
+    "source": ">   [a]: /a\n> {.c}\n>   [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-3-plain",
+    "source": ">    [a]: /a\n>    [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-3-continued",
+    "source": ">    [a]: /a\n>       path\n>    [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-3-attributes",
+    "source": ">    [a]: /a\n> {.c}\n>    [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-4-plain",
+    "source": ">     [a]: /a\n>     [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-4-continued",
+    "source": ">     [a]: /a\n>        path\n>     [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-4-attributes",
+    "source": ">     [a]: /a\n> {.c}\n>     [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-5-plain",
+    "source": "> \t[a]: /a\n> \t[b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-5-continued",
+    "source": "> \t[a]: /a\n>  \t  path\n> \t[b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-5-attributes",
+    "source": "> \t[a]: /a\n> {.c}\n> \t[b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-6-plain",
+    "source": ">  \t[a]: /a\n>  \t[b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-6-continued",
+    "source": ">  \t[a]: /a\n>   \t  path\n>  \t[b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-quote-6-attributes",
+    "source": ">  \t[a]: /a\n> {.c}\n>  \t[b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-bullet-0-plain",
+    "source": "- [a]: /a\n  [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-0-attributes",
+    "source": "- [a]: /a\n  {.c}\n  [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-1-plain",
+    "source": "-  [a]: /a\n   [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-1-attributes",
+    "source": "-  [a]: /a\n  {.c}\n   [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-2-plain",
+    "source": "-   [a]: /a\n    [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-2-attributes",
+    "source": "-   [a]: /a\n  {.c}\n    [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-3-plain",
+    "source": "-    [a]: /a\n     [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-3-attributes",
+    "source": "-    [a]: /a\n  {.c}\n     [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-4-plain",
+    "source": "-     [a]: /a\n      [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-4-attributes",
+    "source": "-     [a]: /a\n  {.c}\n      [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-5-attributes",
+    "source": "- \t[a]: /a\n  {.c}\n  \t[b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-bullet-6-attributes",
+    "source": "-  \t[a]: /a\n  {.c}\n   \t[b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<ul>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ul>\n"
+  },
+  {
+    "id": "references-ordered-0-plain",
+    "source": "1. [a]: /a\n   [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-0-attributes",
+    "source": "1. [a]: /a\n   {.c}\n   [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-1-plain",
+    "source": "1.  [a]: /a\n    [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-1-attributes",
+    "source": "1.  [a]: /a\n   {.c}\n    [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-2-plain",
+    "source": "1.   [a]: /a\n     [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-2-attributes",
+    "source": "1.   [a]: /a\n   {.c}\n     [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-3-plain",
+    "source": "1.    [a]: /a\n      [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-3-attributes",
+    "source": "1.    [a]: /a\n   {.c}\n      [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-4-plain",
+    "source": "1.     [a]: /a\n       [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-4-attributes",
+    "source": "1.     [a]: /a\n   {.c}\n       [b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-ordered-5-attributes",
+    "source": "1. \t[a]: /a\n   {.c}\n   \t[b]: /b\n   \n   [a][] [b][]\n",
+    "html": "<ol>\n<li>\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</li>\n</ol>\n"
+  },
+  {
+    "id": "references-div-0-plain",
+    "source": "::: outer\n[a]: /a\n[b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-0-continued",
+    "source": "::: outer\n[a]: /a\n  path\n[b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-0-attributes",
+    "source": "::: outer\n[a]: /a\n{.c}\n[b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-1-plain",
+    "source": "::: outer\n [a]: /a\n [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-1-continued",
+    "source": "::: outer\n [a]: /a\n   path\n [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-1-attributes",
+    "source": "::: outer\n [a]: /a\n{.c}\n [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-2-plain",
+    "source": "::: outer\n  [a]: /a\n  [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-2-continued",
+    "source": "::: outer\n  [a]: /a\n    path\n  [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-2-attributes",
+    "source": "::: outer\n  [a]: /a\n{.c}\n  [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-3-plain",
+    "source": "::: outer\n   [a]: /a\n   [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-3-continued",
+    "source": "::: outer\n   [a]: /a\n     path\n   [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-3-attributes",
+    "source": "::: outer\n   [a]: /a\n{.c}\n   [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-4-plain",
+    "source": "::: outer\n    [a]: /a\n    [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-4-continued",
+    "source": "::: outer\n    [a]: /a\n      path\n    [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-4-attributes",
+    "source": "::: outer\n    [a]: /a\n{.c}\n    [b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-5-plain",
+    "source": "::: outer\n\t[a]: /a\n\t[b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-5-continued",
+    "source": "::: outer\n\t[a]: /a\n\t  path\n\t[b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-5-attributes",
+    "source": "::: outer\n\t[a]: /a\n{.c}\n\t[b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-6-plain",
+    "source": "::: outer\n \t[a]: /a\n \t[b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-6-continued",
+    "source": "::: outer\n \t[a]: /a\n \t  path\n \t[b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/apath\">a</a> <a href=\"/b\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-div-6-attributes",
+    "source": "::: outer\n \t[a]: /a\n{.c}\n \t[b]: /b\n\n[a][] [b][]\n:::\n",
+    "html": "<div class=\"outer\">\n<p><a href=\"/a\">a</a> <a href=\"/b\" class=\"c\">b</a></p>\n</div>\n"
+  },
+  {
+    "id": "references-semantic-0",
+    "source": "> [a]:\n>   [^x]: note\n>    [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"\">a</a> <a>b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-semantic-1",
+    "source": "[a][] [b][]\n\n> [a]:\n>   [^x]: note\n>    [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<p><a href=\"\">a</a> <a>b</a></p>\n<blockquote>\n<p><a href=\"\">a</a> <a>b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-semantic-2",
+    "source": "> [a]:\n>   [^x]: note\n>     [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<blockquote>\n<p><a href=\"\">a</a> <a>b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-semantic-3",
+    "source": "[a][] [b][]\n\n> [a]:\n>   [^x]: note\n>     [b]: /b\n> \n> [a][] [b][]\n",
+    "html": "<p><a href=\"\">a</a> <a>b</a></p>\n<blockquote>\n<p><a href=\"\">a</a> <a>b</a></p>\n</blockquote>\n"
+  },
+  {
+    "id": "references-semantic-4",
+    "source": ": term\n\n  [a]:\n    [^x]: note\n     [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<dl>\n<dt>term</dt>\n<dd>\n<p><a href=\"\">a</a> <a>b</a></p>\n</dd>\n</dl>\n"
+  },
+  {
+    "id": "references-semantic-5",
+    "source": "[a][] [b][]\n\n: term\n\n  [a]:\n    [^x]: note\n     [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<p><a href=\"\">a</a> <a>b</a></p>\n<dl>\n<dt>term</dt>\n<dd>\n<p><a href=\"\">a</a> <a>b</a></p>\n</dd>\n</dl>\n"
+  },
+  {
+    "id": "references-semantic-6",
+    "source": ": term\n\n  [a]:\n    [^x]: note\n      [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<dl>\n<dt>term</dt>\n<dd>\n<p><a href=\"\">a</a> <a>b</a></p>\n</dd>\n</dl>\n"
+  },
+  {
+    "id": "references-semantic-7",
+    "source": "[a][] [b][]\n\n: term\n\n  [a]:\n    [^x]: note\n      [b]: /b\n  \n  [a][] [b][]\n",
+    "html": "<p><a href=\"\">a</a> <a>b</a></p>\n<dl>\n<dt>term</dt>\n<dd>\n<p><a href=\"\">a</a> <a>b</a></p>\n</dd>\n</dl>\n"
+  },
+  {
+    "id": "words-consecutive-0",
+    "source": "text a{}*b{}{.c}\n",
+    "html": "<p>text a<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-1",
+    "source": "text a{}*b{}{#i}\n",
+    "html": "<p>text a<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-2",
+    "source": "text a{}*b{% note %}{.c}\n",
+    "html": "<p>text a<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-3",
+    "source": "text a{}*b{% note %}{#i}\n",
+    "html": "<p>text a<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-4",
+    "source": "text a{% note %}*b{}{.c}\n",
+    "html": "<p>text a<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-5",
+    "source": "text a{% note %}*b{}{#i}\n",
+    "html": "<p>text a<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-6",
+    "source": "text a{% note %}*b{% note %}{.c}\n",
+    "html": "<p>text a<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-7",
+    "source": "text a{% note %}*b{% note %}{#i}\n",
+    "html": "<p>text a<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-8",
+    "source": "text a{%%}*b{}{.c}\n",
+    "html": "<p>text a<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-9",
+    "source": "text a{%%}*b{}{#i}\n",
+    "html": "<p>text a<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-10",
+    "source": "text a{%%}*b{% note %}{.c}\n",
+    "html": "<p>text a<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-11",
+    "source": "text a{%%}*b{% note %}{#i}\n",
+    "html": "<p>text a<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-12",
+    "source": "text a\\*{}b{}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-13",
+    "source": "text a\\*{}b{}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-14",
+    "source": "text a\\*{}b{% note %}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-15",
+    "source": "text a\\*{}b{% note %}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-16",
+    "source": "text a\\*{}*b{}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-17",
+    "source": "text a\\*{}*b{}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-18",
+    "source": "text a\\*{}*b{% note %}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-19",
+    "source": "text a\\*{}*b{% note %}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-20",
+    "source": "text a\\*{% note %}b{}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-21",
+    "source": "text a\\*{% note %}b{}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-22",
+    "source": "text a\\*{% note %}b{% note %}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-23",
+    "source": "text a\\*{% note %}b{% note %}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-24",
+    "source": "text a\\*{% note %}*b{}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-25",
+    "source": "text a\\*{% note %}*b{}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-26",
+    "source": "text a\\*{% note %}*b{% note %}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-27",
+    "source": "text a\\*{% note %}*b{% note %}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-28",
+    "source": "text a\\*{%%}b{}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-29",
+    "source": "text a\\*{%%}b{}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-30",
+    "source": "text a\\*{%%}b{% note %}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-31",
+    "source": "text a\\*{%%}b{% note %}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-32",
+    "source": "text a\\*{%%}*b{}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-33",
+    "source": "text a\\*{%%}*b{}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-34",
+    "source": "text a\\*{%%}*b{% note %}{.c}\n",
+    "html": "<p>text a*<span class=\"c\">*b</span></p>\n"
+  },
+  {
+    "id": "words-consecutive-35",
+    "source": "text a\\*{%%}*b{% note %}{#i}\n",
+    "html": "<p>text a*<span id=\"i\">*b</span></p>\n"
+  }
+]
