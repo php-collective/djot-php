@@ -2293,5 +2293,150 @@
     "id": "words-consecutive-35",
     "source": "text a\\*{%%}*b{% note %}{#i}\n",
     "html": "<p>text a*<span id=\"i\">*b</span></p>\n"
+  },
+  {
+    "id": "delimiters-strong-nested-comment",
+    "source": "*{{}%*{}\n",
+    "html": "<p><strong>{%</strong></p>\n"
+  },
+  {
+    "id": "delimiters-strong-invalid-comment",
+    "source": "*{?%*{}\n",
+    "html": "<p><strong>{?%</strong></p>\n"
+  },
+  {
+    "id": "delimiters-strong-nested-comment-bulk",
+    "source": "*{{}aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%*{}\n",
+    "html": "<p><strong>{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%</strong></p>\n"
+  },
+  {
+    "id": "delimiters-strong-quoted-delimiter",
+    "source": "*{a=\"*\"}*{}\n",
+    "html": "<p><strong></strong></p>\n"
+  },
+  {
+    "id": "delimiters-strong-comment-delimiter",
+    "source": "*{%*%}*{}\n",
+    "html": "<p><strong></strong></p>\n"
+  },
+  {
+    "id": "delimiters-em-nested-comment",
+    "source": "_{{}%_{}\n",
+    "html": "<p><em>{%</em></p>\n"
+  },
+  {
+    "id": "delimiters-em-invalid-comment",
+    "source": "_{?%_{}\n",
+    "html": "<p><em>{?%</em></p>\n"
+  },
+  {
+    "id": "delimiters-em-nested-comment-bulk",
+    "source": "_{{}aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%_{}\n",
+    "html": "<p><em>{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%</em></p>\n"
+  },
+  {
+    "id": "delimiters-em-quoted-delimiter",
+    "source": "_{a=\"_\"}_{}\n",
+    "html": "<p><em></em></p>\n"
+  },
+  {
+    "id": "delimiters-em-comment-delimiter",
+    "source": "_{%_%}_{}\n",
+    "html": "<p><em></em></p>\n"
+  },
+  {
+    "id": "delimiters-sup-nested-comment",
+    "source": "^{{}%^{}\n",
+    "html": "<p><sup>{%</sup></p>\n"
+  },
+  {
+    "id": "delimiters-sup-invalid-comment",
+    "source": "^{?%^{}\n",
+    "html": "<p><sup>{?%</sup></p>\n"
+  },
+  {
+    "id": "delimiters-sup-nested-comment-bulk",
+    "source": "^{{}aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%^{}\n",
+    "html": "<p><sup>{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%</sup></p>\n"
+  },
+  {
+    "id": "delimiters-sup-quoted-delimiter",
+    "source": "^{a=\"^\"}^{}\n",
+    "html": "<p><sup></sup></p>\n"
+  },
+  {
+    "id": "delimiters-sup-comment-delimiter",
+    "source": "^{%^%}^{}\n",
+    "html": "<p><sup></sup></p>\n"
+  },
+  {
+    "id": "delimiters-sub-nested-comment",
+    "source": "~{{}%~{}\n",
+    "html": "<p><sub>{%</sub></p>\n"
+  },
+  {
+    "id": "delimiters-sub-invalid-comment",
+    "source": "~{?%~{}\n",
+    "html": "<p><sub>{?%</sub></p>\n"
+  },
+  {
+    "id": "delimiters-sub-nested-comment-bulk",
+    "source": "~{{}aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%~{}\n",
+    "html": "<p><sub>{aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa%</sub></p>\n"
+  },
+  {
+    "id": "delimiters-sub-quoted-delimiter",
+    "source": "~{a=\"~\"}~{}\n",
+    "html": "<p><sub></sub></p>\n"
+  },
+  {
+    "id": "delimiters-sub-comment-delimiter",
+    "source": "~{%~%}~{}\n",
+    "html": "<p><sub></sub></p>\n"
+  },
+  {
+    "id": "delimiters-highlight",
+    "source": "*a {=b*c=} d*\n",
+    "html": "<p><strong>a {=b</strong>c=} d*</p>\n"
+  },
+  {
+    "id": "delimiters-insert",
+    "source": "*a {+b*c+} d*\n",
+    "html": "<p><strong>a {+b</strong>c+} d*</p>\n"
+  },
+  {
+    "id": "delimiters-delete",
+    "source": "*a {-b*c-} d*\n",
+    "html": "<p><strong>a {-b</strong>c-} d*</p>\n"
+  },
+  {
+    "id": "delimiters-highlight-em",
+    "source": "_see {=foo_bar=} here_\n",
+    "html": "<p><em>see {=foo</em>bar=} here_</p>\n"
+  },
+  {
+    "id": "delimiters-invalid-class",
+    "source": "*{#a*b}*\n",
+    "html": "<p><strong>{#a</strong>b}*</p>\n"
+  },
+  {
+    "id": "delimiters-strong-comment-separated-nesting",
+    "source": "*{%%{%%{}}}*\n",
+    "html": "<p><strong>{%%{%%}}</strong></p>\n"
+  },
+  {
+    "id": "delimiters-em-comment-separated-nesting",
+    "source": "_{%%{%%{}}}_\n",
+    "html": "<p><em>{%%{%%}}</em></p>\n"
+  },
+  {
+    "id": "delimiters-sup-comment-separated-nesting",
+    "source": "^{%%{%%{}}}^\n",
+    "html": "<p><sup>{%%{%%}}</sup></p>\n"
+  },
+  {
+    "id": "delimiters-sub-comment-separated-nesting",
+    "source": "~{%%{%%{}}}~\n",
+    "html": "<p><sub>{%%{%%}}</sub></p>\n"
   }
 ]

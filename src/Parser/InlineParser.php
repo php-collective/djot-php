@@ -1514,10 +1514,14 @@ class InlineParser
             }
             $char = $text[$searchPos];
 
-            // Skip over attribute blocks {....} respecting quotes
+            // Only valid attributes can hide delimiters inside their payload.
             if ($char === '{') {
                 $attrEnd = $this->findAttributeEnd($text, $searchPos);
-                if ($attrEnd !== null) {
+                if (
+                    $attrEnd !== null
+                    && !($this->attributeScanText === $text && isset($this->invalidAttributeStarts[$searchPos]))
+                    && AttributeParser::isValid(substr($text, $searchPos + 1, $attrEnd - $searchPos - 1))
+                ) {
                     $searchPos = $attrEnd + 1;
 
                     continue;
@@ -2157,13 +2161,10 @@ class InlineParser
         $inQuote = null;
         $openers = [$pos];
         $inComment = false;
-        $percentCount = 0;
-        $percentStarts = [$pos => 0];
 
         while ($i < $length) {
             $char = $text[$i];
             if ($inQuote === null && $char === '%') {
-                $percentCount++;
                 $inComment = !$inComment;
                 $i++;
 
@@ -2177,9 +2178,6 @@ class InlineParser
 
             // Handle escape sequences
             if ($char === '\\' && $i + 1 < $length) {
-                if ($text[$i + 1] === '%') {
-                    $percentCount++;
-                }
                 $i += 2;
 
                 continue;
@@ -2204,11 +2202,8 @@ class InlineParser
 
             if ($char === '{') {
                 $opener = $openers[count($openers) - 1];
-                // A nested brace before any comment cannot validate as an attribute.
-                if ($percentStarts[$opener] === $percentCount) {
-                    $this->invalidAttributeStarts[$opener] = true;
-                }
-                $percentStarts[$i] = $percentCount;
+                // A nested brace outside quotes and comments invalidates the attribute.
+                $this->invalidAttributeStarts[$opener] = true;
                 $openers[] = $i;
             } elseif ($char === '}') {
                 $opener = array_pop($openers);
