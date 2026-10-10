@@ -25,6 +25,15 @@ class PlainTextRendererTest extends TestCase
         $this->renderer = new PlainTextRenderer();
     }
 
+    public function testSmartQuoteSegmentsAndAbbreviations(): void
+    {
+        $converter = DjotConverter::create(renderer: new PlainTextRenderer());
+        $this->assertSame(
+            "O’Reilly and say ’word\n",
+            $converter->convert("O'Reilly and say 'word\n\n*[O’Reilly]: Publisher"),
+        );
+    }
+
     public function testBasicParagraph(): void
     {
         $djot = 'Hello world!';

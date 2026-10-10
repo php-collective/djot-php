@@ -895,8 +895,27 @@ final class BorrowedHtmlLayout
             }
         }
 
-        if (str_contains($withoutContractions, '"') && substr_count($withoutContractions, '"') % 2 !== 0) {
-            return true;
+        if (str_contains($withoutContractions, '"')) {
+            $opening = true;
+            $length = strlen($text);
+            for ($pos = 0; $pos < $length; $pos++) {
+                if ($text[$pos] !== '"') {
+                    continue;
+                }
+                $prev = $pos > 0 ? $text[$pos - 1] : '';
+                $next = $text[$pos + 1] ?? '';
+                $contextOpens = $prev === '' || ctype_space($prev) || str_contains('([{-/=:', $prev);
+                if ($prev === '-' && ($next === '' || ctype_space($next) || str_contains("\"'.,;:!?)]", $next))) {
+                    $contextOpens = false;
+                }
+                if ($contextOpens !== $opening) {
+                    return true;
+                }
+                $opening = !$opening;
+            }
+            if (!$opening) {
+                return true;
+            }
         }
 
         return preg_match('/[{}^\\\\<>~!@$=#\']|\.\.\.|\/\*|\*\/|``|\+\-|\(c\)|\(r\)|\(tm\)/', $withoutContractions) === 1
