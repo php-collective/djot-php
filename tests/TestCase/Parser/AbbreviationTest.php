@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Parser;
 
 use Djot\DjotConverter;
+use Djot\Extension\SmartQuotesExtension;
 use Djot\Node\Inline\Abbreviation;
 use Djot\Parser\BlockParser;
 use PHPUnit\Framework\TestCase;
@@ -19,6 +20,75 @@ class AbbreviationTest extends TestCase
     {
         $this->parser = new BlockParser();
         $this->converter = new DjotConverter();
+    }
+
+    public function testAbbreviationAcrossSmartQuoteSegments(): void
+    {
+        $this->assertSame(
+            '<p><abbr title="Publisher">O’Reilly</abbr></p>' . "\n",
+            $this->converter->convert("O'Reilly\n\n*[O’Reilly]: Publisher"),
+        );
+        $this->assertSame(
+            '<p><abbr title="phrase">say ’word</abbr></p>' . "\n",
+            $this->converter->convert("say 'word\n\n*[say ’word]: phrase"),
+        );
+        $this->assertSame(
+            '<p><abbr title="phrase">say ‘word’</abbr></p>' . "\n",
+            $this->converter->convert("say 'word'\n\n*[say ‘word’]: phrase"),
+        );
+    }
+
+    public function testExplicitAndLocaleQuoteSegments(): void
+    {
+        $this->assertSame(
+            '<p><abbr title="phrase">say ‘word</abbr></p>' . "\n",
+            $this->converter->convert("say {'word\n\n*[say ‘word]: phrase"),
+        );
+        $this->converter->addExtension(new SmartQuotesExtension(locale: 'de'));
+        $this->assertSame(
+            '<p><abbr title="phrase">say ‚word‘</abbr></p>' . "\n",
+            $this->converter->convert("say 'word'\n\n*[say ‚word‘]: phrase"),
+        );
+    }
+
+    public function testQuoteSegmentsKeepAbbreviationWordBoundaries(): void
+    {
+        $this->assertSame(
+            '<p>foo”bar</p>' . "\n",
+            $this->converter->convert("foo\"bar\n\n*[foobar]: phrase"),
+        );
+        $this->assertStringNotContainsString(
+            '<abbr',
+            $this->converter->convert("O'_*Reilly*_\n\n*[O’Reilly]: Publisher"),
+        );
+        $this->assertStringNotContainsString(
+            '<abbr',
+            $this->converter->convert("O\\'Reilly\n\n*[O'Reilly]: Publisher"),
+        );
+    }
+
+    public function testQuoteSegmentsInHeadingsAndAttributedWords(): void
+    {
+        $this->assertSame(
+            '<section id="O-Reilly">' . "\n"
+            . '<h1><abbr title="Publisher">O’Reilly</abbr></h1>' . "\n"
+            . '</section>' . "\n",
+            $this->converter->convert("# O'Reilly\n\n*[O’Reilly]: Publisher"),
+        );
+        $this->assertSame(
+            '<p>O’<span class="publisher">Reilly</span></p>' . "\n",
+            $this->converter->convert("O'Reilly{.publisher}"),
+        );
+    }
+
+    public function testManyQuoteSegmentsInOneAbbreviation(): void
+    {
+        $source = implode("'", array_fill(0, 2000, 'a'));
+        $name = str_replace("'", '’', $source);
+        $this->assertSame(
+            '<p><abbr title="long">' . $name . '</abbr></p>' . "\n",
+            $this->converter->convert($source . "\n\n*[" . $name . ']: long'),
+        );
     }
 
     public function testSimpleAbbreviation(): void

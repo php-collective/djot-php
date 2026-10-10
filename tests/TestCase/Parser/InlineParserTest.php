@@ -258,8 +258,8 @@ class InlineParserTest extends TestCase
 
         $text = $this->getFirstChild($para);
         $this->assertInstanceOf(Text::class, $text);
-        $this->assertStringContainsString("\u{201C}", $text->getContent()); // Left double quote
-        $this->assertStringContainsString("\u{201D}", $text->getContent()); // Right double quote
+        $this->assertStringContainsString("\u{201C}", implode('', array_map(static fn (Text $node): string => $node->getContent(), $para->getChildren()))); // Left double quote
+        $this->assertStringContainsString("\u{201D}", implode('', array_map(static fn (Text $node): string => $node->getContent(), $para->getChildren()))); // Right double quote
     }
 
     public function testParseSmartSingleQuotes(): void
@@ -268,8 +268,8 @@ class InlineParserTest extends TestCase
 
         $text = $this->getFirstChild($para);
         $this->assertInstanceOf(Text::class, $text);
-        $this->assertStringContainsString("\u{2018}", $text->getContent()); // Left single quote
-        $this->assertStringContainsString("\u{2019}", $text->getContent()); // Right single quote
+        $this->assertStringContainsString("\u{2018}", implode('', array_map(static fn (Text $node): string => $node->getContent(), $para->getChildren()))); // Left single quote
+        $this->assertStringContainsString("\u{2019}", implode('', array_map(static fn (Text $node): string => $node->getContent(), $para->getChildren()))); // Right single quote
     }
 
     public function testParseEmDash(): void

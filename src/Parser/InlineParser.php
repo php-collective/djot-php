@@ -30,6 +30,7 @@ use Djot\Parser\Utility\AttributeParser;
 use Djot\Parser\Utility\BacktickRunIndex;
 use Djot\Util\StringUtil;
 use LengthException;
+use WeakMap;
 
 /**
  * Inline parser for Djot
@@ -219,14 +220,23 @@ class InlineParser
     protected string $apostrophe = "\u{2019}";
 
     /**
-     * Cached single quote opener→closer matches for the current text block.
-     *
-     * Pre-computed once per parseInlines() call to avoid O(n²) scanning.
-     * Keys are opener positions, values are closer positions.
-     *
-     * @var array<int, int>|null
+     * @var \WeakMap<\Djot\Node\Inline\Text, int>
      */
-    protected ?array $singleQuoteMatchCache = null;
+    protected WeakMap $abbreviationSegments;
+
+    protected int $abbreviationRun = 0;
+
+    protected bool $abbreviationQuoteRun = false;
+
+    protected ?Text $singleQuoteOpener = null;
+
+    protected bool $singleQuoteOpen = false;
+
+    protected bool $demoteSingleQuote = false;
+
+    protected int $lastQuoteEnd = -1;
+
+    protected string $lastQuoteContext = '';
 
     public function __construct(protected BlockParser $blockParser)
     {
@@ -331,6 +341,14 @@ class InlineParser
         ?array $sourceLineMap = null,
         ?int $sourceColumn = null,
     ): void {
+        $this->abbreviationSegments = new WeakMap();
+        $this->abbreviationRun = 0;
+        $this->abbreviationQuoteRun = false;
+        $this->singleQuoteOpener = null;
+        $this->singleQuoteOpen = false;
+        $this->demoteSingleQuote = false;
+        $this->lastQuoteEnd = -1;
+        $this->lastQuoteContext = '';
         $this->delimiterStack = [];
         $this->currentLine = $sourceLine;
         if ($this->blockParser->collectsWarnings()) {
@@ -357,6 +375,12 @@ class InlineParser
             }
         }
         $this->parseInlines($parent, $text, 0);
+        if ($this->singleQuoteOpen && $this->demoteSingleQuote && $this->singleQuoteOpener !== null) {
+            $this->singleQuoteOpener->setContent($this->apostrophe);
+        }
+        if ($this->blockParser->getAbbreviations() !== []) {
+            $this->resolveAbbreviationSegments($parent);
+        }
     }
 
     protected function parseInlines(Node $parent, string $text, int $origin = 0): void
@@ -475,9 +499,6 @@ class InlineParser
         $pos = 0;
         $textBuffer = '';
         $literalBrace = -1;
-
-        // Pre-compute single quote matches to avoid O(n²) complexity
-        $this->singleQuoteMatchCache = $this->buildSingleQuoteMatchCache($text);
 
         while ($pos < $length) {
             // Fast path: bulk-copy a run of plain text in a single C-level scan,
@@ -755,7 +776,8 @@ class InlineParser
                 $char === '{' && ($nextChar === '"' || $nextChar === "'")
                 && ($text[$pos + 1 + strspn($text, $nextChar, $pos + 1)] ?? '') !== '}'
             ) {
-                $textBuffer .= $nextChar === '"' ? $this->openDoubleQuote : $this->openSingleQuote;
+                $this->emitSmartQuote($parent, $textBuffer, $text, $pos + 1, $nextChar, true);
+                $this->lastQuoteEnd = $this->textOrigin + $pos + 2;
                 $pos += 2;
 
                 continue;
@@ -788,10 +810,11 @@ class InlineParser
             // Smart quotes
             if ($char === '"' || $char === "'") {
                 if ($nextChar === '}') {
-                    $textBuffer .= $char === '"' ? $this->closeDoubleQuote : $this->closeSingleQuote;
+                    $this->emitSmartQuote($parent, $textBuffer, $text, $pos, $char, false);
+                    $this->lastQuoteEnd = $this->textOrigin + $pos + 2;
                     $pos += 2;
                 } else {
-                    $textBuffer .= $this->parseSmartQuote($text, $pos, $char);
+                    $this->emitSmartQuote($parent, $textBuffer, $text, $pos, $char);
                     $pos++;
                 }
 
@@ -825,22 +848,51 @@ class InlineParser
         $this->flushText($parent, $textBuffer);
     }
 
-    protected function flushText(Node $parent, string $text): void
+    protected function flushText(Node $parent, string $text, bool $quoteSegment = false): void
     {
-        if ($text === '') {
-            return;
-        }
-
-        // Check if there are any abbreviations to process
         $abbreviations = $this->blockParser->getAbbreviations();
-        if ($abbreviations === []) {
-            $parent->appendChild(new Text($text));
-
-            return;
+        $this->abbreviationQuoteRun = $this->abbreviationQuoteRun || $quoteSegment;
+        if ($text !== '' && $abbreviations !== [] && !$this->abbreviationQuoteRun) {
+            $this->flushTextWithAbbreviations($parent, $text, $abbreviations);
+        } elseif ($text !== '') {
+            $node = new Text($text);
+            $parent->appendChild($node);
+            if ($this->blockParser->getAbbreviations() !== []) {
+                $this->abbreviationSegments[$node] = $this->abbreviationRun;
+            }
         }
+        if (!$quoteSegment) {
+            $this->abbreviationQuoteRun = false;
+            $this->abbreviationRun++;
+        }
+    }
 
-        // Process abbreviations in the text
-        $this->flushTextWithAbbreviations($parent, $text, $abbreviations);
+    /**
+     * Resolve quote-only flushes after demotion, rebuilding each child list once.
+     */
+    protected function resolveAbbreviationSegments(Node $parent): void
+    {
+        $children = array_values($parent->getChildren());
+        $parent->removeChildren($children);
+        $parts = [];
+        $run = null;
+        foreach ($children as $child) {
+            $childRun = $child instanceof Text ? ($this->abbreviationSegments[$child] ?? null) : null;
+            if ($parts !== [] && ($childRun === null || $childRun !== $run)) {
+                $this->flushTextWithAbbreviations($parent, implode('', $parts), $this->blockParser->getAbbreviations());
+                $parts = [];
+            }
+            if ($child instanceof Text && $childRun !== null) {
+                $parts[] = $child->getContent();
+                $run = $childRun;
+            } else {
+                $this->resolveAbbreviationSegments($child);
+                $parent->appendChild($child);
+            }
+        }
+        if ($parts !== []) {
+            $this->flushTextWithAbbreviations($parent, implode('', $parts), $this->blockParser->getAbbreviations());
+        }
     }
 
     /**
@@ -1673,6 +1725,16 @@ class InlineParser
                     }
                 }
 
+                $endsOpen = $quoteCount > 1 && $quoteCount % 2 !== 0;
+                if ($marker === "'") {
+                    $this->singleQuoteOpen = $endsOpen;
+                    $this->singleQuoteOpener = null;
+                    $this->demoteSingleQuote = false;
+                }
+                $this->lastQuoteEnd = $this->textOrigin + $quotePos + 1;
+                $this->lastQuoteContext = $marker === '"'
+                    ? ($endsOpen ? '“' : '”') : ($endsOpen ? '‘' : '’');
+
                 return [
                     'node' => new Text($result),
                     'pos' => $quotePos + 1,
@@ -1727,142 +1789,79 @@ class InlineParser
         return null;
     }
 
-    protected function parseSmartQuote(string $text, int $pos, string $quote): string
-    {
-        $prevChar = $pos > 0 ? $text[$pos - 1] : ' ';
-        $nextChar = $text[$pos + 1] ?? ' ';
-
-        // Quote immediately after = is always an opener (attribute value start)
-        if ($prevChar === '=') {
-            return $quote === '"' ? $this->openDoubleQuote : $this->openSingleQuote;
+    protected function emitSmartQuote(
+        Node $parent,
+        string &$buffer,
+        string $text,
+        int $pos,
+        string $quote,
+        ?bool $forced = null,
+    ): void {
+        $prev = '';
+        if ($pos > 0) {
+            $tail = substr($text, max(0, $pos - 4), min(4, $pos));
+            $tail = preg_replace('/^[\\x80-\\xBF]+/', '', $tail) ?? '';
+            preg_match('/.\z/us', $tail, $match);
+            $prev = $match[0] ?? $text[$pos - 1];
         }
-
-        // = acts as word boundary for quotes (e.g., key="value" in attributes)
-        $prevIsSpace = ctype_space($prevChar) || $pos === 0;
-        $nextIsSpace = ctype_space($nextChar);
-
-        // A quote following another quote should also be considered as having "space" before
-        // For example, "'Hello" at line start should produce "'Hello
-        $prevIsQuoteOpener = ($prevChar === '"' || $prevChar === "'") && $prevIsSpace === false;
-        if ($prevIsQuoteOpener) {
-            if ($pos === 1) {
-                // Previous quote was at position 0 (start of string)
-                $prevIsSpace = true;
-            } elseif ($pos >= 2) {
-                // Check if the preceding quote was in an opener position
-                $prevPrevChar = $text[$pos - 2];
-                if (ctype_space($prevPrevChar)) {
-                    $prevIsSpace = true;
-                }
+        if ($this->lastQuoteEnd === $this->textOrigin + $pos) {
+            $prev = $this->lastQuoteContext;
+        }
+        preg_match('/\G./us', $text, $match, 0, $pos + 1);
+        $next = $match[0] ?? '';
+        $space = static fn (string $c): bool => $c !== '' && str_contains(" \t\n\r\u{00A0}", $c);
+        $alnum = static fn (string $c): bool => preg_match('/^[\p{L}\p{N}]$/u', $c) === 1;
+        $opening = $prev === '' || $space($prev) || str_contains('([{-–—/=:', $prev)
+            || $prev === '“' || $prev === '‘';
+        if (
+            in_array($prev, ['-', '–', '—'], true)
+            && ($next === '' || $space($next) || str_contains("\"'.,;:!?)]", $next))
+        ) {
+            $opening = false;
+        }
+        $opening = $forced ?? $opening;
+        $apostrophe = false;
+        $closesSpan = $forced === false || !$space($prev);
+        $glyph = $opening ? $this->openDoubleQuote : $this->closeDoubleQuote;
+        if ($quote === "'") {
+            $apostrophe = $forced === null && (ctype_digit($next) || (!$opening && $alnum($next)));
+            if ($opening && $forced === null && $alnum($next)) {
+                preg_match('/\G\p{L}+/u', $text, $wordMatch, 0, $pos + 1);
+                $word = $wordMatch[0] ?? '';
+                $end = $pos + 1 + strlen($word);
+                preg_match('/\G./us', $text, $afterMatch, 0, min(strlen($text), $end + 1));
+                $quoted = ($text[$end] ?? '') === "'" && !$alnum($afterMatch[0] ?? '');
+                $elision = in_array(strtolower($word), [
+                    'tis', 'tisn', 'twas', 'twasn', 'twere', 'twill', 'twould',
+                    'em', 'cause', 'til', 'n', 'bout',
+                ], true) && !$quoted;
+                // The official doubled-quote shape keeps its nested opener.
+                $doubled = $pos > 0 && $text[$pos - 1] === "'" && $prev === '‘';
+                $apostrophe = $apostrophe || $elision || ($this->singleQuoteOpen && !$doubled);
+            }
+            $glyph = $apostrophe ? $this->apostrophe
+                : ($opening ? $this->openSingleQuote : $this->closeSingleQuote);
+            if (!$apostrophe && !$opening && $closesSpan) {
+                $this->singleQuoteOpen = false;
+                $this->singleQuoteOpener = null;
             }
         }
-
-        // Single quote before digit is always apostrophe (e.g., '70s)
-        if ($quote === "'" && ctype_digit($nextChar)) {
-            return $this->apostrophe;
+        $this->flushText($parent, $buffer, true);
+        $buffer = '';
+        $node = new Text($glyph);
+        $parent->appendChild($node);
+        if ($this->blockParser->getAbbreviations() !== []) {
+            $this->abbreviationSegments[$node] = $this->abbreviationRun;
         }
-
-        // A quote after ] or ) cannot be an opener
-        if ($prevChar === ']' || $prevChar === ')') {
-            return $quote === '"' ? $this->closeDoubleQuote : $this->closeSingleQuote;
+        if ($quote === "'" && $opening && !$apostrophe && !$this->singleQuoteOpen) {
+            $this->singleQuoteOpen = true;
+            $this->singleQuoteOpener = $node;
+            $this->demoteSingleQuote = $forced === null && $alnum($next)
+                && $this->textOrigin + $pos !== 0 && $prev !== '“';
         }
-
-        if ($quote === '"') {
-            // Opening if preceded by space or start, closing otherwise
-            return $prevIsSpace && !$nextIsSpace ? $this->openDoubleQuote : $this->closeDoubleQuote;
-        }
-
-        // For single quotes, use pre-computed cache to determine if this could be an opener
-        // A potential opener at position can only be an opener if there's a matching closer later
-        if ($prevIsSpace && !$nextIsSpace) {
-            // This could be an opener - check the pre-computed cache
-            if (isset($this->singleQuoteMatchCache[$pos])) {
-                return $this->openSingleQuote;
-            }
-
-            // No matching closer found, treat as apostrophe
-            return $this->apostrophe;
-        }
-
-        // Check if this is mid-word (next char is a word character) — apostrophe
-        if (preg_match('/\w/u', $nextChar)) {
-            return $this->apostrophe;
-        }
-
-        // Closing single quote
-        return $this->closeSingleQuote;
-    }
-
-    /**
-     * Build a cache of all single quote opener→closer matches for the text.
-     *
-     * This is called once per parseInlines() to avoid O(n²) complexity
-     * when processing many single quotes.
-     *
-     * @return array<int, int> Map of opener position to closer position
-     */
-    protected function buildSingleQuoteMatchCache(string $text): array
-    {
-        // No single quotes means nothing to match; skip the full byte scan.
-        if (!str_contains($text, "'")) {
-            return [];
-        }
-
-        $length = strlen($text);
-        $matched = [];
-        $openerStack = [];
-
-        // Single forward pass: classify each quote and pair a closer with the
-        // innermost still-open opener via a stack. The stack top is always the
-        // largest-index unmatched opener seen so far, so popping it reproduces
-        // the former "nearest preceding unmatched opener" pairing in O(n)
-        // instead of the previous O(n²) closer-by-opener scan.
-        for ($i = 0; $i < $length; $i++) {
-            if ($text[$i] !== "'") {
-                continue;
-            }
-
-            $prevChar = $i > 0 ? $text[$i - 1] : ' ';
-            $nextChar = $text[$i + 1] ?? ' ';
-
-            // Skip quotes before digits (always apostrophe)
-            if (ctype_digit($nextChar)) {
-                continue;
-            }
-
-            // Skip quotes after ] or )
-            if ($prevChar === ']' || $prevChar === ')') {
-                continue;
-            }
-
-            $prevIsSpace = ctype_space($prevChar) || $i === 0;
-            $nextIsSpace = ctype_space($nextChar);
-            $nextIsSpaceOrPunct = $nextIsSpace || $i === $length - 1
-                || preg_match('/^[\p{P}\p{S}]/u', $nextChar) === 1;
-
-            // A quote following another quote at line start should be considered opener
-            $prevIsQuoteOpener = ($prevChar === '"' || $prevChar === "'");
-            if ($prevIsQuoteOpener && !$prevIsSpace) {
-                // $i >= 2 here because: $i=0 means prevChar=' ', so $prevIsQuoteOpener=false;
-                // $i=1 means prevChar=$text[0], if quote, then $prevIsSpace=true (start of string)
-                if ($i === 1) {
-                    $prevIsSpace = true;
-                } elseif (ctype_space($text[$i - 2])) {
-                    $prevIsSpace = true;
-                }
-            }
-
-            if ($prevIsSpace && !$nextIsSpace) {
-                // Potential opener - push onto the stack of open quotes
-                $openerStack[] = $i;
-            } elseif (!$prevIsSpace && $nextIsSpaceOrPunct && $openerStack) {
-                // Potential closer - pair with the innermost unmatched opener
-                $matched[array_pop($openerStack)] = $i;
-            }
-            // Mid-word quotes are skipped (apostrophes)
-        }
-
-        return $matched;
+        $this->lastQuoteEnd = $this->textOrigin + $pos + 1;
+        $this->lastQuoteContext = $opening && ($quote === '"' || !$apostrophe)
+            ? ($quote === '"' ? '“' : '‘') : ($quote === '"' ? '”' : '’');
     }
 
     /**

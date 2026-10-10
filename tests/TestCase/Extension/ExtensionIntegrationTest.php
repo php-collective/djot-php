@@ -18,6 +18,22 @@ use PHPUnit\Framework\TestCase;
  */
 class ExtensionIntegrationTest extends TestCase
 {
+    public function testSmartQuoteSegmentsAroundCustomPatterns(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new MentionsExtension());
+        $converter->addExtension(new AutolinkExtension());
+        $this->assertSame(
+            '<p>‘<a href="/users/view/alice" data-username="alice" class="mention">@alice</a>’'
+            . ' and ‘<a href="https://example.com">https://example.com</a>’</p>' . "\n",
+            $converter->convert("'@alice' and 'https://example.com'"),
+        );
+        $this->assertSame(
+            '<p>say ’word <a href="/users/view/alice" data-username="alice" class="mention">@alice</a></p>' . "\n",
+            $converter->convert("say 'word @alice"),
+        );
+    }
+
     public function testAllExtensionsTogether(): void
     {
         $converter = new DjotConverter();

@@ -10,6 +10,16 @@ use PHPUnit\Framework\TestCase;
 
 class SmartQuotesExtensionTest extends TestCase
 {
+    public function testApostrophesKeepTheirGlyphWithLocaleQuotes(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new SmartQuotesExtension(locale: 'de'));
+        $this->assertStringContainsString('‚a ’b‘', $converter->convert("'a 'b'"));
+        $this->assertStringContainsString('say ’word', $converter->convert("say 'word"));
+        $this->assertStringContainsString('’tis', $converter->convert("'tis"));
+        $this->assertStringContainsString('„‚word', $converter->convert('"\'word'));
+    }
+
     public function testGermanDoubleQuotes(): void
     {
         $converter = new DjotConverter();
