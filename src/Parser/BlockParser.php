@@ -1711,14 +1711,16 @@ class BlockParser
             'paragraphOpen' => false,
         ];
 
+        $nestedState = $lazyState;
+        $containers = [];
+        $trackedLines = 0;
+
         if (preg_match('/^>[ \t](.*)$/', $line, $matches)) {
             $innerLines[] = $matches[1];
             $innerLineMap[] = $this->sourceLineFor($lineMap, $start);
-            $this->trackBlockQuoteLazyState($matches[1], $lazyState);
         } elseif (preg_match('/^>$/', $line)) {
             $innerLines[] = '';
             $innerLineMap[] = $this->sourceLineFor($lineMap, $start);
-            $this->trackBlockQuoteLazyState('', $lazyState);
         }
 
         $i = $start + 1;
@@ -1735,16 +1737,15 @@ class BlockParser
             if (preg_match('/^>[ \t](.*)$/', $currentLine, $matches)) {
                 $innerLines[] = $matches[1];
                 $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
-                $this->trackBlockQuoteLazyState($matches[1], $lazyState);
                 $i++;
             } elseif (preg_match('/^>$/', $currentLine)) {
                 // Empty block quote line (just >)
                 $innerLines[] = '';
                 $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
-                $this->trackBlockQuoteLazyState('', $lazyState);
                 $i++;
             } elseif (
-                $lazyState['paragraphOpen'] && !$this->startsNewBlock($currentLine)
+                $this->blockQuoteParagraphOpen($innerLines, $trackedLines, $lazyState, $nestedState, $containers)
+                && !$this->startsNewBlock($currentLine)
                 && !preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $currentLine)
             ) {
                 // Lazy continuation only extends an OPEN paragraph (djot rule).
@@ -1753,7 +1754,6 @@ class BlockParser
                 // fence), terminates the quote instead of being swallowed.
                 $innerLines[] = $currentLine;
                 $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
-                $this->trackBlockQuoteLazyState($currentLine, $lazyState);
                 $i++;
             } else {
                 break;
@@ -1769,6 +1769,172 @@ class BlockParser
         $parent->appendChild($blockQuote);
 
         return $i - $start;
+    }
+
+    /**
+     * Whether the quote's inner lines leave a paragraph an unquoted line may continue.
+     *
+     * Runs on demand: most quotes never meet an unquoted line. The container
+     * tracker answers while every line stays inside the containers it opened;
+     * after the first line that does not, the flat tracker's answer stands.
+     *
+     * @param array<string> $innerLines
+     * @param int $trackedLines Count of inner lines already tracked, advanced in place.
+     * @param array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool} $flatState
+     * @param array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool} $state
+     * @param array<array{type: string, indent: int, length: int}>|null $containers Null once the container tracker gave up.
+     */
+    private function blockQuoteParagraphOpen(
+        array $innerLines,
+        int &$trackedLines,
+        array &$flatState,
+        array &$state,
+        ?array &$containers,
+    ): bool {
+        for ($count = count($innerLines); $trackedLines < $count; $trackedLines++) {
+            $line = $innerLines[$trackedLines];
+            $this->trackBlockQuoteLazyState($line, $flatState);
+            if ($containers !== null && !$this->trackBlockQuoteLine($line, $state, $containers)) {
+                $containers = null;
+            }
+        }
+
+        return $containers !== null ? $state['paragraphOpen'] : $flatState['paragraphOpen'];
+    }
+
+    /**
+     * Track what one inner line of a block quote leaves open inside nested containers.
+     *
+     * Looks behind list markers and nested ">" prefixes, so a fence or div opened
+     * in a quoted list item is seen to open and to close.
+     *
+     * @param string $line Inner content line (after the "> " marker is stripped).
+     * @param array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool} $state
+     * @param array<array{type: string, indent: int, length: int}> $containers Open list items, nested quotes and divs, outermost
+     *     first. `length` is a div's fence length.
+     *
+     * @return bool False when the line leaves a container in a way only the block parsers can judge.
+     */
+    private function trackBlockQuoteLine(string $line, array &$state, array &$containers): bool
+    {
+        $length = strlen($line);
+        $pos = strspn($line, " \t");
+        foreach ($containers as $index => $container) {
+            if ($container['type'] === 'quote') {
+                if (!$this->isQuotePrefixAt($line, $pos)) {
+                    return false;
+                }
+                $pos++;
+                $pos += strspn($line, " \t", $pos);
+            } elseif ($container['type'] === 'item' && $pos < $length && $pos <= $container['indent']) {
+                // A dedented closer still ends a div that encloses the list.
+                return !$state['inFence'] && !$state['inComment']
+                    && $this->closeBlockQuoteDiv(substr($line, $pos), $state, $containers, $index - 1);
+            }
+        }
+
+        $rest = substr($line, $pos);
+        if ($state['inFence'] || $state['inComment'] || $rest === '') {
+            $this->trackBlockQuoteLazyState($rest, $state);
+
+            return true;
+        }
+        if ($this->closeBlockQuoteDiv($rest, $state, $containers, count($containers) - 1)) {
+            return true;
+        }
+        if ($state['paragraphOpen']) {
+            return !$this->startsNewBlock($rest);
+        }
+
+        // Content nested past the parser's depth cap is literal text, so stop opening containers there.
+        $remaining = self::MAX_NESTING_DEPTH - $this->nestingDepth - count($containers);
+        while ($remaining-- > 0) {
+            if ($this->isQuotePrefixAt($line, $pos)) {
+                $containers[] = ['type' => 'quote', 'indent' => $pos, 'length' => 0];
+                $pos++;
+                $pos += strspn($line, " \t", $pos);
+                if ($pos === $length) {
+                    return true;
+                }
+
+                continue;
+            }
+            $rest = substr($line, $pos);
+            $divInfo = $this->fencedBlockParser->parseDivFenceOpener($rest);
+            if ($divInfo !== null) {
+                $containers[] = ['type' => 'div', 'indent' => $pos, 'length' => $divInfo['length']];
+
+                return true;
+            }
+            // A reference definition may run on over indented lines; leave its extent to the flat tracker.
+            if (preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $rest)) {
+                return false;
+            }
+            if ($this->leavesNoParagraph($rest)) {
+                return true;
+            }
+            $marker = $this->listParser->parseListItemMarker($rest);
+            if ($marker === null) {
+                break;
+            }
+            $containers[] = ['type' => 'item', 'indent' => $pos, 'length' => 0];
+            $pos = $length - strlen($marker['content']);
+            $pos += strspn($line, " \t", $pos);
+            if ($pos === $length) {
+                return true;
+            }
+        }
+
+        $this->trackBlockQuoteLazyState(substr($line, $pos), $state);
+
+        return true;
+    }
+
+    /**
+     * Close the div at $index when the line is its closer.
+     *
+     * @param string $content
+     * @param array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool} $state
+     * @param array<array{type: string, indent: int, length: int}> $containers
+     * @param int $index
+     */
+    private function closeBlockQuoteDiv(string $content, array &$state, array &$containers, int $index): bool
+    {
+        $div = $containers[$index] ?? null;
+        if ($div === null || $div['type'] !== 'div' || !$this->fencedBlockParser->isDivFenceCloser($content, $div['length'])) {
+            return false;
+        }
+        array_splice($containers, $index);
+        $state['paragraphOpen'] = false;
+
+        return true;
+    }
+
+    private function isQuotePrefixAt(string $line, int $pos): bool
+    {
+        if (($line[$pos] ?? '') !== '>') {
+            return false;
+        }
+        $next = $line[$pos + 1] ?? ' ';
+
+        return $next === ' ' || $next === "\t";
+    }
+
+    /**
+     * Whether a line is a block that holds no paragraph an unquoted line could extend.
+     */
+    private function leavesNoParagraph(string $content): bool
+    {
+        if ($this->tableParser->isTableRow($content) || preg_match('/^(?:[-*][ \t]*){3,}$/', $content)) {
+            return true;
+        }
+        if (!str_starts_with($content, '{')) {
+            return false;
+        }
+        $attrEnd = AttributeParser::findEnd($content);
+
+        return $attrEnd !== null && trim(substr($content, $attrEnd + 1)) === ''
+            && AttributeParser::isValid(substr($content, 1, $attrEnd - 1));
     }
 
     /**
