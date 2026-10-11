@@ -653,52 +653,7 @@ class BlockParser
                 $label = StringUtil::normalizeLabel($matches[1]);
                 $content = $matches[2] ?? '';
 
-                // Determine base indentation (2 spaces for footnotes)
-                $baseIndent = 2;
-
-                // Collect continuation lines (indented or blank)
-                $contentLines = [];
-                $contentLineMap = [];
-                if (trim($content) !== '') {
-                    $contentLines[] = $content;
-                    $contentLineMap[] = $i;
-                }
-                $j = $i + 1;
-                $hasContent = false;
-                while ($j < $count) {
-                    $nextLine = $lines[$j];
-                    if (IndentationHelper::isBlankLine($nextLine)) {
-                        // Add blank line to preserve structure
-                        $contentLines[] = '';
-                        $contentLineMap[] = $j;
-                        $j++;
-
-                        continue;
-                    }
-                    // Check if line has at least base indentation (2 spaces or 1 tab)
-                    if (preg_match('/^(?:[ ]{' . $baseIndent . '}|\t)(.*)$/', $nextLine, $contMatch)) {
-                        $contentLines[] = $contMatch[1];
-                        $contentLineMap[] = $j;
-                        $hasContent = true;
-                        $j++;
-                    } elseif (!$hasContent && preg_match('/^\s+(.+)$/', $nextLine, $contMatch)) {
-                        // Allow flexible indentation for first content line
-                        $contentLines[] = $contMatch[1];
-                        $contentLineMap[] = $j;
-                        $hasContent = true;
-                        $j++;
-                    } else {
-                        break;
-                    }
-                }
-
-                // Remove trailing blank lines
-                $lineCount = count($contentLines);
-                while ($lineCount > 0 && $contentLines[$lineCount - 1] === '') {
-                    array_pop($contentLines);
-                    array_pop($contentLineMap);
-                    $lineCount--;
-                }
+                [$contentLines, $contentLineMap] = $this->collectFootnoteLines($lines, $i, $content);
 
                 $footnote = new Footnote($label);
                 if ($contentLines) {
@@ -1831,8 +1786,8 @@ class BlockParser
      *
      * @param string $line Inner content line (after the "> " marker is stripped).
      * @param array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool} $state
-     * @param array<array{type: string, indent: int, length: int}> $containers Open list items, nested quotes and divs, outermost
-     *     first. `length` is a div's fence length.
+     * @param array<array{type: string, indent: int, length: int}> $containers Open list items, nested quotes, divs and a
+     *     trailing reference definition, outermost first. `length` is a div's fence length.
      *
      * @return bool False when the line leaves a container in a way only the block parsers can judge.
      */
@@ -1840,21 +1795,59 @@ class BlockParser
     {
         $length = strlen($line);
         $pos = strspn($line, " \t");
+        // A reference definition is always innermost; it only holds indented lines of its own.
+        $reference = $containers !== [] && $containers[count($containers) - 1]['type'] === 'reference'
+            ? array_pop($containers)
+            : null;
+        $verbatim = $state['inFence'] || $state['inComment'];
         foreach ($containers as $index => $container) {
             if ($container['type'] === 'quote') {
-                if (!$this->isQuotePrefixAt($line, $pos)) {
-                    return false;
+                if ($this->isQuotePrefixAt($line, $pos)) {
+                    $pos++;
+                    $pos += strspn($line, " \t", $pos);
+
+                    continue;
                 }
-                $pos++;
-                $pos += strspn($line, " \t", $pos);
-            } elseif ($container['type'] === 'item' && $pos < $length && $pos <= $container['indent']) {
-                // A dedented closer still ends a div that encloses the list.
-                return !$state['inFence'] && !$state['inComment']
-                    && $this->closeBlockQuoteDiv(substr($line, $pos), $state, $containers, $index - 1);
+                // A blank line ends a quote and whatever it holds.
+                if ($pos === $length) {
+                    array_splice($containers, $index);
+                    $state['inFence'] = false;
+                    $state['inComment'] = false;
+                    $state['paragraphOpen'] = false;
+
+                    return true;
+                }
+            } elseif ($container['type'] !== 'item' || $pos === $length || $pos > $container['indent']) {
+                continue;
             }
+            // With no paragraph to continue, or a marker in the item's own column, the
+            // container ends here and the line starts over.
+            $endsContainer = !$verbatim && (
+                !$state['paragraphOpen']
+                || ($container['type'] === 'item' && $pos === $container['indent']
+                    && $this->listParser->parseListItemMarker(substr($line, $pos)) !== null)
+            );
+            if ($endsContainer) {
+                array_splice($containers, $index);
+                $state['paragraphOpen'] = false;
+
+                break;
+            }
+
+            // A dedented closer still ends a div that encloses the list.
+            return $container['type'] === 'item' && !$verbatim
+                && $this->closeBlockQuoteDiv(substr($line, $pos), $state, $containers, $index - 1);
         }
 
         $rest = substr($line, $pos);
+        if (
+            $reference !== null && $pos > $reference['indent'] && $rest !== ''
+            && !preg_match('/^\[[^\]]+\]:(?=[ \t]|$)/', $rest) && !$this->startsNewBlock($rest)
+        ) {
+            $containers[] = $reference;
+
+            return true;
+        }
         if ($state['inFence'] || $state['inComment'] || $rest === '') {
             $this->trackBlockQuoteLazyState($rest, $state);
 
@@ -1887,9 +1880,15 @@ class BlockParser
 
                 return true;
             }
-            // A reference definition may run on over indented lines; leave its extent to the flat tracker.
             if (preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $rest)) {
-                return false;
+                // A footnote definition holds blocks of its own, and the list parser reads a
+                // definition's indented lines its own way; leave both to the flat tracker.
+                if (str_starts_with($rest, '[^') || in_array('item', array_column($containers, 'type'), true)) {
+                    return false;
+                }
+                $containers[] = ['type' => 'reference', 'indent' => $pos, 'length' => 0];
+
+                return true;
             }
             if ($this->leavesNoParagraph($rest)) {
                 return true;
@@ -1906,7 +1905,12 @@ class BlockParser
             }
         }
 
-        $this->trackBlockQuoteLazyState(substr($line, $pos), $state);
+        $rest = substr($line, $pos);
+        // Blocks end a heading where they would not end a paragraph; leave it to the flat tracker.
+        if (preg_match('/^#{1,6}(?:[ \t]|$)/', $rest)) {
+            return false;
+        }
+        $this->trackBlockQuoteLazyState($rest, $state);
 
         return true;
     }
@@ -1929,6 +1933,26 @@ class BlockParser
         $state['paragraphOpen'] = false;
 
         return true;
+    }
+
+    /**
+     * Whether a line that its container no longer holds opens a block of its own.
+     *
+     * Such a line is not a lazy paragraph continuation; it ends the container.
+     *
+     * @param string $line The line without leading whitespace.
+     */
+    private function opensBlock(string $line): bool
+    {
+        return $this->isQuotePrefixAt($line, 0)
+            || preg_match('/^#{1,6}(?:[ \t]|$)/', $line) === 1
+            || preg_match('/^(?:\*\[|\[\^)[^\]]+\]:(?=[ \t]|$)/', $line) === 1
+            || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $line) === 1
+            || $this->fencedBlockParser->parseCodeFenceOpener($line) !== null
+            || $this->fencedBlockParser->parseDivFenceOpener($line) !== null
+            || $this->leavesNoParagraph($line)
+            || $this->listParser->parseListItemMarker($line) !== null
+            || $this->startsNewBlock($line);
     }
 
     private function isQuotePrefixAt(string $line, int $pos): bool
@@ -4001,29 +4025,90 @@ class BlockParser
         $line = ltrim($lines[$start], " \t");
 
         // Match footnote definition: [^label]: content (requires whitespace after colon)
-        if (!preg_match('/^\[\^([^\]]+)\]:(?=[ \t]|$)/', $line)) {
+        if (!preg_match('/^\[\^([^\]]+)\]:(?:[ \t]+(.*))?[ \t]*$/', $line, $matches)) {
             return null;
         }
 
-        // Skip the footnote definition and any continuation lines
-        $i = $start + 1;
-        $count = count($lines);
+        // Skip the footnote definition and the lines the extraction pass took for it
+        return $this->collectFootnoteLines($lines, $start, $matches[2] ?? '')[2] - $start;
+    }
 
-        while ($i < $count) {
-            $nextLine = $lines[$i];
+    /**
+     * Collect the content lines of the footnote definition at $start.
+     *
+     * @param array<string> $lines
+     * @param int $start Index of the definition's marker line.
+     * @param string $content Text after the marker on that line.
+     *
+     * @return array{array<string>, array<int>, int} Content lines, their line indexes, and the index after the definition.
+     */
+    private function collectFootnoteLines(array $lines, int $start, string $content): array
+    {
+        // Determine base indentation (2 spaces for footnotes)
+        $baseIndent = 2;
+
+        $contentLines = [];
+        $contentLineMap = [];
+        if (trim($content) !== '') {
+            $contentLines[] = $content;
+            $contentLineMap[] = $start;
+        }
+        $state = [
+            'inFence' => false,
+            'fenceChar' => '',
+            'fenceLength' => 0,
+            'inComment' => false,
+            'commentLength' => 0,
+            'paragraphOpen' => false,
+        ];
+        $containers = [];
+        $trackedLines = 0;
+        $count = count($lines);
+        $j = $start + 1;
+        $end = $j;
+        $hasContent = false;
+        while ($j < $count) {
+            $nextLine = $lines[$j];
             if (IndentationHelper::isBlankLine($nextLine)) {
-                $i++;
+                // Add blank line to preserve structure
+                $contentLines[] = '';
+                $contentLineMap[] = $j;
+                $j++;
 
                 continue;
             }
-            if (preg_match('/^\s+/', $nextLine)) {
-                $i++;
+            // Check if line has at least base indentation (2 spaces or 1 tab)
+            if (preg_match('/^(?:[ ]{' . $baseIndent . '}|\t)(.*)$/', $nextLine, $contMatch)) {
+                $contentLines[] = $contMatch[1];
+            } elseif (!$hasContent && preg_match('/^\s+(.+)$/', $nextLine, $contMatch)) {
+                // Allow flexible indentation for first content line
+                $contentLines[] = $contMatch[1];
+            } elseif (
+                $this->containersLeaveParagraphOpen($contentLines, $trackedLines, $state, $containers) === true
+                && !$this->opensBlock(ltrim($nextLine, " \t"))
+            ) {
+                // An open paragraph takes a line that omits the indentation. The line
+                // leaves it open, so the tracker has nothing to learn from it.
+                $contentLines[] = ltrim($nextLine, " \t");
+                $trackedLines++;
             } else {
                 break;
             }
+            $contentLineMap[] = $j;
+            $hasContent = true;
+            $j++;
+            $end = $j;
         }
 
-        return $i - $start;
+        // Remove trailing blank lines
+        $lineCount = count($contentLines);
+        while ($lineCount > 0 && $contentLines[$lineCount - 1] === '') {
+            array_pop($contentLines);
+            array_pop($contentLineMap);
+            $lineCount--;
+        }
+
+        return [$contentLines, $contentLineMap, $end];
     }
 
     /**
