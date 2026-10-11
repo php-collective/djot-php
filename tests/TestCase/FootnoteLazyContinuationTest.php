@@ -94,6 +94,10 @@ class FootnoteLazyContinuationTest extends TestCase
                 "x[^n]\n\n[^n]: a\n|pipe",
                 "<p>x<a id=\"fnref1\" href=\"#fn1\" role=\"doc-noteref\"><sup>1</sup></a></p>\n<section role=\"doc-endnotes\">\n<hr>\n<ol>\n<li id=\"fn1\">\n<p>a\n|pipe<a href=\"#fnref1\" role=\"doc-backlink\">↩︎</a></p>\n</li>\n</ol>\n</section>\n",
             ],
+            'reference-like text with two words' => [
+                "x[^n]\n\n[^n]: a\n[r]: two words",
+                "<p>x<a id=\"fnref1\" href=\"#fn1\" role=\"doc-noteref\"><sup>1</sup></a></p>\n<section role=\"doc-endnotes\">\n<hr>\n<ol>\n<li id=\"fn1\">\n<p>a\n[r]: two words<a href=\"#fnref1\" role=\"doc-backlink\">↩︎</a></p>\n</li>\n</ol>\n</section>\n",
+            ],
         ];
     }
 

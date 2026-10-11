@@ -1946,7 +1946,8 @@ class BlockParser
     {
         return $this->isQuotePrefixAt($line, 0)
             || preg_match('/^#{1,6}(?:[ \t]|$)/', $line) === 1
-            || preg_match('/^\*?\[[^\]]+\]:(?=[ \t]|$)/', $line) === 1
+            || preg_match('/^(?:\*\[|\[\^)[^\]]+\]:(?=[ \t]|$)/', $line) === 1
+            || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $line) === 1
             || $this->fencedBlockParser->parseCodeFenceOpener($line) !== null
             || $this->fencedBlockParser->parseDivFenceOpener($line) !== null
             || $this->leavesNoParagraph($line)
