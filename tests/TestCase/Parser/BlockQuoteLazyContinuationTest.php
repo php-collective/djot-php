@@ -228,6 +228,26 @@ class BlockQuoteLazyContinuationTest extends TestCase
                 "> [a]: /url\n>   ```\n> x\ntail",
                 "<blockquote>\n<p>x\ntail</p>\n</blockquote>\n",
             ],
+            'bare nested quote holds no paragraph' => [
+                "> >\ntail",
+                "<blockquote>\n<blockquote>\n</blockquote>\n</blockquote>\n<p>tail</p>\n",
+            ],
+            'empty list item holds no paragraph' => [
+                "> -\ntail",
+                "<blockquote>\n<ul>\n<li>\n</li>\n</ul>\n</blockquote>\n<p>tail</p>\n",
+            ],
+            'table row in item holds no paragraph' => [
+                "> - | a |\ntail",
+                "<blockquote>\n<ul>\n<li>\n<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n</li>\n</ul>\n</blockquote>\n<p>tail</p>\n",
+            ],
+            'attribute line applies to the unquoted line' => [
+                "> {.c}\ntail",
+                "<blockquote>\n</blockquote>\n<p class=\"c\">tail</p>\n",
+            ],
+            'attribute line in item applies to the unquoted line' => [
+                "> - {.c}\ntail",
+                "<blockquote>\n<ul>\n<li>\n</li>\n</ul>\n</blockquote>\n<p class=\"c\">tail</p>\n",
+            ],
         ];
     }
 }
