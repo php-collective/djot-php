@@ -256,6 +256,24 @@ Use `^` after a block quote to add an attribution/caption. The block quote will 
 </template>
 </OutputTabs>
 
+#### Lines without the `>` prefix
+
+A paragraph in a block quote also takes following lines that leave out the `>`:
+
+```djot
+> This quote is wrapped
+without a prefix on the second line.
+```
+
+That only holds for plain paragraph text. A line that opens a block ends the quote, and the block follows it:
+
+```djot
+> A quote
+- a list after the quote, not text inside it
+```
+
+This applies to list items (`-`, `1.`), headings, `> ` quotes, code fences, divs, thematic breaks, table rows and reference definitions. If a wrapped line of a quote happens to start with one of these, such as `1985. That year`, put the `>` in front of it.
+
 ### Lists
 
 #### Bullet Lists
