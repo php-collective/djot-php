@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Djot\Test\TestCase\Parser;
 
 use Djot\DjotConverter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -103,5 +104,130 @@ class BlockQuoteLazyContinuationTest extends TestCase
         $expected = "<blockquote>\n<p>text\n<code>\nlazy</code></p>\n</blockquote>\n";
 
         $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    /**
+     * A block closed inside a quoted list item leaves no paragraph for an
+     * unquoted line to continue, so the line ends the quote (matches djot.js).
+     */
+    #[DataProvider('closedBlockInQuotedListItemProvider')]
+    public function testUnquotedLineAfterClosedBlockInListItemTerminatesQuote(string $djot, string $expected): void
+    {
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function closedBlockInQuotedListItemProvider(): array
+    {
+        return [
+            'sibling marker after closed div' => [
+                "> - ::: box\n>   :::\n- tail",
+                "<blockquote>\n<ul>\n<li>\n<div class=\"box\">\n</div>\n</li>\n</ul>\n</blockquote>\n<ul>\n<li>\ntail\n</li>\n</ul>\n",
+            ],
+            'indented marker after closed div' => [
+                "> - ::: box\n>   :::\n  - tail",
+                "<blockquote>\n<ul>\n<li>\n<div class=\"box\">\n</div>\n</li>\n</ul>\n</blockquote>\n<ul>\n<li>\ntail\n</li>\n</ul>\n",
+            ],
+            'plain line after closed div' => [
+                "> - ::: box\n>   :::\ntail",
+                "<blockquote>\n<ul>\n<li>\n<div class=\"box\">\n</div>\n</li>\n</ul>\n</blockquote>\n<p>tail</p>\n",
+            ],
+            'closed div with content' => [
+                "> - ::: box\n>   x\n>   :::\n- tail",
+                "<blockquote>\n<ul>\n<li>\n<div class=\"box\">\n<p>x</p>\n</div>\n</li>\n</ul>\n</blockquote>\n<ul>\n<li>\ntail\n</li>\n</ul>\n",
+            ],
+            'closed code fence' => [
+                "> - ```\n>   ```\n- tail",
+                "<blockquote>\n<ul>\n<li>\n<pre><code></code></pre>\n</li>\n</ul>\n</blockquote>\n<ul>\n<li>\ntail\n</li>\n</ul>\n",
+            ],
+            'ordered item' => [
+                "> 1. ::: box\n>    :::\n2. tail",
+                "<blockquote>\n<ol>\n<li>\n<div class=\"box\">\n</div>\n</li>\n</ol>\n</blockquote>\n<ol start=\"2\">\n<li>\ntail\n</li>\n</ol>\n",
+            ],
+            'nested list item' => [
+                "> - - ::: box\n>     :::\n- tail",
+                "<blockquote>\n<ul>\n<li>\n<ul>\n<li>\n<div class=\"box\">\n</div>\n</li>\n</ul>\n</li>\n</ul>\n</blockquote>\n<ul>\n<li>\ntail\n</li>\n</ul>\n",
+            ],
+            'quote inside item' => [
+                "> - > ::: box\n>   > :::\n- tail",
+                "<blockquote>\n<ul>\n<li>\n<blockquote>\n<div class=\"box\">\n</div>\n</blockquote>\n</li>\n</ul>\n</blockquote>\n<ul>\n<li>\ntail\n</li>\n</ul>\n",
+            ],
+            'list inside a closed div' => [
+                "> ::: note\n> - x\n> :::\ntail",
+                "<blockquote>\n<div class=\"note\">\n<ul>\n<li>\nx\n</li>\n</ul>\n</div>\n</blockquote>\n<p>tail</p>\n",
+            ],
+        ];
+    }
+
+    /**
+     * A fence or div opened in a quoted list item ends with the item, so a later
+     * quoted paragraph still takes an unquoted continuation line.
+     */
+    #[DataProvider('blockEndingWithQuotedListItemProvider')]
+    public function testParagraphAfterListItemStillFolds(string $djot, string $expected): void
+    {
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function blockEndingWithQuotedListItemProvider(): array
+    {
+        return [
+            'div ends with its list item' => [
+                "> - ::: box\n> text\n> :::\ntail",
+                "<blockquote>\n<ul>\n<li>\n<div class=\"box\">\n</div>\n</li>\n</ul>\n<p>text\n:::\ntail</p>\n</blockquote>\n",
+            ],
+            'code fence ends with its list item' => [
+                "> - ```\n> text\ntail",
+                "<blockquote>\n<ul>\n<li>\n<pre><code></code></pre>\n</li>\n</ul>\n<p>text\ntail</p>\n</blockquote>\n",
+            ],
+            'nested quote fence ends with its list item' => [
+                "> - > ```\n> > x\ntail",
+                "<blockquote>\n<ul>\n<li>\n<blockquote>\n<pre><code></code></pre>\n</blockquote>\n</li>\n</ul>\n<blockquote>\n<p>x\ntail</p>\n</blockquote>\n</blockquote>\n",
+            ],
+        ];
+    }
+
+    #[DataProvider('nestedContainerEdgeCaseProvider')]
+    public function testNestedContainerEdgeCases(string $djot, string $expected): void
+    {
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function nestedContainerEdgeCaseProvider(): array
+    {
+        return [
+            'blank line closes nested quote' => [
+                "> > x\n>\ntail",
+                "<blockquote>\n<blockquote>\n<p>x</p>\n</blockquote>\n</blockquote>\n<p>tail</p>\n",
+            ],
+            'indented comment marker is paragraph text' => [
+                "> x\n>   %%%\ntail",
+                "<blockquote>\n<p>x\n%%%\ntail</p>\n</blockquote>\n",
+            ],
+            'comment marker in item lead paragraph is text' => [
+                "> - x\n>   %%%\ntail",
+                "<blockquote>\n<ul>\n<li>\nx\n%%%\ntail\n</li>\n</ul>\n</blockquote>\n",
+            ],
+            'indented comment marker after nested quote is text' => [
+                "> > x\n>   %%%\ntail",
+                "<blockquote>\n<blockquote>\n<p>x\n%%%\ntail</p>\n</blockquote>\n</blockquote>\n",
+            ],
+            'closer inside nested quote leaves outer div open' => [
+                "> :::\n> > x\n> > :::\ntail",
+                "<blockquote>\n<div>\n<blockquote>\n<p>x\n:::\ntail</p>\n</blockquote>\n</div>\n</blockquote>\n",
+            ],
+            'fence marker continuing a reference definition' => [
+                "> [a]: /url\n>   ```\n> x\ntail",
+                "<blockquote>\n<p>x\ntail</p>\n</blockquote>\n",
+            ],
+        ];
     }
 }
