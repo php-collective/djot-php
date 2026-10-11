@@ -1803,6 +1803,27 @@ class BlockParser
     }
 
     /**
+     * Whether collected container lines leave a paragraph open, as far as the container tracker can tell.
+     *
+     * @param array<string> $innerLines
+     * @param int $trackedLines Count of inner lines already tracked, advanced in place.
+     * @param array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool} $state
+     * @param array<array{type: string, indent: int, length: int}>|null $containers Null once the container tracker gave up.
+     *
+     * @return bool|null Null when a line left a container in a way only the block parsers can judge.
+     */
+    private function containersLeaveParagraphOpen(array $innerLines, int &$trackedLines, array &$state, ?array &$containers): ?bool
+    {
+        for ($count = count($innerLines); $containers !== null && $trackedLines < $count; $trackedLines++) {
+            if (!$this->trackBlockQuoteLine($innerLines[$trackedLines], $state, $containers)) {
+                $containers = null;
+            }
+        }
+
+        return $containers !== null ? $state['paragraphOpen'] : null;
+    }
+
+    /**
      * Track what one inner line of a block quote leaves open inside nested containers.
      *
      * Looks behind list markers and nested ">" prefixes, so a fence or div opened
@@ -2208,6 +2229,16 @@ class BlockParser
                     $maxContentIndent = $currentIndent;
                     $sawBlankLine = false;
                     $brokeForParentContent = false;
+                    $subState = [
+                        'inFence' => false,
+                        'fenceChar' => '',
+                        'fenceLength' => 0,
+                        'inComment' => false,
+                        'commentLength' => 0,
+                        'paragraphOpen' => false,
+                    ];
+                    $subContainers = [];
+                    $subTrackedLines = 0;
                     while ($i < $count) {
                         $subLine = $lines[$i];
                         if (IndentationHelper::isBlankLine($subLine)) {
@@ -2262,6 +2293,11 @@ class BlockParser
                             // Check if it's a block element - if so, end list content collection
                             // Use isBlockElementStart() which detects blocks regardless of mode
                             if ($this->isBlockElementStart($trimmedLine) || $this->startsNewBlock($trimmedLine)) {
+                                break;
+                            }
+                            // Only an open paragraph takes a lazy line; after a fence or
+                            // other block without one the line belongs outside the list.
+                            if ($this->containersLeaveParagraphOpen($subLines, $subTrackedLines, $subState, $subContainers) === false) {
                                 break;
                             }
                             // Otherwise it's lazy continuation at base level - include in nested content
