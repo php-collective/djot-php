@@ -248,6 +248,26 @@ class BlockQuoteLazyContinuationTest extends TestCase
                 "> - {.c}\ntail",
                 "<blockquote>\n<ul>\n<li>\n</li>\n</ul>\n</blockquote>\n<p class=\"c\">tail</p>\n",
             ],
+            'reference definition holds no paragraph' => [
+                "> [r]: u\ntail",
+                "<blockquote>\n</blockquote>\n<p>tail</p>\n",
+            ],
+            'reference definition with a continued destination' => [
+                "> [r]:\n>  u\ntail",
+                "<blockquote>\n</blockquote>\n<p>tail</p>\n",
+            ],
+            'sibling item after a closed div' => [
+                "> - ::: d\n>   :::\n> - ::: e\n- tail",
+                "<blockquote>\n<ul>\n<li>\n<div class=\"d\">\n</div>\n</li>\n<li>\n<div class=\"e\">\n</div>\n</li>\n</ul>\n</blockquote>\n<ul>\n<li>\ntail\n</li>\n</ul>\n",
+            ],
+            'fence after a closed fence in an item' => [
+                "> - ```\n>   ```\n> ```\ntail",
+                "<blockquote>\n<ul>\n<li>\n<pre><code></code></pre>\n</li>\n</ul>\n<pre><code></code></pre>\n</blockquote>\n<p>tail</p>\n",
+            ],
+            'closed fence in a second item' => [
+                "> - a\n> - ```\n>   ```\ntail",
+                "<blockquote>\n<ul>\n<li>\na\n</li>\n<li>\n<pre><code></code></pre>\n</li>\n</ul>\n</blockquote>\n<p>tail</p>\n",
+            ],
         ];
     }
 }

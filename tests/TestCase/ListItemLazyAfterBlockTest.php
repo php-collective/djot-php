@@ -74,6 +74,10 @@ class ListItemLazyAfterBlockTest extends TestCase
                 "- a\n\n  %%%\n  c\ntext",
                 "<ul>\n<li>\n<p>a</p>\n</li>\n</ul>\n<p>text</p>\n",
             ],
+            'reference definition' => [
+                "- a\n\n  [r]: u\ntext",
+                "<ul>\n<li>\n<p>a</p>\n</li>\n</ul>\n<p>text</p>\n",
+            ],
         ];
     }
 
