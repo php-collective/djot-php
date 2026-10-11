@@ -1688,25 +1688,25 @@ class BlockParser
                 break;
             }
 
-            // Continue with a "> " or ">\t" prefix (space or tab delimiter)
-            if (preg_match('/^>[ \t](.*)$/', $currentLine, $matches)) {
+            // Continue with a "> " or ">\t" prefix (space or tab delimiter), indented or not
+            if (preg_match('/^[ \t]*>[ \t](.*)$/', $currentLine, $matches)) {
                 $innerLines[] = $matches[1];
                 $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
                 $i++;
-            } elseif (preg_match('/^>$/', $currentLine)) {
+            } elseif (preg_match('/^[ \t]*>$/', $currentLine)) {
                 // Empty block quote line (just >)
                 $innerLines[] = '';
                 $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
                 $i++;
             } elseif (
                 $this->blockQuoteParagraphOpen($innerLines, $trackedLines, $lazyState, $nestedState, $containers)
-                && !$this->startsNewBlock($currentLine)
-                && !preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $currentLine)
+                && !$this->opensBlock($currentLine)
             ) {
-                // Lazy continuation only extends an OPEN paragraph (djot rule).
-                // A non-">" line inside an open code fence/comment, or after a
-                // block that left no open paragraph (a just-opened div, a closed
-                // fence), terminates the quote instead of being swallowed.
+                // Lazy continuation only extends an OPEN paragraph (djot rule), and
+                // only with a line that opens no block of its own. A non-">" line
+                // inside an open code fence/comment, or after a block that left no
+                // open paragraph (a just-opened div, a closed fence), terminates the
+                // quote instead of being swallowed.
                 $innerLines[] = $currentLine;
                 $innerLineMap[] = $this->sourceLineFor($lineMap, $i);
                 $i++;
@@ -1939,19 +1939,20 @@ class BlockParser
      * Whether a line that its container no longer holds opens a block of its own.
      *
      * Such a line is not a lazy paragraph continuation; it ends the container.
-     *
-     * @param string $line The line without leading whitespace.
      */
     private function opensBlock(string $line): bool
     {
-        return $this->isQuotePrefixAt($line, 0)
-            || preg_match('/^#{1,6}(?:[ \t]|$)/', $line) === 1
-            || preg_match('/^(?:\*\[|\[\^)[^\]]+\]:(?=[ \t]|$)/', $line) === 1
-            || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $line) === 1
-            || $this->fencedBlockParser->parseCodeFenceOpener($line) !== null
-            || $this->fencedBlockParser->parseDivFenceOpener($line) !== null
-            || $this->leavesNoParagraph($line)
-            || $this->listParser->parseListItemMarker($line) !== null
+        $trimmed = ltrim($line, " \t");
+
+        // startsNewBlock() gets the line as written: an indented `%%%` or `^ ` is text.
+        return $this->isQuotePrefixAt($trimmed, 0)
+            || preg_match('/^#{1,6}(?:[ \t]|$)/', $trimmed) === 1
+            || preg_match('/^(?:\*\[|\[\^)[^\]]+\]:(?=[ \t]|$)/', $trimmed) === 1
+            || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $trimmed) === 1
+            || $this->fencedBlockParser->parseCodeFenceOpener($trimmed) !== null
+            || $this->fencedBlockParser->parseDivFenceOpener($trimmed) !== null
+            || $this->leavesNoParagraph($trimmed)
+            || $this->listParser->parseListItemMarker($trimmed) !== null
             || $this->startsNewBlock($line);
     }
 
@@ -4085,7 +4086,7 @@ class BlockParser
                 $contentLines[] = $contMatch[1];
             } elseif (
                 $this->containersLeaveParagraphOpen($contentLines, $trackedLines, $state, $containers) === true
-                && !$this->opensBlock(ltrim($nextLine, " \t"))
+                && !$this->opensBlock($nextLine)
             ) {
                 // An open paragraph takes a line that omits the indentation. The line
                 // leaves it open, so the tracker has nothing to learn from it.
