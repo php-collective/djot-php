@@ -2135,6 +2135,12 @@ class BlockParser
 
                     return;
                 }
+                // A footnote body continues like the item's own content.
+                if (preg_match('/^\[\^[^\]]+\]:(?:[ \t]+(.*))?$/', $content, $matches)) {
+                    $this->trackDefinitionLazyState($matches[1] ?? '', $state, $divFences, $quoteDepth);
+
+                    return;
+                }
                 // These blocks contain no paragraph for an unindented line to extend.
                 if (
                     $this->tableParser->isTableRow($content)
@@ -2473,6 +2479,8 @@ class BlockParser
             $itemDivFences = [];
             $itemQuoteDepth = 0;
             $this->trackDefinitionLazyState($itemContent, $itemState, $itemDivFences, $itemQuoteDepth);
+            // A footnote's open paragraph, which an under-indented block line closes.
+            $itemNoteOpen = $itemState['paragraphOpen'] && str_starts_with($itemContent, '[^');
 
             while ($i < $count) {
                 $nextLine = $lines[$i];
@@ -2530,6 +2538,10 @@ class BlockParser
                 // Unless nested blocks in lists are enabled, indented block markers
                 // are treated as plain continuation text here.
                 if ($nextIndent >= $contentIndent) {
+                    // A note marked at the content column needs deeper lines.
+                    if ($itemNoteOpen && $nextIndent === $contentIndent && $this->opensBlock($nextLine)) {
+                        $itemState['paragraphOpen'] = false;
+                    }
                     // If the active list-nesting mode treats this indented line
                     // as a nested block, break out so normal nesting handles it.
                     if (
@@ -2546,15 +2558,17 @@ class BlockParser
                     $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
                 } else {
                     // Lazy continuation (not properly indented but not at base level either)
+                    if ($itemNoteOpen && $this->opensBlock($nextLine)) {
+                        $itemState['paragraphOpen'] = false;
+                    }
                     $itemLines[] = $nextTrimmed;
                     $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
                 }
-                $this->trackDefinitionLazyState(
-                    $itemLines[count($itemLines) - 1],
-                    $itemState,
-                    $itemDivFences,
-                    $itemQuoteDepth,
-                );
+                $tracked = $itemLines[count($itemLines) - 1];
+                $wasOpen = $itemState['paragraphOpen'];
+                $this->trackDefinitionLazyState($tracked, $itemState, $itemDivFences, $itemQuoteDepth);
+                $itemNoteOpen = $itemState['paragraphOpen'] && (str_starts_with($tracked, '[^')
+                    || ($itemNoteOpen && $wasOpen && !$this->opensBlock($tracked)));
                 $hasNonMarkerContinuation = true;
                 $i++;
             }
