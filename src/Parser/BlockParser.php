@@ -113,6 +113,11 @@ class BlockParser
     protected array $footnotes = [];
 
     /**
+     * @var array<array{string, \Djot\Exception\ParseWarning}>
+     */
+    protected array $undefinedFootnoteWarnings = [];
+
+    /**
      * Abbreviation definitions: maps abbreviation text to its definition
      *
      * @var array<string, string>
@@ -542,6 +547,7 @@ class BlockParser
         $this->collectingReferences = false;
         $this->deferredReferences = [];
         $this->footnotes = [];
+        $this->undefinedFootnoteWarnings = [];
         $this->abbreviations = [];
         $this->pendingAttributes = [];
         $this->pendingAttributeSourceLines = [];
@@ -570,15 +576,11 @@ class BlockParser
             '/\[[^\]\r\n]+\]:(?:[ \t]+\S*)?[ \t]*(?:\r?\n|$)/',
             $input,
         ) === 1;
-        $hasFootnotes = str_contains($input, '[^');
         $hasAbbreviations = str_contains($input, '*[');
         $hasImplicitHeadingReferences = preg_match('/\]\s*\[/', $input) === 1;
         $this->collectingReferences = $hasImplicitHeadingReferences || $this->collectWarnings;
         if ($hasReferenceDefinitions) {
             $this->extractReferences($lines);
-        }
-        if ($hasFootnotes) {
-            $this->extractFootnotes($lines);
         }
         if ($hasAbbreviations) {
             $this->extractAbbreviations($lines);
@@ -603,6 +605,19 @@ class BlockParser
 
         // Validate references and anchor links if warnings are enabled
         if ($this->collectWarnings) {
+            // A definition inside a container is parsed after earlier references.
+            $resolved = [];
+            foreach ($this->undefinedFootnoteWarnings as [$label, $warning]) {
+                if (isset($this->footnotes[$label])) {
+                    $resolved[spl_object_id($warning)] = true;
+                }
+            }
+            if ($resolved !== []) {
+                $this->warnings = array_values(array_filter(
+                    $this->warnings,
+                    static fn (ParseWarning $w): bool => !isset($resolved[spl_object_id($w)]),
+                ));
+            }
             $this->validateReferences();
             $this->validateAnchorLinks($document);
             usort(
@@ -628,46 +643,6 @@ class BlockParser
     protected function extractReferences(array $lines): void
     {
         $this->collectingReferences = true;
-    }
-
-    /**
-     * Extract footnote definitions from the document
-     *
-     * @param array<string> $lines
-     */
-    protected function extractFootnotes(array $lines): void
-    {
-        $i = 0;
-        $count = count($lines);
-
-        while ($i < $count) {
-            $line = $lines[$i];
-
-            // Match footnote definition: [^label]: content (requires whitespace after colon)
-            if (preg_match('/^\[\^([^\]]+)\]:(?:[ \t]+(.*))?[ \t]*$/', $line, $matches)) {
-                // The marker is matched against ONE line, so a definition label
-                // can never cross a line ending. It is normalized for the same
-                // reason a link reference definition is (see the `[label]: url`
-                // branch above): the reference side normalizes too, and the two
-                // have to meet on the same key.
-                $label = StringUtil::normalizeLabel($matches[1]);
-                $content = $matches[2] ?? '';
-
-                [$contentLines, $contentLineMap] = $this->collectFootnoteLines($lines, $i, $content);
-
-                $footnote = new Footnote($label);
-                if ($contentLines) {
-                    $this->parseBlocks($footnote, $contentLines, 0, $contentLineMap);
-                    // A trailing attribute line in the note must not reach the
-                    // document's first block, which is parsed after this pass.
-                    $this->pendingAttributes = [];
-                    $this->pendingAttributeSourceLines = [];
-                }
-                $this->footnotes[$label] = $footnote;
-            }
-
-            $i++;
-        }
     }
 
     /**
@@ -880,13 +855,14 @@ class BlockParser
             // Indentation before a block start is insignificant (djot syntax:
             // "Indentation is only significant for list item or footnote
             // nesting"), so parse these openers on the lines shifted left.
-            if ($lead > 0 && str_contains('#>|:^', $marker)) {
+            if ($lead > 0 && str_contains('#>|:^[', $marker)) {
                 $view = $this->dedentedLines($lines, $lead, $dedented);
                 $consumed = match ($marker) {
                     '#' => $this->tryParseHeading($parent, $view, $i),
                     '>' => $this->tryParseBlockQuote($parent, $view, $i, $lineMap),
                     '|' => $this->tryParseTable($parent, $view, $i),
                     ':' => $this->tryParseList($parent, $view, $i, $lineMap),
+                    '[' => $this->tryParseFootnoteDefinition($view, $i, $parent, $lineMap),
                     default => $this->tryParseCaption($parent, $view, $i),
                 };
                 if ($consumed !== null) {
@@ -912,7 +888,7 @@ class BlockParser
                 ?? $this->tryParseList($parent, $lines, $i, $lineMap)
                 ?? $this->tryParseLineBlock($parent, $lines, $i)
                 ?? $this->tryParseTable($parent, $lines, $i)
-                ?? $this->tryParseFootnoteDefinition($lines, $i)
+                ?? $this->tryParseFootnoteDefinition($lines, $i, $parent, $lineMap)
                 ?? $this->tryParseReferenceDefinitionAtLine($lines, $i, $sourceLine)
                 ?? $this->tryParseAbbreviationDefinition($lines, $i)
                 ?? $this->tryParseCaption($parent, $lines, $i)
@@ -4068,12 +4044,15 @@ class BlockParser
     }
 
     /**
-     * Skip footnote definitions (already extracted in first pass)
+     * Parse a footnote definition where it occurs. A later definition of the
+     * same label replaces an earlier one. Without a parent the lines are only skipped.
      *
      * @param array<string> $lines
      * @param int $start
+     * @param \Djot\Node\Node|null $parent
+     * @param array<int>|null $lineMap
      */
-    protected function tryParseFootnoteDefinition(array $lines, int $start): ?int
+    protected function tryParseFootnoteDefinition(array $lines, int $start, ?Node $parent = null, ?array $lineMap = null): ?int
     {
         $line = ltrim($lines[$start], " \t");
 
@@ -4082,8 +4061,28 @@ class BlockParser
             return null;
         }
 
-        // Skip the footnote definition and the lines the extraction pass took for it
-        return $this->collectFootnoteLines($lines, $start, $matches[2] ?? '')[2] - $start;
+        [$contentLines, $contentLineMap, $end] = $this->collectFootnoteLines($lines, $start, $matches[2] ?? '');
+
+        if ($parent === null) {
+            return $end - $start;
+        }
+
+        // The note body must neither take nor leave attributes of the blocks around it.
+        $pending = [$this->pendingAttributes, $this->pendingAttributeSourceLines];
+        $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
+        $footnote = new Footnote(StringUtil::normalizeLabel($matches[1]));
+        if ($contentLines) {
+            $map = $lineMap === null ? $contentLineMap : array_map(
+                static fn (int $k): int => $lineMap[$k] ?? -1,
+                $contentLineMap,
+            );
+            $this->parseBlocks($footnote, $contentLines, 0, $map);
+        }
+        [$this->pendingAttributes, $this->pendingAttributeSourceLines] = $pending;
+        $this->footnotes[$footnote->getLabel()] = $footnote;
+
+        return $end - $start;
     }
 
     /**
@@ -4949,12 +4948,15 @@ class BlockParser
      */
     public function addUndefinedFootnoteWarning(string $label, int $line, int $column, bool $sourceMapped = false): void
     {
+        $before = count($this->warnings);
         if ($sourceMapped) {
             $this->addSourceWarning("Undefined footnote '{$label}'", $line, $column);
-
-            return;
+        } else {
+            $this->addWarning("Undefined footnote '{$label}'", $line, $column, false);
         }
-        $this->addWarning("Undefined footnote '{$label}'", $line, $column, false);
+        if (count($this->warnings) > $before) {
+            $this->undefinedFootnoteWarnings[] = [$label, $this->warnings[$before]];
+        }
     }
 
     public function addUnattachedAttributeWarning(int $line, int $column, bool $sourceMapped = false): void
