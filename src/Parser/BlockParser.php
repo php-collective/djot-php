@@ -2492,11 +2492,8 @@ class BlockParser
 
                 $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
                 $nextTrimmed = ltrim($nextLine);
-                if (
-                    $nextIndent <= $baseIndent
-                    && (!$itemState['paragraphOpen']
-                        || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $nextLine))
-                ) {
+                // An unindented line is lazy text only when it opens no block.
+                if ($nextIndent <= $baseIndent && (!$itemState['paragraphOpen'] || $this->opensBlock($nextLine))) {
                     break;
                 }
 
