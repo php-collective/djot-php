@@ -2314,9 +2314,13 @@ class BlockParser
             // Get indentation of current line
             $currentIndent = IndentationHelper::getLeadingSpaces($currentLine);
 
-            // If line is less indented than base, we're done with this list
+            // A less indented line ends the list, unless it is the list's next item.
             if ($currentIndent < $baseIndent) {
-                break;
+                $lowerInfo = $this->listParser->parseListItemMarker(ltrim($currentLine));
+                if ($firstItem || $lowerInfo === null || !$this->listParser->itemMatchesList($listInfo, $lowerInfo)) {
+                    break;
+                }
+                $baseIndent = $currentIndent;
             }
 
             // Check for indented continuation (after blank line = nested content)
