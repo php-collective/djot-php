@@ -2524,8 +2524,10 @@ class BlockParser
             $itemDivFences = [];
             $itemQuoteDepth = 0;
             $this->trackDefinitionLazyState($itemContent, $itemState, $itemDivFences, $itemQuoteDepth);
-            // A footnote's open paragraph, which an under-indented block line closes.
-            $itemNoteOpen = $itemState['paragraphOpen'] && str_starts_with($itemContent, '[^');
+            // The open paragraph of a note or list item on the marker line, which an
+            // under-indented block line closes.
+            $itemNoteOpen = $itemState['paragraphOpen']
+                && (str_starts_with($itemContent, '[^') || $this->listParser->parseListItemMarker($itemContent) !== null);
 
             while ($i < $count) {
                 $nextLine = $lines[$i];
