@@ -2129,6 +2129,8 @@ class BlockParser
             }
         }
         if (!$state['inFence'] && !$state['inComment']) {
+            // Indentation does not change which block a line opens.
+            $content = ltrim($content, " \t");
             $divFence = $divFences !== [] ? $divFences[count($divFences) - 1] : null;
             if ($divFence !== null && $this->fencedBlockParser->isDivFenceCloser($content, $divFence)) {
                 array_pop($divFences);
