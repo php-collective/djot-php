@@ -196,8 +196,8 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        // "C" should be part of "A"
-        $this->assertStringContainsString('<p>C</p>', $result);
+        // "C" is part of "A"; the list stays tight, so neither gets a <p> (djot.js)
+        $this->assertSame("<ul>\n<li>\nA\n<ul>\n<li>\nB\n</li>\n</ul>\nC\n</li>\n</ul>\n", $result);
     }
 
     // ==================== Tight vs loose list behavior ====================
