@@ -3107,8 +3107,8 @@ class BlockParser
                     break;
                 }
 
-                // Definition content must be indented by 2 spaces
-                if (preg_match('/^  (.*)$/', $defLine, $defMatch)) {
+                // Definition content is indented past the `:` marker
+                if (preg_match('/^  ?(.*)$/', $defLine, $defMatch)) {
                     $this->trackDefinitionLazyState($defMatch[1], $lazyState, $divFences, $quoteDepth);
                     $defLines[] = $defMatch[1];
                     $defLineMap[] = $this->sourceLineFor($lineMap, $i);
