@@ -147,14 +147,9 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        // "C" should be part of list item "A", not "B"
-        // Check structure: <li>A ... <ul><li>B ... P</li></ul> ... C</li>
-        $this->assertStringContainsString('<p>C</p>', $result);
-
-        // The <p>C</p> should be inside the outer <li> but after the inner </ul>
-        preg_match('/<li[^>]*>.*?<p>A<\/p>.*?<ul>.*?<\/ul>(.*?)<\/li>/s', $result, $matches);
-        $this->assertNotEmpty($matches);
-        $this->assertStringContainsString('<p>C</p>', $matches[1]);
+        // "C" is part of list item "A", after the sublist. The blank lines belong
+        // to the sublist, so the outer list stays tight (djot.js).
+        $this->assertSame("<ul>\n<li>\nA\n<ul>\n<li>\n<p>B</p>\n<p>P</p>\n</li>\n</ul>\nC\n</li>\n</ul>\n", $result);
     }
 
     public function testContentAtParentLevelInDeeperNesting(): void
@@ -196,8 +191,8 @@ DJOT;
 
         $result = $this->converter->convert($djot);
 
-        // "C" should be part of "A"
-        $this->assertStringContainsString('<p>C</p>', $result);
+        // "C" is part of "A"; the list stays tight, so neither gets a <p> (djot.js)
+        $this->assertSame("<ul>\n<li>\nA\n<ul>\n<li>\nB\n</li>\n</ul>\nC\n</li>\n</ul>\n", $result);
     }
 
     // ==================== Tight vs loose list behavior ====================

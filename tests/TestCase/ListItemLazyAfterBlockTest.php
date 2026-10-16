@@ -111,7 +111,7 @@ class ListItemLazyAfterBlockTest extends TestCase
             ],
             'unclosed fence in a nested item ended by a dedent' => [
                 "- a\n\n  - ```\n    code\n  next\ntext",
-                "<ul>\n<li>\na\n<ul>\n<li>\n<pre><code>code\n</code></pre>\n</li>\n</ul>\n<p>next\ntext</p>\n</li>\n</ul>\n",
+                "<ul>\n<li>\na\n<ul>\n<li>\n<pre><code>code\n</code></pre>\n</li>\n</ul>\nnext\ntext\n</li>\n</ul>\n",
             ],
         ];
     }

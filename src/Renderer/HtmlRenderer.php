@@ -807,16 +807,16 @@ class HtmlRenderer implements RendererInterface
     protected function renderListItem(ListItem $node, bool $tight = true): string
     {
         $attrs = $this->renderAttributesExcluding($node, self::OL_ONLY_ATTRIBUTES);
-        $content = $this->renderChildren($node);
-
-        if ($tight) {
-            // For tight lists, strip paragraph wrapper from content
-            // This handles both:
-            // 1. Single paragraph: <p>text</p> -> text
-            // 2. Paragraph followed by nested list: <p>text</p>\n<ul>... -> text\n<ul>...
-            // A data-source-line-only wrapper is stripped too (the source-line
+        $content = '';
+        foreach ($node->getChildren() as $child) {
+            $html = $this->renderNode($child);
+            // A tight item's own paragraphs render without their wrapper. A
+            // data-source-line-only wrapper is stripped too (the source-line
             // option must never change structure; the <li> keeps the anchor).
-            $content = preg_replace('/^<p(?: data-source-line="\d+")?>(.+?)<\/p>(\n)?/s', '$1$2', $content) ?? $content;
+            if ($tight && $child instanceof Paragraph) {
+                $html = preg_replace('/^<p(?: data-source-line="\d+")?>(.+?)<\/p>(\n)?$/s', '$1$2', $html) ?? $html;
+            }
+            $content .= $html;
         }
 
         // Handle task list items
