@@ -4216,8 +4216,10 @@ class BlockParser
         }
 
         $url = trim($matches[2] ?? '');
+        $indent = strspn($lines[$start], " \t");
 
-        // Collect continuation lines
+        // Collect continuation lines: each is one more URL chunk, without
+        // whitespace inside, indented past the definition's own `[`.
         $i = $start + 1;
         $count = count($lines);
 
@@ -4233,7 +4235,7 @@ class BlockParser
             if ($this->startsNewBlock($nextLine)) {
                 break;
             }
-            if (preg_match('/^\s+(\S.*)$/', $nextLine, $contMatch)) {
+            if (strspn($nextLine, " \t") > $indent && preg_match('/^\s+(\S+)[ \t]*$/', $nextLine, $contMatch)) {
                 $url .= $contMatch[1];
                 $i++;
             } else {
