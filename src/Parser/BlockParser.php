@@ -4798,7 +4798,13 @@ class BlockParser
      */
     protected function splitLines(string $input): array
     {
-        return explode("\n", str_replace(["\r\n", "\r"], "\n", $input));
+        $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $input));
+        // The final line terminator ends the last line; it does not start another.
+        if (count($lines) > 1 && end($lines) === '') {
+            array_pop($lines);
+        }
+
+        return $lines;
     }
 
     /**
