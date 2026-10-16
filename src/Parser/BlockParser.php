@@ -2129,6 +2129,8 @@ class BlockParser
             }
         }
         if (!$state['inFence'] && !$state['inComment']) {
+            // Indentation does not change which block a line opens.
+            $content = ltrim($content, " \t");
             $divFence = $divFences !== [] ? $divFences[count($divFences) - 1] : null;
             if ($divFence !== null && $this->fencedBlockParser->isDivFenceCloser($content, $divFence)) {
                 array_pop($divFences);
@@ -4138,7 +4140,6 @@ class BlockParser
         $count = count($lines);
         $j = $start + 1;
         $end = $j;
-        $hasContent = false;
         while ($j < $count) {
             $nextLine = $lines[$j];
             if (IndentationHelper::isBlankLine($nextLine)) {
@@ -4149,11 +4150,8 @@ class BlockParser
 
                 continue;
             }
-            // Check if line has at least base indentation (2 spaces or 1 tab)
-            if (preg_match('/^(?:[ ]{' . $baseIndent . '}|\t)(.*)$/', $nextLine, $contMatch)) {
-                $contentLines[] = $contMatch[1];
-            } elseif (!$hasContent && preg_match('/^\s+(.+)$/', $nextLine, $contMatch)) {
-                // Allow flexible indentation for first content line
+            // An indented line belongs to the note; up to two spaces (or a tab) are stripped.
+            if (preg_match('/^(?:[ ]{1,' . $baseIndent . '}|\t)(.*)$/', $nextLine, $contMatch)) {
                 $contentLines[] = $contMatch[1];
             } elseif (
                 $this->containersLeaveParagraphOpen($contentLines, $trackedLines, $state, $containers) === true
@@ -4167,7 +4165,6 @@ class BlockParser
                 break;
             }
             $contentLineMap[] = $j;
-            $hasContent = true;
             $j++;
             $end = $j;
         }
