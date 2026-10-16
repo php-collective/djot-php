@@ -307,12 +307,15 @@ function showHelp(): void
 ## Commands
 
 : init
+
   Initialize a new project
 
 : build
+
   Build the project
 
 : deploy
+
   Deploy to production
 
 ## Options
