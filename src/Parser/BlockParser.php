@@ -248,6 +248,14 @@ class BlockParser
      */
     protected bool $trackSourceLines = false;
 
+    /**
+     * The list item whose body is being parsed, and the line indexes where its
+     * direct child blocks start.
+     *
+     * @var array{item: \Djot\Node\Block\ListItem, starts: array<int, true>}|null
+     */
+    private ?array $itemBlockStarts = null;
+
     public function __construct(
         bool $collectWarnings = false,
         bool $strictMode = false,
@@ -803,6 +811,10 @@ class BlockParser
                 $i++;
 
                 continue;
+            }
+
+            if ($this->itemBlockStarts !== null && $this->itemBlockStarts['item'] === $parent) {
+                $this->itemBlockStarts['starts'][$i] = true;
             }
 
             // Try to parse block attributes first
@@ -2256,6 +2268,15 @@ class BlockParser
         $count = count($lines);
         $lastItemHadBlankAfter = false;
         $firstItem = true; // Track first item to use listInfo directly
+        // An item's blocks are parsed in one piece when the item ends, so a
+        // container its first block opens (a definition, a note) keeps the
+        // indented content that follows a blank line.
+        $bodyItem = null;
+        $bodyLines = [];
+        $bodyLineMap = [];
+        // Per body line: true when it still carries its source indentation.
+        $bodyRaw = [];
+        $bodyContentIndent = 0;
 
         while ($i < $count) {
             $currentLine = $lines[$i];
@@ -2279,24 +2300,13 @@ class BlockParser
             // Check for indented continuation (after blank line = nested content)
             if ($lastItemHadBlankAfter && $currentIndent > $baseIndent) {
                 // Content after blank line with indentation belongs to previous item
-                $lastItem = $this->listParser->getLastListItem($list);
-                if ($lastItem !== null) {
-                    // Check if the first indented content is a list marker or regular text
-                    // Blank line followed by indented TEXT = loose list (multiple paragraphs)
-                    // Blank line followed by indented LIST MARKER = tight nesting
-                    $trimmedCurrent = ltrim($currentLine);
-                    $firstContentIsListMarker = $this->listParser->parseListItemMarker($trimmedCurrent) !== null;
-                    if (!$firstContentIsListMarker) {
-                        // Indented text after blank = loose list
-                        $list->setTight(false);
-                    }
-
+                if ($bodyItem !== null) {
+                    $bodyBlankLine = $this->sourceLineFor($lineMap, $i - 1);
                     // Collect all indented content at this new level
                     $subLines = [];
                     $subLineMap = [];
+                    $subRaw = [];
                     $subIndent = $currentIndent;
-                    // Track the maximum content indent we've seen (for detecting drop-back to marker level)
-                    $maxContentIndent = $currentIndent;
                     $sawBlankLine = false;
                     $brokeForParentContent = false;
                     $subState = [
@@ -2314,6 +2324,7 @@ class BlockParser
                         if (IndentationHelper::isBlankLine($subLine)) {
                             $subLines[] = '';
                             $subLineMap[] = $this->sourceLineFor($lineMap, $i);
+                            $subRaw[] = '';
                             $sawBlankLine = true;
                             $i++;
 
@@ -2321,42 +2332,27 @@ class BlockParser
                         }
                         $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
 
-                        // If we've seen content at a higher indent level (actual nested content),
-                        // and now we're back at the marker level (subIndent) after a blank line,
-                        // this content belongs to the parent level - break to let parent handle it
-                        if ($lineIndent === $subIndent && $maxContentIndent > $subIndent && $sawBlankLine) {
-                            // Set flags so parent loop handles this as continuation content
-                            $lastItemHadBlankAfter = true;
-                            $brokeForParentContent = true;
-
-                            break;
-                        }
-
-                        // Check if line has at least the subIndent level
-                        if ($lineIndent >= $subIndent) {
-                            // Track the highest content indent seen
-                            if ($lineIndent > $maxContentIndent) {
-                                $maxContentIndent = $lineIndent;
-                            }
-                            // Remove subIndent worth of indentation (handling tabs)
+                        // Any line indented past the marker belongs to the item.
+                        if ($lineIndent > $baseIndent) {
                             $subLines[] = IndentationHelper::stripLeadingIndent($subLine, $subIndent);
                             $subLineMap[] = $this->sourceLineFor($lineMap, $i);
+                            $subRaw[] = $subLine;
                             $sawBlankLine = false;
                             $i++;
                         } elseif ($lineIndent === $baseIndent) {
                             // Line is at base indent - check if it starts a new block or list item
                             $trimmedLine = ltrim($subLine);
-                            $itemInfo = $this->listParser->parseListItemMarker($trimmedLine);
-                            $sameStyle = !isset($listInfo['style']) || !isset($itemInfo['style']) || $itemInfo['style'] === $listInfo['style'];
-                            if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle) {
-                                break;
-                            }
                             // After a blank line, content dropping back to base indent
-                            // starts a new block outside the list - let parent handle it.
+                            // starts a new item or a block outside the list.
                             if ($sawBlankLine) {
                                 $lastItemHadBlankAfter = true;
                                 $brokeForParentContent = true;
 
+                                break;
+                            }
+                            $itemInfo = $this->listParser->parseListItemMarker($trimmedLine);
+                            $sameStyle = !isset($listInfo['style']) || !isset($itemInfo['style']) || $itemInfo['style'] === $listInfo['style'];
+                            if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle) {
                                 break;
                             }
                             // Content at base indent that's not a matching list marker
@@ -2373,12 +2369,9 @@ class BlockParser
                             // Otherwise it's lazy continuation at base level - include in nested content
                             $subLines[] = $trimmedLine;
                             $subLineMap[] = $this->sourceLineFor($lineMap, $i);
+                            $subRaw[] = null;
                             $sawBlankLine = false;
                             $i++;
-                        } elseif ($lineIndent > $baseIndent) {
-                            // Line is at intermediate indent (between base and nested content)
-                            // This content belongs to a parent list level, not current nested content
-                            break;
                         } else {
                             // End of list
                             break;
@@ -2389,11 +2382,18 @@ class BlockParser
                     while ($subLineCount > 0 && $subLines[$subLineCount - 1] === '') {
                         array_pop($subLines);
                         array_pop($subLineMap);
+                        array_pop($subRaw);
                         $subLineCount--;
                     }
-                    // Parse nested content
                     if ($subLines !== []) {
-                        $this->parseBlocks($lastItem, $subLines, 0, $subLineMap);
+                        $bodyLines[] = '';
+                        $bodyLineMap[] = $bodyBlankLine;
+                        $bodyRaw[] = false;
+                        foreach ($subLines as $subIndex => $subContent) {
+                            $bodyLines[] = $subRaw[$subIndex] ?? $subContent;
+                            $bodyLineMap[] = $subLineMap[$subIndex];
+                            $bodyRaw[] = $subRaw[$subIndex] !== null;
+                        }
                     }
                     // In djot, blank lines within nested content don't make the parent list loose
                     // The list is only loose if there's a blank line directly after item content
@@ -2426,14 +2426,21 @@ class BlockParser
                 }
             }
 
-            // If there was a blank line before this item, list is loose
-            if ($lastItemHadBlankAfter) {
+            $heldBlank = false;
+            if ($this->parseListItemBody($bodyItem, $bodyLines, $bodyLineMap, $bodyRaw, $bodyContentIndent, $heldBlank)) {
+                $list->setTight(false);
+            }
+            // A blank line before this item makes the list loose, unless the
+            // previous item ends in a nested list or a note, which takes it.
+            if ($lastItemHadBlankAfter && !$heldBlank) {
                 $list->setTight(false);
             }
 
             /** @var string|null $taskMarker */
             $taskMarker = $itemInfo['taskMarker'] ?? null;
             $listItem = new ListItem($taskMarker);
+            $bodyItem = $listItem;
+            $bodyContentIndent = 0;
             $listItemSourceLine = $this->sourceLineFor($lineMap, $i);
             /** @var string $itemContent */
             $itemContent = $itemInfo['content'];
@@ -2479,6 +2486,7 @@ class BlockParser
                 $markerWidth = 2;
             }
             $contentIndent = $baseIndent + $markerWidth;
+            $bodyContentIndent = $contentIndent;
             $itemState = [
                 'inFence' => false,
                 'fenceChar' => '',
@@ -2815,7 +2823,9 @@ class BlockParser
                     // Content starts with a block element (blockquote, code fence,
                     // etc.) or we pushed a {...} back into itemLines that must be
                     // recognized as a block attribute for the next block.
-                    $this->parseBlocks($listItem, $itemLines, 0, $itemLineMap);
+                    $bodyLines = $itemLines;
+                    $bodyLineMap = $itemLineMap;
+                    $bodyRaw = array_fill(0, count($itemLines), false);
                 } else {
                     $paragraph = new Paragraph();
                     // Plain-paragraph item: continuation lines strip ALL leading
@@ -2835,7 +2845,9 @@ class BlockParser
             } elseif ($itemLines !== ['']) {
                 // A bare marker with no content is an empty item: leave it childless
                 // so it renders as `<li>\n</li>` rather than wrapping a blank line.
-                $this->parseBlocks($listItem, $itemLines, 0, $itemLineMap);
+                $bodyLines = $itemLines;
+                $bodyLineMap = $itemLineMap;
+                $bodyRaw = array_fill(0, count($itemLines), false);
             }
 
             // When a list-nesting mode is active, check for immediate nested
@@ -2857,6 +2869,9 @@ class BlockParser
 
                 // If there's indented content that could be a nested block
                 if ($enterNesting) {
+                    if ($this->parseListItemBody($bodyItem, $bodyLines, $bodyLineMap, $bodyRaw, $bodyContentIndent)) {
+                        $list->setTight(false);
+                    }
                     $subLines = [];
                     $subLineMap = [];
                     $nestedIndent = $nextIndent;
@@ -2908,6 +2923,9 @@ class BlockParser
             }
             $list->appendChild($listItem);
         }
+        if ($this->parseListItemBody($bodyItem, $bodyLines, $bodyLineMap, $bodyRaw, $bodyContentIndent)) {
+            $list->setTight(false);
+        }
 
         // Apply the saved attributes to the list
         if ($listAttributes !== []) {
@@ -2916,6 +2934,103 @@ class BlockParser
         $parent->appendChild($list);
 
         return $i - $start;
+    }
+
+    /**
+     * Parse the collected lines of a list item and clear them.
+     *
+     * Raw lines keep their source indentation, the others sit at the content
+     * column. A raw line indented less than that column moves the whole body
+     * right, so nested containers compare the columns the source has.
+     *
+     * @param \Djot\Node\Block\ListItem|null $item
+     * @param array<string> $lines
+     * @param array<int> $lineMap
+     * @param array<bool> $raw
+     * @param int $contentIndent
+     * @param bool $heldBlank Set when the item ends in a nested list or a note.
+     *
+     * @return bool Whether a blank line separates two of the item's blocks, which makes the list loose.
+     */
+    private function parseListItemBody(
+        ?ListItem $item,
+        array &$lines,
+        array &$lineMap,
+        array &$raw,
+        int $contentIndent,
+        bool &$heldBlank = false,
+    ): bool {
+        $loose = false;
+        $heldBlank = false;
+        if ($item !== null && $lines !== []) {
+            $strip = $contentIndent;
+            foreach ($lines as $index => $line) {
+                if (($raw[$index] ?? false) && !IndentationHelper::isBlankLine($line)) {
+                    $strip = min($strip, IndentationHelper::getLeadingSpaces($line));
+                }
+            }
+            $shift = str_repeat(' ', $contentIndent - $strip);
+            foreach ($lines as $index => $line) {
+                if ($raw[$index] ?? false) {
+                    $lines[$index] = IndentationHelper::stripLeadingIndent($line, $strip);
+                } elseif ($shift !== '' && $line !== '') {
+                    $lines[$index] = $shift . $line;
+                }
+            }
+            $saved = $this->itemBlockStarts;
+            $this->itemBlockStarts = ['item' => $item, 'starts' => []];
+            try {
+                $this->parseBlocks($item, $lines, 0, $lineMap);
+                $starts = $this->itemBlockStarts['starts'] ?? [];
+            } finally {
+                $this->itemBlockStarts = $saved;
+            }
+            $loose = $this->blankSeparatesItemBlocks($lines, $lineMap, $starts, $heldBlank);
+        }
+        $lines = [];
+        $lineMap = [];
+        $raw = [];
+
+        return $loose;
+    }
+
+    /**
+     * Whether a blank line in an item body comes before one of its direct blocks.
+     *
+     * Follows djot.js: a blank line inside a nested container, after a nested
+     * list or a note, or before a sublist does not count. A body that opens with
+     * a blank line follows the item's first paragraph.
+     *
+     * @param array<string> $lines
+     * @param array<int> $lineMap
+     * @param array<int, true> $starts
+     * @param bool $heldBlank Set when the last block is a nested list or a note.
+     */
+    private function blankSeparatesItemBlocks(array $lines, array $lineMap, array $starts, bool &$heldBlank): bool
+    {
+        $loose = false;
+        $sawBlank = false;
+        $previousHoldsBlank = false;
+        foreach ($lines as $index => $line) {
+            if (IndentationHelper::isBlankLine($line)) {
+                $sawBlank = $sawBlank || ($lineMap[$index] ?? -1) >= 0;
+
+                continue;
+            }
+            if (!isset($starts[$index])) {
+                continue;
+            }
+            $trimmed = ltrim($line);
+            $opensList = $this->listParser->parseListItemMarker($trimmed) !== null;
+            if ($sawBlank && !$opensList && !$previousHoldsBlank) {
+                $loose = true;
+            }
+            $previousHoldsBlank = $opensList || preg_match('/^\[\^[^\]]+\]:/', $trimmed) === 1;
+            $sawBlank = false;
+        }
+        $heldBlank = $previousHoldsBlank;
+
+        return $loose;
     }
 
     /**
