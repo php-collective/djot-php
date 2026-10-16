@@ -896,6 +896,12 @@ class BlockParser
 
             $this->stampSourceLine($parent, $childrenBefore, $sourceLine);
             $i += $consumed;
+            // A block that took a trailing blank line took the blank line's
+            // reset of pending attributes too.
+            if ($consumed > 0 && IndentationHelper::isBlankLine($lines[$i - 1])) {
+                $this->pendingAttributes = [];
+                $this->pendingAttributeSourceLines = [];
+            }
         }
     }
 
@@ -1495,6 +1501,9 @@ class BlockParser
         $previousOffset = $this->lineOffset;
         $this->lineOffset = $previousOffset + $start + 1;
         $this->parseBlocks($div, $innerLines, 0, $innerLineMap);
+        // The closing fence ends the div; attributes left inside apply to nothing.
+        $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
         $this->lineOffset = $previousOffset;
 
         // Apply opener-line attributes (from `::: {#id .class key=value}` syntax)
@@ -4207,8 +4216,10 @@ class BlockParser
         }
 
         $url = trim($matches[2] ?? '');
+        $indent = strspn($lines[$start], " \t");
 
-        // Collect continuation lines
+        // Collect continuation lines: each is one more URL chunk, without
+        // whitespace inside, indented past the definition's own `[`.
         $i = $start + 1;
         $count = count($lines);
 
@@ -4224,7 +4235,7 @@ class BlockParser
             if ($this->startsNewBlock($nextLine)) {
                 break;
             }
-            if (preg_match('/^\s+(\S.*)$/', $nextLine, $contMatch)) {
+            if (strspn($nextLine, " \t") > $indent && preg_match('/^\s+(\S+)[ \t]*$/', $nextLine, $contMatch)) {
                 $url .= $contMatch[1];
                 $i++;
             } else {
@@ -4789,7 +4800,13 @@ class BlockParser
      */
     protected function splitLines(string $input): array
     {
-        return explode("\n", str_replace(["\r\n", "\r"], "\n", $input));
+        $lines = explode("\n", str_replace(["\r\n", "\r"], "\n", $input));
+        // The final line terminator ends the last line; it does not start another.
+        if (count($lines) > 1 && end($lines) === '') {
+            array_pop($lines);
+        }
+
+        return $lines;
     }
 
     /**
