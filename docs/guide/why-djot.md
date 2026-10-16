@@ -212,9 +212,11 @@ Symbols can be rendered as emoji, HTML entities, or custom output.
 **Djot:**
 ```djot
 : Term
+
   Definition of the term.
 
 : Another term
+
   Another definition.
 ```
 

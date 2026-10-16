@@ -118,12 +118,12 @@ class SourceLineTrackingTest extends TestCase
     public function testDefinitionListTermsAndDescriptionsAreStamped(): void
     {
         $converter = new DjotConverter(sourceLines: true);
-        $html = $converter->convert(": term\n  definition\n");
+        $html = $converter->convert(": term\n\n  definition\n");
 
         $this->assertMatchesRegularExpression('/<dl data-source-line="1">/', $html);
         $this->assertStringContainsString('<dt data-source-line="1">term</dt>', $html);
-        $this->assertMatchesRegularExpression('/<dd data-source-line="2">/', $html);
-        $this->assertStringContainsString('<p data-source-line="2">definition</p>', $html);
+        $this->assertMatchesRegularExpression('/<dd data-source-line="3">/', $html);
+        $this->assertStringContainsString('<p data-source-line="3">definition</p>', $html);
     }
 
     public function testNestedAuthorSourceLineAttributeIsNotOverwritten(): void

@@ -690,8 +690,10 @@ See the [Parser Options guide](/guide/parser-options#nested-lists-without-blank-
 
 ### Definition Lists
 
-Terms are prefixed with `: ` and definitions are indented below. A term may have
-an empty definition, including after another block. Unindented prose continues
+Terms are prefixed with `: ` and definitions are indented below, after a blank
+line. A term runs until that blank line, so a line right below it, indented or
+not, continues the term. A term may have an empty definition, including after
+another block. Unindented prose continues
 an open definition paragraph; a blank line or an unindented block marker ends it.
 After a table, thematic break, or closed code block in a definition, unindented
 prose starts a paragraph outside the definition list.

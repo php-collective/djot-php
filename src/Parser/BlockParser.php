@@ -2987,20 +2987,22 @@ class BlockParser
                 $termAttributes = [];
                 $i++;
 
-                // Collect continuation lines for term (before blank line, single-space indent)
+                // The term is a paragraph: it runs to a blank line, and an
+                // unindented line continues it unless it opens a block.
                 while ($i < $count) {
                     $nextLine = $lines[$i];
                     if (IndentationHelper::isBlankLine($nextLine)) {
                         break;
                     }
-                    // Single space continuation is part of term
-                    if (preg_match('/^ ([^ ].*)$/', $nextLine, $contMatch)) {
-                        $termLines[] = $contMatch[1];
-                        $termLineMap[] = $this->sourceLineFor($lineMap, $i);
-                        $i++;
-                    } else {
+                    if (
+                        !in_array($nextLine[0], [' ', "\t"], true)
+                        && ($nextLine[0] === '{' || $this->isBlockElementStart($nextLine) || $this->opensBlock($nextLine))
+                    ) {
                         break;
                     }
+                    $termLines[] = ltrim($nextLine, " \t");
+                    $termLineMap[] = $this->sourceLineFor($lineMap, $i);
+                    $i++;
                 }
 
                 // Check for term attributes on the next line (standalone attribute block)
