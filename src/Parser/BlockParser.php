@@ -2135,6 +2135,12 @@ class BlockParser
 
                     return;
                 }
+                // A footnote body continues like the item's own content.
+                if (preg_match('/^\[\^[^\]]+\]:(?:[ \t]+(.*))?$/', $content, $matches)) {
+                    $this->trackDefinitionLazyState($matches[1] ?? '', $state, $divFences, $quoteDepth);
+
+                    return;
+                }
                 // These blocks contain no paragraph for an unindented line to extend.
                 if (
                     $this->tableParser->isTableRow($content)
@@ -2473,6 +2479,8 @@ class BlockParser
             $itemDivFences = [];
             $itemQuoteDepth = 0;
             $this->trackDefinitionLazyState($itemContent, $itemState, $itemDivFences, $itemQuoteDepth);
+            // A footnote's open paragraph, which an under-indented block line closes.
+            $itemNoteOpen = $itemState['paragraphOpen'] && str_starts_with($itemContent, '[^');
 
             while ($i < $count) {
                 $nextLine = $lines[$i];
@@ -2492,11 +2500,8 @@ class BlockParser
 
                 $nextIndent = IndentationHelper::getLeadingSpaces($nextLine);
                 $nextTrimmed = ltrim($nextLine);
-                if (
-                    $nextIndent <= $baseIndent
-                    && (!$itemState['paragraphOpen']
-                        || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $nextLine))
-                ) {
+                // An unindented line is lazy text only when it opens no block.
+                if ($nextIndent <= $baseIndent && (!$itemState['paragraphOpen'] || $this->opensBlock($nextLine))) {
                     break;
                 }
 
@@ -2533,6 +2538,10 @@ class BlockParser
                 // Unless nested blocks in lists are enabled, indented block markers
                 // are treated as plain continuation text here.
                 if ($nextIndent >= $contentIndent) {
+                    // A note marked at the content column needs deeper lines.
+                    if ($itemNoteOpen && $nextIndent === $contentIndent && $this->opensBlock($nextLine)) {
+                        $itemState['paragraphOpen'] = false;
+                    }
                     // If the active list-nesting mode treats this indented line
                     // as a nested block, break out so normal nesting handles it.
                     if (
@@ -2545,21 +2554,21 @@ class BlockParser
                     // breaks out above): strip all leading whitespace. Indentation
                     // beyond the content column is not significant for plain text,
                     // matching the reference implementation.
-                    $itemLines[] = $itemState['inFence'] || $itemState['inComment'] || $itemDivFences !== []
-                        ? IndentationHelper::stripLeadingIndent($nextLine, $contentIndent)
-                        : $nextTrimmed;
+                    $itemLines[] = IndentationHelper::stripLeadingIndent($nextLine, $contentIndent);
                     $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
                 } else {
                     // Lazy continuation (not properly indented but not at base level either)
+                    if ($itemNoteOpen && $this->opensBlock($nextLine)) {
+                        $itemState['paragraphOpen'] = false;
+                    }
                     $itemLines[] = $nextTrimmed;
                     $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
                 }
-                $this->trackDefinitionLazyState(
-                    $itemLines[count($itemLines) - 1],
-                    $itemState,
-                    $itemDivFences,
-                    $itemQuoteDepth,
-                );
+                $tracked = $itemLines[count($itemLines) - 1];
+                $wasOpen = $itemState['paragraphOpen'];
+                $this->trackDefinitionLazyState($tracked, $itemState, $itemDivFences, $itemQuoteDepth);
+                $itemNoteOpen = $itemState['paragraphOpen'] && (str_starts_with($tracked, '[^')
+                    || ($itemNoteOpen && $wasOpen && !$this->opensBlock($tracked)));
                 $hasNonMarkerContinuation = true;
                 $i++;
             }
@@ -3098,8 +3107,8 @@ class BlockParser
                     break;
                 }
 
-                // Definition content must be indented by 2 spaces
-                if (preg_match('/^  (.*)$/', $defLine, $defMatch)) {
+                // Definition content is indented past the `:` marker
+                if (preg_match('/^  ?(.*)$/', $defLine, $defMatch)) {
                     $this->trackDefinitionLazyState($defMatch[1], $lazyState, $divFences, $quoteDepth);
                     $defLines[] = $defMatch[1];
                     $defLineMap[] = $this->sourceLineFor($lineMap, $i);

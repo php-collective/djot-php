@@ -581,6 +581,22 @@ item
 </ul>
 ```
 
+#### Lines without indentation
+
+A list item's paragraph also takes following lines that are not indented:
+
+```djot
+- This item is wrapped
+without indenting the second line.
+```
+
+As in a block quote, that only holds for plain paragraph text. An unindented line that opens a block ends the list:
+
+```djot
+- An item
+# A heading after the list, not text inside it
+```
+
 #### Tight vs Loose Lists
 
 Lists in Djot can be *tight* or *loose*, which affects how list items are rendered.

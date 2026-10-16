@@ -247,17 +247,14 @@ class BlocksInterruptParagraphsOptionTest extends TestCase
         // nestedListsWithoutBlankLine is the smaller subset: it nests a sublist
         // in a list item but, unlike blocksInterruptParagraphs, does NOT let a
         // non-list block (here a blockquote) interrupt the item's paragraph.
-        $narrow = (new BlockParser(nestedListsWithoutBlankLine: true))->parse("- Item\n  - sub\n  > quote");
-        $item = $narrow->getChildren()[0]->getChildren()[0];
+        $parser = new BlockParser(nestedListsWithoutBlankLine: true);
         $hasSublist = false;
+        foreach ($parser->parse("- Item\n  - sub")->getChildren()[0]->getChildren()[0]->getChildren() as $child) {
+            $hasSublist = $hasSublist || $child instanceof ListBlock;
+        }
         $hasQuote = false;
-        foreach ($item->getChildren() as $child) {
-            if ($child instanceof ListBlock) {
-                $hasSublist = true;
-            }
-            if ($child instanceof BlockQuote) {
-                $hasQuote = true;
-            }
+        foreach ($parser->parse("- Item\n  > quote")->getChildren()[0]->getChildren()[0]->getChildren() as $child) {
+            $hasQuote = $hasQuote || $child instanceof BlockQuote;
         }
         $this->assertTrue($hasSublist);
         $this->assertFalse($hasQuote);
