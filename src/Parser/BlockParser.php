@@ -2545,9 +2545,7 @@ class BlockParser
                     // breaks out above): strip all leading whitespace. Indentation
                     // beyond the content column is not significant for plain text,
                     // matching the reference implementation.
-                    $itemLines[] = $itemState['inFence'] || $itemState['inComment'] || $itemDivFences !== []
-                        ? IndentationHelper::stripLeadingIndent($nextLine, $contentIndent)
-                        : $nextTrimmed;
+                    $itemLines[] = IndentationHelper::stripLeadingIndent($nextLine, $contentIndent);
                     $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
                 } else {
                     // Lazy continuation (not properly indented but not at base level either)
