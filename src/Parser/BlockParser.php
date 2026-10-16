@@ -2314,9 +2314,13 @@ class BlockParser
             // Get indentation of current line
             $currentIndent = IndentationHelper::getLeadingSpaces($currentLine);
 
-            // If line is less indented than base, we're done with this list
+            // A less indented line ends the list, unless it is the list's next item.
             if ($currentIndent < $baseIndent) {
-                break;
+                $lowerInfo = $this->listParser->parseListItemMarker(ltrim($currentLine));
+                if ($firstItem || $lowerInfo === null || !$this->listParser->itemMatchesList($listInfo, $lowerInfo)) {
+                    break;
+                }
+                $baseIndent = $currentIndent;
             }
 
             // Check for indented continuation (after blank line = nested content)
@@ -2361,8 +2365,8 @@ class BlockParser
                             $subRaw[] = $subLine;
                             $sawBlankLine = false;
                             $i++;
-                        } elseif ($lineIndent === $baseIndent) {
-                            // Line is at base indent - check if it starts a new block or list item
+                        } elseif ($lineIndent <= $baseIndent) {
+                            // Line is at or before base indent - check if it starts a new block or list item
                             $trimmedLine = ltrim($subLine);
                             // After a blank line, content dropping back to base indent
                             // starts a new item or a block outside the list.
@@ -4260,7 +4264,16 @@ class BlockParser
 
         $contentLines = [];
         $contentLineMap = [];
+        // What the lazy-line tracker reads: the lines without that column shift.
+        $trackLines = [];
         if (trim($content) !== '') {
+            // A list opened on the marker line keeps its column, which decides
+            // what the lines below it continue.
+            $trackLines[] = $content;
+            $column = strlen($lines[$start]) - strlen($content);
+            if ($column > $baseIndent && $this->listParser->parseListItemMarker($content) !== null) {
+                $content = str_repeat(' ', $column - $baseIndent) . $content;
+            }
             $contentLines[] = $content;
             $contentLineMap[] = $start;
         }
@@ -4282,6 +4295,7 @@ class BlockParser
             if (IndentationHelper::isBlankLine($nextLine)) {
                 // Add blank line to preserve structure
                 $contentLines[] = '';
+                $trackLines[] = '';
                 $contentLineMap[] = $j;
                 $j++;
 
@@ -4290,13 +4304,15 @@ class BlockParser
             // An indented line belongs to the note; up to two spaces (or a tab) are stripped.
             if (preg_match('/^(?:[ ]{1,' . $baseIndent . '}|\t)(.*)$/', $nextLine, $contMatch)) {
                 $contentLines[] = $contMatch[1];
+                $trackLines[] = $contMatch[1];
             } elseif (
-                $this->containersLeaveParagraphOpen($contentLines, $trackedLines, $state, $containers) === true
+                $this->containersLeaveParagraphOpen($trackLines, $trackedLines, $state, $containers) === true
                 && !$this->opensBlock($nextLine)
             ) {
                 // An open paragraph takes a line that omits the indentation. The line
                 // leaves it open, so the tracker has nothing to learn from it.
                 $contentLines[] = ltrim($nextLine, " \t");
+                $trackLines[] = ltrim($nextLine, " \t");
                 $trackedLines++;
             } else {
                 break;
