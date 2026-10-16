@@ -2140,6 +2140,28 @@ class BlockParser
                 $content = $matches[1];
             }
         }
+        if (!$state['paragraphOpen'] && !$state['inFence'] && !$state['inComment']) {
+            $quoteDepth = 0;
+        }
+        if ($state['paragraphOpen'] && $quoteDepth > 0 && !$state['inFence'] && !$state['inComment']) {
+            // A paragraph inside block quotes: a line of bare markers closes it.
+            $inner = ltrim($content, " \t");
+            $markers = 0;
+            while ($markers < $quoteDepth && preg_match('/^>(?:[ \t]+|$)(.*)$/', $inner, $matches)) {
+                $inner = $matches[1];
+                $markers++;
+            }
+            if (trim($inner) === '') {
+                $state['paragraphOpen'] = false;
+                $quoteDepth = 0;
+
+                return;
+            }
+            if ($markers > 0 || !$this->startsNewBlock(ltrim($content, " \t"))) {
+                return;
+            }
+            $quoteDepth = 0;
+        }
         if (!$state['inFence'] && !$state['inComment']) {
             // Indentation does not change which block a line opens.
             $content = ltrim($content, " \t");
@@ -2187,7 +2209,7 @@ class BlockParser
                 }
                 if (preg_match('/^>[ \t]?(.*)$/', $content, $matches)) {
                     $this->trackDefinitionLazyState($matches[1], $state, $divFences, $quoteDepth);
-                    if ($state['inFence'] || $state['inComment']) {
+                    if ($state['inFence'] || $state['inComment'] || $state['paragraphOpen']) {
                         $quoteDepth++;
                     }
 
