@@ -4152,7 +4152,7 @@ class BlockParser
                 continue;
             }
             // Check if line has at least base indentation (2 spaces or 1 tab)
-            if (preg_match('/^(?:[ ]{' . $baseIndent . '}|\t)(.*)$/', $nextLine, $contMatch)) {
+            if (preg_match('/^(?:[ ]{1,' . $baseIndent . '}|\t)(.*)$/', $nextLine, $contMatch)) {
                 $contentLines[] = $contMatch[1];
             } elseif (!$hasContent && preg_match('/^\s+(.+)$/', $nextLine, $contMatch)) {
                 // Allow flexible indentation for first content line
