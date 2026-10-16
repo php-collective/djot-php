@@ -896,6 +896,12 @@ class BlockParser
 
             $this->stampSourceLine($parent, $childrenBefore, $sourceLine);
             $i += $consumed;
+            // A block that took a trailing blank line took the blank line's
+            // reset of pending attributes too.
+            if ($consumed > 0 && IndentationHelper::isBlankLine($lines[$i - 1])) {
+                $this->pendingAttributes = [];
+                $this->pendingAttributeSourceLines = [];
+            }
         }
     }
 
@@ -1495,6 +1501,9 @@ class BlockParser
         $previousOffset = $this->lineOffset;
         $this->lineOffset = $previousOffset + $start + 1;
         $this->parseBlocks($div, $innerLines, 0, $innerLineMap);
+        // The closing fence ends the div; attributes left inside apply to nothing.
+        $this->pendingAttributes = [];
+        $this->pendingAttributeSourceLines = [];
         $this->lineOffset = $previousOffset;
 
         // Apply opener-line attributes (from `::: {#id .class key=value}` syntax)
