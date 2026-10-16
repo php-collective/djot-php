@@ -658,6 +658,10 @@ class BlockParser
                 $footnote = new Footnote($label);
                 if ($contentLines) {
                     $this->parseBlocks($footnote, $contentLines, 0, $contentLineMap);
+                    // A trailing attribute line in the note must not reach the
+                    // document's first block, which is parsed after this pass.
+                    $this->pendingAttributes = [];
+                    $this->pendingAttributeSourceLines = [];
                 }
                 $this->footnotes[$label] = $footnote;
             }
@@ -810,6 +814,8 @@ class BlockParser
     {
         $i = 0;
         $count = count($lines);
+        /** @var array<int, array<string>> $dedented */
+        $dedented = [];
 
         while ($i < $count) {
             CycleCollection::checkpoint();
@@ -826,6 +832,10 @@ class BlockParser
 
             // Try to parse block attributes first
             $attrConsumed = $this->tryParseBlockAttributes($lines, $i);
+            $lead = strspn($line, ' ');
+            if ($attrConsumed === null && $lead > 0 && ($line[$lead] ?? '') === '{') {
+                $attrConsumed = $this->tryParseBlockAttributes($this->dedentedLines($lines, $lead, $dedented), $i);
+            }
             if ($attrConsumed !== null) {
                 $i += $attrConsumed;
 
@@ -867,6 +877,26 @@ class BlockParser
                 continue;
             }
 
+            // Indentation before a block start is insignificant (djot syntax:
+            // "Indentation is only significant for list item or footnote
+            // nesting"), so parse these openers on the lines shifted left.
+            if ($lead > 0 && str_contains('#>|:^', $marker)) {
+                $view = $this->dedentedLines($lines, $lead, $dedented);
+                $consumed = match ($marker) {
+                    '#' => $this->tryParseHeading($parent, $view, $i),
+                    '>' => $this->tryParseBlockQuote($parent, $view, $i, $lineMap),
+                    '|' => $this->tryParseTable($parent, $view, $i),
+                    ':' => $this->tryParseList($parent, $view, $i, $lineMap),
+                    default => $this->tryParseCaption($parent, $view, $i),
+                };
+                if ($consumed !== null) {
+                    $this->stampSourceLine($parent, $childrenBefore, $sourceLine);
+                    $i += $consumed;
+
+                    continue;
+                }
+            }
+
             // Try to match block elements in order of precedence
             // Fenced comment must come before thematic break (%%% vs ---)
             // Comment and raw block must come before code block since ``` =format is a special case
@@ -891,6 +921,28 @@ class BlockParser
             $this->stampSourceLine($parent, $childrenBefore, $sourceLine);
             $i += $consumed;
         }
+    }
+
+    /**
+     * The lines with up to $lead leading spaces removed from each, cached per
+     * width so a run of indented blocks does not copy the lines again.
+     *
+     * @param array<string> $lines
+     * @param int $lead
+     * @param array<int, array<string>> $cache
+     *
+     * @return array<string>
+     */
+    private function dedentedLines(array $lines, int $lead, array &$cache): array
+    {
+        if (!isset($cache[$lead])) {
+            $cache[$lead] = array_map(
+                static fn (string $l): string => substr($l, min($lead, strspn($l, ' '))),
+                $lines,
+            );
+        }
+
+        return $cache[$lead];
     }
 
     /**
