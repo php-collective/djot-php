@@ -1267,6 +1267,9 @@ class BlockParser
                 $this->addWarning('Unclosed comment', $start, 1, true);
                 $literalLines = $lines;
                 $openPos = strpos($line, '{%');
+                if ($openPos === false) {
+                    return null;
+                }
                 $literalLines[$start] = substr_replace($line, '\\', $openPos, 0);
 
                 return $this->tryParseParagraph($parent, $literalLines, $start, $lineMap);
