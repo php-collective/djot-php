@@ -890,7 +890,7 @@ class BlockParser
             // Comment and raw block must come before code block since ``` =format is a special case
             // Caption must come before paragraph to catch `^ caption text`
             $consumed = $this->tryParseFencedComment($parent, $lines, $i)
-                ?? $this->tryParseComment($parent, $lines, $i)
+                ?? $this->tryParseComment($parent, $lines, $i, $lineMap)
                 ?? $this->tryParseRawBlock($parent, $lines, $i)
                 ?? $this->tryParseCodeBlock($parent, $lines, $i)
                 ?? $this->tryParseDiv($parent, $lines, $i, $lineMap)
@@ -1240,14 +1240,37 @@ class BlockParser
      * @param \Djot\Node\Node $parent
      * @param array<string> $lines
      * @param int $start
+     * @param array<int>|null $lineMap
      */
-    protected function tryParseComment(Node $parent, array $lines, int $start): ?int
+    protected function tryParseComment(Node $parent, array $lines, int $start, ?array $lineMap = null): ?int
     {
         $line = $lines[$start];
 
         // Use FencedBlockParser to check for comment opener
         if (!$this->fencedBlockParser->isCommentOpener($line)) {
             return null;
+        }
+
+        if (!str_contains($line, '}')) {
+            $closed = false;
+            for ($next = $start + 1, $total = count($lines); $next < $total; $next++) {
+                if (IndentationHelper::isBlankLine($lines[$next]) || preg_match('/^[ \t]+\S/', $lines[$next]) !== 1) {
+                    break;
+                }
+                if (str_contains($lines[$next], '%}')) {
+                    $closed = true;
+
+                    break;
+                }
+            }
+            if (!$closed) {
+                $this->addWarning('Unclosed comment', $start, 1, true);
+                $literalLines = $lines;
+                $openPos = strpos($line, '{%');
+                $literalLines[$start] = substr_replace($line, '\\', $openPos, 0);
+
+                return $this->tryParseParagraph($parent, $literalLines, $start, $lineMap);
+            }
         }
 
         $content = '';

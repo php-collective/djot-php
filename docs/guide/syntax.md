@@ -1164,6 +1164,8 @@ More visible text
    comment here %}
 ```
 
+Continuation lines in a multiline comment must be indented. An unindented line makes the comment visible as paragraph text.
+
 <OutputTabs>
 <template #output>
 
