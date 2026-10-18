@@ -1871,6 +1871,13 @@ DJOT;
         $converter->convert('{% This comment never closes');
     }
 
+    public function testStrictModeKeepsRejectedCommentContinuationVisible(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        self::assertSame("<p>{%\nc\n%}</p>\n<p>para</p>\n", $converter->convert("{%\nc\n%}\n\npara\n"));
+    }
+
     public function testStrictModeThrowsOnUnclosedRawBlock(): void
     {
         $converter = new DjotConverter(strict: true);

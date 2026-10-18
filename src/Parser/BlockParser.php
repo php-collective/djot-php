@@ -1253,8 +1253,14 @@ class BlockParser
 
         if (!str_contains($line, '}')) {
             $closed = false;
+            $invalidContinuation = false;
             for ($next = $start + 1, $total = count($lines); $next < $total; $next++) {
-                if (IndentationHelper::isBlankLine($lines[$next]) || preg_match('/^[ \t]+\S/', $lines[$next]) !== 1) {
+                if (IndentationHelper::isBlankLine($lines[$next])) {
+                    break;
+                }
+                if (preg_match('/^[ \t]+\S/', $lines[$next]) !== 1) {
+                    $invalidContinuation = true;
+
                     break;
                 }
                 if (str_contains($lines[$next], '%}')) {
@@ -1264,7 +1270,11 @@ class BlockParser
                 }
             }
             if (!$closed) {
-                $this->addWarning('Unclosed comment', $start, 1, true);
+                if ($invalidContinuation) {
+                    $this->addWarning('Comment continuation must be indented', $start, 1);
+                } else {
+                    $this->addWarning('Unclosed comment', $start, 1, true);
+                }
                 $literalLines = $lines;
                 $openPos = strpos($line, '{%');
                 if ($openPos === false) {
