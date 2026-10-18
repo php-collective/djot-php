@@ -1898,6 +1898,26 @@ DJOT;
         );
     }
 
+    public function testStrictModeDoesNotUseAnotherCommentAsTheCloser(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed comment');
+
+        $converter->convert("{%\nc\n\n{% other %}\n");
+    }
+
+    public function testStrictModeDoesNotUseCodeContentAsTheCloser(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed comment');
+
+        $converter->convert("{%\nc\n\n```\n%}\n```\n");
+    }
+
     public function testStrictModeThrowsOnUnclosedRawBlock(): void
     {
         $converter = new DjotConverter(strict: true);

@@ -1271,13 +1271,28 @@ class BlockParser
             }
             if (!$closed) {
                 $visibleCloser = false;
-                for ($lookahead = $start + 1; $lookahead < $total; $lookahead++) {
-                    if (str_contains($lines[$lookahead], '%}')) {
+                $lookaheadStarted = false;
+                for ($lookahead = $next; $lookahead < $total; $lookahead++) {
+                    $candidate = $lines[$lookahead];
+                    if (IndentationHelper::isBlankLine($candidate)) {
+                        if ($invalidContinuation || $lookaheadStarted) {
+                            break;
+                        }
+
+                        continue;
+                    }
+                    $lookaheadStarted = true;
+                    $openerPos = strpos($candidate, '{%');
+                    $closerPos = strpos($candidate, '%}');
+                    if ($openerPos !== false && ($closerPos === false || $openerPos < $closerPos)) {
+                        break;
+                    }
+                    if ($closerPos !== false) {
                         $visibleCloser = true;
 
                         break;
                     }
-                    if (str_contains($lines[$lookahead], '{%')) {
+                    if ($this->startsNewBlock($candidate, $lines, $lookahead)) {
                         break;
                     }
                 }
@@ -1289,14 +1304,13 @@ class BlockParser
                 } else {
                     $this->addWarning('Unclosed comment', $start, 1, true);
                 }
-                $literalLines = $lines;
                 $openPos = strpos($line, '{%');
                 if ($openPos === false) {
                     return null;
                 }
-                $literalLines[$start] = substr_replace($line, '\\', $openPos, 0);
+                $literalFirstLine = substr_replace($line, '\\', $openPos, 0);
 
-                return $this->tryParseParagraph($parent, $literalLines, $start, $lineMap);
+                return $this->tryParseParagraph($parent, $lines, $start, $lineMap, $literalFirstLine);
             }
         }
 
@@ -4505,10 +4519,16 @@ class BlockParser
      * @param array<string> $lines
      * @param int $start
      * @param array<int, int>|null $lineMap
+     * @param string|null $firstLine
      */
-    protected function tryParseParagraph(Node $parent, array $lines, int $start, ?array $lineMap = null): int
-    {
-        $line = $lines[$start];
+    protected function tryParseParagraph(
+        Node $parent,
+        array $lines,
+        int $start,
+        ?array $lineMap = null,
+        ?string $firstLine = null,
+    ): int {
+        $line = $firstLine ?? $lines[$start];
         // Strip leading whitespace from first line (matching JS reference)
         $content = ltrim($line);
         $inlineLineMap = [$this->sourceLineFor($lineMap, $start)];
