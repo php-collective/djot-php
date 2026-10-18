@@ -1270,8 +1270,22 @@ class BlockParser
                 }
             }
             if (!$closed) {
-                if ($invalidContinuation) {
-                    $this->addWarning('Comment continuation must be indented', $start, 1);
+                $visibleCloser = false;
+                for ($lookahead = $start + 1; $lookahead < $total; $lookahead++) {
+                    if (str_contains($lines[$lookahead], '%}')) {
+                        $visibleCloser = true;
+
+                        break;
+                    }
+                    if (str_contains($lines[$lookahead], '{%')) {
+                        break;
+                    }
+                }
+                if ($visibleCloser) {
+                    $message = $invalidContinuation
+                        ? 'Comment continuation must be indented'
+                        : 'Comment cannot contain blank lines';
+                    $this->addWarning($message, $start, 1);
                 } else {
                     $this->addWarning('Unclosed comment', $start, 1, true);
                 }

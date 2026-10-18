@@ -1878,6 +1878,26 @@ DJOT;
         self::assertSame("<p>{%\nc\n%}</p>\n<p>para</p>\n", $converter->convert("{%\nc\n%}\n\npara\n"));
     }
 
+    public function testStrictModeThrowsOnUnclosedCommentAfterUnindentedLine(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed comment');
+
+        $converter->convert("{%\nc\n");
+    }
+
+    public function testStrictModeKeepsCommentWithBlankContinuationVisible(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        self::assertSame(
+            "<p>{%\na</p>\n<p>%}</p>\n<p>para</p>\n",
+            $converter->convert("{%\n  a\n\n  %}\n\npara\n"),
+        );
+    }
+
     public function testStrictModeThrowsOnUnclosedRawBlock(): void
     {
         $converter = new DjotConverter(strict: true);
