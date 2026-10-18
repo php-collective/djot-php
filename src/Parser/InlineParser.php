@@ -1141,7 +1141,7 @@ class InlineParser
         $length = strlen($text);
         $at = $open + 1;
         while ($at < $length) {
-            $at += strcspn($text, '[]\\`', $at);
+            $at += strcspn($text, '[]\\`<', $at);
             if ($at >= $length) {
                 break;
             }
@@ -1155,6 +1155,14 @@ class InlineParser
                 $codeEnd = $this->findCodeSpanEnd($text, $at);
                 if ($codeEnd !== null) {
                     $at = $codeEnd;
+
+                    continue;
+                }
+            }
+            if ($char === '<') {
+                $autolinkEnd = $this->findAutolinkEnd($text, $at);
+                if ($autolinkEnd !== null) {
+                    $at = $autolinkEnd;
 
                     continue;
                 }
