@@ -224,6 +224,11 @@ class InlineParser
      */
     protected WeakMap $abbreviationSegments;
 
+    /**
+     * @var \WeakMap<\Djot\Node\Inline\Text, bool>
+     */
+    protected WeakMap $apostropheNodes;
+
     protected int $abbreviationRun = 0;
 
     protected bool $abbreviationQuoteRun = false;
@@ -342,6 +347,7 @@ class InlineParser
         ?int $sourceColumn = null,
     ): void {
         $this->abbreviationSegments = new WeakMap();
+        $this->apostropheNodes = new WeakMap();
         $this->abbreviationRun = 0;
         $this->abbreviationQuoteRun = false;
         $this->singleQuoteOpener = null;
@@ -1881,6 +1887,9 @@ class InlineParser
         $buffer = '';
         $node = new Text($glyph);
         $parent->appendChild($node);
+        if ($apostrophe) {
+            $this->apostropheNodes[$node] = true;
+        }
         if ($this->blockParser->getAbbreviations() !== []) {
             $this->abbreviationSegments[$node] = $this->abbreviationRun;
         }
@@ -2033,6 +2042,18 @@ class InlineParser
                     break;
                 }
                 $content = $child->getContent();
+                if (
+                    $child instanceof Text && isset($this->apostropheNodes[$child])
+                    && $index > $wordBoundary && $wordNodes !== []
+                    && $children[$index - 1] instanceof Text
+                    && preg_match('/[\p{L}\p{N}]$/u', $children[$index - 1]->getContent()) === 1
+                    && preg_match('/^[\p{L}\p{N}]/u', $wordNodes[count($wordNodes) - 1]->getContent()) === 1
+                ) {
+                    $removeCount++;
+                    $wordNodes[] = $child;
+
+                    continue;
+                }
                 $start = $child instanceof EscapedText ? 0 : $this->attributeWordStart($content);
                 if ($start === strlen($content)) {
                     break;
