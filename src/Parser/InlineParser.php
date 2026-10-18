@@ -1141,7 +1141,7 @@ class InlineParser
         $length = strlen($text);
         $at = $open + 1;
         while ($at < $length) {
-            $at += strcspn($text, '[]\\', $at);
+            $at += strcspn($text, '[]\\`', $at);
             if ($at >= $length) {
                 break;
             }
@@ -1150,6 +1150,14 @@ class InlineParser
                 $at += 2;
 
                 continue;
+            }
+            if ($char === '`') {
+                $codeEnd = $this->findCodeSpanEnd($text, $at);
+                if ($codeEnd !== null) {
+                    $at = $codeEnd;
+
+                    continue;
+                }
             }
             if ($char === '[') {
                 $starts[] = $at;
@@ -1163,6 +1171,13 @@ class InlineParser
                     $destinationEnd = $this->cachedLinkDestinationEnd($text, $at + 1);
                     if ($destinationEnd !== null) {
                         $at = $destinationEnd;
+
+                        continue;
+                    }
+                } elseif ($at + 1 < $length && $text[$at + 1] === '{') {
+                    $attributeEnd = $this->findAttributeEnd($text, $at + 1);
+                    if ($attributeEnd !== null && $this->isValidAttrPayload(substr($text, $at + 2, $attributeEnd - $at - 2))) {
+                        $at = $attributeEnd + 1;
 
                         continue;
                     }

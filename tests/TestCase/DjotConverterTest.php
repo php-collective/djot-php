@@ -2345,18 +2345,23 @@ DJOT;
 
     // Edge cases: Links and URLs
 
-    #[DataProvider('bracketInDestinationCases')]
-    public function testBracketInDestinationDoesNotCloseOuterText(string $djot, string $expected): void
+    #[DataProvider('opaqueBracketContentCases')]
+    public function testOpaqueContentDoesNotCloseOuterBrackets(string $djot, string $expected): void
     {
         $this->assertSame($expected, $this->converter->convert($djot));
     }
 
-    public static function bracketInDestinationCases(): array
+    public static function opaqueBracketContentCases(): array
     {
         return [
             ['a [b [x](http://u/]) c', "<p>a [b <a href=\"http://u/]\">x</a> c</p>\n"],
             ['a [b [x](http://u/[a]) c', "<p>a [b <a href=\"http://u/[a]\">x</a> c</p>\n"],
             ['a [b ![x](http://u/]) c', "<p>a [b <img alt=\"x\" src=\"http://u/]\"> c</p>\n"],
+            ['a [b [x](http://u/]) c](v)', "<p>a <a href=\"v\">b <a href=\"http://u/]\">x</a> c</a></p>\n"],
+            ['[a [x](u\\]) c](v)', "<p><a href=\"v\">a <a href=\"u]\">x</a> c</a></p>\n"],
+            ['[a [x]{title="]"} c](v)', "<p><a href=\"v\">a <span title=\"]\">x</span> c</a></p>\n"],
+            ['[a `]` b](v)', "<p><a href=\"v\">a <code>]</code> b</a></p>\n"],
+            ['[a `[x]` b](v)', "<p><a href=\"v\">a <code>[x]</code> b</a></p>\n"],
         ];
     }
 
