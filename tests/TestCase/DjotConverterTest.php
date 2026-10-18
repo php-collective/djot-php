@@ -2362,6 +2362,9 @@ DJOT;
             ['[a [x]{title="]"} c](v)', "<p><a href=\"v\">a <span title=\"]\">x</span> c</a></p>\n"],
             ['[a `]` b](v)', "<p><a href=\"v\">a <code>]</code> b</a></p>\n"],
             ['[a `[x]` b](v)', "<p><a href=\"v\">a <code>[x]</code> b</a></p>\n"],
+            ['[a <https://x]> b](u)', "<p><a href=\"u\">a <a href=\"https://x]\">https://x]</a> b</a></p>\n"],
+            ['[a <"q]"@x.com> b](u)', "<p><a href=\"u\">a <a href=\"mailto:&quot;q]&quot;@x.com\">\"q]\"@x.com</a> b</a></p>\n"],
+            ['[a <b](u) c>', "<p><a href=\"u\">a &lt;b</a> c&gt;</p>\n"],
         ];
     }
 
