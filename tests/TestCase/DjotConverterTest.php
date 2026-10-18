@@ -2345,6 +2345,21 @@ DJOT;
 
     // Edge cases: Links and URLs
 
+    #[DataProvider('bracketInDestinationCases')]
+    public function testBracketInDestinationDoesNotCloseOuterText(string $djot, string $expected): void
+    {
+        $this->assertSame($expected, $this->converter->convert($djot));
+    }
+
+    public static function bracketInDestinationCases(): array
+    {
+        return [
+            ['a [b [x](http://u/]) c', "<p>a [b <a href=\"http://u/]\">x</a> c</p>\n"],
+            ['a [b [x](http://u/[a]) c', "<p>a [b <a href=\"http://u/[a]\">x</a> c</p>\n"],
+            ['a [b ![x](http://u/]) c', "<p>a [b <img alt=\"x\" src=\"http://u/]\"> c</p>\n"],
+        ];
+    }
+
     public function testLinkWithParenthesesInUrl(): void
     {
         $djot = '[Wikipedia](https://en.wikipedia.org/wiki/Example_(disambiguation))';

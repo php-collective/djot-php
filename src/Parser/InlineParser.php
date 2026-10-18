@@ -1159,6 +1159,14 @@ class InlineParser
                 if ($starts === []) {
                     return $at;
                 }
+                if ($at + 1 < $length && $text[$at + 1] === '(') {
+                    $destinationEnd = $this->cachedLinkDestinationEnd($text, $at + 1);
+                    if ($destinationEnd !== null) {
+                        $at = $destinationEnd;
+
+                        continue;
+                    }
+                }
             }
             $at++;
         }
