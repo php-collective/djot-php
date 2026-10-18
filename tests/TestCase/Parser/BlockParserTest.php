@@ -62,6 +62,21 @@ class BlockParserTest extends TestCase
         $this->assertInstanceOf(Paragraph::class, $doc->getChildren()[1]);
     }
 
+    public function testBlankAfterFootnoteLoosensList(): void
+    {
+        $converter = new DjotConverter();
+        self::assertStringContainsString("<li>\n<p>c</p>\n</li>", $converter->convert("- [^n]: a\n\n- c"));
+        self::assertStringContainsString("<li>\n<p>b</p>\n</li>", $converter->convert("- [^n]: a\n\n  b"));
+    }
+
+    public function testBlankBeforeAttachedCaptionKeepsListTight(): void
+    {
+        $converter = new DjotConverter();
+        self::assertStringContainsString('<caption>cap</caption>', $converter->convert("- | a |\n\n  ^ cap\n- c"));
+        self::assertStringContainsString("<li>\nc\n</li>", $converter->convert("- | a |\n\n  ^ cap\n- c"));
+        self::assertStringContainsString("<li>\n<p>c</p>\n</li>", $converter->convert("- a\n\n  ^ cap\n- c"));
+    }
+
     public function testParseHeading(): void
     {
         $doc = $this->parser->parse('# Heading 1');

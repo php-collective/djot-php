@@ -10,8 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * A list item's blocks are parsed in one piece, so a container its first block
- * opens keeps the indented lines after a blank line, and tightness follows
- * djot.js.
+ * opens keeps the indented lines after a blank line.
  *
  * The definition rows keep `<p>` inside `<dd>`: djot.js renders it bare there
  * because the definition list takes the outer list's tightness, while a
@@ -49,7 +48,7 @@ class ListItemBodyTest extends TestCase
             ],
             'note ends at the item column' => [
                 "[^n]\n\n- [^n]: para\n\n  tail",
-                "<p><a id=\"fnref1\" href=\"#fn1\" role=\"doc-noteref\"><sup>1</sup></a></p>\n<ul>\n<li>\ntail\n</li>\n</ul>\n<section role=\"doc-endnotes\">\n<hr>\n<ol>\n<li id=\"fn1\">\n<p>para<a href=\"#fnref1\" role=\"doc-backlink\">↩︎</a></p>\n</li>\n</ol>\n</section>\n",
+                "<p><a id=\"fnref1\" href=\"#fn1\" role=\"doc-noteref\"><sup>1</sup></a></p>\n<ul>\n<li>\n<p>tail</p>\n</li>\n</ul>\n<section role=\"doc-endnotes\">\n<hr>\n<ol>\n<li id=\"fn1\">\n<p>para<a href=\"#fnref1\" role=\"doc-backlink\">↩︎</a></p>\n</li>\n</ol>\n</section>\n",
             ],
             'reference definition with a shallow body' => [
                 "[r][]\n\n- para\n\n [r]: /u\n  tail",

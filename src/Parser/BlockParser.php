@@ -2457,7 +2457,7 @@ class BlockParser
                 $list->setTight(false);
             }
             // A blank line before this item makes the list loose, unless the
-            // previous item ends in a nested list or a note, which takes it.
+            // previous item ends in a nested list, which takes it.
             if ($lastItemHadBlankAfter && !$heldBlank) {
                 $list->setTight(false);
             }
@@ -2976,7 +2976,7 @@ class BlockParser
      * @param array<int> $lineMap
      * @param array<bool> $raw
      * @param int $contentIndent
-     * @param bool $heldBlank Set when the item ends in a nested list or a note.
+     * @param bool $heldBlank Set when the item ends in a nested list.
      *
      * @return bool Whether a blank line separates two of the item's blocks, which makes the list loose.
      */
@@ -3025,14 +3025,14 @@ class BlockParser
     /**
      * Whether a blank line in an item body comes before one of its direct blocks.
      *
-     * Follows djot.js: a blank line inside a nested container, after a nested
-     * list or a note, or before a sublist does not count. A body that opens with
+     * A blank line inside a nested container, after a nested list, or before a
+     * sublist does not count. A body that opens with
      * a blank line follows the item's first paragraph.
      *
      * @param array<string> $lines
      * @param array<int> $lineMap
      * @param array<int, true> $starts
-     * @param bool $heldBlank Set when the last block is a nested list or a note.
+     * @param bool $heldBlank Set when the last block is a nested list.
      */
     private function blankSeparatesItemBlocks(array $lines, array $lineMap, array $starts, bool &$heldBlank): bool
     {
@@ -3053,7 +3053,7 @@ class BlockParser
             if ($sawBlank && !$opensList && !$previousHoldsBlank) {
                 $loose = true;
             }
-            $previousHoldsBlank = $opensList || preg_match('/^\[\^[^\]]+\]:/', $trimmed) === 1;
+            $previousHoldsBlank = $opensList;
             $sawBlank = false;
         }
         $heldBlank = $previousHoldsBlank;
@@ -4562,6 +4562,7 @@ class BlockParser
             $caption = new Caption();
             $this->inlineParser->parse($caption, $captionText, $start);
             $lastChild->setCaption($caption);
+            $this->markAttachedCaption($parent, $start);
 
             return $linesConsumed;
         }
@@ -4586,6 +4587,7 @@ class BlockParser
 
             // Replace blockquote with figure in parent
             $parent->replaceChild(count($children) - 1, $figure);
+            $this->markAttachedCaption($parent, $start);
 
             return $linesConsumed;
         }
@@ -4616,6 +4618,7 @@ class BlockParser
 
                 // Replace paragraph with figure in parent
                 $parent->replaceChild(count($children) - 1, $figure);
+                $this->markAttachedCaption($parent, $start);
 
                 return $linesConsumed;
             }
@@ -4623,6 +4626,13 @@ class BlockParser
 
         // No valid preceding block for caption - treat as regular paragraph
         return null;
+    }
+
+    private function markAttachedCaption(Node $parent, int $start): void
+    {
+        if ($this->itemBlockStarts !== null && $this->itemBlockStarts['item'] === $parent) {
+            unset($this->itemBlockStarts['starts'][$start]);
+        }
     }
 
     protected function appendToLastParagraph(Node $parent, string $content, int $line): void
