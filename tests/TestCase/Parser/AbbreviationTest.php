@@ -76,7 +76,7 @@ class AbbreviationTest extends TestCase
             $this->converter->convert("# O'Reilly\n\n*[O’Reilly]: Publisher"),
         );
         $this->assertSame(
-            '<p>O’<span class="publisher">Reilly</span></p>' . "\n",
+            '<p><span class="publisher">O’Reilly</span></p>' . "\n",
             $this->converter->convert("O'Reilly{.publisher}"),
         );
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Djot\Test\TestCase\Parser;
 
+use Djot\DjotConverter;
 use Djot\Node\Block\Paragraph;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\Delete;
@@ -240,6 +241,14 @@ class InlineParserTest extends TestCase
         $this->assertInstanceOf(Span::class, $span);
         $class = $span->getAttribute('class') ?? '';
         $this->assertTrue(str_contains($class, 'class'));
+    }
+
+    public function testWordAttributeIncludesInternalApostrophe(): void
+    {
+        $converter = new DjotConverter();
+        self::assertSame("<p><span class=\"x\">don’t</span></p>\n", $converter->convert("don't{.x}"));
+        self::assertSame("<p>a <span class=\"x\">b’c</span></p>\n", $converter->convert("a b'c{.x}"));
+        self::assertSame("<p>‘hello’</p>\n", $converter->convert("'hello'{.x}"));
     }
 
     public function testParseLinkWithAttributes(): void
