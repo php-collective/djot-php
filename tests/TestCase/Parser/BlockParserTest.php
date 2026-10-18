@@ -40,8 +40,36 @@ class BlockParserTest extends TestCase
     public function testMultilineCommentKeepsBracesInItsContent(): void
     {
         $converter = new DjotConverter();
-        $input = "{%\nTODO: fix {x} later\nmore\n%}\n\npara\n";
+        $input = "{%\n  TODO: fix {x} later\n  more\n  %}\n\npara\n";
         self::assertSame("<p>para</p>\n", $converter->convert($input));
+    }
+
+    public function testUnindentedCommentLinesRemainVisibleInQuote(): void
+    {
+        $converter = new DjotConverter();
+        self::assertSame(
+            "<blockquote>\n<p>{%\nc\n%}</p>\n</blockquote>\n",
+            $converter->convert("> {%\n> c\n> %}"),
+        );
+    }
+
+    public function testBlankLineRejectsMultilineComment(): void
+    {
+        $converter = new DjotConverter();
+        self::assertSame("<p>{%</p>\n<p>c</p>\n", $converter->convert("{%\n\nc"));
+    }
+
+    public function testRejectedCommentUsesNormalInlineParsing(): void
+    {
+        $converter = new DjotConverter();
+        self::assertSame("<p>{%\n<strong>x</strong> * y</p>\n", $converter->convert("{%\n*x* \\* y"));
+    }
+
+    public function testUnclosedMultilineCommentRemainsVisible(): void
+    {
+        $converter = new DjotConverter();
+        self::assertSame("<p>{% unclosed</p>\n", $converter->convert('{% unclosed'));
+        self::assertSame("<p>{%\nx</p>\n", $converter->convert("{%\n  x"));
     }
 
     public function testParseParagraph(): void

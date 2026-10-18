@@ -762,7 +762,7 @@ DJOT;
 
     public function testMultilineComment(): void
     {
-        $djot = "Before\n\n{% This is a\nmultiline\ncomment %}\n\nAfter";
+        $djot = "Before\n\n{% This is a\n  multiline\n  comment %}\n\nAfter";
 
         $result = $this->converter->convert($djot);
 
@@ -1869,6 +1869,53 @@ DJOT;
         $this->expectExceptionMessage('Unclosed comment');
 
         $converter->convert('{% This comment never closes');
+    }
+
+    public function testStrictModeKeepsRejectedCommentContinuationVisible(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        self::assertSame("<p>{%\nc\n%}</p>\n<p>para</p>\n", $converter->convert("{%\nc\n%}\n\npara\n"));
+    }
+
+    public function testStrictModeThrowsOnUnclosedCommentAfterUnindentedLine(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed comment');
+
+        $converter->convert("{%\nc\n");
+    }
+
+    public function testStrictModeKeepsCommentWithBlankContinuationVisible(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        self::assertSame(
+            "<p>{%\na</p>\n<p>%}</p>\n<p>para</p>\n",
+            $converter->convert("{%\n  a\n\n  %}\n\npara\n"),
+        );
+    }
+
+    public function testStrictModeDoesNotUseAnotherCommentAsTheCloser(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed comment');
+
+        $converter->convert("{%\nc\n\n{% other %}\n");
+    }
+
+    public function testStrictModeDoesNotUseCodeContentAsTheCloser(): void
+    {
+        $converter = new DjotConverter(strict: true);
+
+        $this->expectException(ParseException::class);
+        $this->expectExceptionMessage('Unclosed comment');
+
+        $converter->convert("{%\nc\n\n```\n%}\n```\n");
     }
 
     public function testStrictModeThrowsOnUnclosedRawBlock(): void
