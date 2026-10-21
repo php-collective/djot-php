@@ -959,17 +959,31 @@ class HtmlToDjot
         $backticks = StringUtil::findSafeCodeFence($content, 1);
         $attrs = $this->formatInlineAttributes($node);
 
-        // Separate the content from the fence when it begins or ends with a
-        // backtick. Djot only strips padding when both ends have a space, so the
-        // padding must be symmetric: a lone pad space would be kept as content
-        // and corrupt the value on the next parse.
-        if (strlen($backticks) > 1) {
-            $needsSpace = (str_starts_with($content, '`') && !str_starts_with($content, ' '))
-                || (str_ends_with($content, '`') && !str_ends_with($content, ' '));
-
-            if ($needsSpace) {
-                return $backticks . ' ' . $content . ' ' . $backticks . $attrs;
+        // A space directly before an initial backtick or after a final
+        // backtick is always padding in Djot. Such significant spaces cannot
+        // be represented by one verbatim span. Generate a safe code element
+        // with escaped text rather than copying raw input HTML.
+        if (str_starts_with($content, ' `') || str_ends_with($content, '` ')) {
+            $safeAttrs = '';
+            foreach (['id', 'class', 'title'] as $name) {
+                if ($node->hasAttribute($name)) {
+                    $safeAttrs .= ' ' . $name . '="'
+                        . htmlspecialchars($node->getAttribute($name), ENT_QUOTES | ENT_HTML5) . '"';
+                }
             }
+            $html = '<code' . $safeAttrs . '>' . htmlspecialchars($content, ENT_QUOTES | ENT_HTML5) . '</code>';
+            $fence = StringUtil::findSafeCodeFence($html, 1);
+
+            return $fence . $html . $fence . '{=html}';
+        }
+
+        // Add only the padding needed to separate a boundary backtick from
+        // the fence. Djot strips the two ends independently.
+        if (strlen($backticks) > 1) {
+            $left = str_starts_with($content, '`') ? ' ' : '';
+            $right = str_ends_with($content, '`') ? ' ' : '';
+
+            return $backticks . $left . $content . $right . $backticks . $attrs;
         }
 
         return $backticks . $content . $backticks . $attrs;

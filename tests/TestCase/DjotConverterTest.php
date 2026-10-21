@@ -2577,6 +2577,27 @@ DJOT;
     }
 
     /**
+     * @return array<string, array{string, string}>
+     */
+    public static function verbatimBoundarySpaceProvider(): array
+    {
+        return [
+            'left padding' => ['`` `foo``', '`foo'],
+            'right padding' => ['``foo` ``', 'foo`'],
+            'both ends' => ['`` `foo` ``', '`foo`'],
+            'ordinary leading space' => ['`` foo``', ' foo'],
+            'ordinary trailing space' => ['``foo ``', 'foo '],
+            'two leading spaces' => ['``  `foo``', '  `foo'],
+        ];
+    }
+
+    #[DataProvider('verbatimBoundarySpaceProvider')]
+    public function testVerbatimBoundarySpaces(string $source, string $content): void
+    {
+        $this->assertSame('<p><code>' . $content . "</code></p>\n", $this->converter->convert($source));
+    }
+
+    /**
      * Test that inline link URLs have newlines stripped
      *
      * Regression test: [link](url\nandurl) should produce urlandurl as the href
