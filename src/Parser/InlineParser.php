@@ -1085,11 +1085,13 @@ class InlineParser
             // Found exact match
             $content = substr($text, $contentStart, $closePos - $contentStart);
 
-            // Strip single leading and trailing space if content starts/ends with backtick
-            if (strlen($content) >= 2 && $content[0] === ' ' && $content[strlen($content) - 1] === ' ') {
-                if (str_contains($content, '`')) {
-                    $content = substr($content, 1, -1);
-                }
+            // Djot removes padding independently at either end when it sits
+            // next to a backtick in the verbatim content.
+            if (str_starts_with($content, ' `')) {
+                $content = substr($content, 1);
+            }
+            if (str_ends_with($content, '` ')) {
+                $content = substr($content, 0, -1);
             }
 
             // Check for raw inline format: `...`{=format}

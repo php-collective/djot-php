@@ -12,12 +12,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * Inline code-span content must survive HTML -> Djot -> HTML untouched.
  *
- * Djot strips a single leading and trailing space from a code span only when
- * both ends have one and the span is not all spaces. So content that begins or
- * ends with a backtick (which needs a separating space) must be padded on both
- * ends, not one; otherwise a lone pad space is kept and the content gains a
- * space. Likewise, content that already begins or ends with a significant space
- * must be padded so the strip rule restores it rather than eating it.
+ * Djot strips padding independently next to a backtick at either end.
+ * Significant spaces in those positions need a raw HTML fallback.
  */
 class HtmlToDjotCodeSpanTest extends TestCase
 {
@@ -50,6 +46,8 @@ class HtmlToDjotCodeSpanTest extends TestCase
             'both spaces' => [' a '],
             'all spaces' => ['   '],
             'leading space and backtick' => [' `a'],
+            'trailing backtick and space' => ['a` '],
+            'leading backtick after a space with HTML text' => [' `<script>alert(1)</script>'],
         ];
     }
 
@@ -64,5 +62,15 @@ class HtmlToDjotCodeSpanTest extends TestCase
         $got = html_entity_decode($matches[1] ?? '(no code element)', ENT_QUOTES | ENT_HTML5);
 
         $this->assertSame($content, $got, 'Djot intermediate: ' . $djot);
+    }
+
+    public function testUnrepresentableCodeSpanUsesEscapedHtml(): void
+    {
+        $html = '<p><code class="language-php" onclick="alert(1)"> `&lt;script&gt;</code></p>';
+        $djot = $this->converter->convert($html);
+        $rendered = $this->renderer->convert($djot);
+
+        $this->assertStringContainsString('<code class="language-php"> `&lt;script&gt;</code>', $rendered);
+        $this->assertStringNotContainsString('onclick=', $rendered);
     }
 }
