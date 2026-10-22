@@ -614,6 +614,19 @@ DJOT;
         $this->assertStringContainsString('<div class="custom">Raw HTML</div>', $result);
     }
 
+    public function testRawBlockWithoutSpaceBeforeFormat(): void
+    {
+        $source = "```=html\n<b>x</b>\n```";
+
+        $this->assertSame("<b>x</b>\n", $this->converter->convert($source));
+
+        $listSource = "-\n\n  ```=html\n  <b>x</b>\n  ```";
+        $this->assertStringContainsString('<b>x</b>', $this->converter->convert($listSource));
+
+        $tabSource = "```\t=html\n<b>x</b>\n```";
+        $this->assertSame("<b>x</b>\n", $this->converter->convert($tabSource));
+    }
+
     public function testMathInline(): void
     {
         $djot = 'The equation is $`E = mc^2`$.';

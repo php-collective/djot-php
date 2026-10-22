@@ -164,8 +164,8 @@ class FencedBlockParser
             return null;
         }
 
-        // Match opening fence with =format: ``` =html (space before = is syntax delimiter)
-        if (!preg_match('/^(`{3,}) +=(\w+) *$/', $line, $matches)) {
+        // Match opening fence with =format, with or without whitespace before =.
+        if (!preg_match('/^(`{3,})[ \t]*=(\w+)[ \t]*$/', $line, $matches)) {
             return null;
         }
 
