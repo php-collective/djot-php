@@ -183,4 +183,126 @@ class ListItemMarkerAttributesTest extends TestCase
             $result,
         );
     }
+
+    public function testAttributeLineInsideOpenCodeSpanRemainsCode(): void
+    {
+        $source = "- a\n  ```\n  {.c}\n  ```\n";
+
+        $this->assertSame(
+            "<ul>\n<li>\na\n<code>\n{.c}\n</code>\n</li>\n</ul>\n",
+            $this->converter->convert($source),
+        );
+    }
+
+    public function testEscapedBacktickBeforeAttributeLineStillAttachesToItem(): void
+    {
+        $source = "- a\\`\n  {.c}\n";
+
+        $this->assertSame(
+            "<ul>\n<li class=\"c\">\na`\n</li>\n</ul>\n",
+            $this->converter->convert($source),
+        );
+    }
+
+    public function testBacktickInsideEarlierFenceDoesNotHideItemAttribute(): void
+    {
+        $source = "- ~~~\n  `\n  ~~~\n  {.c}\n";
+
+        $this->assertStringContainsString('<li class="c">', $this->converter->convert($source));
+    }
+
+    public function testCodeSpanInsideEarlierDivDoesNotHideItemAttribute(): void
+    {
+        $source = "- ::: d\n  `x\n\n  y\n  :::\n  {.c}\n";
+
+        $this->assertStringContainsString('<li class="c">', $this->converter->convert($source));
+    }
+
+    public function testSeveralAttributeShapedLinesInsideOpenCodeSpanRemainCode(): void
+    {
+        $source = "- a\n  ```\n  {.c}\n  {#x}\n  ```\n";
+
+        $this->assertSame(
+            "<ul>\n<li>\na\n<code>\n{.c}\n{#x}\n</code>\n</li>\n</ul>\n",
+            $this->converter->convert($source),
+        );
+    }
+
+    public function testOpenCodeSpanDoesNotAbsorbNextListItem(): void
+    {
+        $source = "- a `x\n- b\n";
+
+        $this->assertSame(
+            "<ul>\n<li>\na <code>x</code>\n</li>\n<li>\nb\n</li>\n</ul>\n",
+            $this->converter->convert($source),
+        );
+    }
+
+    public function testClosingDivStillAllowsItemAttributeAfterUnclosedCode(): void
+    {
+        $source = "- ::: d\n  `x\n  :::\n  {.c}\n";
+
+        $this->assertStringContainsString('<li class="c">', $this->converter->convert($source));
+    }
+
+    public function testBacktickInHeadingStillAllowsItemAttribute(): void
+    {
+        $source = "- # h `x\n  {.c}\n";
+
+        $this->assertStringContainsString('<li class="c">', $this->converter->convert($source));
+    }
+
+    public function testBacktickInQuoteStillAllowsItemAttribute(): void
+    {
+        $source = "- > q `x\n  {.c}\n";
+
+        $this->assertStringContainsString('<li class="c">', $this->converter->convert($source));
+    }
+
+    public function testBackticksInOpaqueInlineContentStillAllowItemAttribute(): void
+    {
+        $sources = [
+            "- <https://a`b>\n  {.c}\n",
+            "- [x](u`v)\n  {.c}\n",
+            "- [a [b] c](u`v)\n  {.c}\n",
+            "- a{title=\"`\"}\n  {.c}\n",
+            "- a{title=\"}`\"}\n  {.c}\n",
+            "- a {% `x %}\n  {.c}\n",
+            "- a `x`\n  {.c}\n",
+        ];
+        foreach ($sources as $source) {
+            $this->assertStringContainsString('<li class="c">', $this->converter->convert($source));
+        }
+    }
+
+    public function testTrailingInlineCodeOpenerKeepsAttributeLineInsideCode(): void
+    {
+        $source = "- a `x\n  {.c}\n  `\n";
+
+        $this->assertSame(
+            "<ul>\n<li>\na <code>x\n{.c}\n</code>\n</li>\n</ul>\n",
+            $this->converter->convert($source),
+        );
+    }
+
+    public function testLiteralAngleBracketBeforeCodeOpenerKeepsAttributeInsideCode(): void
+    {
+        $sources = [
+            "- x < y `z > w\n  {.c}\n  `\n",
+            "- a \\<b `c >\n  {.c}\n  `\n",
+            "- a](b`c)\n  {.c}\n  `\n",
+        ];
+        foreach ($sources as $source) {
+            $result = $this->converter->convert($source);
+            $this->assertStringNotContainsString('<li class="c">', $result);
+            $this->assertStringContainsString('{.c}', $result);
+        }
+    }
+
+    public function testStandaloneCommentBeforeItemAttributeStillAllowsAttribute(): void
+    {
+        $source = "- a\n  {% `x %}\n  {.c}\n";
+
+        $this->assertStringContainsString('<li class="c">', $this->converter->convert($source));
+    }
 }

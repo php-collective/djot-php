@@ -2588,6 +2588,10 @@ class BlockParser
             $itemDivFences = [];
             $itemQuoteDepth = 0;
             $this->trackDefinitionLazyState($itemContent, $itemState, $itemDivFences, $itemQuoteDepth);
+            $plainParagraph = $itemState['paragraphOpen'] && !$this->opensBlock($itemContent);
+            $paragraphCodeWidth = $plainParagraph
+                ? $this->codeSpanDelimiterAfterListLine($itemContent)
+                : 0;
             // The open paragraph of a note or list item on the marker line, which an
             // under-indented block line closes.
             $itemNoteOpen = $itemState['paragraphOpen']
@@ -2603,6 +2607,10 @@ class BlockParser
                     $itemLines[] = '';
                     $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
                     $this->trackDefinitionLazyState('', $itemState, $itemDivFences, $itemQuoteDepth);
+                    if (!$itemState['paragraphOpen']) {
+                        $plainParagraph = false;
+                        $paragraphCodeWidth = 0;
+                    }
                     $hasNonMarkerContinuation = true;
                     $i++;
 
@@ -2634,11 +2642,16 @@ class BlockParser
                     }
                 }
 
+                $attributeInsideCode = $itemState['paragraphOpen']
+                    && $paragraphCodeWidth > 0
+                    && $nextIndent >= $contentIndent
+                    && preg_match('/^\{([^{}]+)\}\s*$/', $nextTrimmed);
                 // Check for list item attributes (must be at content indent, be a standalone attribute block)
                 if (
                     !$itemState['inFence'] && !$itemState['inComment']
                     && $nextIndent >= $contentIndent
                     && preg_match('/^\{([^{}]+)\}\s*$/', $nextTrimmed, $attrMatch)
+                    && !$attributeInsideCode
                 ) {
                     // This is a list item attribute line - don't add to content
                     break;
@@ -2678,6 +2691,27 @@ class BlockParser
                 $tracked = $itemLines[count($itemLines) - 1];
                 $wasOpen = $itemState['paragraphOpen'];
                 $this->trackDefinitionLazyState($tracked, $itemState, $itemDivFences, $itemQuoteDepth);
+                if ($attributeInsideCode) {
+                    $itemState['paragraphOpen'] = true;
+                }
+                if ($itemState['paragraphOpen']) {
+                    if (!$wasOpen) {
+                        $plainParagraph = !$this->opensBlock($tracked);
+                    }
+                    if (!$plainParagraph) {
+                        $paragraphCodeWidth = 0;
+                    } elseif ($wasOpen && $paragraphCodeWidth > 0) {
+                        $paragraphCodeWidth = $this->codeSpanDelimiterAfterListLine(
+                            $tracked,
+                            $paragraphCodeWidth,
+                        );
+                    } else {
+                        $paragraphCodeWidth = $this->codeSpanDelimiterAfterListLine($tracked);
+                    }
+                } else {
+                    $plainParagraph = false;
+                    $paragraphCodeWidth = 0;
+                }
                 $itemNoteOpen = $itemState['paragraphOpen'] && (str_starts_with($tracked, '[^')
                     || ($itemNoteOpen && $wasOpen && !$this->opensBlock($tracked)));
                 $hasNonMarkerContinuation = true;
@@ -3026,6 +3060,93 @@ class BlockParser
         $parent->appendChild($list);
 
         return $i - $start;
+    }
+
+    /**
+     * Track a code span across plain list-paragraph lines.
+     */
+    private function codeSpanDelimiterAfterListLine(string $line, int $openWidth = 0): int
+    {
+        if ($openWidth === 0 && !str_contains($line, '`')) {
+            return 0;
+        }
+        $length = strlen($line);
+        $bracketDepth = 0;
+        for ($i = 0; $i < $length; $i++) {
+            if ($openWidth === 0) {
+                if ($line[$i] === '[' || $line[$i] === '<' || $line[$i] === '{' || $line[$i] === ']') {
+                    $slashes = 0;
+                    for ($previous = $i - 1; $previous >= 0 && $line[$previous] === '\\'; $previous--) {
+                        $slashes++;
+                    }
+                    if ($slashes % 2 === 0) {
+                        if ($line[$i] === '[') {
+                            $bracketDepth++;
+                        } elseif ($line[$i] === '<') {
+                            $end = $i + 1 + strcspn($line, "<> \t\n", $i + 1);
+                            if ($end < $length && $line[$end] === '>') {
+                                $inner = substr($line, $i + 1, $end - $i - 1);
+                                if (preg_match('/^(?:[a-zA-Z][a-zA-Z0-9+.-]*:[^\s<>]*|[^\s<>@]+@[^\s<>@]+)$/', $inner)) {
+                                    $i = $end;
+
+                                    continue;
+                                }
+                            }
+                        } elseif (
+                            $line[$i] === '{' && $i > 0
+                            && (!ctype_space($line[$i - 1]) || ($line[$i + 1] ?? '') === '%')
+                        ) {
+                            $nextBrace = $i + 1 + strcspn($line, "{}\n", $i + 1);
+                            if ($nextBrace < $length && $line[$nextBrace] === '}') {
+                                $end = AttributeParser::findEnd($line, $i);
+                                if (
+                                    $end !== null
+                                    && AttributeParser::isValid(substr($line, $i + 1, $end - $i - 1))
+                                ) {
+                                    $i = $end;
+
+                                    continue;
+                                }
+                            }
+                        } elseif ($line[$i] === ']') {
+                            $hadOpenBracket = $bracketDepth > 0;
+                            if ($hadOpenBracket) {
+                                $bracketDepth--;
+                            }
+                            if ($hadOpenBracket && $bracketDepth === 0 && ($line[$i + 1] ?? '') === '(') {
+                                $end = $i + 2 + strcspn($line, "()[] \t\n", $i + 2);
+                                if ($end < $length && $line[$end] === ')') {
+                                    $i = $end;
+
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if ($line[$i] !== '`') {
+                continue;
+            }
+            if ($openWidth === 0) {
+                $slashes = 0;
+                for ($previous = $i - 1; $previous >= 0 && $line[$previous] === '\\'; $previous--) {
+                    $slashes++;
+                }
+                if ($slashes % 2 === 1) {
+                    continue;
+                }
+            }
+            $runWidth = strspn($line, '`', $i);
+            if ($openWidth === 0) {
+                $openWidth = $runWidth;
+            } elseif ($runWidth === $openWidth) {
+                $openWidth = 0;
+            }
+            $i += $runWidth - 1;
+        }
+
+        return $openWidth;
     }
 
     /**
