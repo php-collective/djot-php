@@ -1913,10 +1913,12 @@ class BlockParser
             ? array_pop($containers)
             : null;
         $verbatim = $state['inFence'] || $state['inComment'];
+        $written = 0;
         foreach ($containers as $index => $container) {
             if ($container['type'] === 'quote') {
                 if ($this->isQuotePrefixAt($line, $pos)) {
                     $pos++;
+                    $written = $pos + 1;
                     $pos += strspn($line, " \t", $pos);
 
                     continue;
@@ -1930,14 +1932,19 @@ class BlockParser
 
                     return true;
                 }
+                // A lazy line continues the open paragraph and leaves the quotes open.
+                if (!$verbatim && $state['paragraphOpen'] && !$this->opensBlock(substr($line, $written))) {
+                    return true;
+                }
             } elseif ($container['type'] !== 'item' || $pos === $length || $pos > $container['indent']) {
                 continue;
             }
-            // With no paragraph to continue, or a marker in the item's own column, the
-            // container ends here and the line starts over.
+            // With no paragraph to continue, a line opening a block outside a quote, or
+            // a marker in the item's own column, the container ends and the line starts over.
             $endsContainer = !$verbatim && (
                 !$state['paragraphOpen']
-                || ($container['type'] === 'item' && $pos === $container['indent']
+                || $container['type'] === 'quote'
+                || ($pos === $container['indent']
                     && $this->listParser->parseListItemMarker(substr($line, $pos)) !== null)
             );
             if ($endsContainer) {
@@ -2445,10 +2452,9 @@ class BlockParser
                             if ($itemInfo !== null && $itemInfo['type'] === $listInfo['type'] && $itemInfo['marker'] === $listInfo['marker'] && $sameStyle) {
                                 break;
                             }
-                            // Content at base indent that's not a matching list marker
-                            // Check if it's a block element - if so, end list content collection
-                            // Use isBlockElementStart() which detects blocks regardless of mode
-                            if ($this->isBlockElementStart($trimmedLine) || $this->startsNewBlock($trimmedLine)) {
+                            // A base-indent line that opens a real block ends the list
+                            // content; `>x` or `***x` opens none and stays lazy text.
+                            if ($this->opensBlock($trimmedLine) || preg_match('/^:(?: |$)/', $trimmedLine) === 1) {
                                 break;
                             }
                             // Only an open paragraph takes a lazy line; after a fence or
@@ -2735,18 +2741,42 @@ class BlockParser
                 $gathered = [];
                 $gatheredLineMap = [];
                 $consumedThrough = $i;
+                $gatherState = [
+                    'inFence' => false,
+                    'fenceChar' => '',
+                    'fenceLength' => 0,
+                    'inComment' => false,
+                    'commentLength' => 0,
+                    'paragraphOpen' => false,
+                ];
+                $gatherDivFences = [];
+                $gatherQuoteDepth = 0;
+                $this->trackDefinitionLazyState($itemContent, $gatherState, $gatherDivFences, $gatherQuoteDepth);
                 while ($j < $count) {
                     $subLine = $lines[$j];
                     if (IndentationHelper::isBlankLine($subLine)) {
                         $gathered[] = '';
                         $gatheredLineMap[] = $this->sourceLineFor($lineMap, $j);
+                        $this->trackDefinitionLazyState('', $gatherState, $gatherDivFences, $gatherQuoteDepth);
                         $j++;
 
                         continue;
                     }
                     $lineIndent = IndentationHelper::getLeadingSpaces($subLine);
                     if ($lineIndent < $contentIndent) {
-                        break;
+                        // A lazy line continues the inner item's open paragraph.
+                        if (
+                            !$gatherState['paragraphOpen'] || $gathered === [] || $gathered[array_key_last($gathered)] === ''
+                            || $this->opensBlock($subLine) || preg_match('/^:(?: |$)/', ltrim($subLine)) === 1
+                        ) {
+                            break;
+                        }
+                        $gathered[] = ltrim($subLine);
+                        $gatheredLineMap[] = $this->sourceLineFor($lineMap, $j);
+                        $j++;
+                        $consumedThrough = $j;
+
+                        continue;
                     }
                     if (
                         $lineIndent === $contentIndent
@@ -2765,6 +2795,7 @@ class BlockParser
                     }
                     $gathered[] = IndentationHelper::stripLeadingIndent($subLine, $contentIndent);
                     $gatheredLineMap[] = $this->sourceLineFor($lineMap, $j);
+                    $this->trackDefinitionLazyState(ltrim($gathered[array_key_last($gathered)]), $gatherState, $gatherDivFences, $gatherQuoteDepth);
                     $j++;
                     $consumedThrough = $j;
                 }
@@ -2941,7 +2972,7 @@ class BlockParser
             // This prevents "-like" lines from being parsed as nested lists while
             // still allowing blockquotes, code blocks, etc. to be properly recognized.
             if ($hasNonMarkerContinuation) {
-                $firstLine = $itemLines[0];
+                $firstLine = ltrim($itemLines[0], ' ');
                 if (
                     $parseItemLinesAsBlocks || $this->isBlockElementStart($firstLine)
                     || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $firstLine)
