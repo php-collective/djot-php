@@ -896,7 +896,8 @@ final class BorrowedHtmlLayout
         }
 
         if (str_contains($withoutContractions, '"')) {
-            if ($this->verbatimHoldsQuote($text)) {
+            // An empty pair (`""`) is two openers in djot.js, not a quotation.
+            if (str_contains($text, '""') || $this->verbatimHoldsQuote($text)) {
                 return true;
             }
             $opening = true;

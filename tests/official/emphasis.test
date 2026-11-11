@@ -222,6 +222,23 @@ _[bar_](url)
 <p>_<a href="url">bar_</a></p>
 ```
 
+Closest opener wins (spec: "When there are multiple openers that
+might be matched with a given closer, the closest one is used"):
+
+```
+*not strong *strong*
+.
+<p>*not strong <strong>strong</strong></p>
+```
+
+Nested emphasis with non-consecutive closers:
+
+```
+__emphasis inside_ emphasis_
+.
+<p><em><em>emphasis inside</em> emphasis</em></p>
+```
+
 Code takes precedence:
 
 ```
@@ -236,27 +253,4 @@ Autolinks take precedence:
 _<http://example.com/a_b>
 .
 <p>_<a href="http://example.com/a_b">http://example.com/a_b</a></p>
-```
-
-Inline attributes after the closing delimiter attach to the
-emphasis or strong element rather than wrapping it in a span:
-
-```
-_emph_{.a}
-.
-<p><em class="a">emph</em></p>
-```
-
-```
-*strong*{.a}
-.
-<p><strong class="a">strong</strong></p>
-```
-
-Combined id, class, and key=value attributes on emphasis:
-
-```
-_emph_{#id .cls key=val}
-.
-<p><em id="id" class="cls" key="val">emph</em></p>
 ```

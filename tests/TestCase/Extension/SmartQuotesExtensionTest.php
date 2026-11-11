@@ -17,7 +17,7 @@ class SmartQuotesExtensionTest extends TestCase
         $this->assertStringContainsString('‚a ’b‘', $converter->convert("'a 'b'"));
         $this->assertStringContainsString('say ’word', $converter->convert("say 'word"));
         $this->assertStringContainsString('’tis', $converter->convert("'tis"));
-        $this->assertStringContainsString('„‚word', $converter->convert('"\'word'));
+        $this->assertStringContainsString('„’word', $converter->convert('"\'word'));
     }
 
     public function testGermanDoubleQuotes(): void

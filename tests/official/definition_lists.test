@@ -95,8 +95,7 @@ list
 ````
 
 A bare `:` marker followed by end-of-input produces an empty
-term and empty definition rather than failing or reading past
-the end of the buffer:
+term and empty definition rather than failing:
 
 ```
 :

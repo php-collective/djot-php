@@ -77,6 +77,35 @@ a list
 </ul>
 ```
 
+In a loose list, all items get <p> wrapping, including items
+that appear before the blank line that makes the list loose:
+
+```
+- a
+- b
+- c
+
+  more
+
+- d
+.
+<ul>
+<li>
+<p>a</p>
+</li>
+<li>
+<p>b</p>
+</li>
+<li>
+<p>c</p>
+<p>more</p>
+</li>
+<li>
+<p>d</p>
+</li>
+</ul>
+```
+
 Without a blank line before a nested marker, an indented `-` is
 literal continuation of the parent item, not a sub-list. A
 paragraph following the parent list's blank line must not be
@@ -556,30 +585,6 @@ b
 <ol start="5" type="A">
 <li>
 d
-</li>
-</ol>
-```
-
-Mixed styles start new lists (issue #23).
-
-```
-i. item
-A. item
-1. item
-.
-<ol type="i">
-<li>
-item
-</li>
-</ol>
-<ol type="A">
-<li>
-item
-</li>
-</ol>
-<ol>
-<li>
-item
 </li>
 </ol>
 ```

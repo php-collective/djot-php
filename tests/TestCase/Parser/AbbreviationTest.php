@@ -54,7 +54,7 @@ class AbbreviationTest extends TestCase
     public function testQuoteSegmentsKeepAbbreviationWordBoundaries(): void
     {
         $this->assertSame(
-            '<p>foo”bar</p>' . "\n",
+            '<p>foo“bar</p>' . "\n",
             $this->converter->convert("foo\"bar\n\n*[foobar]: phrase"),
         );
         $this->assertStringNotContainsString(

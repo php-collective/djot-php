@@ -246,6 +246,18 @@ class InlineParser
 
     protected bool $demoteSingleQuote = false;
 
+    /**
+     * Quote openers not yet closed, for djot.js's form of unmatched quotes.
+     *
+     * @var array<\Djot\Node\Inline\Text>
+     */
+    private array $doubleQuoteOpeners = [];
+
+    /**
+     * @var array<\Djot\Node\Inline\Text>
+     */
+    private array $singleQuoteOpeners = [];
+
     protected int $lastQuoteEnd = -1;
 
     protected string $lastQuoteContext = '';
@@ -360,6 +372,8 @@ class InlineParser
         $this->singleQuoteOpener = null;
         $this->singleQuoteOpen = false;
         $this->demoteSingleQuote = false;
+        $this->doubleQuoteOpeners = [];
+        $this->singleQuoteOpeners = [];
         $this->lastQuoteEnd = -1;
         $this->lastQuoteContext = '';
         $this->delimiterStack = [];
@@ -390,6 +404,10 @@ class InlineParser
         $this->parseInlines($parent, $text, 0);
         if ($this->singleQuoteOpen && $this->demoteSingleQuote && $this->singleQuoteOpener !== null) {
             $this->singleQuoteOpener->setContent($this->apostrophe);
+        }
+        // An unmatched single quote is an apostrophe, as in djot.js.
+        foreach ($this->singleQuoteOpeners as $opener) {
+            $opener->setContent($this->apostrophe);
         }
         if ($this->blockParser->getAbbreviations() !== []) {
             $this->resolveAbbreviationSegments($parent);
@@ -818,6 +836,13 @@ class InlineParser
                     continue;
                 }
                 $literalBrace = $pos;
+                $literalEnd = $this->failedAttributeLiteralEnd($text, $pos);
+                if ($literalEnd > $pos + 1) {
+                    $textBuffer .= substr($text, $pos, $literalEnd - $pos);
+                    $pos = $literalEnd;
+
+                    continue;
+                }
             }
 
             // Smart quotes
@@ -1066,8 +1091,8 @@ class InlineParser
             $closePos = strpos($text, str_repeat('`', $openBackticks), $searchPos);
             if ($closePos === false) {
                 // No closing backticks found - in djot, unclosed code spans
-                // extend to end of paragraph content
-                $remaining = substr($text, $contentStart);
+                // extend to end of paragraph content, without its trailing spaces
+                $remaining = rtrim(substr($text, $contentStart), ' ');
 
                 return [
                     'node' => new Code($remaining),
@@ -1261,9 +1286,8 @@ class InlineParser
             if ($destinationEnd !== null) {
                 $urlEnd = $destinationEnd - 1;
                 $url = substr($text, $urlStart, $urlEnd - $urlStart);
-                // Remove newlines from URL (soft breaks are ignored in URLs)
-                $url = str_replace(["\r\n", "\r", "\n"], '', $url);
-                $url = trim($url);
+                // A line break and the indentation after it are dropped, as in djot.js; other spaces are kept.
+                $url = preg_replace('/(?:\r\n|\r|\n)[ \t]*/', '', $url) ?? $url;
                 // Process escape sequences in URL (e.g., \* -> *)
                 $url = preg_replace('/\\\\([!"#$%&\'()*+,\-.\/:;<=>?@\[\\\\\]\^_`{|}~])/', '$1', $url) ?? $url;
                 $link = new Link($url);
@@ -1777,6 +1801,14 @@ class InlineParser
                     $this->singleQuoteOpener = null;
                     $this->demoteSingleQuote = false;
                 }
+                // A lone forced closer (`{'}`, `{"}`) closes the open quote.
+                if ($quoteCount === 1) {
+                    if ($marker === "'") {
+                        array_pop($this->singleQuoteOpeners);
+                    } else {
+                        array_pop($this->doubleQuoteOpeners);
+                    }
+                }
                 $this->lastQuoteEnd = $this->textOrigin + $quotePos + 1;
                 $this->lastQuoteContext = $marker === '"'
                     ? ($endsOpen ? '“' : '”') : ($endsOpen ? '‘' : '’');
@@ -1809,6 +1841,10 @@ class InlineParser
             return null;
         }
         $searchPos = $this->findBracedCloser($text, $marker, $pos + 2);
+        // A closer right after the opener closes no span (`{==}`); a later one may.
+        if ($searchPos === $pos + 2) {
+            $searchPos = $this->findBracedCloser($text, $marker, $pos + 3);
+        }
         if ($searchPos !== null) {
             $content = substr($text, $pos + 2, $searchPos - $pos - 2);
             $node = new $nodeClass();
@@ -1852,6 +1888,55 @@ class InlineParser
         $char = substr($text, $pos, $lead >= 0xF0 ? 4 : ($lead >= 0xE0 ? 3 : 2));
 
         return preg_match('/^.\z/us', $char) === 1 ? $char : '';
+    }
+
+    /**
+     * End of the text djot.js keeps literal after an attribute at $pos fails.
+     *
+     * djot.js feeds a candidate attribute in slices that end at special characters and,
+     * when the attribute fails, reparses the slices it had accepted one by one, so no
+     * smart dash or ellipsis forms there (`{1--}` stays as written). Only the plain case
+     * (keys, values, classes, ids and blanks) is modeled; otherwise this returns $pos.
+     */
+    private function failedAttributeLiteralEnd(string $text, int $pos): int
+    {
+        $length = strlen($text);
+        $state = 'scan';
+        $fail = $length;
+        for ($i = $pos + 1; $i < $length; $i++) {
+            $c = $text[$i];
+            $blank = $c === ' ' || $c === "\t";
+            $keyChar = ctype_alnum($c) || $c === '_' || $c === ':' || $c === '-';
+            $next = match ($state) {
+                'scan' => $blank ? 'scan' : ($c === '#' ? 'id' : ($c === '.' ? 'class' : ($keyChar ? 'key' : 'fail'))),
+                'id', 'class', 'bare' => $blank ? 'scan' : ($keyChar ? $state : 'fail'),
+                'key' => $c === '=' ? 'value' : ($keyChar ? 'key' : 'fail'),
+                default => $keyChar ? 'bare' : 'fail',
+            };
+            if ($next === 'fail') {
+                // A quote, comment or line break is not the plain case, nor a brace that would close the attribute.
+                if (str_contains("\"%\n\r", $c) || ($c === '}' && $state !== 'key' && $state !== 'value')) {
+                    return $pos;
+                }
+                $fail = $i;
+
+                break;
+            }
+            $state = $next;
+        }
+        $end = $pos + 1;
+        for ($i = $pos + 1; $i < $fail; $i++) {
+            if (str_contains('"\'()*+.:<=[\\]^_`${}~-', $text[$i])) {
+                $end = $i + 1;
+            }
+        }
+        if ($fail === $length) {
+            $end = $length;
+        }
+
+        return strspn($text, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 #.=-', $pos + 1, $end - $pos - 1) === $end - $pos - 1
+            ? $end
+            : $pos;
     }
 
     protected function emitSmartQuote(
@@ -1917,10 +2002,30 @@ class InlineParser
                 $this->singleQuoteOpener = null;
             }
         }
+        // An unmatched double quote is a left one, as in djot.js; forced quotes keep their direction.
+        if ($quote === '"' && !$opening && $forced === null && $this->doubleQuoteOpeners === []) {
+            $glyph = $this->openDoubleQuote;
+        }
         $this->flushText($parent, $buffer, true);
         $buffer = '';
         $node = new Text($glyph);
         $parent->appendChild($node);
+        if ($quote === '"') {
+            if ($opening) {
+                $this->doubleQuoteOpeners[] = $node;
+            } else {
+                array_pop($this->doubleQuoteOpeners);
+            }
+        } elseif (!$opening) {
+            // djot.js lets an apostrophe inside a word close an open single quote too.
+            $closed = array_pop($this->singleQuoteOpeners);
+            if ($closed !== null && $closed === $this->singleQuoteOpener) {
+                $this->singleQuoteOpen = false;
+                $this->singleQuoteOpener = null;
+            }
+        } elseif (!$apostrophe && $forced === null) {
+            $this->singleQuoteOpeners[] = $node;
+        }
         if ($apostrophe) {
             $this->apostropheNodes[$node] = true;
         }
@@ -1949,6 +2054,13 @@ class InlineParser
         while ($pos + $dashCount < $length && $text[$pos + $dashCount] === '-') {
             $dashCount++;
         }
+        $end = $pos + $dashCount;
+        // Before `}` the last hyphen is left to close a `{-` span, as djot.js does.
+        $suffix = '';
+        if (($text[$end] ?? '') === '}') {
+            $dashCount--;
+            $suffix = '-';
+        }
 
         // Convert dashes according to djot algorithm:
         // 1. If divisible by 3, all em-dashes
@@ -1957,26 +2069,26 @@ class InlineParser
         $emDash = "\u{2014}"; // —
         $enDash = "\u{2013}"; // –
 
-        if ($dashCount === 1) {
+        if ($dashCount <= 1) {
             return [
-                'text' => '-',
-                'pos' => $pos + $dashCount,
+                'text' => str_repeat('-', $dashCount) . $suffix,
+                'pos' => $end,
             ];
         }
 
         if ($dashCount % 3 === 0) {
             // All em-dashes
             return [
-                'text' => str_repeat($emDash, (int)($dashCount / 3)),
-                'pos' => $pos + $dashCount,
+                'text' => str_repeat($emDash, (int)($dashCount / 3)) . $suffix,
+                'pos' => $end,
             ];
         }
 
         if ($dashCount % 2 === 0) {
             // All en-dashes
             return [
-                'text' => str_repeat($enDash, (int)($dashCount / 2)),
-                'pos' => $pos + $dashCount,
+                'text' => str_repeat($enDash, (int)($dashCount / 2)) . $suffix,
+                'pos' => $end,
             ];
         }
 
@@ -1997,8 +2109,8 @@ class InlineParser
         }
 
         return [
-            'text' => str_repeat($emDash, $emCount) . str_repeat($enDash, $enCount),
-            'pos' => $pos + $dashCount,
+            'text' => str_repeat($emDash, $emCount) . str_repeat($enDash, $enCount) . $suffix,
+            'pos' => $end,
         ];
     }
 
@@ -2628,6 +2740,9 @@ class InlineParser
         }
 
         $content = substr($text, $contentStart, $closePos - $contentStart);
+        if ($closeEnd === null) {
+            $content = rtrim($content, ' ');
+        }
 
         $math = new Math($content, $display);
         $endPos = $this->applyConsecutiveAttributes($math, $text, $closePos + $backtickCount);

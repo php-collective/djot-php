@@ -59,7 +59,7 @@ final class ParserWorkBoundsTest extends TestCase
     public static function smartQuoteWindowProvider(): array
     {
         return [
-            'multibyte after a short word' => ["'ab€ x", "<p>‘ab€ x</p>\n"],
+            'multibyte after a short word' => ["'ab€ x", "<p>’ab€ x</p>\n"],
             'four-byte character next' => ["'😀' x", "<p>‘😀’ x</p>\n"],
             'elision word' => ["'tis so", "<p>’tis so</p>\n"],
             'elision word quoted' => ["x 'tis' y", "<p>x ‘tis’ y</p>\n"],

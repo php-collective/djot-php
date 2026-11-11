@@ -1040,10 +1040,11 @@ class BlockParser
             }
             $attrStr = trim(substr($line, 1, $attrEnd - 1));
             // Exclude _ * = + - ~ ^ which are braced inline markers (not block attributes)
-            // Comment-only blocks retain their Comment node.
+            // Comment-only blocks retain their Comment node; with a blank before the
+            // comment (`{ %}`) the comment parser does not take the line, so it stays here.
             if (
                 !preg_match('/^[.#a-zA-Z%]/', $attrStr)
-                || (str_starts_with($attrStr, '%') && AttributeParser::parse($attrStr) === [])
+                || (str_starts_with($line, '{%') && AttributeParser::parse($attrStr) === [])
             ) {
                 return null;
             }
@@ -1058,7 +1059,7 @@ class BlockParser
             // (they were already applied during extractReferences)
             $count = count($lines);
             $nextIdx = $start + 1;
-            if ($nextIdx < $count && preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)/', $lines[$nextIdx])) {
+            if ($nextIdx < $count && preg_match('/^\[([^\]]*)\]:(?=[ \t]|$)/', $lines[$nextIdx])) {
                 if ($this->collectingReferences) {
                     $this->parseAttributeString($attrStr);
                 }
@@ -2396,7 +2397,7 @@ class BlockParser
                 if (
                     $this->tableParser->isTableRow($content)
                     || (strlen($content) <= $breakRun && preg_match('/^(?:[-*][ \t]*){3,}$/', $content))
-                    || (str_starts_with($content, '[') && preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $content))
+                    || (str_starts_with($content, '[') && preg_match('/^\[[^\]]*\]:(?:[ \t]+\S*)?[ \t]*$/', $content))
                 ) {
                     $state['paragraphOpen'] = false;
 
@@ -3546,7 +3547,7 @@ class BlockParser
                 $term = new DefinitionTerm();
                 $termLines = $termData['lines'];
                 if ($termLines !== []) {
-                    $this->inlineParser->parse($term, implode("\n", $termLines), $start);
+                    $this->inlineParser->parse($term, rtrim(implode("\n", $termLines), ' '), $start);
                 }
                 // Apply term attributes
                 if ($termData['attributes'] !== []) {
@@ -3630,7 +3631,7 @@ class BlockParser
                     $i++;
                 } elseif (
                     $lazyState['paragraphOpen'] && !$this->isBlockElementStart($defLine)
-                    && !preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)|^\{/', $defLine)
+                    && !preg_match('/^\[([^\]]*)\]:(?=[ \t]|$)|^\{/', $defLine)
                 ) {
                     $defLines[] = $defLine;
                     $defLineMap[] = $this->sourceLineFor($lineMap, $i);
@@ -3645,9 +3646,12 @@ class BlockParser
                 $allDefBlocks[] = ['lines' => $defLines, 'map' => $defLineMap];
             }
 
+            // Blank lines at the end of an unclosed fence are part of its content.
+            $openFenceBlock = $lazyState['inFence'] ? array_key_last($allDefBlocks) : null;
+
             // Create definition node(s)
             if ($allDefBlocks !== []) {
-                foreach ($allDefBlocks as $blockData) {
+                foreach ($allDefBlocks as $blockIndex => $blockData) {
                     $def = new DefinitionDescription();
                     $defAttributes = [];
                     $block = $blockData['lines'];
@@ -3658,7 +3662,7 @@ class BlockParser
                         array_shift($block);
                         array_shift($blockLineMap);
                     }
-                    while ($block !== [] && end($block) === '') {
+                    while ($blockIndex !== $openFenceBlock && $block !== [] && end($block) === '') {
                         array_pop($block);
                         array_pop($blockLineMap);
                     }
@@ -4754,7 +4758,7 @@ class BlockParser
 
         // Match reference definition: [label]: url
         // URL must be a single non-whitespace token; see extractReferences().
-        if (!preg_match('/^\[([^\]]+)\]:(?:[ \t]+(\S*))?[ \t]*$/', $line, $matches)) {
+        if (!preg_match('/^\[([^\]]*)\]:(?:[ \t]+(\S*))?[ \t]*$/', $line, $matches)) {
             return null;
         }
 
@@ -4772,7 +4776,7 @@ class BlockParser
                 break;
             }
             // Check if next line starts a new reference definition
-            if (preg_match('/^\[([^\]]+)\]:(?=[ \t]|$)/', ltrim($nextLine, " \t"))) {
+            if (preg_match('/^\[([^\]]*)\]:(?=[ \t]|$)/', ltrim($nextLine, " \t"))) {
                 break;
             }
             if ($this->startsNewBlock($nextLine)) {
@@ -4786,8 +4790,9 @@ class BlockParser
             }
         }
 
-        if ($this->collectingReferences) {
-            $label = preg_replace('/\s+/', ' ', trim($matches[1])) ?? '';
+        $label = preg_replace('/\s+/', ' ', trim($matches[1])) ?? '';
+        // An empty label is a definition no reference can use, as in djot.js.
+        if ($this->collectingReferences && $label !== '') {
             $this->references[$label] = new ReferenceDefinition(
                 $url,
                 $this->pendingAttributes,
