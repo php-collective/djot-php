@@ -897,7 +897,7 @@ class AnsiRenderer implements RendererInterface
     {
         // Show raw blocks dimmed
         $format = $this->documentText($node->getFormat());
-        $content = $this->documentText($node->getContent());
+        $content = $this->documentText(trim($node->getContent(), "\n"));
 
         return $this->style('[raw:' . $format . '] ' . $content, self::DIM) . "\n\n";
     }

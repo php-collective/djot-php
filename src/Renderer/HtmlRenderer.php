@@ -1410,6 +1410,8 @@ class HtmlRenderer implements RendererInterface
         }
 
         $content = $node->getContent();
+        // A blank-only block keeps its own newlines; an empty one prints nothing.
+        $newline = $content === '' || str_ends_with($content, "\n") ? '' : "\n";
 
         // Handle raw HTML according to safe mode
         if ($this->safeMode !== null) {
@@ -1418,11 +1420,11 @@ class HtmlRenderer implements RendererInterface
                 return '';
             }
             if ($mode === SafeMode::RAW_HTML_ESCAPE) {
-                return $this->escape($content) . "\n";
+                return $this->escape($content) . $newline;
             }
         }
 
-        return $content . "\n";
+        return $content . $newline;
     }
 
     protected function renderRawInline(RawInline $node): string

@@ -66,6 +66,11 @@ class InlineParser
     protected int $inlineDepth = 0;
 
     /**
+     * Whether the end of the text passed to parse() is the end of a line.
+     */
+    protected bool $textEndsLine = true;
+
+    /**
      * @var array<array{type: string, char: string, pos: int, node: \Djot\Node\Node}>
      */
     protected array $delimiterStack = [];
@@ -357,6 +362,7 @@ class InlineParser
      * @param int $sourceLine Source line number (0-indexed) for error reporting
      * @param list<int>|null $sourceLineMap Original source line for each line in $text
      * @param int|null $sourceColumn Authored column where the first line starts
+     * @param bool $endsLine False when the text ends before a delimiter on the same line (table cell)
      */
     public function parse(
         Node $parent,
@@ -364,7 +370,9 @@ class InlineParser
         int $sourceLine = 0,
         ?array $sourceLineMap = null,
         ?int $sourceColumn = null,
+        bool $endsLine = true,
     ): void {
+        $this->textEndsLine = $endsLine;
         $this->abbreviationSegments = new WeakMap();
         $this->apostropheNodes = new WeakMap();
         $this->abbreviationRun = 0;
@@ -579,7 +587,10 @@ class InlineParser
                     while ($lookAhead < $length && ($text[$lookAhead] === ' ' || $text[$lookAhead] === "\t")) {
                         $lookAhead++;
                     }
-                    if ($lookAhead < $length && $text[$lookAhead] === "\n") {
+                    $atLineEnd = $lookAhead < $length
+                        ? $text[$lookAhead] === "\n"
+                        : $this->textEndsLine && $this->inlineDepth === 1;
+                    if ($atLineEnd) {
                         // This is a hard break - strip trailing whitespace from text buffer
                         $textBuffer = rtrim($textBuffer, " \t");
                         $this->flushText($parent, $textBuffer);
