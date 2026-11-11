@@ -183,6 +183,13 @@ class InlineParser
 
     private ?BacktickRunIndex $backtickRuns = null;
 
+    private ?string $bracedCloserText = null;
+
+    /**
+     * @var array<string, array<int>>
+     */
+    private array $bracedClosers = [];
+
     private ?string $terminatorText = null;
 
     /**
@@ -1160,7 +1167,7 @@ class InlineParser
                 continue;
             }
             if ($char === '`') {
-                $codeEnd = $this->findCodeSpanEnd($text, $at);
+                $codeEnd = $this->findVerbatimEnd($text, $at);
                 if ($codeEnd !== null) {
                     $at = $codeEnd;
 
@@ -1622,7 +1629,7 @@ class InlineParser
 
             // Skip over code spans `...`
             if ($char === '`') {
-                $codeEnd = $this->findCodeSpanEnd($text, $searchPos);
+                $codeEnd = $this->findVerbatimEnd($text, $searchPos);
                 if ($codeEnd !== null) {
                     $searchPos = $codeEnd;
 
@@ -1801,8 +1808,8 @@ class InlineParser
         if (!$this->hasTerminatorAfter($text, $marker . '}', $pos + 2)) {
             return null;
         }
-        $searchPos = strpos($text, $marker . '}', $pos + 2);
-        if ($searchPos !== false) {
+        $searchPos = $this->findBracedCloser($text, $marker, $pos + 2);
+        if ($searchPos !== null) {
             $content = substr($text, $pos + 2, $searchPos - $pos - 2);
             $node = new $nodeClass();
             $this->parseInlines($node, $content, $this->textOrigin + $pos + 2);
@@ -2170,6 +2177,50 @@ class InlineParser
         return $emailEnd === false ? null : $pos + 1 + $emailEnd;
     }
 
+    /**
+     * Find `marker}` outside verbatim spans, which take no markup.
+     */
+    private function findBracedCloser(string $text, string $marker, int $pos): ?int
+    {
+        if ($this->bracedCloserText !== $text) {
+            $this->bracedCloserText = $text;
+            $this->bracedClosers = [];
+        }
+        if (!isset($this->bracedClosers[$marker])) {
+            $closer = $marker . '}';
+            $closers = [];
+            $at = 0;
+            $found = strpos($text, $closer);
+            $tick = strpos($text, '`');
+            while ($found !== false) {
+                if ($tick !== false && $tick < $found) {
+                    $at = (int)$this->findVerbatimEnd($text, $tick);
+                    $tick = strpos($text, '`', $at);
+                } else {
+                    $closers[] = $found;
+                    $at = $found + 1;
+                }
+                if ($found < $at) {
+                    $found = strpos($text, $closer, $at);
+                }
+            }
+            $this->bracedClosers[$marker] = $closers;
+        }
+        $closers = $this->bracedClosers[$marker];
+        $low = 0;
+        $high = count($closers);
+        while ($low < $high) {
+            $middle = intdiv($low + $high, 2);
+            if ($closers[$middle] < $pos) {
+                $low = $middle + 1;
+            } else {
+                $high = $middle;
+            }
+        }
+
+        return $closers[$low] ?? null;
+    }
+
     private function hasTerminatorAfter(string $text, string $marker, int $pos): bool
     {
         if ($this->terminatorText !== $text) {
@@ -2300,6 +2351,33 @@ class InlineParser
 
         // Preserve the lookahead's minimum-width rule for longer closing runs.
         return $this->backtickRuns->findCloser($contentStart, $width);
+    }
+
+    /**
+     * End of the verbatim span opened at $pos: the next backtick run of the
+     * same width, or the end of the text when the span is unclosed.
+     */
+    protected function findVerbatimEnd(string $text, int $pos): ?int
+    {
+        $width = strspn($text, '`', $pos);
+        if ($width === 0) {
+            return null;
+        }
+
+        return $this->findCodeSpanCloser($text, $pos + $width, $width) ?? strlen($text);
+    }
+
+    /**
+     * End of the first backtick run at or after $offset that is exactly $width wide.
+     */
+    protected function findCodeSpanCloser(string $text, int $offset, int $width): ?int
+    {
+        if ($this->backtickScanText !== $text || $this->backtickRuns === null) {
+            $this->backtickScanText = $text;
+            $this->backtickRuns = new BacktickRunIndex($text);
+        }
+
+        return $this->backtickRuns->findExactCloser($offset, $width);
     }
 
     /**
@@ -2517,12 +2595,13 @@ class InlineParser
 
         $contentStart = $startPos + $backtickCount;
 
-        // Find closing backticks
-        $closingBackticks = str_repeat('`', $backtickCount);
-        $closePos = strpos($text, $closingBackticks, $contentStart);
-
-        if ($closePos === false) {
-            return null;
+        // Like verbatim, unclosed math runs to the end of the inline content.
+        $closeEnd = $this->findCodeSpanCloser($text, $contentStart, $backtickCount);
+        if ($closeEnd === null) {
+            $closePos = $length;
+            $backtickCount = 0;
+        } else {
+            $closePos = $closeEnd - $backtickCount;
         }
 
         $content = substr($text, $contentStart, $closePos - $contentStart);

@@ -896,6 +896,9 @@ final class BorrowedHtmlLayout
         }
 
         if (str_contains($withoutContractions, '"')) {
+            if ($this->verbatimHoldsQuote($text)) {
+                return true;
+            }
             $opening = true;
             $length = strlen($text);
             for ($pos = 0; $pos < $length; $pos++) {
@@ -920,6 +923,28 @@ final class BorrowedHtmlLayout
 
         return preg_match('/[{}^\\\\<>~!@$=#\']|\.\.\.|\/\*|\*\/|``|\+\-|\(c\)|\(r\)|\(tm\)/', $withoutContractions) === 1
             || substr_count($text, ':') >= 2;
+    }
+
+    /**
+     * Quote pairing in inlineComplex() cannot see verbatim spans, which hide quotes.
+     */
+    private function verbatimHoldsQuote(string $text): bool
+    {
+        $at = 0;
+        while (($open = strpos($text, '`', $at)) !== false) {
+            $contentStart = $open + strspn($text, '`', $open);
+            $close = strpos($text, '`', $contentStart);
+            $end = $close === false ? strlen($text) : $close;
+            if (str_contains(substr($text, $contentStart, $end - $contentStart), '"')) {
+                return true;
+            }
+            if ($close === false) {
+                return false;
+            }
+            $at = $close + strspn($text, '`', $close);
+        }
+
+        return false;
     }
 
     private function blockish(string $text): bool
