@@ -94,10 +94,10 @@ class InlineFootnotesExtension implements ExtensionInterface
             if ($renderer->isRoundTripMode()) {
                 $contentHtml = $event->getChildrenHtml();
                 $html .= ' data-djot-inline-footnote-html="'
-                    . htmlspecialchars($contentHtml, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
+                    . htmlspecialchars($contentHtml, ENT_COMPAT | ENT_HTML5, 'UTF-8') . '"';
                 if ($cssClass !== 'fn') {
                     $html .= ' data-djot-inline-footnote-class="'
-                        . htmlspecialchars($cssClass, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
+                        . htmlspecialchars($cssClass, ENT_COMPAT | ENT_HTML5, 'UTF-8') . '"';
                 }
             }
             $html .= '><sup>' . $number . '</sup>';

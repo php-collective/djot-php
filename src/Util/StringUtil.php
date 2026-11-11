@@ -39,7 +39,7 @@ final class StringUtil
      */
     public static function escapeHtml(string $value): string
     {
-        $escaped = htmlspecialchars($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $escaped = htmlspecialchars($value, ENT_COMPAT | ENT_HTML5, 'UTF-8');
 
         return str_replace("\u{E000}", '&nbsp;', $escaped);
     }

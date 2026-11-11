@@ -193,6 +193,23 @@ abstract class Node
     }
 
     /**
+     * The value HTML output uses for a lowercase `$name`: attribute names
+     * compare case-insensitively, so `ID=v` is the id too, and the last
+     * spelling written wins.
+     */
+    public function getFoldedAttribute(string $name): ?string
+    {
+        $found = null;
+        foreach ($this->attributes as $key => $value) {
+            if (strtolower((string)$key) === $name) {
+                $found = $value;
+            }
+        }
+
+        return $found;
+    }
+
+    /**
      * @return array<string, string>
      */
     public function getAttributes(): array

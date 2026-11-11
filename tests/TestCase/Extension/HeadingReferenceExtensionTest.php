@@ -295,4 +295,25 @@ DJOT);
 
         $converter->addExtension(new WikilinksExtension());
     }
+
+    public function testSchemeLikeTargetDoesNotLeakThePlaceholder(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $html = $converter->convert('[[javascript:x]] and [[data:y|shown]]');
+
+        $this->assertSame("<p>[[javascript:x]] and [[data:y|shown]]</p>\n", $html);
+    }
+
+    public function testSchemeLikeTargetResolvesToItsHeading(): void
+    {
+        $converter = new DjotConverter();
+        $converter->addExtension(new HeadingReferenceExtension());
+
+        $html = $converter->convert("# javascript:x\n\n[[javascript:x]]");
+
+        $this->assertStringContainsString('<a href="#javascript-x" class="heading-ref">javascript:x</a>', $html);
+        $this->assertStringNotContainsString('__djot_heading_ref_', $html);
+    }
 }

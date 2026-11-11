@@ -149,6 +149,11 @@ human-readable plain text used for things like TOC labels):
 The ID is `Release-notes`, not `Release-notes-tada`. A heading whose only
 content is a symbol falls back to a generated `s-N` ID.
 
+An image is not excluded: its alt text is part of the identifier, as in
+djot.js. `# Intro ![logo](l.png)` gets the ID `Intro-logo`, and `# ![s]()`
+gets `s`. Earlier releases left the alt text out (`Intro`, `s-1`), so anchors
+of such headings change.
+
 ---
 
 ## Heading ID Generation
@@ -169,7 +174,7 @@ Auto-generated heading IDs follow the settled [jgm/djot#393](https://github.com/
 
 > Only the core, locale-independent glyphs (apostrophe, straight-quote pair, en/em dash, ellipsis) are reversed. Locale quote glyphs from the opt-in `SmartQuotesExtension` (guillemets, low-9 quotes) are left as-is, and a literal author-typed typographic glyph in the source is treated the same as a parser-generated one.
 
-Symbols (`:name:`) and footnote references are excluded from the id text (see [Section ID Excludes Footnote Markers and Symbols](#section-id-excludes-footnote-markers-and-symbols)).
+Symbols (`:name:`) and footnote references are excluded from the id text; image alt text is included (see [Section ID Excludes Footnote Markers and Symbols](#section-id-excludes-footnote-markers-and-symbols)).
 
 ### Examples
 
@@ -188,6 +193,7 @@ Symbols (`:name:`) and footnote references are excluded from the id text (see [S
 | `# 123 Numbers First` | `s-123-Numbers-First` |
 | `# $this->method()` | `this-method` |
 | `# ###` | `s-1` |
+| `# Intro ![logo](l.png)` | `Intro-logo` |
 
 ### ASCII heading IDs (opt-in) {#ascii-heading-ids-opt-in}
 
