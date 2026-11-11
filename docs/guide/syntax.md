@@ -403,13 +403,17 @@ marker on its own line is a valid empty item. This works for every marker type
 
 #### Nested Lists
 
-Indent with 2+ spaces for nested lists.
+Indent with 2+ spaces for nested lists, and put a blank line between the
+parent item's text and the nested list. Without it the nested markers are lazy
+continuation text of the parent item.
 
 **Input:**
 ```djot
 - Item 1
+
   - Nested A
   - Nested B
+
 - Item 2
 ```
 
@@ -418,26 +422,40 @@ Indent with 2+ spaces for nested lists.
 
 ```html
 <ul>
-<li>Item 1
+<li>
+Item 1
 <ul>
-<li>Nested A</li>
-<li>Nested B</li>
+<li>
+Nested A
+</li>
+<li>
+Nested B
+</li>
 </ul>
 </li>
-<li>Item 2</li>
+<li>
+Item 2
+</li>
 </ul>
 ```
 
 </template>
 <template #result>
 <ul>
-<li>Item 1
+<li>
+Item 1
 <ul>
-<li>Nested A</li>
-<li>Nested B</li>
+<li>
+Nested A
+</li>
+<li>
+Nested B
+</li>
 </ul>
 </li>
-<li>Item 2</li>
+<li>
+Item 2
+</li>
 </ul>
 </template>
 </OutputTabs>
@@ -460,18 +478,36 @@ The underscore notation `[_]` is useful on mobile devices or in editors without 
 
 ```html
 <ul class="task-list">
-<li><input type="checkbox" disabled> Todo item (space)</li>
-<li><input type="checkbox" disabled> Todo item (underscore)</li>
-<li><input type="checkbox" disabled checked> Done item</li>
+<li>
+<input disabled="" type="checkbox"/>
+Todo item (space)
+</li>
+<li>
+<input disabled="" type="checkbox"/>
+Todo item (underscore)
+</li>
+<li>
+<input disabled="" type="checkbox" checked=""/>
+Done item
+</li>
 </ul>
 ```
 
 </template>
 <template #result>
 <ul class="task-list">
-<li><input type="checkbox" disabled> Todo item (space)</li>
-<li><input type="checkbox" disabled> Todo item (underscore)</li>
-<li><input type="checkbox" disabled checked> Done item</li>
+<li>
+<input disabled="" type="checkbox"/>
+Todo item (space)
+</li>
+<li>
+<input disabled="" type="checkbox"/>
+Todo item (underscore)
+</li>
+<li>
+<input disabled="" type="checkbox" checked=""/>
+Done item
+</li>
 </ul>
 </template>
 </OutputTabs>
@@ -820,26 +856,36 @@ Tables use `|` to separate columns.
 
 ```html
 <table>
-<thead>
-<tr><th>Header 1</th><th>Header 2</th></tr>
-</thead>
-<tbody>
-<tr><td>Cell 1</td><td>Cell 2</td></tr>
-<tr><td>Cell 3</td><td>Cell 4</td></tr>
-</tbody>
+<tr>
+<th>Header 1</th>
+<th>Header 2</th>
+</tr>
+<tr>
+<td>Cell 1</td>
+<td>Cell 2</td>
+</tr>
+<tr>
+<td>Cell 3</td>
+<td>Cell 4</td>
+</tr>
 </table>
 ```
 
 </template>
 <template #result>
 <table>
-<thead>
-<tr><th>Header 1</th><th>Header 2</th></tr>
-</thead>
-<tbody>
-<tr><td>Cell 1</td><td>Cell 2</td></tr>
-<tr><td>Cell 3</td><td>Cell 4</td></tr>
-</tbody>
+<tr>
+<th>Header 1</th>
+<th>Header 2</th>
+</tr>
+<tr>
+<td>Cell 1</td>
+<td>Cell 2</td>
+</tr>
+<tr>
+<td>Cell 3</td>
+<td>Cell 4</td>
+</tr>
 </table>
 </template>
 </OutputTabs>
@@ -860,24 +906,32 @@ Use `:` in the separator row for alignment.
 
 ```html
 <table>
-<thead>
-<tr><th style="text-align: left">Left</th><th style="text-align: center">Center</th><th style="text-align: right">Right</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">L</td><td style="text-align: center">C</td><td style="text-align: right">R</td></tr>
-</tbody>
+<tr>
+<th style="text-align: left;">Left</th>
+<th style="text-align: center;">Center</th>
+<th style="text-align: right;">Right</th>
+</tr>
+<tr>
+<td style="text-align: left;">L</td>
+<td style="text-align: center;">C</td>
+<td style="text-align: right;">R</td>
+</tr>
 </table>
 ```
 
 </template>
 <template #result>
 <table>
-<thead>
-<tr><th style="text-align: left">Left</th><th style="text-align: center">Center</th><th style="text-align: right">Right</th></tr>
-</thead>
-<tbody>
-<tr><td style="text-align: left">L</td><td style="text-align: center">C</td><td style="text-align: right">R</td></tr>
-</tbody>
+<tr>
+<th style="text-align: left;">Left</th>
+<th style="text-align: center;">Center</th>
+<th style="text-align: right;">Right</th>
+</tr>
+<tr>
+<td style="text-align: left;">L</td>
+<td style="text-align: center;">C</td>
+<td style="text-align: right;">R</td>
+</tr>
 </table>
 </template>
 </OutputTabs>
@@ -900,12 +954,14 @@ Use `^` after the table for a caption.
 ```html
 <table>
 <caption>This is the caption</caption>
-<thead>
-<tr><th>A</th><th>B</th></tr>
-</thead>
-<tbody>
-<tr><td>1</td><td>2</td></tr>
-</tbody>
+<tr>
+<th>A</th>
+<th>B</th>
+</tr>
+<tr>
+<td>1</td>
+<td>2</td>
+</tr>
 </table>
 ```
 
@@ -913,12 +969,14 @@ Use `^` after the table for a caption.
 <template #result>
 <table>
 <caption>This is the caption</caption>
-<thead>
-<tr><th>A</th><th>B</th></tr>
-</thead>
-<tbody>
-<tr><td>1</td><td>2</td></tr>
-</tbody>
+<tr>
+<th>A</th>
+<th>B</th>
+</tr>
+<tr>
+<td>1</td>
+<td>2</td>
+</tr>
 </table>
 </template>
 </OutputTabs>
@@ -934,11 +992,11 @@ Attributes can be added to table rows and individual cells:
 | John | 30  |{.highlight}
 ```
 
-**Cell attributes** (after opening pipe):
+**Cell attributes** (after opening pipe), here together with row attributes:
 ```djot
-|{.name} Name |{.age} Age |
+|{.name} Name |{.age} Age |{.header-row}
 |-------------|-----------|
-|{.emphasis} John | 30 |
+|{.emphasis} John | 30 |{.highlight}
 ```
 
 <OutputTabs>
@@ -1110,7 +1168,7 @@ Nested divs:
 
 **Input:**
 ```djot
-::: outer
+:::: outer
 Outer content
 
 ::: inner
@@ -1118,7 +1176,7 @@ Inner content
 :::
 
 More outer
-:::
+::::
 ```
 
 <OutputTabs>
@@ -1348,14 +1406,18 @@ This is a note.
 <template #output>
 
 ```html
-<h1 class="highlight" id="intro">Introduction</h1>
+<section id="intro">
+<h1 class="highlight">Introduction</h1>
 <p class="note" data-version="2.0">This is a note.</p>
+</section>
 ```
 
 </template>
 <template #result>
-<h1 class="highlight" id="intro">Introduction</h1>
+<section id="intro">
+<h1 class="highlight">Introduction</h1>
 <p class="note" data-version="2.0">This is a note.</p>
+</section>
 </template>
 </OutputTabs>
 
@@ -1378,21 +1440,33 @@ Boolean/flag attributes can be specified without a value:
 
 ```html
 <ol reversed="">
-<li>Third</li>
-<li>Second</li>
-<li>First</li>
+<li>
+Third
+</li>
+<li>
+Second
+</li>
+<li>
+First
+</li>
 </ol>
-<p><a href="file.zip" class="btn" download="">Download</a></p>
+<p><a href="file.zip" download="" class="btn">Download</a></p>
 ```
 
 </template>
 <template #result>
 <ol reversed="">
-<li>Third</li>
-<li>Second</li>
-<li>First</li>
+<li>
+Third
+</li>
+<li>
+Second
+</li>
+<li>
+First
+</li>
 </ol>
-<p><a href="file.zip" class="btn" download="">Download</a></p>
+<p><a href="file.zip" download="" class="btn">Download</a></p>
 </template>
 </OutputTabs>
 
@@ -1457,13 +1531,14 @@ For literal backticks: `` `code` ``
 #### Inline Links
 
 A backslash in a link destination escapes ASCII punctuation. Before other
-characters, such as in `a\b`, the backslash stays in the URL.
+characters, such as in `a\b`, the backslash stays in the URL. Djot has no
+title syntax inside the parentheses; set a title with an attribute.
 
 **Input:**
 ```djot
 [Link text](https://example.com)
 
-[Link with title](https://example.com "Title")
+[Link with title](https://example.com){title="Title"}
 ```
 
 <OutputTabs>
@@ -1590,21 +1665,21 @@ Link-level attributes can override or extend definition attributes:
 ```djot
 ![Demo landscape](/demo.svg)
 
-![Demo landscape](/demo.svg "A simple landscape")
+![Demo landscape](/demo.svg){title="A simple landscape"}
 ```
 
 <OutputTabs>
 <template #output>
 
 ```html
-<p><img src="/demo.svg" alt="Demo landscape"></p>
-<p><img src="/demo.svg" alt="Demo landscape" title="A simple landscape"></p>
+<p><img alt="Demo landscape" src="/demo.svg"></p>
+<p><img alt="Demo landscape" src="/demo.svg" title="A simple landscape"></p>
 ```
 
 </template>
 <template #result>
-<p><img src="/demo.svg" alt="Demo landscape"></p>
-<p><img src="/demo.svg" alt="Demo landscape" title="A simple landscape"></p>
+<p><img alt="Demo landscape" src="/demo.svg"></p>
+<p><img alt="Demo landscape" src="/demo.svg" title="A simple landscape"></p>
 </template>
 </OutputTabs>
 
@@ -1623,14 +1698,14 @@ Use `^` after an image to add a caption. The image will be wrapped in a `<figure
 
 ```html
 <figure>
-<img src="/demo.svg" alt="Demo landscape"><figcaption>A simple landscape with sun, hills, and sky</figcaption>
+<img alt="Demo landscape" src="/demo.svg"><figcaption>A simple landscape with sun, hills, and sky</figcaption>
 </figure>
 ```
 
 </template>
 <template #result>
 <figure>
-<img src="/demo.svg" alt="Demo landscape"><figcaption>A simple landscape with sun, hills, and sky</figcaption>
+<img alt="Demo landscape" src="/demo.svg"><figcaption>A simple landscape with sun, hills, and sky</figcaption>
 </figure>
 </template>
 </OutputTabs>
@@ -1738,7 +1813,7 @@ example, ``$`m`{#i .c}`` adds the ID and class to that span.
 
 **Input:**
 ```djot
-The equation $`E = mc^2`$ is famous.
+The equation $`E = mc^2` is famous.
 ```
 
 <OutputTabs>
@@ -1758,19 +1833,19 @@ The equation $`E = mc^2`$ is famous.
 
 **Input:**
 ```djot
-$$`\sum_{i=0}^{n} i = \frac{n(n+1)}{2}`$$
+$$`\sum_{i=0}^{n} i = \frac{n(n+1)}{2}`
 ```
 
 <OutputTabs>
 <template #output>
 
 ```html
-<span class="math display">\[\sum_{i=0}^{n} i = \frac{n(n+1)}{2}\]</span>
+<p><span class="math display">\[\sum_{i=0}^{n} i = \frac{n(n+1)}{2}\]</span></p>
 ```
 
 </template>
 <template #result>
-<span class="math display">\[\sum_{i=0}^{n} i = \frac{n(n+1)}{2}\]</span>
+<p><span class="math display">\[\sum_{i=0}^{n} i = \frac{n(n+1)}{2}\]</span></p>
 </template>
 </OutputTabs>
 
@@ -1787,16 +1862,17 @@ I :heart: Djot
 <template #output>
 
 ```html
-<p>I <span class="symbol">heart</span> Djot</p>
+<p>I :heart: Djot</p>
 ```
 
 </template>
 <template #result>
-<p>I <span class="symbol">heart</span> Djot</p>
+<p>I :heart: Djot</p>
 </template>
 </OutputTabs>
 
-Note: Symbol rendering can be customized via events. See the [Cookbook](/cookbook/) for examples.
+The HTML renderer keeps a symbol as its `:name:` text, as djot.js does.
+Symbol rendering can be customized via events. See the [Cookbook](/cookbook/) for examples.
 
 ### Footnotes
 
@@ -1815,26 +1891,36 @@ Another reference[^note].
 <template #output>
 
 ```html
-<p>Here is a statement<sup id="fnref-1-1"><a href="#fn-1">1</a></sup> with a footnote.</p>
-<p>Another reference<sup id="fnref-note-1"><a href="#fn-note">note</a></sup>.</p>
-<div class="footnote" id="fn-1">
-<p><sup>1</sup> This is the first footnote. <a href="#fnref-1-1">↩</a></p>
-</div>
-<div class="footnote" id="fn-note">
-<p><sup>note</sup> This is a named footnote. <a href="#fnref-note-1">↩</a></p>
-</div>
+<p>Here is a statement<a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a> with a footnote.</p>
+<p>Another reference<a id="fnref2" href="#fn2" role="doc-noteref"><sup>2</sup></a>.</p>
+<section role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn1">
+<p>This is the first footnote.<a href="#fnref1" role="doc-backlink">↩︎</a></p>
+</li>
+<li id="fn2">
+<p>This is a named footnote.<a href="#fnref2" role="doc-backlink">↩︎</a></p>
+</li>
+</ol>
+</section>
 ```
 
 </template>
 <template #result>
-<p>Here is a statement<sup id="fnref-1-1"><a href="#fn-1">1</a></sup> with a footnote.</p>
-<p>Another reference<sup id="fnref-note-1"><a href="#fn-note">note</a></sup>.</p>
-<div class="footnote" id="fn-1">
-<p><sup>1</sup> This is the first footnote. <a href="#fnref-1-1">↩</a></p>
-</div>
-<div class="footnote" id="fn-note">
-<p><sup>note</sup> This is a named footnote. <a href="#fnref-note-1">↩</a></p>
-</div>
+<p>Here is a statement<a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a> with a footnote.</p>
+<p>Another reference<a id="fnref2" href="#fn2" role="doc-noteref"><sup>2</sup></a>.</p>
+<section role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn1">
+<p>This is the first footnote.<a href="#fnref1" role="doc-backlink">↩︎</a></p>
+</li>
+<li id="fn2">
+<p>This is a named footnote.<a href="#fnref2" role="doc-backlink">↩︎</a></p>
+</li>
+</ol>
+</section>
 </template>
 </OutputTabs>
 
@@ -1909,14 +1995,14 @@ and attribute values.
 <template #output>
 
 ```html
-<p>"Double quotes" and 'single quotes'</p>
-<p>"Nested 'quotes' work" too</p>
+<p>“Double quotes” and ‘single quotes’</p>
+<p>“Nested ‘quotes’ work” too</p>
 ```
 
 </template>
 <template #result>
-<p>"Double quotes" and 'single quotes'</p>
-<p>"Nested 'quotes' work" too</p>
+<p>“Double quotes” and ‘single quotes’</p>
+<p>“Nested ‘quotes’ work” too</p>
 </template>
 </OutputTabs>
 
@@ -2032,7 +2118,9 @@ Definitions can span multiple lines if continuation lines are indented:
 
 ### Inline Abbreviations
 
-For one-off abbreviations or to override a definition, use the inline span syntax:
+For one-off abbreviations or to override a definition, use the inline span
+syntax with `SemanticSpanExtension` registered (without it, `abbr` stays an
+ordinary attribute on a `<span>`):
 
 **Input:**
 ```djot
