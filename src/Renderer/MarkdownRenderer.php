@@ -661,7 +661,9 @@ class MarkdownRenderer implements RendererInterface
     protected function renderRawBlock(RawBlock $node): string
     {
         if ($node->getFormat() === 'html') {
-            return $node->getContent() . "\n\n";
+            $content = $node->getContent();
+
+            return trim($content, "\n") === '' ? '' : $content . "\n\n";
         }
 
         return '';

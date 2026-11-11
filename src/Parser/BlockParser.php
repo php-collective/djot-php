@@ -1055,18 +1055,6 @@ class BlockParser
                 return null;
             }
 
-            // Check if attributes precede a reference definition - if so, skip storing them
-            // (they were already applied during extractReferences)
-            $count = count($lines);
-            $nextIdx = $start + 1;
-            if ($nextIdx < $count && preg_match('/^\[([^\]]*)\]:(?=[ \t]|$)/', $lines[$nextIdx])) {
-                if ($this->collectingReferences) {
-                    $this->parseAttributeString($attrStr);
-                }
-
-                return 1;
-            }
-
             $this->parseAttributeString($attrStr);
             $this->pendingAttributeSourceLines[] = $line;
 
@@ -1474,7 +1462,9 @@ class BlockParser
             $this->addWarning('Unclosed raw block', $start, 1, true);
         }
 
-        $rawBlock = new RawBlock(trim($content, "\n"), $format);
+        // Only blank lines: keep them, so the block stays distinct from one with no lines.
+        $trimmed = trim($content, "\n");
+        $rawBlock = new RawBlock($trimmed !== '' ? $trimmed : $content, $format);
         $this->applyPendingAttributes($rawBlock);
         $parent->appendChild($rawBlock);
 
@@ -3118,6 +3108,8 @@ class BlockParser
                 if (
                     $parseItemLinesAsBlocks || $this->isBlockElementStart($firstLine)
                     || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $firstLine)
+                    // A marker-line `{...}` may be a block attribute for the lines below.
+                    || preg_match('/^\{.*\}[ \t]*$/', $firstLine)
                 ) {
                     // Content starts with a block element (blockquote, code fence,
                     // etc.) or we pushed a {...} back into itemLines that must be
@@ -4131,7 +4123,7 @@ class BlockParser
                     if ($trimmedContent !== '' && $this->isPlainText($trimmedContent)) {
                         $cell->appendChild(new Text($trimmedContent));
                     } else {
-                        $this->inlineParser->parse($cell, $trimmedContent, $baseLineForRow);
+                        $this->inlineParser->parse($cell, $trimmedContent, $baseLineForRow, endsLine: false);
                     }
                     if (!$indexedSpans) {
                         $row->appendChild($cell);
