@@ -67,4 +67,15 @@ class ControlCharacterStrippingTest extends TestCase
 
         $this->assertSame("a ]0;pwned b\n", $output);
     }
+
+    /**
+     * Stripping runs after the URL check, so the check must already ignore the controls it strips.
+     */
+    #[DataProvider('renderers')]
+    public function testStrippingCannotAssembleADangerousScheme(RendererInterface $renderer): void
+    {
+        $document = (new DjotConverter())->parse("[a](java\x7Fscript:x) [b](java\u{0085}script:y)");
+
+        $this->assertStringNotContainsString('script:', $renderer->render($document));
+    }
 }

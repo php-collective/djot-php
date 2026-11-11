@@ -60,4 +60,16 @@ class HtmlToDjotDeepNestingTest extends TestCase
     {
         $this->assertSame("a\n\nb\n", (new HtmlToDjot())->convert('<section><div>a</div><p>b</p></section>'));
     }
+
+    public function testFlattenedRawTextStaysText(): void
+    {
+        $inner = '<p><textarea><script>keep &amp; me</script></textarea></p>';
+        $converter = new HtmlToDjot();
+
+        $shallow = $converter->convert($inner);
+        $deep = $converter->convert(str_repeat('<div>', 300) . $inner . str_repeat('</div>', 300));
+
+        $this->assertSame($shallow, $deep);
+        $this->assertStringContainsString('keep & me', $deep);
+    }
 }

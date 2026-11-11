@@ -242,7 +242,12 @@ class HtmlToDjot
                         return $match[0];
                     }
 
-                    return in_array(strtolower($match[1]), ['script', 'style'], true) ? '' : $match[2];
+                    // Inner text must stay text when the flattened markup is parsed again.
+                    return match (strtolower($match[1])) {
+                        'script', 'style' => '',
+                        'xmp' => htmlspecialchars($match[2], ENT_NOQUOTES | ENT_HTML5, 'UTF-8'),
+                        default => str_replace('<', '&lt;', $match[2]),
+                    };
                 }
                 if (!isset($match[4])) {
                     return $match[0];
