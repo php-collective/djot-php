@@ -4937,8 +4937,7 @@ class BlockParser
                 // Code fences: `{3,}
                 return isset($line[1], $line[2]) && $line[1] === '`' && $line[2] === '`';
             case ':':
-                // Fenced divs: :{3,}
-                return isset($line[1], $line[2]) && $line[1] === ':' && $line[2] === ':';
+                return $this->fencedBlockParser->parseDivFenceOpener($line) !== null;
             case '%':
                 // Fenced comments: %{3,}
                 return isset($line[1], $line[2]) && $line[1] === '%' && $line[2] === '%';
