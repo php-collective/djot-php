@@ -101,6 +101,86 @@ class BlockStructureParityTest extends TestCase
                 ":::\ntext\n\n```\n:::\n```\n:::\n",
                 "<div>\n<p>text</p>\n<pre><code>:::\n</code></pre>\n</div>\n",
             ],
+            'a fence after a heading still hides the closer' => [
+                ":::\n# heading\n```\n:::\n```\n:::\n",
+                "<div>\n<h1 id=\"heading\">heading</h1>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after a thematic break still hides the closer' => [
+                ":::\n---\n```\n:::\n```\n:::\n",
+                "<div>\n<hr>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after a table row still hides the closer' => [
+                ":::\n| t |\n```\n:::\n```\n:::\n",
+                "<div>\n<table>\n<tr>\n<td>t</td>\n</tr>\n</table>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after an attribute line still hides the closer' => [
+                ":::\n{.c}\n```\n:::\n```\n:::\n",
+                "<div>\n<pre class=\"c\"><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after a heading continuation still hides the closer' => [
+                ":::\n# h\nmore\n```\n:::\n```\n:::\n",
+                "<div>\n<h1 id=\"h-more\">h\nmore</h1>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'an unindented fence after a list item still hides the closer' => [
+                ":::\n- i\n```\n:::\n```\n:::\n",
+                "<div>\n<ul>\n<li>\ni\n</li>\n</ul>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after a quote still hides the closer' => [
+                ":::\n> q\n```\n:::\n```\n:::\n",
+                "<div>\n<blockquote>\n<p>q</p>\n</blockquote>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after an item paragraph past a blank line still hides the closer' => [
+                ":::\n- i\n\n  para\n```\n:::\n```\n:::\n",
+                "<div>\n<ul>\n<li>\n<p>i</p>\n<p>para</p>\n</li>\n</ul>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after a quote that follows a list item still hides the closer' => [
+                ":::\n- a\n> q\n  ```\n:::\n  ```\n:::\n",
+                "<div>\n<ul>\n<li>\na\n</li>\n</ul>\n<blockquote>\n<p>q</p>\n</blockquote>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'an attribute line after a list item still lets a fence hide the closer' => [
+                ":::\n1. c\n  - b\n{.c}\n  ```\n```\n:::\n",
+                "<div>\n<ol>\n<li>\nc\n- b\n</li>\n</ol>\n<pre class=\"c\"><code></code></pre>\n</div>\n",
+            ],
+            'an empty task item opens no paragraph for a fence line' => [
+                ":::\n- [ ]\n`x`\n- a\n```\n:::\n",
+                "<div>\n<ul class=\"task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\n</li>\n</ul>\n<p><code>x</code>\n- a\n<code></code></p>\n</div>\n",
+            ],
+            'empty quote lines open no paragraph for a fence line' => [
+                ":::\n>\n>\n`x`\n  ```\n  :::\nafter\n",
+                "<div>\n<blockquote>\n</blockquote>\n<p><code>x</code>\n<code></code></p>\n</div>\n<p>after</p>\n",
+            ],
+            'a fence inside a list item ends with the item' => [
+                ":::\n- a\n# h\n- [ ]\n  ```\n{.c}\n  > r\n:::\n",
+                "<div>\n<ul>\n<li>\na\n</li>\n</ul>\n<h1 id=\"h\">h</h1>\n<ul class=\"task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\n<pre><code></code></pre>\n</li>\n</ul>\n<blockquote class=\"c\">\n<p>r</p>\n</blockquote>\n</div>\n",
+            ],
+            'a table row ends the heading before a paragraph' => [
+                ":::\n- x\n# h\n| t |\n`x`\n```\n:::\n",
+                "<div>\n<ul>\n<li>\nx\n</li>\n</ul>\n<h1 id=\"h\">h</h1>\n<table>\n<tr>\n<td>t</td>\n</tr>\n</table>\n<p><code>x</code>\n<code></code></p>\n</div>\n",
+            ],
+            'a fence inside a list item ends at an unindented paragraph line' => [
+                ":::\n- [ ]\n  ```\nx\n:::\n",
+                "<div>\n<ul class=\"task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\n<pre><code></code></pre>\n</li>\n</ul>\n<p>x</p>\n</div>\n",
+            ],
+            'a thematic break ends the heading before a paragraph' => [
+                ":::\n# h\n- - -\n`x`\n```\n:::\n",
+                "<div>\n<h1 id=\"h\">h</h1>\n<hr>\n<p><code>x</code>\n<code></code></p>\n</div>\n",
+            ],
+            'closing pipe inside an open code span ends the table' => [
+                "| a |\n| `a |\n",
+                "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| <code>a |</code></p>\n",
+            ],
+            'closing pipe inside an open code span on an indented row ends the table' => [
+                "| a |\n | `a |\n",
+                "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| <code>a |</code></p>\n",
+            ],
+            'escaped closing pipe ends the table' => [
+                "| a |\n| b \\|\n",
+                "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| b |</p>\n",
+            ],
+            'escaped closing pipe on an indented row ends the table' => [
+                "| a |\n | b \\|\n",
+                "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| b |</p>\n",
+            ],
             'line before a sublist past a task box' => [
                 "- [ ] *\n   `x`\n",
                 "<ul class=\"task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\n<ul>\n<li>\n</li>\n</ul>\n<code>x</code>\n</li>\n</ul>\n",
@@ -122,6 +202,13 @@ class BlockStructureParityTest extends TestCase
                 "<ul class=\"task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\" checked=\"\"/>\n<ol>\n<li>\na\n</li>\n</ol>\nb\n</li>\n</ul>\n",
             ],
         ];
+    }
+
+    public function testFencedCommentHidesTheDivCloser(): void
+    {
+        $html = (new DjotConverter())->convert("::: outer\n%%%\n:::\n%%%\nvisible\n:::\n");
+
+        $this->assertSame("<div class=\"outer\">\n<p>visible</p>\n</div>\n", $html);
     }
 
     #[DataProvider('htmlProvider')]

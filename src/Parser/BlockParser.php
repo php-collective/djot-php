@@ -1518,20 +1518,25 @@ class BlockParser
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
-        // A fence-looking line inside an open paragraph is text, so it cannot hide the closer.
-        $state = [
-            'inFence' => false,
-            'fenceChar' => '',
-            'fenceLength' => 0,
-            'inComment' => false,
-            'commentLength' => 0,
-            'paragraphOpen' => false,
+        $scan = [
+            'state' => [
+                'inFence' => false,
+                'fenceChar' => '',
+                'fenceLength' => 0,
+                'inComment' => false,
+                'commentLength' => 0,
+                'paragraphOpen' => false,
+            ],
+            'inHeading' => false,
+            'quoteParagraph' => false,
+            'listColumns' => [],
+            'fenceItem' => null,
         ];
 
         while ($i < $count) {
             $currentLine = $lines[$i];
             if (
-                !$state['inFence'] && !$state['inComment']
+                !$scan['state']['inComment'] && !$this->fenceHoldsLine($currentLine, $scan)
                 && $this->fencedBlockParser->isDivFenceCloser(ltrim($currentLine, " \t"), $fenceLength)
             ) {
                 $i++;
@@ -1539,7 +1544,7 @@ class BlockParser
 
                 break;
             }
-            $this->trackBlockQuoteLazyState($currentLine, $state);
+            $this->trackDivBodyLine($currentLine, $scan);
             $i++;
         }
 
@@ -2178,6 +2183,130 @@ class BlockParser
         // list item, heading, nested quote) - all leave an open paragraph a lazy line
         // may continue.
         $state['paragraphOpen'] = true;
+    }
+
+    /**
+     * Track a div body line closely enough to tell a code fence (which hides a `:::`)
+     * from a fence-looking line inside an open paragraph (which is text).
+     *
+     * @param string $line
+     * @param array{state: array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool}, inHeading: bool, quoteParagraph: bool, listColumns: array<int>, fenceItem: int|null} $scan
+     */
+    private function trackDivBodyLine(string $line, array &$scan): void
+    {
+        $state = &$scan['state'];
+        $trimmed = ltrim($line, " \t");
+        $indent = strlen($line) - strlen($trimmed);
+        $innermostItem = $scan['listColumns'] !== [] ? end($scan['listColumns']) : null;
+        if ($state['inFence'] && !$this->fenceHoldsLine($line, $scan)) {
+            $state['inFence'] = false;
+            $state['paragraphOpen'] = false;
+        }
+        $wasInBlock = $state['inFence'] || $state['inComment'];
+        // A paragraph inside a list item or quote ends at a block line outside that container.
+        if (
+            !$wasInBlock && $state['paragraphOpen']
+            && (
+                ($scan['quoteParagraph'] && !str_starts_with($trimmed, '>'))
+                || ($innermostItem !== null && $indent <= $innermostItem)
+            )
+            && ($this->isBlockElementStart($trimmed) || $this->isSingleLineBlock($trimmed))
+        ) {
+            $state['paragraphOpen'] = false;
+        }
+        $paragraphWasOpen = $state['paragraphOpen'];
+        $this->trackBlockQuoteLazyState($line, $state);
+        if (!$wasInBlock && $state['inFence']) {
+            while ($scan['listColumns'] !== [] && end($scan['listColumns']) >= $indent) {
+                array_pop($scan['listColumns']);
+            }
+            $scan['fenceItem'] = $scan['listColumns'] !== [] ? end($scan['listColumns']) : null;
+        }
+        if ($wasInBlock || IndentationHelper::isBlankLine($line)) {
+            $scan['inHeading'] = false;
+            $scan['quoteParagraph'] = false;
+
+            return;
+        }
+        if (!$paragraphWasOpen || !$state['paragraphOpen']) {
+            while ($scan['listColumns'] !== [] && end($scan['listColumns']) >= $indent) {
+                array_pop($scan['listColumns']);
+            }
+            if (
+                $this->listParser->parseListItemMarker($trimmed) !== null
+                && !preg_match('/^(?:[-*][ \t]*){3,}$/', $trimmed)
+            ) {
+                $scan['listColumns'][] = $indent;
+            }
+        }
+        if (!$paragraphWasOpen && $state['paragraphOpen'] && $this->onlyContainerMarkers($trimmed)) {
+            $state['paragraphOpen'] = false;
+        }
+        if (!$state['paragraphOpen']) {
+            $scan['inHeading'] = false;
+            $scan['quoteParagraph'] = false;
+
+            return;
+        }
+        if (!$paragraphWasOpen) {
+            $scan['quoteParagraph'] = str_starts_with($trimmed, '>');
+        }
+        // A heading (with its continuation lines), thematic break, table row or
+        // attribute line opens no paragraph that would turn a fence line into text.
+        $scan['inHeading'] = ($scan['inHeading'] && !$this->isBlockElementStart($trimmed) && !$this->isSingleLineBlock($trimmed))
+            || (!$paragraphWasOpen && preg_match('/^#+(?:[ \t]|$)/', $trimmed) === 1);
+        if ($scan['inHeading'] || (!$paragraphWasOpen && $this->isSingleLineBlock($trimmed))) {
+            $state['paragraphOpen'] = false;
+        }
+    }
+
+    /**
+     * Whether the scanner's open fence holds $line; a fence inside a list item ends with the item.
+     *
+     * @param string $line
+     * @param array{state: array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool}, inHeading: bool, quoteParagraph: bool, listColumns: array<int>, fenceItem: int|null} $scan
+     */
+    private function fenceHoldsLine(string $line, array $scan): bool
+    {
+        if (!$scan['state']['inFence']) {
+            return false;
+        }
+
+        return $scan['fenceItem'] === null || IndentationHelper::isBlankLine($line)
+            || strspn($line, " \t") > $scan['fenceItem'];
+    }
+
+    /**
+     * Whether a line holds only quote or list markers (`>`, `- [ ]`, `> -`), which open no paragraph.
+     */
+    private function onlyContainerMarkers(string $line): bool
+    {
+        for ($level = 0; $level < self::MAX_NESTING_DEPTH; $level++) {
+            $line = ltrim($line, " \t");
+            if ($line === '') {
+                return true;
+            }
+            if ($line[0] === '>') {
+                $line = substr($line, 1);
+
+                continue;
+            }
+            $marker = $this->listParser->parseListItemMarker($line);
+            if ($marker === null || preg_match('/^(?:[-*][ \t]*){3,}$/', $line)) {
+                return false;
+            }
+            $line = $marker['content'];
+        }
+
+        return false;
+    }
+
+    private function isSingleLineBlock(string $line): bool
+    {
+        return preg_match('/^(?:[-*][ \t]*){3,}$/', $line) === 1
+            || $this->tableParser->isTableRow($line)
+            || (str_starts_with($line, '{') && str_ends_with(rtrim($line), '}')
+                && AttributeParser::isValid(substr(rtrim($line), 1, -1)));
     }
 
     /**
@@ -3758,8 +3887,18 @@ class BlockParser
             $lineWithoutRowAttrs = $this->tableParser->stripRowAttributes($currentLine);
 
             // Trailing whitespace after the closing pipe is insignificant
-            // (parity with carve-js / carve-rs).
+            // (parity with carve-js / carve-rs). An escaped closing pipe ends no row.
             if (!preg_match('/^\|.*\|[ \t]*$/', $lineWithoutRowAttrs)) {
+                break;
+            }
+            // Later rows follow the first row's rules: no escaped closing pipe, none inside a code span.
+            if (
+                $i > $start && !$this->tableParser->isTableRow($currentLine)
+                && !(
+                    $this->tableParser->isPotentialTableRowWithUnclosedCodeSpan($currentLine)
+                    && $this->canCloseCodeSpanWithContinuations($lines, $i, $count)
+                )
+            ) {
                 break;
             }
 
