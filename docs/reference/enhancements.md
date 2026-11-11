@@ -109,8 +109,7 @@ First reference[^note] and second reference[^note] and third[^note].
 
 **Features:**
 - Unique IDs: `fnref1`, `fnref1-2`, `fnref1-3`
-- Multiple backlinks in footnote content, each numbered with a `<sup>` after
-  the first
+- Multiple backlinks in footnote content, each numbered with a `<sup>`
 - Proper ARIA roles for accessibility
 
 ---
