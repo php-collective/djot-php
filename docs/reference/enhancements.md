@@ -96,17 +96,12 @@ First reference[^note] and second reference[^note] and third[^note].
 
 **Output:**
 ```html
-<p>First reference<a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a>
-and second reference<a id="fnref1-2" href="#fn1" role="doc-noteref"><sup>1</sup></a>
-and third<a id="fnref1-3" href="#fn1" role="doc-noteref"><sup>1</sup></a>.</p>
-
+<p>First reference<a id="fnref1" href="#fn1" role="doc-noteref"><sup>1</sup></a> and second reference<a id="fnref1-2" href="#fn1" role="doc-noteref"><sup>1</sup></a> and third<a id="fnref1-3" href="#fn1" role="doc-noteref"><sup>1</sup></a>.</p>
 <section role="doc-endnotes">
+<hr>
 <ol>
 <li id="fn1">
-<p>This footnote is referenced three times.
-<a href="#fnref1" role="doc-backlink">↩︎</a>
-<a href="#fnref1-2" role="doc-backlink">↩︎</a>
-<a href="#fnref1-3" role="doc-backlink">↩︎</a></p>
+<p>This footnote is referenced three times.<a href="#fnref1" role="doc-backlink">↩︎<sup>1</sup></a> <a href="#fnref1-2" role="doc-backlink">↩︎<sup>2</sup></a> <a href="#fnref1-3" role="doc-backlink">↩︎<sup>3</sup></a></p>
 </li>
 </ol>
 </section>
@@ -114,7 +109,8 @@ and third<a id="fnref1-3" href="#fn1" role="doc-noteref"><sup>1</sup></a>.</p>
 
 **Features:**
 - Unique IDs: `fnref1`, `fnref1-2`, `fnref1-3`
-- Multiple backlinks in footnote content
+- Multiple backlinks in footnote content, each numbered with a `<sup>` after
+  the first
 - Proper ARIA roles for accessibility
 
 ---

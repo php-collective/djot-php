@@ -1179,7 +1179,9 @@ https://www.youtube.com/watch?v=dQw4w9WgXcQ
 :::
 ```
 
-Output:
+Output with the `render.div` listener above registered (without it, this is an
+ordinary `<div class="video">`; the iframe markup itself comes from
+media-embed and is shortened here):
 
 ```html
 <figure class="video-embed">
