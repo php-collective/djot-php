@@ -72,4 +72,25 @@ class HtmlToDjotDeepNestingTest extends TestCase
         $this->assertSame($shallow, $deep);
         $this->assertStringContainsString('keep & me', $deep);
     }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function ignoredElements(): array
+    {
+        return [
+            'noscript' => ['<p>a</p><noscript><p>secret</p></noscript><p>b</p>'],
+            'unclosed script' => ['<p>a</p><p>b</p><script>secret()'],
+            'unclosed style' => ['<p>a</p><p>b</p><style>secret{}'],
+        ];
+    }
+
+    #[DataProvider('ignoredElements')]
+    public function testIgnoredElementsStayIgnoredWhenFlattened(string $html): void
+    {
+        $deep = (new HtmlToDjot())->convert(str_repeat('<div>', 300) . $html . str_repeat('</div>', 300));
+
+        $this->assertStringNotContainsString('secret', $deep);
+        $this->assertMatchesRegularExpression('/(?<![a-z])a(?![a-z]).*(?<![a-z])b(?![a-z])/s', $deep);
+    }
 }

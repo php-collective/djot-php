@@ -233,7 +233,7 @@ class HtmlToDjot
 
         return preg_replace_callback(
             '/<!--.*?(?:-->|$)|<[!?][^>]*>'
-            . '|<(script|style|textarea|title|xmp)\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*>(.*?)<\/\1\s*>'
+            . '|<(script|style|noscript|textarea|title|xmp)\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*>(.*?)(?:<\/\1\s*>|$)'
             . '|<(\/?)([a-zA-Z][^\s\/>]*)((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>/is',
             function (array $match) use (&$stack, $maxDepth): string {
                 $tooDeep = count($stack) >= $maxDepth;
@@ -244,7 +244,7 @@ class HtmlToDjot
 
                     // Inner text must stay text when the flattened markup is parsed again.
                     return match (strtolower($match[1])) {
-                        'script', 'style' => '',
+                        'script', 'style', 'noscript' => '',
                         'xmp' => htmlspecialchars($match[2], ENT_NOQUOTES | ENT_HTML5, 'UTF-8'),
                         default => str_replace('<', '&lt;', $match[2]),
                     };

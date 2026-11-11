@@ -27,6 +27,7 @@ class ControlCharacterStrippingTest extends TestCase
         . "``` py\ethon\ncode\e[31m\n```\n\n"
         . "``` =ht\eml\n<b>raw\e</b>\n```\n\n"
         . "| ce\ell |\n\n"
+        . "{title=\"ti\e]0;x\x07tle\"}\n::: note\nin div\n:::\n\n"
         . "- li\est\tkeeps tab\n";
 
     /**
@@ -87,5 +88,12 @@ class ControlCharacterStrippingTest extends TestCase
         $this->assertStringNotContainsString("\x9B", $output);
         $this->assertStringNotContainsString("\x9D", $output);
         $this->assertStringContainsString("\u{00E9}\u{20AC}", $output);
+    }
+
+    public function testInvalidUtf8BecomesReplacementCharacters(): void
+    {
+        $output = (new PlainTextRenderer())->render((new DjotConverter())->parse("a\x9Bb\xFFc"));
+
+        $this->assertSame("a\u{FFFD}b\u{FFFD}c\n", $output);
     }
 }
