@@ -17,7 +17,8 @@ use function count;
  * These tests are downloaded from https://github.com/jgm/djot.js/tree/main/test
  * and provide compatibility verification with the reference implementation.
  *
- * Current compatibility: 100% (237 tests passing)
+ * Current compatibility: 305 of 311 cases pass; the other six are listed in
+ * INTENTIONAL_DEVIATIONS.
  *
  * To run these tests:
  *   vendor/bin/phpunit tests/OfficialTestSuiteTest.php
@@ -36,7 +37,12 @@ class OfficialTestSuiteTest extends TestCase
      * @var array<string, string>
      */
     protected const INTENTIONAL_DEVIATIONS = [
-        // Currently no intentional deviations
+        'attributes_40' => 'boolean attributes: a bare key is a valid attribute',
+        'attributes_42' => 'boolean attributes: a bare key is a valid attribute',
+        'filters_0' => 'Lua filters are not supported',
+        'filters_1' => 'Lua filters are not supported',
+        'footnotes_0' => 'a footnote referenced more than once gets one backlink per reference',
+        'footnotes_3' => 'a footnote referenced more than once gets one backlink per reference',
     ];
 
     protected DjotConverter $converter;

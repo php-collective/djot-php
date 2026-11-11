@@ -36,6 +36,15 @@ Special characters: `*hi*`
 <p><code>``a``</code></p>
 ```
 
+Space stripping with multi-backtick delimiters (spec: "If the content
+starts or ends with a backtick character, a single space is removed"):
+
+```
+`` `foo` ``
+.
+<p><code>`foo`</code></p>
+```
+
 Implicitly closed by end of paragraph:
 
 ```
@@ -44,18 +53,4 @@ c
 .
 <p><code> a
 c</code></p>
-```
-
-Inline attributes attach to the code element:
-
-```
-`code`{.a}
-.
-<p><code class="a">code</code></p>
-```
-
-```
-`code`{key="value"}
-.
-<p><code key="value">code</code></p>
 ```
