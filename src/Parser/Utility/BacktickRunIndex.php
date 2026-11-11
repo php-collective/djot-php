@@ -28,6 +28,11 @@ final class BacktickRunIndex
 
     private int $leafCount = 1;
 
+    /**
+     * @var array<int, array<int>>
+     */
+    private array $startsByWidth = [];
+
     public function __construct(string $text)
     {
         $offset = 0;
@@ -35,6 +40,7 @@ final class BacktickRunIndex
             $end = $start + strspn($text, '`', $start);
             $this->starts[] = $start;
             $this->ends[] = $end;
+            $this->startsByWidth[$end - $start][] = $start;
             $offset = $end;
         }
         $runCount = count($this->starts);
@@ -68,6 +74,26 @@ final class BacktickRunIndex
         $index = $this->findFirst(1, 0, $this->leafCount, $low, $minimumWidth);
 
         return $index === null ? null : $this->ends[$index];
+    }
+
+    /**
+     * End of the first run at or after $offset that is exactly $width wide.
+     */
+    public function findExactCloser(int $offset, int $width): ?int
+    {
+        $starts = $this->startsByWidth[$width] ?? [];
+        $low = 0;
+        $high = count($starts);
+        while ($low < $high) {
+            $middle = intdiv($low + $high, 2);
+            if ($starts[$middle] < $offset) {
+                $low = $middle + 1;
+            } else {
+                $high = $middle;
+            }
+        }
+
+        return $low === count($starts) ? null : $starts[$low] + $width;
     }
 
     private function findFirst(int $node, int $left, int $right, int $from, int $minimumWidth): ?int
