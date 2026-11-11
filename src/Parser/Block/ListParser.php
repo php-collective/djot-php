@@ -93,7 +93,7 @@ class ListParser
         // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred), etc.
         $matches = [];
         $content = ($line[strspn($line, ' ', 1) + 1] ?? '') === '['
-            ? $this->matchMarker('/^(?<marker>[-*+]) +\[(?<task>.)\](?:\{(?<attrs>[^{}]+)\})? +/', $line, $matches)
+            ? $this->matchMarker('/^(?<marker>[-*+]) +\[(?<task>.)\](?:\{(?<attrs>[^{}]+)\})?(?: +|$)/', $line, $matches)
             : null;
         if ($content !== null) {
             $taskMarker = $matches['task'];

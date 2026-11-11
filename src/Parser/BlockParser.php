@@ -83,6 +83,11 @@ class BlockParser
 
     private int $nestingDepth = 0;
 
+    /**
+     * Line index of row 0 while tryParseTable() parses a dedented slice of its rows.
+     */
+    private int $tableLineOffset = 0;
+
     private bool $mayHaveTableRowspans = true;
 
     protected InlineParser $inlineParser;
@@ -1513,43 +1518,28 @@ class BlockParser
         $i = $start + 1;
         $count = count($lines);
         $closed = false;
-        $inCodeBlock = false;
-        $codeBlockFence = '';
-        $codeBlockFenceLength = 0;
+        // A fence-looking line inside an open paragraph is text, so it cannot hide the closer.
+        $state = [
+            'inFence' => false,
+            'fenceChar' => '',
+            'fenceLength' => 0,
+            'inComment' => false,
+            'commentLength' => 0,
+            'paragraphOpen' => false,
+        ];
 
         while ($i < $count) {
             $currentLine = $lines[$i];
-
-            // Track code blocks so we don't mistake ::: inside code blocks as closing fences
-            if (!$inCodeBlock) {
-                $codeFenceInfo = $this->fencedBlockParser->parseCodeFenceOpener($currentLine);
-                if ($codeFenceInfo !== null) {
-                    $inCodeBlock = true;
-                    $codeBlockFence = $codeFenceInfo['char'];
-                    $codeBlockFenceLength = $codeFenceInfo['length'];
-                    $i++;
-
-                    continue;
-                }
-            }
-            if ($inCodeBlock) {
-                // Check for closing code fence
-                if ($this->fencedBlockParser->isCodeFenceCloser($currentLine, $codeBlockFence, $codeBlockFenceLength)) {
-                    $inCodeBlock = false;
-                }
-                $i++;
-
-                continue;
-            }
-
-            // Check for closing fence (equal or longer) - only when not in code block
-            if ($this->fencedBlockParser->isDivFenceCloser(ltrim($currentLine, " \t"), $fenceLength)) {
+            if (
+                !$state['inFence'] && !$state['inComment']
+                && $this->fencedBlockParser->isDivFenceCloser(ltrim($currentLine, " \t"), $fenceLength)
+            ) {
                 $i++;
                 $closed = true;
 
                 break;
             }
-
+            $this->trackBlockQuoteLazyState($currentLine, $state);
             $i++;
         }
 
@@ -2599,6 +2589,12 @@ class BlockParser
             }
             $contentIndent = $baseIndent + $markerWidth;
             $bodyContentIndent = $contentIndent;
+            // A sublist opened on the marker line keeps its source column (past a
+            // task box or extra spaces), which decides what the lines below continue.
+            $contentColumn = $baseIndent + strlen($trimmedLine) - strlen($itemContent);
+            if ($markerLineSublist && $contentColumn > $contentIndent) {
+                $itemLines[0] = str_repeat(' ', $contentColumn - $contentIndent) . $itemContent;
+            }
             $itemState = [
                 'inFence' => false,
                 'fenceChar' => '',
@@ -3281,7 +3277,9 @@ class BlockParser
                 continue;
             }
             $trimmed = ltrim($line);
-            $opensList = $this->listParser->parseListItemMarker($trimmed) !== null;
+            // `- - -` parses as a marker but opens a thematic break.
+            $opensList = $this->listParser->parseListItemMarker($trimmed) !== null
+                && !preg_match('/^(?:[-*][ \t]*){3,}$/', $trimmed);
             if ($sawBlank && !$opensList && !$previousHoldsBlank) {
                 $loose = true;
             }
@@ -3718,6 +3716,28 @@ class BlockParser
             }
         }
 
+        // Indentation before a later row is insignificant too; parse the rows shifted left.
+        $end = $start + 1;
+        $indented = false;
+        while ($end < $count) {
+            $lead = strspn($lines[$end], " \t");
+            if (!in_array($lines[$end][$lead] ?? '', ['|', '+'], true)) {
+                break;
+            }
+            $indented = $indented || $lead > 0;
+            $end++;
+        }
+        if ($indented) {
+            $rows = array_map(static fn (string $row): string => ltrim($row, " \t"), array_slice($lines, $start, $end - $start));
+
+            $this->tableLineOffset += $start;
+            try {
+                return $this->tryParseTable($parent, $rows, 0);
+            } finally {
+                $this->tableLineOffset -= $start;
+            }
+        }
+
         $table = new Table();
         $i = $start;
         $alignments = [];
@@ -3817,7 +3837,7 @@ class BlockParser
             // Store cell contents and attributes for potential merging
             $mergedCells = array_map(fn ($c) => $c['content'], $cellsWithAttrs);
             $cellAttributes = array_map(fn ($c) => $c['attributes'], $cellsWithAttrs);
-            $baseLineForRow = $i;
+            $baseLineForRow = $this->tableLineOffset + $i;
 
             $i++;
 
@@ -3964,7 +3984,7 @@ class BlockParser
                     if ($cellData['attributes']) {
                         $cell->setAttributes($cellData['attributes']);
                     }
-                    $trimmedContent = trim($cellData['content']);
+                    $trimmedContent = $this->tableParser->trimCellContent($cellData['content']);
                     if ($trimmedContent !== '' && $this->isPlainText($trimmedContent)) {
                         $cell->appendChild(new Text($trimmedContent));
                     } else {
