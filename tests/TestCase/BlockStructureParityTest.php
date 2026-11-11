@@ -141,6 +141,30 @@ class BlockStructureParityTest extends TestCase
                 ":::\n1. c\n  - b\n{.c}\n  ```\n```\n:::\n",
                 "<div>\n<ol>\n<li>\nc\n- b\n</li>\n</ol>\n<pre class=\"c\"><code></code></pre>\n</div>\n",
             ],
+            'an empty task item opens no paragraph for a fence line' => [
+                ":::\n- [ ]\n`x`\n- a\n```\n:::\n",
+                "<div>\n<ul class=\"task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\n</li>\n</ul>\n<p><code>x</code>\n- a\n<code></code></p>\n</div>\n",
+            ],
+            'empty quote lines open no paragraph for a fence line' => [
+                ":::\n>\n>\n`x`\n  ```\n  :::\nafter\n",
+                "<div>\n<blockquote>\n</blockquote>\n<p><code>x</code>\n<code></code></p>\n</div>\n<p>after</p>\n",
+            ],
+            'a fence inside a list item ends with the item' => [
+                ":::\n- a\n# h\n- [ ]\n  ```\n{.c}\n  > r\n:::\n",
+                "<div>\n<ul>\n<li>\na\n</li>\n</ul>\n<h1 id=\"h\">h</h1>\n<ul class=\"task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\n<pre><code></code></pre>\n</li>\n</ul>\n<blockquote class=\"c\">\n<p>r</p>\n</blockquote>\n</div>\n",
+            ],
+            'a table row ends the heading before a paragraph' => [
+                ":::\n- x\n# h\n| t |\n`x`\n```\n:::\n",
+                "<div>\n<ul>\n<li>\nx\n</li>\n</ul>\n<h1 id=\"h\">h</h1>\n<table>\n<tr>\n<td>t</td>\n</tr>\n</table>\n<p><code>x</code>\n<code></code></p>\n</div>\n",
+            ],
+            'a fence inside a list item ends at an unindented paragraph line' => [
+                ":::\n- [ ]\n  ```\nx\n:::\n",
+                "<div>\n<ul class=\"task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\n<pre><code></code></pre>\n</li>\n</ul>\n<p>x</p>\n</div>\n",
+            ],
+            'a thematic break ends the heading before a paragraph' => [
+                ":::\n# h\n- - -\n`x`\n```\n:::\n",
+                "<div>\n<h1 id=\"h\">h</h1>\n<hr>\n<p><code>x</code>\n<code></code></p>\n</div>\n",
+            ],
             'closing pipe inside an open code span ends the table' => [
                 "| a |\n| `a |\n",
                 "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| <code>a |</code></p>\n",
