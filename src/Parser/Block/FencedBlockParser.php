@@ -120,8 +120,10 @@ class FencedBlockParser
                     $className = $attributes['class'];
                     unset($attributes['class']);
                 }
-            } else {
+            } elseif (preg_match('/^[A-Za-z0-9_-]+$/', $tail) === 1) {
                 $className = $tail;
+            } else {
+                return null;
             }
         }
 
