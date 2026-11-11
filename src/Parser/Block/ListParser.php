@@ -91,11 +91,11 @@ class ListParser
         // Task list: - [.] where . is any single character
         // Standard markers: ' ' (unchecked), 'x'/'X' (checked)
         // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred), etc.
-        if (
-            ($line[strspn($line, ' ', 1) + 1] ?? '') === '['
-            && preg_match('/^(?<marker>[-*+]) +\[(?<task>.)\](?:\{(?<attrs>[^{}]+)\})? +/', $line, $matches)
-            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
-        ) {
+        $matches = [];
+        $content = ($line[strspn($line, ' ', 1) + 1] ?? '') === '['
+            ? $this->matchMarker('/^(?<marker>[-*+]) +\[(?<task>.)\](?:\{(?<attrs>[^{}]+)\})? +/', $line, $matches)
+            : null;
+        if ($content !== null) {
             $taskMarker = $matches['task'];
 
             return $this->withMarkerAttrs([
@@ -110,10 +110,8 @@ class ListParser
         // Bullet list: -, +, or *
         // A marker followed by a space (or end of line) is a valid item; a bare
         // marker alone on its line is an empty item (djot allows marker + newline).
-        if (
-            preg_match('/^([-*+])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
-            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
-        ) {
+        $content = $this->matchMarker('/^([-*+])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches);
+        if ($content !== null) {
             $marker = $matches[1];
 
             return $this->withMarkerAttrs([
@@ -124,10 +122,8 @@ class ListParser
         }
 
         // Ordered list: 1. or 1) or (1) - bare marker (no content) is an empty item.
-        if (
-            preg_match('/^(\d+)([.)])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
-            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
-        ) {
+        $content = $this->matchMarker('/^(\d+)([.)])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches);
+        if ($content !== null) {
             return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => $matches[2],
@@ -136,10 +132,8 @@ class ListParser
             ], $matches[3] ?? '');
         }
 
-        if (
-            preg_match('/^\((\d+)\)(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
-            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
-        ) {
+        $content = $this->matchMarker('/^\((\d+)\)(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches);
+        if ($content !== null) {
             return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => '()',
@@ -149,10 +143,8 @@ class ListParser
         }
 
         // Roman numeral ordered list
-        if (
-            preg_match('/^([ivxlcdmIVXLCDM]+)([.)])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
-            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
-        ) {
+        $content = $this->matchMarker('/^([ivxlcdmIVXLCDM]+)([.)])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches);
+        if ($content !== null) {
             $roman = $matches[1];
             $isLower = ctype_lower($roman[0]);
             $start = $this->romanToInt(strtoupper($roman));
@@ -175,10 +167,8 @@ class ListParser
             }
         }
 
-        if (
-            preg_match('/^\(([ivxlcdmIVXLCDM]+)\)(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
-            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
-        ) {
+        $content = $this->matchMarker('/^\(([ivxlcdmIVXLCDM]+)\)(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches);
+        if ($content !== null) {
             $roman = $matches[1];
             $isLower = ctype_lower($roman[0]);
             $start = $this->romanToInt(strtoupper($roman));
@@ -202,10 +192,8 @@ class ListParser
         }
 
         // Alpha ordered list: a. or A. or a) or A) or (a) or (A)
-        if (
-            preg_match('/^([a-zA-Z])([.)])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
-            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
-        ) {
+        $content = $this->matchMarker('/^([a-zA-Z])([.)])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches);
+        if ($content !== null) {
             $letter = $matches[1];
             $isLower = ctype_lower($letter);
             $start = ord(strtolower($letter)) - ord('a') + 1;
@@ -219,10 +207,8 @@ class ListParser
             ], $matches[3] ?? '');
         }
 
-        if (
-            preg_match('/^\(([a-zA-Z])\)(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
-            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
-        ) {
+        $content = $this->matchMarker('/^\(([a-zA-Z])\)(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches);
+        if ($content !== null) {
             $letter = $matches[1];
             $isLower = ctype_lower($letter);
             $start = ord(strtolower($letter)) - ord('a') + 1;
@@ -237,10 +223,8 @@ class ListParser
         }
 
         // Definition list: `: term`, or a bare `:` (empty term and definition)
-        if (
-            preg_match('/^:(?: +|$)/', $line, $matches)
-            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
-        ) {
+        $content = $this->matchMarker('/^:(?: +|$)/', $line, $matches);
+        if ($content !== null) {
             return [
                 'type' => ListBlock::TYPE_DEFINITION,
                 'marker' => ':',
@@ -249,6 +233,24 @@ class ListParser
         }
 
         return null;
+    }
+
+    /**
+     * @param-out array<array-key, string> $matches
+     *
+     * @param string $pattern
+     * @param string $line
+     * @param array<array-key, string>|null $matches
+     *
+     * @return string|null The text after the marker, or null when the pattern does not match.
+     */
+    private function matchMarker(string $pattern, string $line, ?array &$matches): ?string
+    {
+        if (!preg_match($pattern, $line, $matches)) {
+            return null;
+        }
+
+        return $this->restOfLine($line, strlen($matches[0]));
     }
 
     /**
