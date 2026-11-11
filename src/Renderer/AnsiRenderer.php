@@ -621,8 +621,8 @@ class AnsiRenderer implements RendererInterface
         // A Div's quoted title (e.g. an admonition title carried as the `title`
         // attribute) is preserved as a leading bold line instead of being
         // dropped.
-        $title = $node->getAttribute('title');
-        if (is_string($title) && $title !== '') {
+        $title = $this->documentText((string)$node->getAttribute('title'));
+        if ($title !== '') {
             return $this->style($title, self::BOLD) . "\n\n" . $body;
         }
 

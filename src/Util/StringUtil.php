@@ -75,7 +75,11 @@ final class StringUtil
     public static function stripControlCharacters(string $text): string
     {
         if (preg_match('//u', $text) !== 1) {
-            $text = mb_scrub($text, 'UTF-8');
+            // ENT_SUBSTITUTE turns invalid sequences into U+FFFD without needing mbstring.
+            $text = htmlspecialchars_decode(
+                htmlspecialchars($text, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'),
+                ENT_NOQUOTES,
+            );
         }
 
         return preg_replace('/[\x00-\x08\x0B-\x1F\x7F]|\xC2[\x80-\x9F]/', '', $text) ?? $text;
