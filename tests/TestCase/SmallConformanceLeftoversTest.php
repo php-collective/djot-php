@@ -81,6 +81,14 @@ class SmallConformanceLeftoversTest extends TestCase
                 "# h \\  \n\npara\n",
                 "<section id=\"h\">\n<h1>h<br>\n</h1>\n<p>para</p>\n</section>\n",
             ],
+            'backslash before a tab inside a line stays literal' => [
+                "x\\\ty\n",
+                "<p>x\\\ty</p>\n",
+            ],
+            'escaped space separates words in a heading id' => [
+                "# x \\ y\n",
+                "<section id=\"x-y\">\n<h1>x &nbsp;y</h1>\n</section>\n",
+            ],
             'backslash before a space at the end of link text' => [
                 "[a \\ ](u)\n",
                 "<p><a href=\"u\">a &nbsp;</a></p>\n",

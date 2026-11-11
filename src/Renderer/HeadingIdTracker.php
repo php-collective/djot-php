@@ -174,6 +174,9 @@ class HeadingIdTracker
      */
     protected function slug(string $text): string
     {
+        // An escaped space (placeholder U+E000) separates words like a space.
+        $text = str_replace("\u{E000}", ' ', $text);
+
         return trim(preg_replace('/[^0-9A-Za-z\x{0080}-\x{10FFFF}]+/u', '-', $text) ?? $text, '-');
     }
 

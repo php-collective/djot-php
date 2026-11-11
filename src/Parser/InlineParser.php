@@ -609,8 +609,8 @@ class InlineParser
 
                         continue;
                     }
-                    // Escaped tab becomes literal tab
-                    $textBuffer .= $escaped;
+                    // A tab is not escapable: the backslash stays literal.
+                    $textBuffer .= '\\' . $escaped;
                     $pos += 2;
 
                     continue;
