@@ -2813,8 +2813,8 @@ class BlockParser
                 $potentialAttrLine = $lines[$i];
                 $trimmedAttrLine = ltrim($potentialAttrLine);
                 if (
-                    preg_match('/^\{([^{}]+)\}\s*$/', $trimmedAttrLine, $attrMatch) &&
-                    IndentationHelper::getLeadingSpaces($potentialAttrLine) >= $contentIndent
+                    preg_match('/^\{([^{}]+)\}\s*$/', $trimmedAttrLine, $attrMatch)
+                    && IndentationHelper::getLeadingSpaces($potentialAttrLine) >= $contentIndent
                 ) {
                     // Peek ahead: is there more item content at content indent
                     // (non-blank, non-sibling-marker)?
