@@ -2191,13 +2191,15 @@ class InlineParser
             $closers = [];
             $at = 0;
             $found = strpos($text, $closer);
-            $tick = strpos($text, '`');
+            $tick = $this->findUnescapedBacktick($text, 0);
             while ($found !== false) {
-                if ($tick !== false && $tick < $found) {
+                if ($tick !== null && $tick < $found) {
                     $at = (int)$this->findVerbatimEnd($text, $tick);
-                    $tick = strpos($text, '`', $at);
+                    $tick = $this->findUnescapedBacktick($text, $at);
                 } else {
-                    $closers[] = $found;
+                    if (!$this->isEscapedAt($text, $found)) {
+                        $closers[] = $found;
+                    }
                     $at = $found + 1;
                 }
                 if ($found < $at) {
@@ -2219,6 +2221,28 @@ class InlineParser
         }
 
         return $closers[$low] ?? null;
+    }
+
+    private function findUnescapedBacktick(string $text, int $pos): ?int
+    {
+        while (($tick = strpos($text, '`', $pos)) !== false) {
+            if (!$this->isEscapedAt($text, $tick)) {
+                return $tick;
+            }
+            $pos = $tick + 1;
+        }
+
+        return null;
+    }
+
+    private function isEscapedAt(string $text, int $pos): bool
+    {
+        $slashes = 0;
+        while ($pos - $slashes > 0 && $text[$pos - $slashes - 1] === '\\') {
+            $slashes++;
+        }
+
+        return $slashes % 2 === 1;
     }
 
     private function hasTerminatorAfter(string $text, string $marker, int $pos): bool
