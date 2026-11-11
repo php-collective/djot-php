@@ -240,13 +240,13 @@ class BlockQuoteLazyContinuationTest extends TestCase
                 "> - | a |\ntail",
                 "<blockquote>\n<ul>\n<li>\n<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n</li>\n</ul>\n</blockquote>\n<p>tail</p>\n",
             ],
-            'attribute line applies to the unquoted line' => [
+            'attribute line at the end of the quote is dropped' => [
                 "> {.c}\ntail",
-                "<blockquote>\n</blockquote>\n<p class=\"c\">tail</p>\n",
+                "<blockquote>\n</blockquote>\n<p>tail</p>\n",
             ],
-            'attribute line in item applies to the unquoted line' => [
+            'attribute line at the end of a quoted item is dropped' => [
                 "> - {.c}\ntail",
-                "<blockquote>\n<ul>\n<li>\n</li>\n</ul>\n</blockquote>\n<p class=\"c\">tail</p>\n",
+                "<blockquote>\n<ul>\n<li>\n</li>\n</ul>\n</blockquote>\n<p>tail</p>\n",
             ],
             'reference definition holds no paragraph' => [
                 "> [r]: u\ntail",
