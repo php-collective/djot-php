@@ -1670,7 +1670,7 @@ class BlockParser
             return false;
         }
         if (
-            preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $line)
+            preg_match('/^\[[^\]]*\]:(?:[ \t]+\S*)?[ \t]*$/', $line)
             || $this->fencedBlockParser->parseCodeFenceOpener($line) !== null
             || $this->fencedBlockParser->parseDivFenceOpener($line) !== null
             || $this->listParser->parseListItemMarker($line) !== null
@@ -1948,7 +1948,7 @@ class BlockParser
         $rest = substr($line, $pos);
         if (
             $reference !== null && $pos > $reference['indent'] && $rest !== ''
-            && !preg_match('/^\[[^\]]+\]:(?=[ \t]|$)/', $rest) && !$this->startsNewBlock($rest)
+            && !preg_match('/^\[[^\]]*\]:(?=[ \t]|$)/', $rest) && !$this->startsNewBlock($rest)
         ) {
             $containers[] = $reference;
 
@@ -1986,7 +1986,7 @@ class BlockParser
 
                 return true;
             }
-            if (preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $rest)) {
+            if (preg_match('/^\[[^\]]*\]:(?:[ \t]+\S*)?[ \t]*$/', $rest)) {
                 // A footnote definition holds blocks of its own, and the list parser reads a
                 // definition's indented lines its own way; leave both to the flat tracker.
                 if (str_starts_with($rest, '[^') || in_array('item', array_column($containers, 'type'), true)) {
@@ -2054,7 +2054,7 @@ class BlockParser
         return $this->isQuotePrefixAt($trimmed, 0)
             || preg_match('/^#{1,6}(?:[ \t]|$)/', $trimmed) === 1
             || preg_match('/^(?:\*\[|\[\^)[^\]]+\]:(?=[ \t]|$)/', $trimmed) === 1
-            || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $trimmed) === 1
+            || preg_match('/^\[[^\]]*\]:(?:[ \t]+\S*)?[ \t]*$/', $trimmed) === 1
             || $this->fencedBlockParser->parseCodeFenceOpener($trimmed) !== null
             || $this->fencedBlockParser->parseDivFenceOpener($trimmed) !== null
             || $this->leavesNoParagraph($trimmed)
@@ -2547,7 +2547,7 @@ class BlockParser
                         if (IndentationHelper::isBlankLine($subLine)) {
                             $subLines[] = '';
                             $subLineMap[] = $this->sourceLineFor($lineMap, $i);
-                            $subRaw[] = '';
+                            $subRaw[] = $subLine;
                             $sawBlankLine = true;
                             $i++;
 
@@ -2742,7 +2742,8 @@ class BlockParser
                     if (!$itemState['inFence'] && !$itemState['inComment'] && $itemDivFences === []) {
                         break;
                     }
-                    $itemLines[] = '';
+                    // Keep the spaces past the content column: a raw or code block shows them.
+                    $itemLines[] = IndentationHelper::stripLeadingIndent($nextLine, $contentIndent);
                     $itemLineMap[] = $this->sourceLineFor($lineMap, $i);
                     $this->trackDefinitionLazyState('', $itemState, $itemDivFences, $itemQuoteDepth);
                     if (!$itemState['paragraphOpen']) {
@@ -3107,7 +3108,7 @@ class BlockParser
                 $firstLine = ltrim($itemLines[0], ' ');
                 if (
                     $parseItemLinesAsBlocks || $this->isBlockElementStart($firstLine)
-                    || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $firstLine)
+                    || preg_match('/^\[[^\]]*\]:(?:[ \t]+\S*)?[ \t]*$/', $firstLine)
                     // A marker-line `{...}` may be a block attribute for the lines below.
                     || preg_match('/^\{.*\}[ \t]*$/', $firstLine)
                 ) {
