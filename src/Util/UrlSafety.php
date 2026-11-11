@@ -27,7 +27,8 @@ final class UrlSafety
      */
     public static function hasDangerousScheme(string $url): bool
     {
-        $probe = (string)preg_replace('/[\x00-\x20]+/', '', $url);
+        // DEL and C1 count too: the text renderers strip them after this check.
+        $probe = (string)preg_replace('/(?:[\x00-\x20\x7F]|\xC2[\x80-\x9F])+/', '', $url);
         if (preg_match('/^([a-zA-Z][a-zA-Z0-9+.\-]*):/', $probe, $m) === 1) {
             return in_array(strtolower($m[1]), self::DANGEROUS_SCHEMES, true);
         }

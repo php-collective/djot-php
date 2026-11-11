@@ -786,4 +786,18 @@ DJOT;
             $this->assertStringNotContainsString('<script>', $html);
         }
     }
+
+    public function testPlaceholderRestoreIsSinglePass(): void
+    {
+        // A restored span is never scanned again, so text shaped like a later placeholder stays literal.
+        $this->assertSame("`a\x00PROTECTED1\x00` and `b`", $this->converter->convert("`a\x00PROTECTED1\x00` and `b`"));
+        $this->assertSame("`x\x00PROTECTED2\x00` `y` `z`", $this->converter->convert("`x\x00PROTECTED2\x00` `y` `z`"));
+    }
+
+    public function testManyProtectedSpansOnOneLine(): void
+    {
+        $markdown = str_repeat('`a`a', 2000);
+
+        $this->assertSame($markdown, $this->converter->convert($markdown));
+    }
 }

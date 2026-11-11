@@ -48,6 +48,7 @@ use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\Utility\AbbreviationBudgetTrait;
+use Djot\Util\StringUtil;
 use Djot\Util\UrlSafety;
 
 /**
@@ -409,8 +410,8 @@ class AnsiRenderer implements RendererInterface
             $node instanceof Table => $this->renderTable($node),
             $node instanceof LineBlock => $this->renderLineBlock($node),
             $node instanceof Footnote => $this->renderFootnote($node),
-            $node instanceof Text => $node->getContent(),
-            $node instanceof EscapedText => $node->getContent(),
+            $node instanceof Text => $this->documentText($node->getContent()),
+            $node instanceof EscapedText => $this->documentText($node->getContent()),
             $node instanceof Abbreviation => $this->renderAbbreviation($node),
             $node instanceof Emphasis => $this->renderEmphasis($node),
             $node instanceof Strong => $this->renderStrong($node),
@@ -487,14 +488,14 @@ class AnsiRenderer implements RendererInterface
 
     protected function renderCodeBlock(CodeBlock $node): string
     {
-        $content = $node->getContent();
-        $lang = $node->getLanguage();
+        $content = $this->documentText($node->getContent());
+        $lang = $this->documentText($node->getLanguage() ?? '');
 
         $lines = explode("\n", rtrim($content));
         $output = '';
 
         // Header with language
-        if ($lang !== null && $lang !== '') {
+        if ($lang !== '') {
             $header = $this->useUnicode
                 ? self::BOX_TOP_LEFT . str_repeat(self::BOX_HORIZONTAL, 2) . ' ' . $lang . ' '
                 : '--- ' . $lang . ' ';
@@ -764,7 +765,7 @@ class AnsiRenderer implements RendererInterface
 
     protected function renderFootnote(Footnote $node): string
     {
-        $label = $node->getLabel();
+        $label = $this->documentText($node->getLabel());
         $content = trim($this->renderChildren($node));
         $marker = $this->style('[' . $label . ']', self::FG_CYAN . self::DIM);
 
@@ -783,7 +784,7 @@ class AnsiRenderer implements RendererInterface
 
     protected function renderCode(Code $node): string
     {
-        $content = $node->getContent();
+        $content = $this->documentText($node->getContent());
 
         return $this->style($content, self::FG_BRIGHT_YELLOW);
     }
@@ -791,7 +792,7 @@ class AnsiRenderer implements RendererInterface
     protected function renderLink(Link $node): string
     {
         $text = $this->renderChildren($node);
-        $url = UrlSafety::sanitize($node->getDestination() ?? '');
+        $url = $this->documentText(UrlSafety::sanitize($node->getDestination() ?? ''));
 
         // OSC 8 hyperlink support (for terminals that support it)
         // Format: \033]8;;URL\033\\TEXT\033]8;;\033\\
@@ -806,7 +807,7 @@ class AnsiRenderer implements RendererInterface
 
     protected function renderImage(Image $node): string
     {
-        $alt = $node->getAlt();
+        $alt = $this->documentText($node->getAlt());
         $marker = $this->style('[img:', self::FG_MAGENTA);
         $altText = $alt !== '' ? ' ' . $alt : '';
 
@@ -852,14 +853,14 @@ class AnsiRenderer implements RendererInterface
 
     protected function renderMath(Math $node): string
     {
-        $content = $node->getContent();
+        $content = $this->documentText($node->getContent());
 
         return $this->style($content, self::FG_BRIGHT_MAGENTA);
     }
 
     protected function renderSymbol(Symbol $node): string
     {
-        $name = $node->getName();
+        $name = $this->documentText($node->getName());
 
         // Common emoji mappings
         $emoji = match ($name) {
@@ -887,7 +888,7 @@ class AnsiRenderer implements RendererInterface
 
     protected function renderFootnoteRef(FootnoteRef $node): string
     {
-        $label = $node->getLabel();
+        $label = $this->documentText($node->getLabel());
 
         return $this->style('[' . $label . ']', self::FG_CYAN . self::BOLD);
     }
@@ -895,8 +896,8 @@ class AnsiRenderer implements RendererInterface
     protected function renderRawBlock(RawBlock $node): string
     {
         // Show raw blocks dimmed
-        $format = $node->getFormat();
-        $content = $node->getContent();
+        $format = $this->documentText($node->getFormat());
+        $content = $this->documentText($node->getContent());
 
         return $this->style('[raw:' . $format . '] ' . $content, self::DIM) . "\n\n";
     }
@@ -934,10 +935,18 @@ class AnsiRenderer implements RendererInterface
             return $text;
         }
 
-        $title = $node->getTitle();
+        $title = $this->documentText($node->getTitle());
 
         // Show abbreviation with definition in parentheses
         return $text . $this->style(' (' . $title . ')', self::DIM);
+    }
+
+    /**
+     * Document text never carries its own terminal controls; only style() emits escapes.
+     */
+    protected function documentText(string $text): string
+    {
+        return StringUtil::stripControlCharacters($text);
     }
 
     /**

@@ -235,6 +235,9 @@ echo "Hello";
 - Converts `<span>` with class/id to Djot span syntax
 - Handles nested lists
 - Handles tables with headers
+- Keeps content past deep nesting: libxml stops parsing at 256 levels, so
+  elements nested deeper than 128 levels are flattened to their text instead of
+  cutting off the rest of the document
 
 ### Round-Trip Mode
 

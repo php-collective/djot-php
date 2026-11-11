@@ -109,7 +109,7 @@ class MarkdownRenderer implements RendererInterface
         $this->resetAbbreviationBudget($document->getSourceLength());
         $this->siblingBoundaries = new WeakMap();
 
-        $markdown = $this->renderChildren($document);
+        $markdown = StringUtil::stripControlCharacters($this->renderChildren($document));
 
         // Normalize multiple blank lines
         $markdown = preg_replace("/\n{3,}/", "\n\n", $markdown) ?? $markdown;

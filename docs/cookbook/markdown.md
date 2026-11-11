@@ -49,6 +49,10 @@ This is **bold** and *italic* text with a [link](https://example.com).
 
 Note: Djot uses `*` for strong and `_` for emphasis, while Markdown uses `**` for strong and `*` for emphasis. The renderer handles this conversion automatically.
 
+Control characters in the document text (C0 except tab and newline, DEL, and
+C1) are removed from the output, so text rendered for a terminal cannot carry
+escape sequences.
+
 ## Djot to Markdown Conversion
 
 Convert Djot documents to Markdown for compatibility with Markdown-based systems:

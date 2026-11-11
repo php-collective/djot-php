@@ -41,6 +41,10 @@ Welcome
 This is bold and italic text with a link.
 ```
 
+Control characters in the document text (C0 except tab and newline, DEL, and
+C1) are removed from the output, so text rendered for a terminal cannot carry
+escape sequences.
+
 ## Search Indexing
 
 Extract clean text for full-text search indexing:
