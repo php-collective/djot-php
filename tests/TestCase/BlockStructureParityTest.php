@@ -204,6 +204,13 @@ class BlockStructureParityTest extends TestCase
         ];
     }
 
+    public function testFencedCommentHidesTheDivCloser(): void
+    {
+        $html = (new DjotConverter())->convert("::: outer\n%%%\n:::\n%%%\nvisible\n:::\n");
+
+        $this->assertSame("<div class=\"outer\">\n<p>visible</p>\n</div>\n", $html);
+    }
+
     #[DataProvider('htmlProvider')]
     public function testMatchesDjotJs(string $input, string $expected): void
     {

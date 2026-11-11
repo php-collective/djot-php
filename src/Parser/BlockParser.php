@@ -1536,7 +1536,7 @@ class BlockParser
         while ($i < $count) {
             $currentLine = $lines[$i];
             if (
-                !$this->fenceHoldsLine($currentLine, $scan)
+                !$scan['state']['inComment'] && !$this->fenceHoldsLine($currentLine, $scan)
                 && $this->fencedBlockParser->isDivFenceCloser(ltrim($currentLine, " \t"), $fenceLength)
             ) {
                 $i++;
