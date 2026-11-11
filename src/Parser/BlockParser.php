@@ -2195,9 +2195,19 @@ class BlockParser
      * @param array{inFence:bool,fenceChar:string,fenceLength:int,inComment:bool,commentLength:int,paragraphOpen:bool} $state
      * @param array<int> $divFences
      * @param int $quoteDepth
+     * @param int $level Containers already opened on this line.
+     * @param int|null $breakRun Length of the line's trailing run of `-`, `*`, space and tab; every
+     *   nested call sees a suffix of the line, so this tells in O(1) whether a suffix can be a thematic break.
      */
-    private function trackDefinitionLazyState(string $content, array &$state, array &$divFences, int &$quoteDepth): void
-    {
+    private function trackDefinitionLazyState(
+        string $content,
+        array &$state,
+        array &$divFences,
+        int &$quoteDepth,
+        int $level = 0,
+        ?int $breakRun = null,
+    ): void {
+        $breakRun ??= strlen($content) - strlen(rtrim($content, "-* \t"));
         if ($state['inFence'] || $state['inComment']) {
             for ($depth = 0; $depth < $quoteDepth; $depth++) {
                 if (!preg_match('/^>[ \t]?(.*)$/', $content, $matches)) {
@@ -2234,6 +2244,12 @@ class BlockParser
             $quoteDepth = 0;
         }
         if (!$state['inFence'] && !$state['inComment']) {
+            // Content nested past the parser's depth cap is literal text.
+            if ($level >= self::MAX_NESTING_DEPTH - $this->nestingDepth) {
+                $state['paragraphOpen'] = $state['paragraphOpen'] || !IndentationHelper::isBlankLine($content);
+
+                return;
+            }
             // Indentation does not change which block a line opens.
             $content = ltrim($content, " \t");
             $divFence = $divFences !== [] ? $divFences[count($divFences) - 1] : null;
@@ -2252,16 +2268,16 @@ class BlockParser
                     return;
                 }
                 // A footnote body continues like the item's own content.
-                if (preg_match('/^\[\^[^\]]+\]:(?:[ \t]+(.*))?$/', $content, $matches)) {
-                    $this->trackDefinitionLazyState($matches[1] ?? '', $state, $divFences, $quoteDepth);
+                if (str_starts_with($content, '[^') && preg_match('/^\[\^[^\]]+\]:(?:[ \t]+(.*))?$/', $content, $matches)) {
+                    $this->trackDefinitionLazyState($matches[1] ?? '', $state, $divFences, $quoteDepth, $level + 1, $breakRun);
 
                     return;
                 }
                 // These blocks contain no paragraph for an unindented line to extend.
                 if (
                     $this->tableParser->isTableRow($content)
-                    || preg_match('/^(?:[-*][ \t]*){3,}$/', $content)
-                    || preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $content)
+                    || (strlen($content) <= $breakRun && preg_match('/^(?:[-*][ \t]*){3,}$/', $content))
+                    || (str_starts_with($content, '[') && preg_match('/^\[[^\]]+\]:(?:[ \t]+\S*)?[ \t]*$/', $content))
                 ) {
                     $state['paragraphOpen'] = false;
 
@@ -2279,7 +2295,7 @@ class BlockParser
                     }
                 }
                 if (preg_match('/^>[ \t]?(.*)$/', $content, $matches)) {
-                    $this->trackDefinitionLazyState($matches[1], $state, $divFences, $quoteDepth);
+                    $this->trackDefinitionLazyState($matches[1], $state, $divFences, $quoteDepth, $level + 1, $breakRun);
                     if ($state['inFence'] || $state['inComment'] || $state['paragraphOpen']) {
                         $quoteDepth++;
                     }
@@ -2288,7 +2304,7 @@ class BlockParser
                 }
                 $marker = $this->listParser->parseListItemMarker($content);
                 if ($marker !== null) {
-                    $this->trackDefinitionLazyState($marker['content'], $state, $divFences, $quoteDepth);
+                    $this->trackDefinitionLazyState($marker['content'], $state, $divFences, $quoteDepth, $level + 1, $breakRun);
 
                     return;
                 }

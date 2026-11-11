@@ -91,24 +91,30 @@ class ListParser
         // Task list: - [.] where . is any single character
         // Standard markers: ' ' (unchecked), 'x'/'X' (checked)
         // Extended markers: '-' (cancelled), '/' (partial), '>' (deferred), etc.
-        if (preg_match('/^(?<marker>[-*+]) +\[(?<task>.)\](?:\{(?<attrs>[^{}]+)\})? +(?<content>.*)$/', $line, $matches)) {
+        if (
+            ($line[strspn($line, ' ', 1) + 1] ?? '') === '['
+            && preg_match('/^(?<marker>[-*+]) +\[(?<task>.)\](?:\{(?<attrs>[^{}]+)\})? +/', $line, $matches)
+            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
+        ) {
             $taskMarker = $matches['task'];
 
             return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_TASK,
                 'marker' => $matches['marker'],
-                'content' => $matches['content'],
+                'content' => $content,
                 'checked' => strtolower($taskMarker) === 'x',
                 'taskMarker' => $taskMarker,
-            ], $matches['attrs']);
+            ], $matches['attrs'] ?? '');
         }
 
         // Bullet list: -, +, or *
         // A marker followed by a space (or end of line) is a valid item; a bare
         // marker alone on its line is an empty item (djot allows marker + newline).
-        if (preg_match('/^([-*+])(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+        if (
+            preg_match('/^([-*+])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
+            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
+        ) {
             $marker = $matches[1];
-            $content = $matches[3] ?? '';
 
             return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_BULLET,
@@ -118,26 +124,35 @@ class ListParser
         }
 
         // Ordered list: 1. or 1) or (1) - bare marker (no content) is an empty item.
-        if (preg_match('/^(\d+)([.)])(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+        if (
+            preg_match('/^(\d+)([.)])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
+            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
+        ) {
             return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => $matches[2],
-                'content' => $matches[4] ?? '',
+                'content' => $content,
                 'start' => (int)$matches[1],
             ], $matches[3] ?? '');
         }
 
-        if (preg_match('/^\((\d+)\)(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+        if (
+            preg_match('/^\((\d+)\)(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
+            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
+        ) {
             return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => '()',
-                'content' => $matches[3] ?? '',
+                'content' => $content,
                 'start' => (int)$matches[1],
             ], $matches[2] ?? '');
         }
 
         // Roman numeral ordered list
-        if (preg_match('/^([ivxlcdmIVXLCDM]+)([.)])(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+        if (
+            preg_match('/^([ivxlcdmIVXLCDM]+)([.)])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
+            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
+        ) {
             $roman = $matches[1];
             $isLower = ctype_lower($roman[0]);
             $start = $this->romanToInt(strtoupper($roman));
@@ -145,7 +160,7 @@ class ListParser
                 $result = [
                     'type' => ListBlock::TYPE_ORDERED,
                     'marker' => $matches[2],
-                    'content' => $matches[4] ?? '',
+                    'content' => $content,
                     'start' => $start,
                     'style' => $isLower ? 'i' : 'I',
                 ];
@@ -160,7 +175,10 @@ class ListParser
             }
         }
 
-        if (preg_match('/^\(([ivxlcdmIVXLCDM]+)\)(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+        if (
+            preg_match('/^\(([ivxlcdmIVXLCDM]+)\)(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
+            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
+        ) {
             $roman = $matches[1];
             $isLower = ctype_lower($roman[0]);
             $start = $this->romanToInt(strtoupper($roman));
@@ -168,7 +186,7 @@ class ListParser
                 $result = [
                     'type' => ListBlock::TYPE_ORDERED,
                     'marker' => '()',
-                    'content' => $matches[3] ?? '',
+                    'content' => $content,
                     'start' => $start,
                     'style' => $isLower ? 'i' : 'I',
                 ];
@@ -184,7 +202,10 @@ class ListParser
         }
 
         // Alpha ordered list: a. or A. or a) or A) or (a) or (A)
-        if (preg_match('/^([a-zA-Z])([.)])(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+        if (
+            preg_match('/^([a-zA-Z])([.)])(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
+            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
+        ) {
             $letter = $matches[1];
             $isLower = ctype_lower($letter);
             $start = ord(strtolower($letter)) - ord('a') + 1;
@@ -192,13 +213,16 @@ class ListParser
             return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => $matches[2],
-                'content' => $matches[4] ?? '',
+                'content' => $content,
                 'start' => $start,
                 'style' => $isLower ? 'a' : 'A',
             ], $matches[3] ?? '');
         }
 
-        if (preg_match('/^\(([a-zA-Z])\)(?:\{([^{}]+)\})?(?: +(.*))?$/', $line, $matches)) {
+        if (
+            preg_match('/^\(([a-zA-Z])\)(?:\{([^{}]+)\})?(?: +|$)/', $line, $matches)
+            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
+        ) {
             $letter = $matches[1];
             $isLower = ctype_lower($letter);
             $start = ord(strtolower($letter)) - ord('a') + 1;
@@ -206,22 +230,45 @@ class ListParser
             return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_ORDERED,
                 'marker' => '()',
-                'content' => $matches[3] ?? '',
+                'content' => $content,
                 'start' => $start,
                 'style' => $isLower ? 'a' : 'A',
             ], $matches[2] ?? '');
         }
 
         // Definition list: `: term`, or a bare `:` (empty term and definition)
-        if (preg_match('/^:(?: +(.*))?$/', $line, $matches)) {
+        if (
+            preg_match('/^:(?: +|$)/', $line, $matches)
+            && ($content = $this->restOfLine($line, strlen($matches[0]))) !== null
+        ) {
             return [
                 'type' => ListBlock::TYPE_DEFINITION,
                 'marker' => ':',
-                'content' => $matches[1] ?? '',
+                'content' => $content,
             ];
         }
 
         return null;
+    }
+
+    /**
+     * The text after a marker, as `(.*)$` would capture it, without a regex scan of the rest
+     * of the line (a nested marker walk would otherwise rescan the line once per marker).
+     *
+     * @param string $line
+     * @param int $start
+     *
+     * @return string|null Null where `(.*)$` would not match (a line break before the last byte).
+     */
+    private function restOfLine(string $line, int $start): ?string
+    {
+        $rest = substr($line, $start);
+        $break = strpos($rest, "\n");
+        if ($break === false) {
+            return $rest;
+        }
+
+        return $break === strlen($rest) - 1 ? substr($rest, 0, -1) : null;
     }
 
     private function markerCanStart(string $line): bool

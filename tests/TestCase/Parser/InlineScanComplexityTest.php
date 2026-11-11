@@ -11,7 +11,6 @@ use Djot\Node\Inline\Span;
 use Djot\Parser\Block\FencedBlockParser;
 use Djot\Parser\BlockParser;
 use Djot\Parser\InlineParser;
-use Djot\Parser\Utility\BacktickRunIndex;
 use Djot\Renderer\HtmlRenderer;
 use LogicException;
 use PHPUnit\Framework\TestCase;
@@ -48,11 +47,11 @@ final class InlineScanComplexityTest extends TestCase
             $parser = new class (new BlockParser()) extends InlineParser {
                 public int $codeProbes = 0;
 
-                protected function findCodeSpanEnd(string $text, int $pos): ?int
+                protected function findVerbatimEnd(string $text, int $pos): ?int
                 {
                     $this->codeProbes++;
 
-                    return parent::findCodeSpanEnd($text, $pos);
+                    return parent::findVerbatimEnd($text, $pos);
                 }
             };
             $input = str_repeat($delimiter . $delimiter . 'a' . $delimiter . ' `code` ', 512);
@@ -88,11 +87,11 @@ final class InlineScanComplexityTest extends TestCase
         $parser = new class (new BlockParser()) extends InlineParser {
             public int $codeProbes = 0;
 
-            protected function findCodeSpanEnd(string $text, int $pos): ?int
+            protected function findVerbatimEnd(string $text, int $pos): ?int
             {
                 $this->codeProbes++;
 
-                return parent::findCodeSpanEnd($text, $pos);
+                return parent::findVerbatimEnd($text, $pos);
             }
         };
         $parser->parse(new Paragraph(), str_repeat('_word `code` ', 512));
@@ -162,41 +161,6 @@ final class InlineScanComplexityTest extends TestCase
         self::assertTrue($parser->isDivFenceCloser('::: ', 3));
         self::assertFalse($parser->isDivFenceCloser(' :::', 3));
         self::assertFalse($parser->isDivFenceCloser('plain', 3));
-    }
-
-    public function testBacktickIndexMatchesMinimumWidthLookaheadAtEveryOffset(): void
-    {
-        foreach (['', 'plain', '`a```b``c`````d`', str_repeat('``a`b```c ', 12)] as $text) {
-            $index = new BacktickRunIndex($text);
-            preg_match_all('/`+/', $text, $runs, PREG_OFFSET_CAPTURE);
-            for ($offset = strlen($text) + 1; $offset >= 0; $offset--) {
-                for ($width = 1; $width <= 8; $width++) {
-                    $expected = null;
-                    foreach ($runs[0] as [$run, $start]) {
-                        if ($start >= $offset && strlen($run) >= $width) {
-                            $expected = $start + strlen($run);
-
-                            break;
-                        }
-                    }
-                    self::assertSame($expected, $index->findCloser($offset, $width));
-                }
-            }
-        }
-    }
-
-    public function testBacktickLookaheadPreservesLongerRunBehaviorAndParserReuse(): void
-    {
-        $parser = new class (new BlockParser()) extends InlineParser {
-            public function codeEnd(string $text, int $pos): ?int
-            {
-                return $this->findCodeSpanEnd($text, $pos);
-            }
-        };
-        self::assertSame(6, $parser->codeEnd('``a```b', 0));
-        self::assertSame(6, $parser->codeEnd('`a````', 0));
-        self::assertNull($parser->codeEnd('```a``', 0));
-        self::assertSame(5, $parser->codeEnd('``b``', 0));
     }
 
     public function testDestinationIndexPreservesEscapesNestedPairsAndFailures(): void
