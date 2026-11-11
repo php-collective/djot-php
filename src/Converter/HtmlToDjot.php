@@ -35,6 +35,30 @@ use RuntimeException;
  */
 class HtmlToDjot
 {
+    /**
+     * Nesting depth past which imported HTML is flattened to text, well below libxml's limit of 256.
+     *
+     * @var int
+     */
+    protected const MAX_HTML_DEPTH = 128;
+
+    /**
+     * @var array<string>
+     */
+    protected const VOID_ELEMENTS = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'];
+
+    /**
+     * Elements whose dropped tags become a space, so flattened words stay apart.
+     *
+     * @var array<string>
+     */
+    protected const FLATTEN_BREAK_ELEMENTS = [
+        'address', 'article', 'aside', 'blockquote', 'br', 'dd', 'div', 'dl', 'dt', 'figcaption',
+        'figure', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr',
+        'li', 'main', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'td', 'th',
+        'tr', 'ul',
+    ];
+
     protected int $inlineQuoteDepth = 0;
 
     /**
@@ -118,19 +142,12 @@ class HtmlToDjot
             $html = '<div>' . $html . '</div>';
         }
 
-        // Load HTML
-        $doc = new DOMDocument();
-        $doc->encoding = 'UTF-8';
-
-        // Suppress warnings for malformed HTML
-        libxml_use_internal_errors(true);
-        $doc->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
+        $doc = $this->loadHtml('<?xml encoding="UTF-8">', $html, '');
 
         // Extract abbreviation definitions from template element (round-trip support)
         $this->extractAbbreviationDefinitions($doc);
 
-        $djot = $this->processNode($doc->documentElement ?? $doc);
+        $djot = $this->processNode($doc);
 
         // Prepend abbreviation definitions at the start
         if ($this->abbreviationDefinitions !== []) {
@@ -162,6 +179,98 @@ class HtmlToDjot
         $djot = $this->cleanup($djot);
 
         return $djot;
+    }
+
+    /**
+     * Parse HTML without losing content past libxml's nesting limit.
+     *
+     * libxml stops at depth 256 and drops the rest of the document. When that
+     * happens the markup is parsed again with elements past MAX_HTML_DEPTH
+     * flattened to their text, and as a last resort with every tag removed.
+     */
+    protected function loadHtml(string $prefix, string $html, string $suffix): DOMDocument
+    {
+        $doc = $this->parseHtml($prefix . $html . $suffix, $tooDeep);
+        foreach ([self::MAX_HTML_DEPTH, 0] as $depth) {
+            if (!$tooDeep) {
+                break;
+            }
+            $doc = $this->parseHtml($prefix . $this->flattenDeepHtml($html, $depth) . $suffix, $tooDeep);
+        }
+
+        return $doc;
+    }
+
+    protected function parseHtml(string $markup, ?bool &$tooDeep): DOMDocument
+    {
+        $doc = new DOMDocument();
+        $doc->encoding = 'UTF-8';
+
+        // Suppress warnings for malformed HTML
+        libxml_use_internal_errors(true);
+        libxml_clear_errors();
+        $doc->loadHTML($markup, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+
+        $tooDeep = false;
+        foreach (libxml_get_errors() as $error) {
+            if ($error->level === LIBXML_ERR_FATAL && stripos($error->message, 'depth') !== false) {
+                $tooDeep = true;
+
+                break;
+            }
+        }
+        libxml_clear_errors();
+
+        return $doc;
+    }
+
+    /**
+     * Drop the tags of elements nested deeper than $maxDepth, keeping their text.
+     */
+    protected function flattenDeepHtml(string $html, int $maxDepth): string
+    {
+        $stack = [];
+
+        return preg_replace_callback(
+            '/<!--.*?(?:-->|$)|<[!?][^>]*>'
+            . '|<(script|style|textarea|title|xmp)\b(?:[^>"\']|"[^"]*"|\'[^\']*\')*>(.*?)<\/\1\s*>'
+            . '|<(\/?)([a-zA-Z][^\s\/>]*)((?:[^>"\']|"[^"]*"|\'[^\']*\')*)>/is',
+            function (array $match) use (&$stack, $maxDepth): string {
+                $tooDeep = count($stack) >= $maxDepth;
+                if (($match[1] ?? '') !== '') {
+                    if (!$tooDeep) {
+                        return $match[0];
+                    }
+
+                    return in_array(strtolower($match[1]), ['script', 'style'], true) ? '' : $match[2];
+                }
+                if (!isset($match[4])) {
+                    return $match[0];
+                }
+
+                $name = strtolower($match[4]);
+                $separator = in_array($name, self::FLATTEN_BREAK_ELEMENTS, true) ? ' ' : '';
+                if ($match[3] === '/') {
+                    for ($i = count($stack) - 1; $i >= 0; $i--) {
+                        if ($stack[$i][0] === $name) {
+                            $dropped = $stack[$i][1];
+                            array_splice($stack, $i);
+
+                            return $dropped ? $separator : $match[0];
+                        }
+                    }
+
+                    return $match[0];
+                }
+
+                if (!in_array($name, self::VOID_ELEMENTS, true) && !str_ends_with($match[5], '/')) {
+                    $stack[] = [$name, $tooDeep];
+                }
+
+                return $tooDeep ? $separator : $match[0];
+            },
+            $html,
+        ) ?? strip_tags($html);
     }
 
     /**
@@ -386,7 +495,10 @@ class HtmlToDjot
             $content .= $inlineText . "\n\n";
         }
 
-        return trim($content);
+        $content = trim($content);
+
+        // Keep the block boundary so a following sibling is not glued on.
+        return $content === '' ? '' : $content . "\n\n";
     }
 
     /**
@@ -2345,12 +2457,7 @@ class HtmlToDjot
         $converter = new self($this->trustedRoundTrip);
         $converter->preserveTextWhitespace = true;
 
-        $doc = new DOMDocument();
-        $doc->encoding = 'UTF-8';
-
-        libxml_use_internal_errors(true);
-        $doc->loadHTML('<?xml encoding="UTF-8"><span>' . $html . '</span>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
+        $doc = $this->loadHtml('<?xml encoding="UTF-8"><span>', $html, '</span>');
 
         $root = $doc->documentElement;
         if (!$root instanceof DOMElement) {

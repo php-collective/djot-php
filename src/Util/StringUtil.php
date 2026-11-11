@@ -63,4 +63,16 @@ final class StringUtil
 
         return trim($collapsed, " \t\r\n");
     }
+
+    /**
+     * Remove terminal control characters from document text.
+     *
+     * Strips C0 controls except tab and newline, DEL, and C1 controls
+     * (U+0080 to U+009F), so rendered text cannot carry escape sequences
+     * to a terminal. Works on bytes, so invalid UTF-8 input is safe.
+     */
+    public static function stripControlCharacters(string $text): string
+    {
+        return preg_replace('/[\x00-\x08\x0B-\x1F\x7F]|\xC2[\x80-\x9F]/', '', $text) ?? $text;
+    }
 }

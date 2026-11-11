@@ -385,17 +385,10 @@ class MarkdownToDjot
             return '$`' . $match[1] . '`';
         }, $line) ?? $line;
 
-        // Restore strong placeholders
-        foreach ($strongPlaceholders as $placeholder => $content) {
-            $line = str_replace($placeholder, $content, $line);
-        }
+        // One pass each: a str_replace per placeholder rescans the line every time.
+        $line = strtr($line, $strongPlaceholders);
 
-        // Restore protected content
-        foreach ($protected as $placeholder => $content) {
-            $line = str_replace($placeholder, $content, $line);
-        }
-
-        return $line;
+        return strtr($line, $protected);
     }
 
     protected function rawHtmlInline(string $html): string

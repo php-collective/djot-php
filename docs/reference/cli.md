@@ -52,6 +52,12 @@ Enable safe mode for untrusted content:
 ./vendor/bin/djot convert document.djot --safe=strict
 ```
 
+Safe mode applies to HTML output. The `ansi`, `text` and `markdown` formats
+always remove terminal control characters from the document text: C0 controls
+other than tab and newline, DEL, and C1 controls (U+0080 to U+009F). A document
+cannot set the window title, emit hyperlinks or clear the screen through them.
+The ANSI renderer's own styling escapes are unaffected.
+
 ### Section Wrapping
 
 Disable document heading section wrappers in HTML output:

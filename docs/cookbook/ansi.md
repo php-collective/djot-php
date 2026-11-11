@@ -420,6 +420,10 @@ The AnsiRenderer supports all Djot elements:
 | Thematic breaks | Horizontal line |
 | Footnotes | Cyan markers |
 
+Control characters in the document text (C0 except tab and newline, DEL, and
+C1) are removed before output, so untrusted input cannot inject its own escape
+sequences. Only the renderer's styling escapes reach the terminal.
+
 ## ANSI Code Reference
 
 Available constants in AnsiRenderer:

@@ -41,6 +41,7 @@ use Djot\Node\Inline\Symbol;
 use Djot\Node\Inline\Text;
 use Djot\Node\Node;
 use Djot\Renderer\Utility\EventDispatcherTrait;
+use Djot\Util\StringUtil;
 use Djot\Util\UrlSafety;
 
 /**
@@ -93,7 +94,7 @@ class PlainTextRenderer implements RendererInterface
 
     public function render(Document $document): string
     {
-        $text = $this->renderChildren($document);
+        $text = StringUtil::stripControlCharacters($this->renderChildren($document));
 
         // Normalize multiple blank lines to single
         $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
