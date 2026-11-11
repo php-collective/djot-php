@@ -9,6 +9,7 @@ use Djot\Node\Block\Heading;
 use Djot\Node\Inline\Code;
 use Djot\Node\Inline\FootnoteRef;
 use Djot\Node\Inline\HardBreak;
+use Djot\Node\Inline\Image;
 use Djot\Node\Inline\Math;
 use Djot\Node\Inline\SoftBreak;
 use Djot\Node\Inline\Symbol;
@@ -120,8 +121,9 @@ class HeadingIdTracker
      */
     public function reserveExplicitIds(Node $node): void
     {
-        if ($node->hasAttribute('id')) {
-            $this->trackId((string)$node->getAttribute('id'));
+        $id = $node->getFoldedAttribute('id');
+        if ($id !== null) {
+            $this->trackId($id);
         }
 
         foreach ($node->getChildren() as $child) {
@@ -239,7 +241,7 @@ class HeadingIdTracker
      * from auto-generated heading identifiers are skipped: symbols (`:name:`)
      * and footnote references (`[^label]`). See jgm/djot#393. Otherwise the
      * full human-readable text is returned (e.g. for TOC labels), with
-     * symbols rendered as `:name:`.
+     * symbols rendered as `:name:`. Image alt text counts for the id only.
      */
     protected function extractPlainText(Node $node, bool $forId = false): string
     {
@@ -258,6 +260,11 @@ class HeadingIdTracker
             } elseif ($child instanceof Symbol) {
                 if (!$forId) {
                     $text .= ':' . $child->getName() . ':';
+                }
+            } elseif ($child instanceof Image) {
+                // djot.js takes an image's alt text into the id.
+                if ($forId) {
+                    $text .= $child->getAlt();
                 }
             } elseif ($child instanceof Node) {
                 $text .= $this->extractPlainText($child, $forId);
@@ -284,9 +291,9 @@ class HeadingIdTracker
     protected function generateId(Heading $node): string
     {
         // If heading has explicit id attribute, use it
-        if ($node->hasAttribute('id')) {
-            $idAttr = $node->getAttribute('id');
-            $id = $idAttr ?? '';
+        $idAttr = $node->getFoldedAttribute('id');
+        if ($idAttr !== null) {
+            $id = $idAttr;
             // Track explicit IDs so auto-generated IDs don't conflict
             if (!isset($this->usedIds[$id])) {
                 $this->usedIds[$id] = 0;

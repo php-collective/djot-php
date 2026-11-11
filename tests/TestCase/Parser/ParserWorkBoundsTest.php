@@ -83,7 +83,7 @@ final class ParserWorkBoundsTest extends TestCase
 
         return [
             'double-quoted escapes' => ['[x]{k="' . $escaped . '"}', '<span k="' . str_repeat('a&quot;', 5000) . '">x</span>'],
-            'single-quoted escapes' => ["[x]{k='" . str_repeat("a\\'", 5000) . "'}", '<span k="' . str_repeat('a&apos;', 5000) . '">x</span>'],
+            'single-quoted escapes' => ["[x]{k='" . str_repeat("a\\'", 5000) . "'}", '<span k="' . str_repeat("a'", 5000) . '">x</span>'],
             'many class tokens' => ['[x]{' . str_repeat('.a ', 20000) . '}', '<span class="a">x</span>'],
         ];
     }

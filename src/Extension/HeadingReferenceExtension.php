@@ -189,7 +189,7 @@ class HeadingReferenceExtension implements ResettableExtensionInterface, BeforeR
      */
     protected function escapeAttribute(string $text): string
     {
-        $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $escaped = htmlspecialchars($text, ENT_COMPAT | ENT_HTML5, 'UTF-8');
 
         return str_replace("\u{E000}", '&nbsp;', $escaped);
     }
@@ -201,13 +201,14 @@ class HeadingReferenceExtension implements ResettableExtensionInterface, BeforeR
             $displayText = $data['displayText'];
             $normalizedTarget = $this->normalizeQuotes($target);
             $count = $this->headingTargetCounts[$normalizedTarget] ?? 0;
+            // The random placeholder alone identifies the link: the renderer may
+            // blank a scheme-like data-heading-ref value.
             $quotedPlaceholder = preg_quote($this->escapeAttribute($placeholder), '/');
-            $quotedTarget = preg_quote($this->escapeAttribute($target), '/');
             $quotedDisplayText = preg_quote($this->escape($displayText), '/');
 
             if ($count === 1 && isset($this->headingTargets[$normalizedTarget])) {
                 $html = (string)preg_replace_callback(
-                    '/<a\b(?=[^>]*\bhref="' . $quotedPlaceholder . '")(?=[^>]*\bdata-heading-ref="' . $quotedTarget . '")(?P<before>[^>]*)\bhref="' . $quotedPlaceholder . '"(?P<after>[^>]*)>'
+                    '/<a\b(?P<before>[^>]*)\bhref="' . $quotedPlaceholder . '"(?P<after>[^>]*)>'
                     . $quotedDisplayText
                     . '<\/a>/u',
                     function (array $matches) use ($target, $displayText, $normalizedTarget): string {
@@ -244,7 +245,7 @@ class HeadingReferenceExtension implements ResettableExtensionInterface, BeforeR
 
             $pattern = '/<a\b[^>]*href="'
                 . $quotedPlaceholder
-                . '"(?=[^>]*\bdata-heading-ref="' . $quotedTarget . '")[^>]*>'
+                . '"[^>]*>'
                 . $quotedDisplayText
                 . '<\/a>/u';
             $html = (string)preg_replace(

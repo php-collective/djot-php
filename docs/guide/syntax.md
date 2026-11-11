@@ -1393,6 +1393,14 @@ reference.
 Place `{...}` on the line immediately before its block. A blank line discards
 the attributes. Whitespace inside the braces is allowed, including an empty `{ }`.
 
+In HTML output every attribute value is double-quoted: `"` is written as
+`&quot;` and `'` stays literal, as in djot.js. Attribute names compare
+case-insensitively, so a name is written once per element, at its first
+position and spelling, with the last value given: `[x]{id=a ID=b}` renders
+`<span id="b">`, and classes join. A value the element sets itself (a link's
+`href`, an image's `src` and `alt`, an ordered list's `start`) wins over an
+authored attribute of the same name.
+
 **Input:**
 ```djot
 {.highlight #intro}

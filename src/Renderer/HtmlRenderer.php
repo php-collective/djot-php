@@ -437,7 +437,7 @@ class HtmlRenderer implements RendererInterface
 
                 // Check if heading has explicit ID (for round-trip support)
                 $explicitIdAttr = '';
-                if ($this->roundTripMode && $child->hasAttribute('id')) {
+                if ($this->roundTripMode && $child->getFoldedAttribute('id') !== null) {
                     $explicitIdAttr = ' data-djot-explicit-id="1"';
                 }
 
@@ -520,9 +520,8 @@ class HtmlRenderer implements RendererInterface
      */
     protected function trackIdFromNode(Node $node): void
     {
-        if ($node->hasAttribute('id')) {
-            $idAttr = $node->getAttribute('id');
-            $id = $idAttr ?? '';
+        $id = $node->getFoldedAttribute('id');
+        if ($id !== null) {
             $this->getRenderContext()->headingIdTracker->trackId($id);
         }
 
@@ -623,7 +622,7 @@ class HtmlRenderer implements RendererInterface
 
         // Add data attribute for explicit ID round-trip support
         $explicitIdAttr = '';
-        if ($this->roundTripMode && $node->hasAttribute('id')) {
+        if ($this->roundTripMode && $node->getFoldedAttribute('id') !== null) {
             $explicitIdAttr = ' data-djot-explicit-id="1"';
         }
 
@@ -784,8 +783,15 @@ class HtmlRenderer implements RendererInterface
             }
             // Preserve marker for round-trip (only if non-default and round-trip mode enabled)
             if ($this->roundTripMode && $marker !== null && $marker !== '.') {
-                $olAttrs .= ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
+                $olAttrs .= ' data-marker="' . htmlspecialchars($marker, ENT_COMPAT | ENT_HTML5, 'UTF-8') . '"';
             }
+
+            $derived = array_merge($start !== 1 ? ['start'] : [], $style !== null ? ['type'] : []);
+            $attrs = array_filter(
+                $attrs,
+                static fn (string|int $key): bool => !in_array(strtolower((string)$key), $derived, true),
+                ARRAY_FILTER_USE_KEY,
+            );
 
             return '<ol' . $olAttrs . $this->renderAttributeArray($attrs) . ">\n" . $html . "</ol>\n";
         }
@@ -798,7 +804,7 @@ class HtmlRenderer implements RendererInterface
         $marker = $node->getMarker();
         $markerAttr = '';
         if ($this->roundTripMode && $marker !== null && $marker !== '-') {
-            $markerAttr = ' data-marker="' . htmlspecialchars($marker, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
+            $markerAttr = ' data-marker="' . htmlspecialchars($marker, ENT_COMPAT | ENT_HTML5, 'UTF-8') . '"';
         }
 
         return '<ul' . $markerAttr . $this->renderAttributeArray($attrs) . ">\n" . $html . "</ul>\n";
@@ -824,7 +830,7 @@ class HtmlRenderer implements RendererInterface
             $checked = $node->getChecked() ? ' checked=""' : '';
             // Always use xhtml-style format for task list checkboxes
             $checkbox = '<input disabled="" type="checkbox"' . $checked . "/>\n";
-            $content = $checkbox . rtrim($content);
+            $content = rtrim($checkbox . $content);
         } else {
             $content = rtrim($content);
         }
@@ -843,7 +849,7 @@ class HtmlRenderer implements RendererInterface
         $attrs = $this->renderAttributes($node);
         // Preserve character for round-trip (only if non-default and round-trip mode enabled)
         if ($this->roundTripMode && $node->char !== '-') {
-            $attrs .= ' data-char="' . htmlspecialchars($node->char, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
+            $attrs .= ' data-char="' . htmlspecialchars($node->char, ENT_COMPAT | ENT_HTML5, 'UTF-8') . '"';
         }
 
         return $this->xhtml ? '<hr' . $attrs . " />\n" : '<hr' . $attrs . ">\n";
@@ -901,7 +907,7 @@ class HtmlRenderer implements RendererInterface
         // Add round-trip separator widths attribute if available and in round-trip mode
         if ($this->roundTripMode && $node->getSeparatorWidths() !== null) {
             $widths = implode(',', $node->getSeparatorWidths());
-            $attrs .= ' data-djot-col-widths="' . htmlspecialchars($widths, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '"';
+            $attrs .= ' data-djot-col-widths="' . htmlspecialchars($widths, ENT_COMPAT | ENT_HTML5, 'UTF-8') . '"';
         }
 
         $html = '<table' . $attrs . ">\n";
@@ -938,12 +944,12 @@ class HtmlRenderer implements RendererInterface
 
         $rowspan = $node->getRowspan();
         if ($rowspan > 1) {
-            $attrs['rowspan'] = (string)$rowspan;
+            $attrs[$this->attributeKey($attrs, 'rowspan') ?? 'rowspan'] = (string)$rowspan;
         }
 
         $colspan = $node->getColspan();
         if ($colspan > 1) {
-            $attrs['colspan'] = (string)$colspan;
+            $attrs[$this->attributeKey($attrs, 'colspan') ?? 'colspan'] = (string)$colspan;
         }
 
         $alignment = $node->getAlignment();
@@ -975,9 +981,13 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderLink(Link $node): string
     {
-        $attrs = $this->renderAttributes($node);
         $href = $node->getDestination();
         $title = $node->getTitle();
+        // A value the element derives wins over an authored copy of that name.
+        $attrs = $this->renderAttributesExcluding($node, array_merge(
+            $href !== null ? ['href'] : [],
+            $title !== null ? ['title'] : [],
+        ));
 
         // Always-on URL hardening (dangerous scheme denylist), then safe mode
         // may apply a stricter allowlist on top.
@@ -1018,10 +1028,10 @@ class HtmlRenderer implements RendererInterface
 
     protected function renderImage(Image $node): string
     {
-        $attrs = $this->renderAttributes($node);
         $alt = $this->escapeAttribute($node->getAlt());
         $src = $node->getSource();
         $title = $node->getTitle();
+        $attrs = $this->renderAttributesExcluding($node, $title !== null ? ['alt', 'src', 'title'] : ['alt', 'src']);
 
         // Always-on URL hardening (dangerous scheme denylist), then safe mode
         // may apply a stricter allowlist on top.
@@ -1148,8 +1158,14 @@ class HtmlRenderer implements RendererInterface
             return [];
         }
 
+        $attrs = $this->foldAttributeNames($attrs);
         if ($exclude !== []) {
-            $attrs = array_diff_key($attrs, array_flip($exclude));
+            $exclude = array_map('strtolower', $exclude);
+            $attrs = array_filter(
+                $attrs,
+                static fn (string|int $key): bool => !in_array(strtolower((string)$key), $exclude, true),
+                ARRAY_FILTER_USE_KEY,
+            );
         }
 
         // Always-on hardening: strip event handlers / injection sinks and
@@ -1288,19 +1304,20 @@ class HtmlRenderer implements RendererInterface
             return $attrs;
         }
 
+        $key = $this->attributeKey($attrs, $key) ?? $key;
         if (!isset($attrs[$key]) || $attrs[$key] === '') {
             $attrs[$key] = $value;
 
             return $attrs;
         }
 
-        if ($key === 'class') {
+        if (strtolower($key) === 'class') {
             $attrs[$key] .= ' ' . $value;
 
             return $attrs;
         }
 
-        if ($key === 'style') {
+        if (strtolower($key) === 'style') {
             $existing = rtrim($attrs[$key]);
             if ($existing !== '' && !str_ends_with($existing, ';')) {
                 $existing .= ';';
@@ -1334,10 +1351,55 @@ class HtmlRenderer implements RendererInterface
     public function escapeAttribute(string $text): string
     {
         // ENT_QUOTES: Escape both single and double quotes for attribute values
-        $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $escaped = htmlspecialchars($text, ENT_COMPAT | ENT_HTML5, 'UTF-8');
 
         // Convert escaped space placeholder (U+E000) to &nbsp; entity
         return str_replace("\u{E000}", '&nbsp;', $escaped);
+    }
+
+    /**
+     * HTML attribute names compare case-insensitively: write each name once, at
+     * its first position and spelling, with the last value; classes join.
+     *
+     * @param array<string, string> $attrs
+     *
+     * @return array<string, string>
+     */
+    protected function foldAttributeNames(array $attrs): array
+    {
+        $first = [];
+        $out = [];
+        foreach ($attrs as $key => $value) {
+            $key = (string)$key;
+            $name = strtolower($key);
+            if (!isset($first[$name])) {
+                $first[$name] = $key;
+                $out[$key] = $value;
+
+                continue;
+            }
+            $slot = $first[$name];
+            $out[$slot] = $name === 'class' ? trim($out[$slot] . ' ' . $value) : $value;
+        }
+
+        return $out;
+    }
+
+    /**
+     * The key holding `$name` in an attribute array, whatever its case.
+     *
+     * @param array<string, string> $attrs
+     * @param string $name
+     */
+    protected function attributeKey(array $attrs, string $name): ?string
+    {
+        foreach (array_keys($attrs) as $key) {
+            if (strtolower((string)$key) === $name) {
+                return (string)$key;
+            }
+        }
+
+        return null;
     }
 
     protected function renderRawBlock(RawBlock $node): string
@@ -1614,10 +1676,13 @@ class HtmlRenderer implements RendererInterface
 
         $attrs = $this->getRenderableAttributes($node);
         $class = 'math ' . ($node->isDisplay() ? 'display' : 'inline');
-        if (isset($attrs['class']) && $attrs['class'] !== '') {
-            $class .= ' ' . $attrs['class'];
+        $classKey = $this->attributeKey($attrs, 'class');
+        if ($classKey !== null && $attrs[$classKey] !== '') {
+            $class .= ' ' . $attrs[$classKey];
         }
-        unset($attrs['class']);
+        if ($classKey !== null) {
+            unset($attrs[$classKey]);
+        }
         $attributes = $this->renderAttributeArray(['class' => $class] + $attrs);
         $open = $node->isDisplay() ? '\\[' : '\\(';
         $close = $node->isDisplay() ? '\\]' : '\\)';
