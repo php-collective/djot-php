@@ -95,9 +95,17 @@ class InlineParityTest extends TestCase
                 "x --}\n",
                 "<p>x --}</p>\n",
             ],
+            'F16 longer dash run before a closing brace' => [
+                "a----}\n",
+                "<p>a—-}</p>\n",
+            ],
             'F25 comment-only attribute with a blank' => [
                 "{ %}\npara\n",
                 "<p>para</p>\n",
+            ],
+            'F25 comment-only attribute with blanks around it' => [
+                "{ % }\n",
+                '',
             ],
             'F25 empty highlight' => [
                 "{==}\n",
@@ -115,9 +123,21 @@ class InlineParityTest extends TestCase
                 "x `y \n",
                 "<p>x <code>y</code></p>\n",
             ],
+            'F25 unclosed double verbatim trailing spaces' => [
+                "x ``y  \n",
+                "<p>x <code>y</code></p>\n",
+            ],
             'F25 unclosed math trailing space' => [
                 "x \$`y \n",
                 "<p>x <span class=\"math inline\">\\(y\\)</span></p>\n",
+            ],
+            'F25 unclosed display math trailing space' => [
+                "x \$\$`y \n",
+                "<p>x <span class=\"math display\">\\[y\\]</span></p>\n",
+            ],
+            'F25 unclosed fence in a definition keeps two blank lines' => [
+                ": ```\n\n\n",
+                "<dl>\n<dt></dt>\n<dd>\n<pre><code>\n\n</code></pre>\n</dd>\n</dl>\n",
             ],
             'F25 unclosed fence in a definition keeps a blank line' => [
                 ": ```\n\n",
@@ -130,6 +150,10 @@ class InlineParityTest extends TestCase
             'F25 empty reference label is not used' => [
                 "[][]\n\n[]: /u\n",
                 "<p><a></a></p>\n",
+            ],
+            'F25 empty reference label is not used inside text' => [
+                "x [][] y\n\n[]: /u\n",
+                "<p>x <a></a> y</p>\n",
             ],
         ];
     }
