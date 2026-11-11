@@ -20,6 +20,20 @@ class DivFenceOpenerTest extends TestCase
         $this->assertSame($expected, (new DjotConverter())->convert($djot));
     }
 
+    public function testInvalidOpenerDoesNotInterruptParagraph(): void
+    {
+        $converter = new DjotConverter(blocksInterruptParagraphs: true);
+
+        $this->assertSame(
+            "<p>before\n::: warning extra\nafter</p>\n",
+            $converter->convert("before\n::: warning extra\nafter"),
+        );
+        $this->assertSame(
+            "<p>before</p>\n<div class=\"warning\">\n<p>after</p>\n</div>\n",
+            $converter->convert("before\n::: warning\nafter"),
+        );
+    }
+
     /**
      * @return array<string, array{string, string}>
      */
