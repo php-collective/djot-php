@@ -1835,6 +1835,25 @@ class InlineParser
         return null;
     }
 
+    /**
+     * The UTF-8 character starting at byte $pos, or '' at the end or on an invalid sequence.
+     * Matching a `/u` regex at an offset into the whole text validates all of it on every
+     * call, which made quote-heavy paragraphs superlinear.
+     */
+    private function charAt(string $text, int $pos): string
+    {
+        if (!isset($text[$pos])) {
+            return '';
+        }
+        $lead = ord($text[$pos]);
+        if ($lead < 0x80) {
+            return $text[$pos];
+        }
+        $char = substr($text, $pos, $lead >= 0xF0 ? 4 : ($lead >= 0xE0 ? 3 : 2));
+
+        return preg_match('/^.\z/us', $char) === 1 ? $char : '';
+    }
+
     protected function emitSmartQuote(
         Node $parent,
         string &$buffer,
@@ -1853,8 +1872,7 @@ class InlineParser
         if ($this->lastQuoteEnd === $this->textOrigin + $pos) {
             $prev = $this->lastQuoteContext;
         }
-        preg_match('/\G./us', $text, $match, 0, $pos + 1);
-        $next = $match[0] ?? '';
+        $next = $this->charAt($text, $pos + 1);
         $space = static fn (string $c): bool => $c !== '' && str_contains(" \t\n\r\u{00A0}", $c);
         $alnum = static fn (string $c): bool => preg_match('/^[\p{L}\p{N}]$/u', $c) === 1;
         $opening = $prev === '' || $space($prev) || str_contains('([{-–—/=:', $prev)
@@ -1872,11 +1890,18 @@ class InlineParser
         if ($quote === "'") {
             $apostrophe = $forced === null && (ctype_digit($next) || (!$opening && $alnum($next)));
             if ($opening && $forced === null && $alnum($next)) {
-                preg_match('/\G\p{L}+/u', $text, $wordMatch, 0, $pos + 1);
-                $word = $wordMatch[0] ?? '';
-                $end = $pos + 1 + strlen($word);
-                preg_match('/\G./us', $text, $afterMatch, 0, min(strlen($text), $end + 1));
-                $quoted = ($text[$end] ?? '') === "'" && !$alnum($afterMatch[0] ?? '');
+                // Seven letters are enough: every elision word below is shorter.
+                $word = '';
+                $end = $pos + 1;
+                for ($letters = 0; $letters < 7; $letters++) {
+                    $char = $this->charAt($text, $end);
+                    if (preg_match('/^\p{L}$/u', $char) !== 1) {
+                        break;
+                    }
+                    $word .= $char;
+                    $end += strlen($char);
+                }
+                $quoted = ($text[$end] ?? '') === "'" && !$alnum($this->charAt($text, $end + 1));
                 $elision = in_array(strtolower($word), [
                     'tis', 'tisn', 'twas', 'twasn', 'twere', 'twill', 'twould',
                     'em', 'cause', 'til', 'n', 'bout',
@@ -2349,32 +2374,6 @@ class InlineParser
         }
 
         return null;
-    }
-
-    /**
-     * Find the end of a code span starting at $pos
-     *
-     * @return int|null Position after the closing backticks, or null if not found
-     */
-    protected function findCodeSpanEnd(string $text, int $pos): ?int
-    {
-        $width = strspn($text, '`', $pos);
-        if ($width === 0) {
-            return null;
-        }
-        $contentStart = $pos + $width;
-        if ($width === 1) {
-            $start = strpos($text, '`', $contentStart);
-
-            return $start === false ? null : $start + strspn($text, '`', $start);
-        }
-        if ($this->backtickScanText !== $text || $this->backtickRuns === null) {
-            $this->backtickScanText = $text;
-            $this->backtickRuns = new BacktickRunIndex($text);
-        }
-
-        // Preserve the lookahead's minimum-width rule for longer closing runs.
-        return $this->backtickRuns->findCloser($contentStart, $width);
     }
 
     /**
