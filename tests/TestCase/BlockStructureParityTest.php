@@ -133,6 +133,22 @@ class BlockStructureParityTest extends TestCase
                 ":::\n- i\n\n  para\n```\n:::\n```\n:::\n",
                 "<div>\n<ul>\n<li>\n<p>i</p>\n<p>para</p>\n</li>\n</ul>\n<pre><code>:::\n</code></pre>\n</div>\n",
             ],
+            'a fence after a quote that follows a list item still hides the closer' => [
+                ":::\n- a\n> q\n  ```\n:::\n  ```\n:::\n",
+                "<div>\n<ul>\n<li>\na\n</li>\n</ul>\n<blockquote>\n<p>q</p>\n</blockquote>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'an attribute line after a list item still lets a fence hide the closer' => [
+                ":::\n1. c\n  - b\n{.c}\n  ```\n```\n:::\n",
+                "<div>\n<ol>\n<li>\nc\n- b\n</li>\n</ol>\n<pre class=\"c\"><code></code></pre>\n</div>\n",
+            ],
+            'closing pipe inside an open code span ends the table' => [
+                "| a |\n| `a |\n",
+                "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| <code>a |</code></p>\n",
+            ],
+            'closing pipe inside an open code span on an indented row ends the table' => [
+                "| a |\n | `a |\n",
+                "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| <code>a |</code></p>\n",
+            ],
             'escaped closing pipe ends the table' => [
                 "| a |\n| b \\|\n",
                 "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| b |</p>\n",

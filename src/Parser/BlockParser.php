@@ -2201,8 +2201,11 @@ class BlockParser
         // A paragraph inside a list item or quote ends at a block line outside that container.
         if (
             !$wasInBlock && $state['paragraphOpen']
-            && ($scan['quoteParagraph'] || ($innermostItem !== null && $indent <= $innermostItem))
-            && $this->fencedBlockParser->parseCodeFenceOpener($trimmed) !== null
+            && (
+                ($scan['quoteParagraph'] && !str_starts_with($trimmed, '>'))
+                || ($innermostItem !== null && $indent <= $innermostItem)
+            )
+            && ($this->isBlockElementStart($trimmed) || $this->isSingleLineBlock($trimmed))
         ) {
             $state['paragraphOpen'] = false;
         }
@@ -3829,9 +3832,16 @@ class BlockParser
 
             // Trailing whitespace after the closing pipe is insignificant
             // (parity with carve-js / carve-rs). An escaped closing pipe ends no row.
+            if (!preg_match('/^\|.*\|[ \t]*$/', $lineWithoutRowAttrs)) {
+                break;
+            }
+            // Later rows follow the first row's rules: no escaped closing pipe, none inside a code span.
             if (
-                !preg_match('/^\|.*\|[ \t]*$/', $lineWithoutRowAttrs)
-                || str_ends_with(rtrim($lineWithoutRowAttrs, " \t"), '\\|')
+                $i > $start && !$this->tableParser->isTableRow($currentLine)
+                && !(
+                    $this->tableParser->isPotentialTableRowWithUnclosedCodeSpan($currentLine)
+                    && $this->canCloseCodeSpanWithContinuations($lines, $i, $count)
+                )
             ) {
                 break;
             }
