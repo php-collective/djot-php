@@ -660,7 +660,7 @@ class TableParser
 
         // Fast path: no backticks means no code spans to worry about
         if (!str_contains($line, '`')) {
-            return $line[$length - 1] === '|';
+            return $line[$length - 1] === '|' && ($line[$length - 2] ?? '') !== '\\';
         }
 
         $inCode = false;
@@ -706,7 +706,23 @@ class TableParser
             }
         }
 
-        // The line ends with | outside code span if the last | is at the end
-        return $lastPipeOutsideCode === $length - 1;
+        // The line ends with | outside code span if the last | is at the end and not escaped
+        return $lastPipeOutsideCode === $length - 1 && ($line[$length - 2] ?? '') !== '\\';
+    }
+
+    /**
+     * Trim a cell's content, keeping a space that a backslash escapes (`| C:\\ |`).
+     *
+     * @param string $content
+     */
+    public function trimCellContent(string $content): string
+    {
+        $trimmed = rtrim($content, " \t");
+        $backslashes = strlen($trimmed) - strlen(rtrim($trimmed, '\\'));
+        if ($backslashes % 2 === 1 && strlen($trimmed) < strlen($content)) {
+            $trimmed .= $content[strlen($trimmed)];
+        }
+
+        return ltrim($trimmed, " \t");
     }
 }
