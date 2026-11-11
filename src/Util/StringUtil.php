@@ -69,10 +69,15 @@ final class StringUtil
      *
      * Strips C0 controls except tab and newline, DEL, and C1 controls
      * (U+0080 to U+009F), so rendered text cannot carry escape sequences
-     * to a terminal. Works on bytes, so invalid UTF-8 input is safe.
+     * to a terminal. Invalid UTF-8 is scrubbed first: a stray 0x80-0x9F
+     * byte is itself a C1 control to an 8-bit terminal.
      */
     public static function stripControlCharacters(string $text): string
     {
+        if (preg_match('//u', $text) !== 1) {
+            $text = mb_scrub($text, 'UTF-8');
+        }
+
         return preg_replace('/[\x00-\x08\x0B-\x1F\x7F]|\xC2[\x80-\x9F]/', '', $text) ?? $text;
     }
 }

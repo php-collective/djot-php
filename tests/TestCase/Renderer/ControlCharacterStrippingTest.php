@@ -78,4 +78,14 @@ class ControlCharacterStrippingTest extends TestCase
 
         $this->assertStringNotContainsString('script:', $renderer->render($document));
     }
+
+    #[DataProvider('renderers')]
+    public function testStrayC1BytesInInvalidUtf8AreRemoved(RendererInterface $renderer): void
+    {
+        $output = $renderer->render((new DjotConverter())->parse("A\x9B2JB \x9D0;t\x07 \u{00E9}\u{20AC}"));
+
+        $this->assertStringNotContainsString("\x9B", $output);
+        $this->assertStringNotContainsString("\x9D", $output);
+        $this->assertStringContainsString("\u{00E9}\u{20AC}", $output);
+    }
 }
