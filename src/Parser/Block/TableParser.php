@@ -713,11 +713,13 @@ class TableParser
     /**
      * Trim a cell's content, keeping a space that a backslash escapes (`| C:\\ |`).
      *
+     * Like djot.js, only spaces are trimmed at the end; a trailing tab is cell text.
+     *
      * @param string $content
      */
     public function trimCellContent(string $content): string
     {
-        $trimmed = rtrim($content, " \t");
+        $trimmed = rtrim($content, ' ');
         $backslashes = strlen($trimmed) - strlen(rtrim($trimmed, '\\'));
         if ($backslashes % 2 === 1 && strlen($trimmed) < strlen($content)) {
             $trimmed .= $content[strlen($trimmed)];
