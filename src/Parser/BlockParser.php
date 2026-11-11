@@ -2661,13 +2661,6 @@ class BlockParser
             /** @var string|null $taskMarker */
             $taskMarker = $itemInfo['taskMarker'] ?? null;
             $listItem = new ListItem($taskMarker);
-            // Attributes the previous item left without a target go to this item (djot.js);
-            // a blank line before it drops them.
-            if ($this->pendingAttributes !== [] && !$lastItemHadBlankAfter) {
-                $listItem->setAttributes($this->pendingAttributes);
-            }
-            $this->pendingAttributes = [];
-            $this->pendingAttributeSourceLines = [];
             $bodyItem = $listItem;
             $bodyContentIndent = 0;
             $listItemSourceLine = $this->sourceLineFor($lineMap, $i);
@@ -4627,7 +4620,8 @@ class BlockParser
             return $end - $start;
         }
 
-        // The note consumes attributes before it (djot.js), and its body leaves none behind.
+        // The note body must neither take nor leave attributes of the blocks around it.
+        $pending = [$this->pendingAttributes, $this->pendingAttributeSourceLines];
         $this->pendingAttributes = [];
         $this->pendingAttributeSourceLines = [];
         $footnote = new Footnote(StringUtil::normalizeLabel($matches[1]));
@@ -4638,8 +4632,7 @@ class BlockParser
             );
             $this->parseBlocks($footnote, $contentLines, 0, $map);
         }
-        $this->pendingAttributes = [];
-        $this->pendingAttributeSourceLines = [];
+        [$this->pendingAttributes, $this->pendingAttributeSourceLines] = $pending;
         $this->footnotes[$footnote->getLabel()] = $footnote;
 
         return $end - $start;
