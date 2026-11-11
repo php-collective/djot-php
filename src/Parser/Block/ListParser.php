@@ -110,17 +110,6 @@ class ListParser
             $marker = $matches[1];
             $content = $matches[3] ?? '';
 
-            // Don't treat as list if content ends with same marker (likely emphasis)
-            if ($marker === '*' || $marker === '-') {
-                $trimmed = rtrim($content);
-                if ($trimmed !== '' && substr($trimmed, -1) === $marker) {
-                    $inner = substr($trimmed, 0, -1);
-                    if (trim($inner) !== '' && !str_contains($inner, "\n")) {
-                        return null;
-                    }
-                }
-            }
-
             return $this->withMarkerAttrs([
                 'type' => ListBlock::TYPE_BULLET,
                 'marker' => $marker,
