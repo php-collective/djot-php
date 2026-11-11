@@ -790,6 +790,11 @@ class BlockParser
         } finally {
             $this->nestingDepth--;
         }
+        // Attributes with no block left in a container are dropped, not passed on (jgm/djot.js#175).
+        if ($this->nestingDepth > 0) {
+            $this->pendingAttributes = [];
+            $this->pendingAttributeSourceLines = [];
+        }
     }
 
     /**
