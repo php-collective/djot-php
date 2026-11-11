@@ -1077,7 +1077,10 @@ Below
 
 ### Divs
 
-Fenced divs use `:::` with an optional class name.
+Fenced divs use `:::` with an optional class name. The class is a single word of
+letters, digits, `-` and `_`; a line like `::: warning extra` or `::: *` is not a
+fence and stays paragraph text. For more than one class, put a `{.a .b}`
+attribute line above the fence.
 
 **Input:**
 ```djot

@@ -5026,7 +5026,7 @@ class BlockParser
         }
 
         // Fenced divs (::: but not definition list :)
-        if (preg_match('/^:{3,}/', $line)) {
+        if ($this->fencedBlockParser->parseDivFenceOpener($line) !== null) {
             return true;
         }
 
