@@ -101,6 +101,46 @@ class BlockStructureParityTest extends TestCase
                 ":::\ntext\n\n```\n:::\n```\n:::\n",
                 "<div>\n<p>text</p>\n<pre><code>:::\n</code></pre>\n</div>\n",
             ],
+            'a fence after a heading still hides the closer' => [
+                ":::\n# heading\n```\n:::\n```\n:::\n",
+                "<div>\n<h1 id=\"heading\">heading</h1>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after a thematic break still hides the closer' => [
+                ":::\n---\n```\n:::\n```\n:::\n",
+                "<div>\n<hr>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after a table row still hides the closer' => [
+                ":::\n| t |\n```\n:::\n```\n:::\n",
+                "<div>\n<table>\n<tr>\n<td>t</td>\n</tr>\n</table>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after an attribute line still hides the closer' => [
+                ":::\n{.c}\n```\n:::\n```\n:::\n",
+                "<div>\n<pre class=\"c\"><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after a heading continuation still hides the closer' => [
+                ":::\n# h\nmore\n```\n:::\n```\n:::\n",
+                "<div>\n<h1 id=\"h-more\">h\nmore</h1>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'an unindented fence after a list item still hides the closer' => [
+                ":::\n- i\n```\n:::\n```\n:::\n",
+                "<div>\n<ul>\n<li>\ni\n</li>\n</ul>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after a quote still hides the closer' => [
+                ":::\n> q\n```\n:::\n```\n:::\n",
+                "<div>\n<blockquote>\n<p>q</p>\n</blockquote>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'a fence after an item paragraph past a blank line still hides the closer' => [
+                ":::\n- i\n\n  para\n```\n:::\n```\n:::\n",
+                "<div>\n<ul>\n<li>\n<p>i</p>\n<p>para</p>\n</li>\n</ul>\n<pre><code>:::\n</code></pre>\n</div>\n",
+            ],
+            'escaped closing pipe ends the table' => [
+                "| a |\n| b \\|\n",
+                "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| b |</p>\n",
+            ],
+            'escaped closing pipe on an indented row ends the table' => [
+                "| a |\n | b \\|\n",
+                "<table>\n<tr>\n<td>a</td>\n</tr>\n</table>\n<p>| b |</p>\n",
+            ],
             'line before a sublist past a task box' => [
                 "- [ ] *\n   `x`\n",
                 "<ul class=\"task-list\">\n<li>\n<input disabled=\"\" type=\"checkbox\"/>\n<ul>\n<li>\n</li>\n</ul>\n<code>x</code>\n</li>\n</ul>\n",
